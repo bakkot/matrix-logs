@@ -1,0 +1,2674 @@
+2020-11-01
+[06:53:27.0000] <EveryOS>
+I saw one of the people from  this IRC on Discord, without the Discord server even being related. This is probably the second coolest thing that has happened on 2020
+
+[06:54:27.0000] <EveryOS>
+This server only has 102 people, so what are the odds of seeing one of the people in a random Discord server
+
+[07:13:50.0000] <EveryOS>
+Know what would be even cooler, though? If I coincidentally met Domenic, Annevk, or MikeSmith elsewhere. (Or even intentionally). Those guys are real cool
+
+
+2020-11-02
+[17:08:53.0000] <DerekNonGeneric>
+ 
+
+[17:08:54.0000] <DerekNonGeneric>
+ 
+
+[17:08:55.0000] <DerekNonGeneric>
+ 
+
+[17:08:55.0000] <DerekNonGeneric>
+ 
+
+[21:07:42.0000] <ryzokuken>
+question: is a test without a frontmatter a valid test262 test?
+
+[21:08:06.0000] <ryzokuken>
+should it be treated the same as a test without `includes` `features` etc?
+
+[21:09:03.0000] <ryzokuken>
+I believed that atleast esid was compulsory, but there are tests which don't have any frontmatter, so that assumption isn't quite holding up.
+
+[21:34:51.0000] <Bakkot>
+ryzokuken INTERPRETING.md says test files "may" include metadata, so I guess it's technicially optional
+
+[21:35:00.0000] <Bakkot>
+I'm surprised there's any missing it, though
+
+[22:01:43.0000] <ryzokuken>
+Bakkot: let me find the exact file that's missing it.
+
+[23:05:57.0000] <ryzokuken>
+Bakkot: There are about 48 files in test262/test/language/expressions/dynamic-import/ folder alone that don't have any frontmattter
+
+[23:07:12.0000] <Bakkot>
+ryzokuken are those the FIXTURE files? because those aren't tests
+
+[23:07:28.0000] <ryzokuken>
+Ah
+
+[23:07:31.0000] <ryzokuken>
+wait, yes
+
+[23:07:53.0000] <ryzokuken>
+is there something about it on INTERPRETING.md too?
+
+[23:07:55.0000] <Bakkot>
+https://github.com/tc39/test262/blob/main/INTERPRETING.md#modules
+
+[23:08:00.0000] <ryzokuken>
+yeeeeah
+
+[23:08:03.0000] <Bakkot>
+"Files bearing a name ending in _FIXTURE.js MUST NOT be interpreted as standalone tests; they are intended to be referenced by test files."
+
+[23:08:14.0000] <ryzokuken>
+my bad, I'll read this more carefully.
+
+[23:08:41.0000] <ryzokuken>
+I rushed into things headfast and didn't read this properly 🙈
+
+[23:10:41.0000] <ryzokuken>
+recklessly*
+
+[05:50:32.0000] <jmdyck>
+hm. PR #2085 removed `GetReferencedName ( _V_ )`, but there are still references to it.
+
+[07:13:27.0000] <Bakkot>
+rebase oversight with 2030, I guess
+
+[08:57:21.0000] <jmdyck>
+Bakkot: tx re PR #2220. One other thing I noticed about #2085 was that it un-defined id 'super-reference' (replacing it with 'super-reference-record'). Maybe 'super-reference' should be added as an oldid.
+
+[08:58:33.0000] <jmdyck>
+(It un-defined a few other ids as well, but there isn't a sensible place to make them oldids.)
+
+[08:58:58.0000] <Bakkot>
+sgtm, I'll add a commit to 2220
+
+[09:18:01.0000] <rwaldron->
+devsnek actually, rkirsling is the right person to ask, because I now have the same question. I had written those tests and asked rkirsling to review and sign off, but Fabrice Bellard brought the same question.
+
+[09:19:14.0000] <rwaldron->
+ryzokuken I'm also here to answer any questions re: test262 stuff.
+
+[09:57:55.0000] <ryzokuken>
+rwaldron-: I know you are! And thanks for that. Didn't want to ping you in the middle of the night though :D
+
+[10:00:25.0000] <ryzokuken>
+For now, I'll stop trying to run non-tests and keep the assumption (that all valid tests have a frontmatter), hopefully it won't be a problem.
+
+[10:01:21.0000] <rwaldron->
+Sounds good
+
+[10:03:16.0000] <rwaldron->
+devsnek nevermind my "question" above, I misread the path through the "holes check". I'm making the updates now
+
+[10:22:14.0000] <devsnek>
+rwaldron-: great, thanks!
+
+[11:23:32.0000] <bradleymeck>
+/me stares at `delete new.target;`
+
+[11:23:54.0000] <bradleymeck>
+/me stares at `delete super.toString`;
+
+[11:24:03.0000] <bradleymeck>
+one of these is not like the other
+
+[11:30:21.0000] <rkirsling>
+devsnek: rwaldron-: there's no reason that the HasProperty check should apply to typed arrays
+
+[11:30:59.0000] <rkirsling>
+typed arrays can't have holes, and the methods that actually have complete definitions in the spec don't check HasProperty, e.g. https://tc39.es/ecma262/#sec-%typedarray%.prototype.map
+
+[11:31:03.0000] <rwaldron->
+rkirsling it does in the cases where TypedArray.p.* delegates to Array.p.* and that function has a holes check
+
+[11:31:14.0000] <rkirsling>
+but it's not delegating, right?
+
+[11:31:20.0000] <rkirsling>
+it's just lazy speccing
+
+[11:32:27.0000] <rwaldron->
+I think it's pretty explicit: "%TypedArray%.prototype.some is a distinct function that implements the same algorithm as Array.prototype.some as defined in 22.1.3.26 except that the this value's [[ArrayLength]] internal slot is accessed in place of performing a [[Get]] of "length"."
+
+[11:33:20.0000] <rkirsling>
+hmm, I disagree, since this is the second such problem we've had to deal with due to that omission of proper algorithms
+
+[11:33:47.0000] <rwaldron->
+rkirsling the problem I see is that two implementers are telling you that they interpret the spec the same (independently).
+
+[11:34:56.0000] <rkirsling>
+and the ones that have to worry about web compat are on the opposite side, no?
+
+[11:37:24.0000] <rkirsling>
+SM and V8 disagree but I believe that was the case with the other point of disagreement too
+
+[11:38:28.0000] <rwaldron->
+rkirsling I'm just asking you to make this explicit.
+
+[11:39:28.0000] <ljharb>
+bradleymeck: does `delete super.toString` work?
+
+[11:39:38.0000] <bradleymeck>
+no, early error
+
+[11:39:43.0000] <ljharb>
+kk
+
+[11:39:46.0000] <rkirsling>
+rwaldron-: sorry, make which explicit?
+
+[11:40:12.0000] <rkirsling>
+I agree that those method algorithms need to be filled in explicitly
+
+[11:41:22.0000] <rwaldron->
+I'm just spit balling... In the "lazy spec" description, add something like "Step 5.b is replaced with "Let kPresent be true"
+
+[11:41:36.0000] <rwaldron->
+It would be different for each of them
+
+[11:42:24.0000] <rkirsling>
+right
+
+[11:42:42.0000] <rwaldron->
+or you could add a line in the algorithm's themselves: "if O.[[TypedArrayName]] is present, let kPresent be true"
+
+[11:43:43.0000] <rwaldron->
+algorithm*
+
+[11:43:49.0000] <rkirsling>
+I think we have the intention to write everything out explicitly, it was just believed not to be urgent
+
+[11:44:56.0000] <rkirsling>
+I was off most of last week but I can put it on my radar for this week
+
+[11:45:03.0000] <rwaldron->
+Ok, then the issue I'm faced with is that currently devsnek and Fabrice Bellard believe the tests in Test262 to be wrong, and they are trying to implement these changes. I don't want my response to be "just accept them as is, we'll get around to explicit spec later"
+
+[11:45:58.0000] <rwaldron->
+rkirsling can you comment here: https://github.com/tc39/test262/issues/2879
+
+[11:46:04.0000] <rkirsling>
+sure
+
+[11:46:07.0000] <rwaldron->
+Thank you sir
+
+[11:46:14.0000] <rkirsling>
+I just can't remember where our previous discussion about
+
+[11:46:28.0000] <rwaldron->
+I'm going to undo the changes I have in another PR
+
+[11:46:28.0000] <rkirsling>
+"not only does it not throw, it doesn't even stop iterating" took place
+
+[11:46:38.0000] <rwaldron->
+Right, that's what I was working from
+
+[11:46:51.0000] <rwaldron->
+But devsnek and Fabrice's reading isn't wrong, tbh.
+
+[11:47:10.0000] <rwaldron->
+The problem is that it's underspec'ed and you're going to fix that.
+
+[11:47:12.0000] <rwaldron->
+Right?
+
+[11:47:24.0000] <rkirsling>
+yeah I agree with that statement
+
+[11:48:10.0000] <rwaldron->
+Cool, glad to see this getting ironed out. I appreciate your time/energy
+
+[11:48:55.0000] <rkirsling>
+likewise 🙇‍♂️
+
+[11:50:11.0000] <devsnek>
+rkirsling: it seems more correct to me to stop the loop
+
+[11:50:23.0000] <devsnek>
+cuz the length is zero and it doesn't have any of those properties
+
+[11:51:04.0000] <rkirsling>
+the issue is that none of the explicit algorithms do that
+
+[11:51:44.0000] <rkirsling>
+(like map and filter)
+
+[12:19:42.0000] <rkirsling>
+spec text doesn't have a boolean NOT, right?
+
+[12:20:10.0000] <rkirsling>
+i.e. "perform this predicate AO and return the opposite"
+
+[12:24:39.0000] <bradleymeck>
+is there a grammar production used both as a reference/value and for string value?
+
+[12:29:42.0000] <shu>
+rkirsling: nope, you usually end up writing two steps
+
+[12:29:52.0000] <rkirsling>
+I guess there's `; else return`
+
+[12:30:36.0000] <shu>
+yeah
+
+
+2020-11-03
+[16:22:03.0000] <rkirsling>
+phew https://github.com/tc39/ecma262/pull/2221
+
+[16:46:19.0000] <rwaldron->
+damn rkirsling
+
+[16:46:21.0000] <rwaldron->
+Nice work
+
+[16:50:50.0000] <rkirsling>
+thanks :D
+
+[05:22:56.0000] <annevk>
+rkirsling: thanks so much for cleaning up buffers and views!
+
+[10:00:49.0000] <shu>
+rkirsling: beautiful work, and you have also uncovered more ripple effects :)
+
+[11:55:35.0000] <rkirsling>
+annevk: my pleasure!
+
+[11:56:08.0000] <rkirsling>
+shu: oh geez, and it's the ones that I'm just doing for sake of completion, huh
+
+[12:17:05.0000] <shu>
+rkirsling: i guess maximal consistency would be for indexOf and friends to treat as if it were an array of [[ArrayLength]] full of undefineds
+
+[12:17:28.0000] <shu>
+it feels weirder than the "continue iteration" case for the iteration built-ins, and i'm not sure why since it's the same mechanic
+
+[12:19:22.0000] <rkirsling>
+just looking through the interesting cases now but what's interesting is that like
+
+[12:19:51.0000] <rkirsling>
+right off the bat, `includes` was basically as-is, in that it didn't have any HasProperty checks to eliminate
+
+[12:21:59.0000] <rkirsling>
+I mean this is clearly important to address since everyone's doing it differently
+
+[12:22:31.0000] <shu>
+SM is pretty consistent
+
+[12:22:49.0000] <shu>
+(except for `join`, which i think SM should fix)
+
+[12:23:13.0000] <rkirsling>
+yeah, SM is
+
+[12:23:23.0000] <rkirsling>
+thanks to anba, I imagine? haha
+
+[12:24:53.0000] <shu>
+what's your take on what indexOf and includes ought to do?
+
+[12:26:57.0000] <rkirsling>
+so it's not that I necessarily *like* the behavior
+
+[12:27:35.0000] <rkirsling>
+but given that I was only aiming to clarify and not actually modify, SM is doing the correct thing
+
+[12:29:26.0000] <rkirsling>
+and like
+
+[12:30:11.0000] <rkirsling>
+having arg `undefined` match get-after-detach `undefined` isn't unthinkable
+
+[12:30:43.0000] <shu>
+so it gets a little weirder since the current underspecified behavior talks about aligning with Arrays
+
+[12:31:47.0000] <shu>
+oh no, wait, i think i'm mistaken
+
+[12:32:55.0000] <shu>
+so, *because* of the HasProperty check in Array#indexOf, this returns -1:
+
+[12:33:08.0000] <shu>
+let a = [1,2,3,4];
+
+[12:33:08.0000] <shu>
+print(a.indexOf(undefined, { valueOf() { a.length = 0; return 0; } }));
+
+[12:34:01.0000] <rkirsling>
+ahhh that is an interesting example
+
+[12:34:11.0000] <shu>
+so since the current prose says, behave like Arrays, mutadis mutandis
+
+[12:34:24.0000] <rkirsling>
+I'd only thought of holes but `length = 0` is very similar to detachment
+
+[12:34:35.0000] <rkirsling>
+right so
+
+[12:35:06.0000] <rkirsling>
+it doesn't help with `includes` or `join` but
+
+[12:35:25.0000] <shu>
+yeah includes actually returns `true` for the a.length = 0 analogue for Arrays too
+
+[12:35:41.0000] <shu>
+(and engines do agree)
+
+[12:35:47.0000] <rkirsling>
+sweet
+
+[12:35:48.0000] <rkirsling>
+we *could* leave the HasProperty for indexOf
+
+[12:36:04.0000] <shu>
+that's an interesting middle path yes
+
+[12:36:12.0000] <rkirsling>
+I only removed it because I believed it to have no impact on observable behavior
+
+[12:36:31.0000] <rkirsling>
+it's really the callback-taking methods that I'm worried about so all of these are like bonus content 😂
+
+[12:36:59.0000] <shu>
+haha yeah
+
+[12:37:17.0000] <rkirsling>
+I believe that assumption is true for `reverse` though?
+
+[12:37:51.0000] <rkirsling>
+because Set will early out
+
+[12:37:55.0000] <shu>
+i think so, yes
+
+[12:38:45.0000] <shu>
+we should quickly discuss this in committee
+
+[12:39:20.0000] <rkirsling>
+yeah
+
+[12:39:40.0000] <rkirsling>
+I'm really happy you thought of the `array.length = 0` example
+
+[12:40:00.0000] <rkirsling>
+I think we should align with that, and I'll reinstate HasProperty for indexOf/lastIndexOf
+
+[12:40:05.0000] <shu>
+thanks, that's one axis to align on
+
+[12:40:22.0000] <shu>
+another one is double down on the "well, the length is cached and there aren't HasProperty checks"
+
+[12:40:34.0000] <shu>
+given the existing spec prose i lean towards the first being the intention
+
+[12:42:29.0000] <rkirsling>
+yeah. they're both fair game but the first feels smoother to argue for
+
+[12:44:03.0000] <shu>
+either one works, i'm optimistic whatever we choose will be web compatible
+
+[12:45:21.0000] <rkirsling>
+indeed
+
+[12:55:36.0000] <rkirsling>
+https://github.com/tc39/ecma262/pull/2210 is the other one that needs to be added to the agenda, right?
+
+[13:10:18.0000] <rkirsling>
+^ shu Bakkot
+
+[13:10:54.0000] <Bakkot>
+yes
+
+[13:15:42.0000] <rkirsling>
+how do we typically indicate "on behalf of"
+
+[13:19:59.0000] <shu>
+also yes
+
+[13:20:11.0000] <shu>
+rkirsling: that phrase works?
+
+[13:20:19.0000] <shu>
+i've just said "for"
+
+[13:20:23.0000] <rkirsling>
+ah true
+
+[13:21:26.0000] <rkirsling>
+shu: you okay with presenting 2221?
+
+[13:21:40.0000] <shu>
+if you want to confuse people you can say "original author in absentia"
+
+[13:22:05.0000] <rkirsling>
+hahaha
+
+[13:22:05.0000] <shu>
+rkirsling: sure, you don't want to?
+
+[13:22:16.0000] <rkirsling>
+I do but I don't think I'll be present
+
+[13:22:29.0000] <shu>
+i would _like_ to be in absentia truth be told
+
+[13:22:32.0000] <rkirsling>
+yeah
+
+[13:22:41.0000] <shu>
+but yeah sure put my name down
+
+[13:22:58.0000] <rkirsling>
+I just put a comma for now
+
+[13:23:00.0000] <rkirsling>
+https://github.com/tc39/agendas/blob/master/2020/11.md#agenda-items
+
+[13:23:16.0000] <rkirsling>
+in case I were to end up attending just enough to present for myself
+
+[13:23:48.0000] <shu>
+cool
+
+[14:08:42.0000] <rkirsling>
+oh yeah I forgot about how DST would affect this meeting
+
+[14:08:52.0000] <rkirsling>
+so it starts at midnight PST?
+
+[14:38:40.0000] <Bakkot>
+yeah, I think so
+
+[14:38:52.0000] <Bakkot>
+https://everytimezone.com/?t=5fb1c100,1e0
+
+[14:41:09.0000] <drousso>
+1am i think
+
+[14:41:14.0000] <drousso>
+since daylight savings time just ended
+
+[14:41:44.0000] <drousso>
+also that website is 🤩
+
+[14:42:51.0000] <Bakkot>
+... midnight, since DST just ended, right?
+
+[14:43:29.0000] <Bakkot>
+west coast is now on Pacific Standard Time, which is UTC-8; meeting starts at 10AM in UTC+2; 10 - (2 - -8) = 0 i.e. midnight
+
+[14:43:57.0000] <drousso>
+http://www.timebie.com/std/centraleuropeansummer.php?q=10
+
+[14:44:20.0000] <drousso>
+oh hmmm
+
+[14:44:27.0000] <drousso>
+it's no longer CEST tho, so i dunno
+
+[14:45:09.0000] <Bakkot>
+sigh
+
+[14:45:21.0000] <Bakkot>
+yeah, agenda says CEST, but budapest is not on CEST
+
+[14:45:23.0000] <drousso>
+timezones are confusing
+
+[14:45:28.0000] <rkirsling>
+oh it is 1am
+
+[14:45:32.0000] <drousso>
+it's either 12am or 1am
+
+[14:45:38.0000] <rkirsling>
+I didn't realize the S was for Summer and not for Standard
+
+[14:45:49.0000] <rkirsling>
+that's very confusing
+
+[14:46:04.0000] <Bakkot>
+it says UTC +2, which is unambiguously 10 hours ahead of west coast, currently
+
+[14:46:13.0000] <Bakkot>
+however, it's also an hour ahead of budapest, currently
+
+[14:46:38.0000] <rkirsling>
+that one hour would be so helpful
+
+[14:46:41.0000] <rkirsling>
+oh well
+
+[14:46:55.0000] <Bakkot>
+I mean I don't think this is resolved
+
+[14:47:02.0000] <Bakkot>
+it's not like we are actually in budapest
+
+[14:47:18.0000] <Bakkot>
+we gotta get the chairs or host to make an unambiguous ruling
+
+[14:48:13.0000] <drousso>
+(partially joking) use the unix timestamp for meeting start times from now on
+
+[14:48:25.0000] <drousso>
+we should*
+
+[14:48:32.0000] <Bakkot>
+cc akirose robpalme - the agenda is confusing, when does the meeting start?
+
+[14:52:08.0000] <shu>
+i wonder if i can train a gpt model to ask questions in my stead
+
+[14:52:21.0000] <rkirsling>
+lol
+
+
+2020-11-04
+[09:21:32.0000] <robpalme>
+@bakkot The materials have been updated to reflect Hungary local time. (UTC+1)  Apologies for the confusion.
+
+[09:24:05.0000] <ljharb>
+robpalme: i updated the proposal deadline too, can you confirm it's correct? (an hour earlier)
+
+[09:27:30.0000] <robpalme>
+an hour later ;-)
+
+[09:27:36.0000] <ljharb>
+aha, thanks. timezones ¯\_(ツ)_/¯
+
+[09:27:52.0000] <ljharb>
+fixed and landed
+
+
+2020-11-06
+[11:28:11.0000] <bradleymeck>
+why don't we allow `export default const foo = ...`?
+
+[11:28:39.0000] <bradleymeck>
+making a local name and the "default" export at the same time
+
+[11:29:14.0000] <bradleymeck>
+i can see string forms being pretty rare and not needing convenience but i feel like default is pretty common
+
+[11:31:33.0000] <ljharb>
+i don't believe `export default` is a live binding - so if you did `export default let foo = 3; foo = 4;`, it would still export 3
+
+[11:31:52.0000] <ljharb>
+and i also don't believe we ban let anywhere we allow const
+
+[12:16:40.0000] <bradleymeck>
+export default is live but to a non-reference-able "thing"
+
+[12:18:01.0000] <bradleymeck>
+import(`data:text/javascript,export default class X {}; X = 2; console.log(X)`)
+
+[12:18:12.0000] <bradleymeck>
+we allow this in class/function
+
+[12:18:17.0000] <bradleymeck>
+but not const/let/var?
+
+[12:21:25.0000] <bradleymeck>
+i think it would be bad to allow multiple bound names to follow it, is that why? `export VariableStatement` allows `export var x, y;` but that wouldn't make sense for `export default var x, y`
+
+[12:34:17.0000] <ljharb>
+that also sounds bad
+
+[12:34:36.0000] <ljharb>
+i think `export default class X { }` is less of a problem because people are highly unlikely to even attempt to reassign X
+
+[12:40:42.0000] <bradleymeck>
+i mean, i'd be fine if it only allowed const in that position
+
+[12:41:25.0000] <bradleymeck>
+but reading code after my wife pointed out the pattern of `class X {}; export default X` is super common got me pondering
+
+[12:41:26.0000] <ljharb>
+that seems technically workable but unlikely to be widely palatable
+
+[12:41:51.0000] <bradleymeck>
+the issue appears to be since var/let/const don't work in those positions it just led to that pattern from short talks
+
+[12:42:15.0000] <bradleymeck>
+so i think it is a real thing, people are actively avoiding something due to lack of support of another thing
+
+[12:42:36.0000] <bradleymeck>
+also, they didn't use `export {X as default}` which was interesting
+
+[12:42:48.0000] <bradleymeck>
+no opinion on that bit
+
+[12:43:13.0000] <ljharb>
+imo `as default` is a wart that exists for consistency
+
+[12:43:51.0000] <bradleymeck>
+X as "default"
+
+[12:43:56.0000] <bradleymeck>
+fixed it for ya
+
+[12:43:59.0000] <ljharb>
+lol
+
+[12:44:26.0000] <bradleymeck>
+i don't really come to judge usage, i'm just trying to make the coding less boilerplate / unintended effects
+
+[12:44:56.0000] <bradleymeck>
+so, adding `export default VariableStatement` seemed prudent to consider given people are avoiding other things in that position because it doesn't exist
+
+[12:46:35.0000] <ljharb>
+tbh that trend does surprise me
+
+[12:47:05.0000] <ljharb>
+i wouldn't expect people to often try to export-default a variable while creating it
+
+[12:47:21.0000] <ljharb>
+(given a lot of folks put exports at the end of the file, like returns at the end of functions)
+
+[12:48:15.0000] <bradleymeck>
+enough to cause a medium sized corp to avoid stuff
+
+[12:51:27.0000] <bradleymeck>
+i'm more curious as to why it would be bad to add since we have strange corollary only for FunctionDeclaration and ClassDeclaration
+
+[12:52:18.0000] <Bakkot>
+bradleymeck you would normally `export default 42` or whatever; creating two bindings at once is weird
+
+[12:52:38.0000] <bradleymeck>
+Bakkot: yet we already do for `export default Class X {}`
+
+[12:52:48.0000] <Bakkot>
+the fact that `export default function f(){}` also creates a local `f` is IMO a mistake
+
+[12:52:57.0000] <bradleymeck>
+we ain't gonna fix it
+
+[12:53:07.0000] <Bakkot>
+no but we don't need to use it as precedent
+
+[12:53:14.0000] <bradleymeck>
+lean into it to make things less confusing to people
+
+[12:53:25.0000] <bradleymeck>
+what about it is a mistake i guess is the question
+
+[12:53:59.0000] <Bakkot>
+it does too many things, basically
+
+[12:55:23.0000] <bradleymeck>
+Bakkot: `export default` <- makes a default export, `class X {}` makes a class `X`?
+
+[12:55:30.0000] <bradleymeck>
+at top level classes always make a local
+
+[12:56:03.0000] <Bakkot>
+the question is whether it is at the top level
+
+[12:56:18.0000] <Bakkot>
+this feels to me more like `return class X{}`, which does not declare a local binding
+
+[12:56:44.0000] <Bakkot>
+(it feels that way because you can `export default 0`, etc)
+
+[12:57:04.0000] <bradleymeck>
+but i can have `0;` as a whole program too
+
+[12:57:09.0000] <Bakkot>
+sure
+
+[12:57:17.0000] <Bakkot>
+can't have `class {}` as a program though!
+
+[12:57:25.0000] <Bakkot>
+but can both `return` and `export default` a `class {}`
+
+[12:57:41.0000] <bradleymeck>
+fair, but class {} doesn't make a local
+
+[12:57:46.0000] <Bakkot>
+anyway, point is that you _wouldn't_ have a `0` as a whole program
+
+[12:57:49.0000] <Bakkot>
+that would be a weird thing to doo
+
+[12:57:51.0000] <Bakkot>
+*do
+
+[12:58:12.0000] <bradleymeck>
+apparently exporting a value is weird to an entire company
+
+[12:58:37.0000] <Bakkot>
+both `return` and `export default` feel like operations which take a value, basically
+
+[12:58:39.0000] <bradleymeck>
+i dont find this kind of judgement too beneficial personally as the mental model doesn't seem clear
+
+[12:59:20.0000] <bradleymeck>
+Bakkot: and you wouldn't consider a variable a value?
+
+[12:59:28.0000] <bradleymeck>
+does `export` take an operand?
+
+[12:59:31.0000] <bradleymeck>
+no default
+
+[12:59:43.0000] <Bakkot>
+I would not consider a variable _declaration_ to be a value, no. it's a declaration.
+
+[13:00:09.0000] <Bakkot>
+`export` takes a declaration
+
+[13:00:28.0000] <bradleymeck>
+`export default`, is `default` the declaration then?
+
+[13:00:40.0000] <Bakkot>
+there isn't really a declaration involved?
+
+[13:00:44.0000] <Bakkot>
+no more than there is in `return`
+
+[13:00:44.0000] <ljharb>
+bradleymeck: to be fair, a medium-sized company usually takes its style choices from a very small number of passionate engineers
+
+[13:01:00.0000] <bradleymeck>
+ljharb: they are using a public lint rule and it isn't complaining
+
+[13:01:13.0000] <bradleymeck>
+i think the point is something is lacking due to the inconsistency
+
+[13:01:21.0000] <ljharb>
+bradleymeck: sure, lint rules are only built when people feel the need to force a style
+
+[13:01:25.0000] <bradleymeck>
+and the statement that the inconsistency is a mistake isn't useful without proving why
+
+[13:01:34.0000] <ljharb>
+sure
+
+[13:01:54.0000] <bradleymeck>
+statements of it takes a value vs a declaration are interesting because `export default` takes both
+
+[13:02:09.0000] <Bakkot>
+it shouldn't, is my point
+
+[13:02:14.0000] <ljharb>
+^ i agree with that
+
+[13:02:17.0000] <ljharb>
+it's weird that it takes both
+
+[13:02:23.0000] <bradleymeck>
+Bakkot: regardless of what you want, it does
+
+[13:02:31.0000] <bradleymeck>
+and it only takes *some* declarations
+
+[13:02:38.0000] <ljharb>
+and that because of the way the live bindings works in consumers, it conceptually only takes a value. that function/class produce a binding is weird and surprising
+
+[13:02:40.0000] <bradleymeck>
+which is what brought this up enough for my wife to rope me in
+
+[13:02:47.0000] <ljharb>
+the only 2 declarations it takes *appear* like they're expressions
+
+[13:02:57.0000] <bradleymeck>
+ljharb: that is not true to their conversation
+
+[13:03:14.0000] <Bakkot>
+bradleymeck the fact that it does is a weird quirk of the language which no one should ever have to think about, except when they have to figure out why they can't redeclare a name which good style would dictate they not redeclare anyway
+
+[13:03:23.0000] <ljharb>
+i know it's not actually the case, because it makes the bindings, but it would look identical if they were treated as expressions instead of declarations
+
+[13:03:27.0000] <bradleymeck>
+Bakkot: they did think about it on a call today?
+
+[13:03:40.0000] <bradleymeck>
+Bakkot: so they did think about it, and didn't think it was a quick but a missing feature?
+
+[13:03:56.0000] <bradleymeck>
+hence me coming up
+
+[13:04:02.0000] <ljharb>
+to be clear, that nonzero people are asking about this makes it worth discussing, but it doesn't invalidate a general sentiment that very few people will likely run into it
+
+[13:04:07.0000] <Bakkot>
+bradleymeck right, I'm not saying people _don't_ think about it
+
+[13:04:13.0000] <Bakkot>
+but I think that's a failure of pedagogy
+
+[13:04:28.0000] <bradleymeck>
+Bakkot: so they are incorrect in how they chose to see consistency?
+
+[13:04:29.0000] <Bakkot>
+just like how people think about how `[] == ''` sometimes
+
+[13:04:50.0000] <Bakkot>
+bradleymeck uhhhh I don't think that's a thing people can be correct about?
+
+[13:04:59.0000] <bradleymeck>
+Bakkot: i think you are dismissing without consideration the fact that there is a potential to reduce overall inconsistency
+
+[13:05:16.0000] <bradleymeck>
+reducing overall inconsistency wouldn't harm us
+
+[13:05:17.0000] <Bakkot>
+I would not regard it as a reduction in inconsistency, is my point
+
+[13:05:27.0000] <bradleymeck>
+Bakkot: then would it be an increase?
+
+[13:05:37.0000] <bradleymeck>
+if it is neither, why is it undesirable
+
+[13:05:56.0000] <Bakkot>
+it would be an increase in inconstancy to my mental model, while being a decrease in theirs
+
+[13:06:14.0000] <bradleymeck>
+Bakkot: does your mental model not seek to align with spec?
+
+[13:06:30.0000] <Bakkot>
+uhhhh not really?
+
+[13:06:38.0000] <bradleymeck>
+and if your mental model never uses declarations would it ever surface in code?
+
+[13:06:54.0000] <Bakkot>
+there are parts of the language I avoid using and hope to avoid ever reading code which uses
+
+[13:07:20.0000] <Bakkot>
+and this allows a simpler mental model for every day life
+
+[13:07:21.0000] <bradleymeck>
+so you would seek to avoid ever moving towards advancing those parts of the language?
+
+[13:07:42.0000] <bradleymeck>
+if you don't use the feature i don't think this would affect everyday life
+
+[13:07:44.0000] <Bakkot>
+uh, yeah, pretty much; I am opposed, e.g., to adding any affordances to `with`, ever
+
+[13:08:23.0000] <bradleymeck>
+Bakkot: that is avoiding affordances to support `with` not about ever doing something with `with`
+
+[13:08:24.0000] <Bakkot>
+if other people use it, it affects everyday life; more time spent reading than writing code, as we always say
+
+[13:08:36.0000] <bradleymeck>
+Bakkot: then this applies to *all* features
+
+[13:08:44.0000] <bradleymeck>
+if they do not fit your mental model, they should not advance?
+
+[13:08:44.0000] <Bakkot>
+um
+
+[13:09:35.0000] <Bakkot>
+if something does not fit my mental model and I don't think that the mental model it suggests is superior to the mental model I have, and the only reason to add it is because it increases the consistency of someone else's mental model, then yes I am going to be opposed to adding it
+
+[13:09:53.0000] <Bakkot>
+not, like, dead against, if I am persuaded that my way of thinking is unusual
+
+[13:10:03.0000] <Bakkot>
+just that I would need to be convinced of it
+
+[13:10:21.0000] <Bakkot>
+or there would need to be some reason to add it other than consistency with some mental model
+
+[13:11:02.0000] <bradleymeck>
+it also makes you have to write less code `let X; export X` -> `export let X;` avoids potential refactoring of 2 locations, and means that `export default` operates on all hoistables
+
+[13:11:09.0000] <bradleymeck>
+none of those are mental model
+
+[13:11:46.0000] <Bakkot>
+"operates on all hoistables" is
+
+[13:11:56.0000] <bradleymeck>
+it currently operates on 2 out of 5
+
+[13:12:03.0000] <bradleymeck>
+that is not a mental model thing
+
+[13:12:34.0000] <Bakkot>
+again, I think that fact is a weird quirk of the language programmers should not need to have in their mental model
+
+[13:12:42.0000] <Bakkot>
+it is absolutely a mental model thing
+
+[13:13:01.0000] <bradleymeck>
+it is not, it came up today in a call from a random person about why it works this way
+
+[13:13:08.0000] <bradleymeck>
+why the implementation *acts* a way
+
+[13:13:37.0000] <bradleymeck>
+saying it operates on 0 out of 5 hoistables isn't true and is thought about
+
+[13:13:44.0000] <bradleymeck>
+wanting it to be true won't make it true
+
+[13:13:52.0000] <bradleymeck>
+observable behavior isn't mental modelling
+
+[13:14:33.0000] <Bakkot>
+I also want it to be true that variable names are purely programmer-level and not observable by any code, but that's false too; nevertheless I would encourage programmers to think of it as if they were
+
+[13:14:56.0000] <bradleymeck>
+do you consider this to expose variable names outside of the programmer-level?
+
+[13:15:06.0000] <Bakkot>
+no it's just an analogy
+
+[13:15:34.0000] <bradleymeck>
+i don't see the direct argument against this feature then, except that you object to a different feature
+
+[13:15:44.0000] <Bakkot>
+let me draw it out then
+
+[13:16:25.0000] <bradleymeck>
+i mean, i've said in the past, i can use mental models to claim just about anything if I have time, and that can block anything so my bar is very high for a claim about mental models
+
+[13:16:31.0000] <bradleymeck>
+and it seems to be the inverse here
+
+[13:17:58.0000] <Bakkot>
+there are a number things which are false by a strict reading of the specification, for which I think programmers should, most of the time, act and reason about their programs as if those things were true. "variable names are purely programmer-level" is such a thing. so is, _to me_, "`export default` takes values and also several declaration forms, two of which exist nowhere else in the language"
+
+[13:18:17.0000] <Bakkot>
+I don't think we can ever get away from talking about mental models; they're one of the most important things in language design
+
+[13:18:39.0000] <Bakkot>
+I'm not saying I am blocking or whatever, just explaining why I personally dislike this proposal
+
+[13:18:46.0000] <bradleymeck>
+i think they are abused as a front to avoid discussing reality and it causes programmers to fall into surprises
+
+[13:19:22.0000] <bradleymeck>
+so i feel incredibly strongly that a mental model claim needs harsh scrutiny because i can pull it out just about anything if i wanted to imagine JS was a nicer language than it is
+
+[13:19:34.0000] <bradleymeck>
+but we need to scrutinize the actual language and not just what we desire it to be
+
+[13:20:02.0000] <bradleymeck>
+so, apologies on the interrogation but to me, it is extremely important
+
+[13:20:13.0000] <Bakkot>
+mm. I basically just disagree I guess.
+
+[13:20:21.0000] <Bakkot>
+I don't think that's likely to be reconcilable.
+
+[13:20:24.0000] <bradleymeck>
+the central theme is that we should never re-introduce a form that takes both declarations and values i think
+
+[13:20:41.0000] <bradleymeck>
+at least from what I am understanding?
+
+[13:21:10.0000] <Bakkot>
+I think it would be good to avoid such a thing in the future, yeah, though I don't know if I'd call it a central theme
+
+[13:21:21.0000] <bradleymeck>
+for me i have no qualms about never introducing a new form like that, but i do think addressing existing forms seems prudent
+
+[13:21:57.0000] <bradleymeck>
+if there is a claim we shouldn't fix edge cases because we don't want similar features in the future, that seems a hard discussion
+
+[13:22:04.0000] <ljharb>
+i would also like to avoid such a thing in the future
+
+[13:22:17.0000] <Bakkot>
+the disagreement is about whether this is "fixing" an edge case or making it worse
+
+[13:22:22.0000] <Bakkot>
+I think it would make it worse
+
+[13:22:25.0000] <bradleymeck>
+ljharb: i have no objections to putting an invariant down and marking this as an existing exception
+
+[13:22:45.0000] <bradleymeck>
+Bakkot: the edge case exists regardless and ignoring it won't make it go away
+
+[13:23:00.0000] <bradleymeck>
+it is in use so like you said it affects your everyday life already
+
+[13:23:51.0000] <bradleymeck>
+to me, `export` forms just decorate and not operate so i guess that is different
+
+[13:24:42.0000] <ljharb>
+to me they operate on the module
+
+[13:24:53.0000] <ljharb>
+iow they're not a trait of the thing being exported, but of the module itself
+
+[13:25:18.0000] <ljharb>
+(this specific point came up during the "@dec export" vs "export @dec" discussions)
+
+[13:25:23.0000] <bradleymeck>
+i guess that would still be compatible with my view
+
+[13:25:50.0000] <bradleymeck>
+bindings and modules are intertwined
+
+
+2020-11-08
+[18:13:27.0000] <jackworks>
+FYI repo for the extension proposal in the next meeting is available now
+
+[07:13:02.0000] <croraf>
+Hi, is this a good place to discuss something suspicious in the ES spec?
+
+[07:13:46.0000] <croraf>
+(both FF and Chrome seems not to be conforming to something I'm checking in it right now)
+
+[07:42:52.0000] <ljharb>
+croraf: sure
+
+[07:43:30.0000] <croraf>
+Cool. OK, I'm checking https://tc39.es/ecma262/#sec-typedarray for a specific case:
+
+[07:44:04.0000] <croraf>
+const z = {}; z.length = 5;  new Int8Array(z);
+
+[07:45:58.0000] <croraf>
+This reaches 6.iv.4 where it assumes it is an array-like object. First of all this note is kind of suspicious and strange.
+
+[07:48:37.0000] <croraf>
+What would it mean to assume something here, when it is not necessarily true. The assumption is kind of irrelevant.
+
+[07:49:28.0000] <croraf>
+But, OK, this is not my main issue. 6.iv.4.b is entered, that is https://tc39.es/ecma262/#sec-initializetypedarrayfromarraylike with the second argument of my "z" object.
+
+[07:49:34.0000] <devsnek>
+did anyone consider for the anonymous name change that `class extends class X {}` went from having an inherited X name to having an empty name
+
+[07:51:46.0000] <croraf>
+Now my main issue here is, that it seems that O['0'] till O['4'] should be set to "undefined" in the bullet 5 loop of https://tc39.es/ecma262/#sec-initializetypedarrayfromarraylike
+
+[07:54:25.0000] <croraf>
+Hmmm, I guess https://tc39.es/ecma262/#sec-integer-indexed-exotic-objects-set-p-v-receiver is used as a [[Set]]
+
+[07:54:40.0000] <devsnek>
+I'm not sure what your question is
+
+[07:55:58.0000] <devsnek>
+but by the way that note is not saying that it knows the object is array-like, it's saying from that point forward the algorithm will treat the object as though it is an array like object
+
+[07:56:56.0000] <croraf>
+devsnek, but that Note is not an assert.
+
+[07:57:22.0000] <devsnek>
+right, because it is not known that the object is array like
+
+[07:57:35.0000] <croraf>
+And I don't think that is true.
+
+[07:57:49.0000] <devsnek>
+it doesn't matter if the object is array-like or not
+
+[07:57:56.0000] <croraf>
+Then why the note?
+
+[07:58:00.0000] <devsnek>
+the point is that the algorithm will try treat it as though it js
+
+[07:58:04.0000] <devsnek>
+it is*
+
+[07:58:45.0000] <croraf>
+This seems meaningless: "The algorithm will treat something as X, even though something might not be X"
+
+[07:58:59.0000] <devsnek>
+it's just helping explain the logic of the constructor
+
+[07:59:17.0000] <devsnek>
+it checks for typed arrays, then iterables, and if those checks fail it falls back to array-like
+
+[08:00:23.0000] <croraf>
+Very strange, but OK.
+
+[08:01:41.0000] <devsnek>
+what are you trying to do with your object
+
+[08:02:05.0000] <devsnek>
+if you just want a typed array of some length you can do new WhateverArray(length)
+
+[08:03:03.0000] <croraf>
+No, I'm checking a potential edge case bug in the spec
+
+[08:03:41.0000] <croraf>
+If you can check my thought process for my code example: const z = {}; z.length = 5;  new Int8Array(z);
+
+[08:03:58.0000] <croraf>
+6.iv.4.b is entered, right?
+
+[08:05:27.0000] <croraf>
+*6.b.iv.4.b
+
+[08:06:15.0000] <croraf>
+"O" is the thing constructed in 6.b.i, and "firstArgument" iz my object "z".
+
+[08:06:58.0000] <croraf>
+With this we end up in https://tc39.es/ecma262/#sec-initializetypedarrayfromarraylike
+
+[08:08:35.0000] <devsnek>
+yes
+
+[08:11:19.0000] <croraf>
+bullet 2. there is 5, and the loop at 5. is entered.
+
+[08:11:31.0000] <devsnek>
+yes
+
+[08:12:25.0000] <croraf>
+In each iteration kValue is extracted there from my object "z", which is always undefined
+
+[08:12:32.0000] <devsnek>
+yes
+
+[08:13:11.0000] <croraf>
+And a set of this "undefined" is done on O at keys "0", "1", "2", "3" and "4"
+
+[08:13:39.0000] <devsnek>
+yes
+
+[08:14:17.0000] <croraf>
+Now here I made a wrong assumption first that O is an ordinary object, but I guess its [[Set]] is defined by https://tc39.es/ecma262/#sec-integerindexedobjectcreate
+
+[08:14:58.0000] <devsnek>
+that sounds right
+
+[08:15:02.0000] <croraf>
+through https://tc39.es/ecma262/#sec-typedarray 6.b.i and https://tc39.es/ecma262/#sec-allocatetypedarray 2.
+
+[08:16:19.0000] <croraf>
+That is, the [[Set]] in https://tc39.es/ecma262/#sec-integer-indexed-exotic-objects-set-p-v-receiver has to be applied with key "0" and value "undefined"
+
+[08:16:58.0000] <croraf>
+The key has been stringified in https://tc39.es/ecma262/#sec-initializetypedarrayfromarraylike 5.a
+
+[08:17:09.0000] <croraf>
+The value is Undefined
+
+[08:17:12.0000] <devsnek>
+yes
+
+[08:17:57.0000] <devsnek>
+you could probably go on engine262.js.org and set a breakpoint in the debugger and step through this
+
+[08:19:56.0000] <croraf>
+OK, ill try. Ok, so in https://tc39.es/ecma262/#sec-integer-indexed-exotic-objects-set-p-v-receiver 2.a give "numericIndex" as an integer 0 I guess. And https://tc39.es/ecma262/#sec-integerindexedelementset with O, 0 and undefined is called.
+
+[08:20:31.0000] <croraf>
+Now here it might be a bug, that I saw.
+
+[08:25:08.0000] <croraf>
+In 3. of https://tc39.es/ecma262/#sec-integerindexedelementset "numValue" is set to NaN and now I have to go in debugger :D
+
+[08:26:43.0000] <croraf>
+I don't know how to use https://engine262.js.org/#code=MYewdgzgLgBAXjAvDA3gXwNzwHQBsCmYA5lABZIwCsWMY%2BA7jAJJhQAcAggE5cCGAngAo4ASgxA%3D&mode=script&features= as a debugger
+
+[08:29:45.0000] <croraf>
+Where is https://tc39.es/ecma262/#sec-integerindexedelementset in this engine262
+
+[08:32:10.0000] <croraf>
+OK, found it.
+
+[08:41:46.0000] <croraf>
+OK, I see. NaN is converted to 0 and that's it.
+
+[09:22:41.0000] <croraf>
+This engine262.js.org doesnt output the result of the script, this is an error in it?
+
+[10:45:39.0000] <leobalter>
+I love the rubberducking here. I nerd about the typedarray specs and I really enjoying following the chat
+
+[11:12:17.0000] <croraf>
+What is really funny is that the spec defines basically every object to be array-like
+
+[11:13:27.0000] <croraf>
+This must return an integer and not throw to be array-like: Return ℝ(? ToLength(? Get(obj, "length"))) https://tc39.es/ecma262/#sec-lengthofarraylike
+
+[11:13:55.0000] <croraf>
+And if the object doesnt have the length property defined, ToLength(undefined) is 0, and all is good.
+
+[11:15:49.0000] <croraf>
+Only some really weird edge-case objects might be non-array-like.
+
+[13:05:31.0000] <ljharb>
+croraf: yes, that's generally true
+
+[13:55:38.0000] <Bakkot>
+croraf "X is assumed to be array-like" doesn't mean "X is definitely array-like", it means "the following steps are designed so that the thing they do makes sense when X is an array-like, and not necessarily otherwise"
+
+[13:56:40.0000] <Bakkot>
+"makes sense" is obviously not an objective concept in general, but it's just a note for humans who probably have some idea of what it means in the context of any particular algorithm
+
+[14:12:03.0000] <croraf>
+It would be better if the spec immediately threw an error if it is not array like, and have a clean case
+
+[14:12:05.0000] <croraf>
+Bakkot,
+
+[14:13:00.0000] <ljharb>
+croraf: you could argue that for new things that accept arraylikes, but the web almost certainly relies on the existing behavior.
+
+[14:14:12.0000] <croraf>
+well yes, it is in the spec now so it is already over
+
+
+2020-11-09
+[16:40:51.0000] <Bakkot>
+is there a proposal for Array.prototype.findLast / Array.prototype.findLastIndex? I could swear I remember one but there seem to be no traces of it
+
+[16:40:53.0000] <Bakkot>
+maybe I dreamt it
+
+[16:43:36.0000] <ljharb>
+i've never heard of it even being discussed
+
+[16:44:25.0000] <Bakkot>
+guess I must have dreamt it
+
+[18:53:18.0000] <devsnek>
+I asked about it a while ago
+
+[09:49:22.0000] <devsnek>
+I don't get the extensions proposal
+
+[09:49:28.0000] <devsnek>
+but I would love to have the bind operator
+
+[11:31:25.0000] <bradleymeck>
+devsnek: i think it is lexically scoped properties?
+
+[11:32:37.0000] <devsnek>
+from what i can tell its bind operator but you have to use a weird declaration to take advantage of it
+
+[11:34:10.0000] <bradleymeck>
+yea, there is the ability to declare them though lexically which is different
+
+[11:36:44.0000] <devsnek>
+i am interested to see the motivation for that because it seems like you could just drop the declaration syntax
+
+[11:38:59.0000] <bradleymeck>
+i think part of this is allowing a kind of lexical macros, where you don't pollute the prototype when referencing from other modules
+
+[11:40:22.0000] <devsnek>
+yeah but i feel like the bind operator along already does that?
+
+[11:41:11.0000] <bradleymeck>
+well functions do it already too since you can just wrap in foo(x), so its a big question I would agree
+
+[12:28:59.0000] <ljharb>
+the bind operator is great; being able to do `const map = ::Array.prototype.map.call` would be amazing (haven't read the updated proposal yet tho)
+
+[12:29:43.0000] <ljharb>
+i am a bit confused about the `*::` syntax tho
+
+[12:30:48.0000] <ljharb>
+haxjs: why remove the `::a.b` form? that's the only part of the proposal that pipeline can't solve (and when we discussed pipeline in committee, that was the only part of the bind operator anyone wanted to keep, in a world where we have pipeline)
+
+
+2020-11-10
+[16:50:36.0000] <jmdyck>
+Hm. It looks like NativeFunction is ambiguous. E.g., with `function get () { ... }`, the `get` could match NativeFunctionAccessor or PropertyName.
+
+[17:00:54.0000] <jmdyck>
+ah, already pointed out in #1948.
+
+[00:42:22.0000] <haxjs>
+ljharb: The old proposal have three features, they are loosely related but each have their own problems and make the whole proposal hard to advance. So it would be better to separate them. And `::a.b` use cases could be solved by the new proposal in a different way (I'll add some docs later. )
+
+[05:10:58.0000] <gsnedders>
+is that the link to #prod-Assertion at the start of https://tc39.es/ecma262/#sec-assertion doesn't show up in the "References to #prod-Assertion" box a ecma262 or a ecmarkup issue?
+
+[05:12:00.0000] <gsnedders>
+as it is, it's quite hard to get from the productions to the semantics for the regexp stuff :(
+
+[06:45:33.0000] <ljharb>
+haxjs: agreed it has 3; the only one to me that’s still important to have is the unary form
+
+[07:21:51.0000] <jmdyck>
+gsnedders: That would have to be an ecmarkup issue. I don't think it ever sees a left-hand-side occurrence of a nonterminal as a 'Reference' for the purpose of the "References to" pane.
+
+[07:25:31.0000] <jmdyck>
+Going from a production to its associated semantics should be easier after 1950. See discussion starting at https://github.com/tc39/ecma262/issues/1950#issuecomment-713699429
+
+
+2020-11-11
+[09:22:00.0000] <devsnek>
+littledan: have you ever thought about "custom sections" for js
+
+[09:22:12.0000] <devsnek>
+idk what it would look like but it would let us scrap import assertions
+
+[09:22:17.0000] <littledan>
+wow I can't believe how fast you read these things
+
+[09:22:28.0000] <devsnek>
+huh
+
+[09:22:30.0000] <littledan>
+I think import assertions are best inline, not out-of-line
+
+[09:22:38.0000] <devsnek>
+you posted those issues an hour ago 😅
+
+[09:23:08.0000] <devsnek>
+yeah i mean they could be inline still, idk how exactly
+
+[09:23:11.0000] <littledan>
+oh no I lost track of time drafting other issues; I can't believe i took an hour. I thought of it as one atomic block
+
+[09:23:20.0000] <devsnek>
+the form is unclear
+
+[09:23:32.0000] <devsnek>
+just a nebulous thought i had
+
+[09:23:40.0000] <littledan>
+I think the design space is just different for binary formats vs text-based grammars like JS
+
+[09:23:47.0000] <devsnek>
+agree there
+
+[09:24:06.0000] <littledan>
+in a binary format, it's easy to say, "this section is n bytes long; skip ahead that much and ignore this part"
+
+[09:24:31.0000] <littledan>
+another place where this is relevant is bundling: we can bundle multiple MIME types together in a binary format; harder in a text-based format for this reason
+
+[09:24:32.0000] <devsnek>
+i mean i wouldn't mind the web specifying a form of significant comment syntax
+
+[09:24:46.0000] <littledan>
+we can base64-encode whatever we want in a comment!
+
+[09:25:19.0000] <littledan>
+`import json from "./foo.json" /* sv920Skdfjlhf2DSFf3 */`
+
+[09:25:22.0000] <littledan>
+isn't it great?
+
+[09:25:26.0000] <devsnek>
+i would be fine with that
+
+[09:25:31.0000] <littledan>
+haha
+
+[09:25:43.0000] <Bakkot>
+:|
+
+[09:25:57.0000] <devsnek>
+but like `import json from "./foo.json" /*! type: json */`
+
+[09:26:23.0000] <ljharb>
+why is that better than import assertions
+
+[09:26:29.0000] <devsnek>
+because then js doesn't specify it
+
+[09:26:38.0000] <ljharb>
+why is that better
+
+[09:26:50.0000] <devsnek>
+because its not a js problem, it's a web problem
+
+[09:26:59.0000] <ljharb>
+ah, i see what you mean
+
+[09:27:01.0000] <littledan>
+IMO it's better if JS *does* specify these things so then we can ensure alignment across environments
+
+[09:27:05.0000] <ljharb>
+^
+
+[09:27:19.0000] <littledan>
+I guess environments already can, you know, interpret comments however they want
+
+[09:27:23.0000] <devsnek>
+well i don't want to get into that argument again 😄 just a thought i had
+
+[09:27:26.0000] <littledan>
+we don't give them tools for this
+
+[09:27:36.0000] <littledan>
+but... I don't think we should
+
+[09:27:40.0000] <littledan>
+but they can do it anyway
+
+[09:28:50.0000] <Bakkot>
+js can specify syntax without giving it semantics
+
+[09:29:10.0000] <devsnek>
+doesn't the import assertion proposal specify a `type` attribute
+
+
+2020-11-12
+[09:11:23.0000] <howdoi>
+https://github.com/tc39/proposal-upsert is not the https://github.com/tc39/proposals list?
+
+[10:00:23.0000] <ljharb>
+howdoi: it is, it's Map.prototype.emplace
+
+[10:00:40.0000] <ljharb>
+(the name is in the top of the readme on proposal-upsert)
+
+[10:01:12.0000] <howdoi>
+ljharb: got it, thanks!
+
+[10:39:15.0000] <bradleymeck>
+howdoi: that keeps on changing names due to reasons :/
+
+[10:40:09.0000] <bradleymeck>
+it also needs to be split into *Map.prototype.get(key, ifMissingFn) and *Map.prototype.update(key, ifPresentFn)
+
+[10:42:03.0000] <bradleymeck>
+littledan: your batch preloading, would it be any different from just having an `import.preload(arr): Promise<>`?
+
+[10:43:30.0000] <howdoi>
+bradleymeck: for the better anyway, also heard `item()` might be `at()`
+
+[10:45:42.0000] <ljharb>
+we'll find out next week
+
+[10:57:04.0000] <littledan>
+bradleymeck: i can't answer that question since I don't know what that operation would do. It is important to distinguish the array of preloaded resources from the URL of the batch expected to contain them
+
+[10:57:42.0000] <keith_mi_>
+Can someone remind me why we allow private fields on objects returned by `super` that don't have the parents brand?
+
+[10:57:52.0000] <keith_mi_>
+Or was this something we didn't consider?
+
+[10:59:49.0000] <ljharb>
+keith_mi_: allow installing them? parents don’t necessarily have a “brand”, and super can change, i believe?
+
+[11:01:38.0000] <keith_mi_>
+ljharb: Yeah, just seems kinda strange and most likely a bug in practice. Doesn't super use [[HomeObject]] so it can't change?
+
+[11:02:36.0000] <ljharb>
+super.foo does iirc, but super itself i thought depends on the [[Prototype]]
+
+[11:03:09.0000] <keith_mi_>
+oh lol
+
+[11:03:13.0000] <keith_mi_>
+So weird, ok
+
+[11:03:17.0000] <keith_mi_>
+nvm then
+
+[11:03:21.0000] <ljharb>
+in practice I’d say returning an object from a constructor is certainly most likely a bug, but since class didn’t “fix” that, it seems important to preserve it
+
+[11:47:19.0000] <jmdyck>
+Does anyone know why https://tc39.es/ecma262/#sec-uri-syntax-and-semantics bothers to give the "general form" of URIs, and the syntax for uri, uriCharacters, uriCharacter, and uriEscaped? As far as I can see, the spec doesn't make any use of those things.
+
+[11:48:53.0000] <jmdyck>
+Moreover, for the other uri* productions, it doesn't actually use them as productions (to parse something), but just as a way to defined a couple character sets.
+
+[11:51:04.0000] <Bakkot>
+my guess is that it's there to give a human-readable explanation of the syntax expected / produced by encodeURI and decodeURI, so you don't have to figure out it out by reading the prose parsing / codegen algorithms
+
+[11:51:39.0000] <Bakkot>
+but that's just a guess; I don't know the actual history
+
+[11:52:09.0000] <jmdyck>
+but those don't actually care that their input/output is a URI, do they?
+
+[11:54:19.0000] <jmdyck>
+E.g. if encodeURI receives a string which doesn't conform to the uri syntax, it doesn't throw, it just returns another string, right?
+
+[11:54:46.0000] <jmdyck>
+(assuming no unpaired surrogates)
+
+[12:02:28.0000] <jmdyck>
+afk
+
+[12:30:07.0000] <bradleymeck>
+littledan: my main concern is instead of preloading you are priming side-effects of fetching or w/e
+
+[12:30:42.0000] <littledan>
+bradleymeck: The idea is, it's not a side effect. Servers are required to return the same thing if you skip the batch preload. So, it's just like other kinds of preloading.
+
+[12:30:46.0000] <bradleymeck>
+this looks a lot like asset references with a reflective API, but it is assigning references out of band?
+
+[12:31:03.0000] <bradleymeck>
+i don't understand how that can be enforced
+
+[12:31:07.0000] <littledan>
+it doesn't give you asset references; it gives you a Promise of void
+
+[12:31:28.0000] <littledan>
+URLs are still the logical asset references here
+
+[12:31:32.0000] <bradleymeck>
+i agree not getting references, but you are doing a very similar thing
+
+[12:31:44.0000] <littledan>
+hmm, I don't understand
+
+[12:32:10.0000] <littledan>
+the preloadBatch API is just like adding a <link rel=batchpreload> tag
+
+[12:32:25.0000] <littledan>
+which is like adding a bunch of <link rel=preload> tags, but with fancier serving
+
+[12:32:52.0000] <littledan>
+see this section for enforcement: https://gist.github.com/littledan/e01801001c277b0be03b1ca54788505e#personalization
+
+[12:33:34.0000] <bradleymeck>
+that is all browser specific stuff and means you can't have credentialed resources prefetched
+
+[12:33:58.0000] <littledan>
+keith_mi_: One example is custom element upgrade
+
+[12:34:00.0000] <bradleymeck>
+maybe i'm not understanding something
+
+[12:34:09.0000] <littledan>
+keith_mi_: also, generally, maintaining the WeakMap analogy
+
+[12:34:22.0000] <littledan>
+bradleymeck: Right, you can't have credientialed resources prefetched
+
+[12:34:47.0000] <keith_mi_>
+littledan: What's the weakmap analogy?
+
+[12:34:49.0000] <littledan>
+about being browser-specific: we're talking about the loading semantics, so it kinda has to be... on the filesystem, the enforcement mechanisms could be different; I guess I haven't really thought about that
+
+[12:35:15.0000] <littledan>
+keith_mi_: https://docs.google.com/presentation/d/1lPEfTLk_9jjjcjJcx0IAKoaq10mv1XrTZ-pgERG5YoM/edit
+
+[12:35:26.0000] <littledan>
+this presentation explains many of the design points for private fields
+
+[12:36:19.0000] <bradleymeck>
+littledan: yea i'm just confused on how this is going to work in a way that doesn't make the key more complex (also I'd note the key in html will have an assert component so it has another tier)
+
+[12:36:40.0000] <littledan>
+about custom element upgrade: HTML uses the super return trick on purpose (Apple pushed for this design I believe)
+
+[12:36:49.0000] <keith_mi_>
+gotcha
+
+[12:36:56.0000] <littledan>
+it's important that you be able to use private fields in custom HTML elements IMO
+
+[12:37:25.0000] <littledan>
+bradleymeck: This definitely doesn't make the key more complex. The key is still the same URL. Resource batch preloading works at a lower level, of populating the HTTP cache
+
+[12:38:14.0000] <bradleymeck>
+littledan: i'm getting more confused
+
+[12:38:22.0000] <bradleymeck>
+i'll just wait on the presentation
+
+[12:38:39.0000] <littledan>
+bradleymeck: Jeffrey Yasskin proposed a different URL scheme for bundles, but in my opinion, it's unnecessary in the same-origin case (and I'm proposing restricting bundles to a single origin) https://github.com/WICG/webpackage/blob/master/explainers/bundle-urls-and-origins.md
+
+[12:38:54.0000] <bradleymeck>
+we don't have any of those in node
+
+[12:38:59.0000] <bradleymeck>
+so i'm kind of 🤷
+
+[12:39:12.0000] <littledan>
+the web doesn't have package URLs either, it's just a proposal
+
+[12:39:15.0000] <bradleymeck>
+we do have scopes on fs but that is about it
+
+[12:40:03.0000] <littledan>
+there's a very self-contained deterministic caching mechanism described in https://gist.github.com/littledan/e01801001c277b0be03b1ca54788505e#semantics-of-resource-batches . I wonder if it could be implemented in node to handle resource batches
+
+[12:40:25.0000] <littledan>
+I definitely care about this working across environments, e.g., for Node.js startup time
+
+[12:40:34.0000] <littledan>
+however, my presentation focuses on web loading, since that's complicated enough
+
+[12:40:44.0000] <littledan>
+I'd be happy to have a call about this some time if you're interested
+
+[12:40:55.0000] <bradleymeck>
+sure
+
+[12:41:17.0000] <bradleymeck>
+to me currently this looks mostly like it is useful but the API is confusing me
+
+[12:41:59.0000] <littledan>
+(btw the caching described in the section I linked is entirely in-memory. Browsers may want to store this persistently in the HTTP cache but Node would probably just load the resource batch each time)
+
+[12:42:10.0000] <littledan>
+the trick is to talk about this topic while avoiding saying the words "batch file"
+
+[12:42:48.0000] <bradleymeck>
+also per bundling include a length param at the tail of w/e the format, we added it web bundles to support executables
+
+
+2020-11-13
+[04:38:50.0000] <littledan>
+bradleymeck: Yeah, I have no concerns with adding that back in, I was just trying to take out every single thing I could to avoid excess complexity, but I probably went overboard
+
+[06:01:34.0000] <rwaldron->
+littledan are you still pursuing https://github.com/tc39/ecma262/pull/2038? I completed the testing work to support it.
+
+[08:06:33.0000] <littledan>
+that proposal is seeking another champion. I still think it would be worthwhile, but it's not justified by Records and Tuples in their current state.
+
+[08:06:56.0000] <littledan>
+another champion who would explain the utility to the committee could make the case for Stage 2
+
+[09:45:53.0000] <bradleymeck>
+anyone have context on the concurrent stuff from Shu on agenda?
+
+[09:46:57.0000] <shu>
+bradleymeck: i am not asking for any advancement of any new proposals, though i will throw out some ideas
+
+[09:47:17.0000] <shu>
+bradleymeck: i do apologize on the delay for readable materials, been crazy busy this week with multiple internal events
+
+[09:47:20.0000] <bradleymeck>
+shu: are we talking about something like the old thing from JSCore?
+
+[09:47:26.0000] <shu>
+i don't know what that is
+
+[09:47:28.0000] <shu>
+so probably not?
+
+[09:47:30.0000] <bradleymeck>
+/me digs about
+
+[09:47:45.0000] <bradleymeck>
+https://webkit.org/blog/7846/concurrent-javascript-it-can-work/
+
+[09:47:53.0000] <bradleymeck>
+object level locks
+
+[09:49:26.0000] <shu>
+oh, JSCore as in JSC
+
+[09:49:38.0000] <shu>
+lol sorry i always see JSC and JSCore threw me off and i thuoght it was a library
+
+[09:49:54.0000] <shu>
+bradleymeck: it is partially related, though i don't think that particular formulation flies
+
+[09:51:05.0000] <shu>
+my high-level thesis is that we have two concurrent programming models in the JS ecosystem: 1) traditional threads with shared memory, which is here to stay because of SABs and increasing adoption of wasm, and 2) web-like, which is this kinda-sorta actor-inspired system with better guarantees, with run-to-completion semantics, async everything, etc
+
+[09:51:25.0000] <shu>
+and that we ought to push on both, and i think more work especially is needed to better support 2)
+
+[09:51:28.0000] <shu>
+and i'll throw out some ideas there
+
+[09:51:48.0000] <littledan>
+also SIMD.js!
+
+[09:51:59.0000] <littledan>
+/me hides
+
+[09:51:59.0000] <shu>
+Fil's post is more about how to retrofit JS to do 1) a la Java
+
+[09:52:14.0000] <shu>
+which has some good parts, but i think retrofitting our plain objects to be lockable is kinda a lost cause
+
+[09:52:56.0000] <shu>
+SIMD.js as a thin wrapper around wasm SIMD? :P
+
+[09:59:18.0000] <bradleymeck>
+shu: idk, if we are working on strings I wish we had SIMD ops XD, but then that means exposing the underbelly of the beast
+
+[10:03:24.0000] <shu>
+bradleymeck: anyway does that top-level overview help?
+
+[10:04:10.0000] <bradleymeck>
+shu: yes, I'm very curious about making 2) cheaper in particular
+
+[10:04:24.0000] <bradleymeck>
+1) seems very hard to actually retrofit in any way
+
+[10:04:38.0000] <bradleymeck>
+2) ergonomics are good enough that we see massive waste currently
+
+[10:07:10.0000] <shu>
+then please stay tuned :)
+
+[10:07:54.0000] <shu>
+for 1) i don't think it can be retrofit, and would need a new kind of fixed-shape objects that are independently motivated by a lot of other use cases too
+
+[10:08:04.0000] <shu>
+littledan's been doing a lot of thinking in that space
+
+[10:09:52.0000] <littledan>
+you know, typed objects, like TC39 has been thinking about for many years
+
+[10:13:00.0000] <Bakkot>
+I saw there's that module blocks proposal from surma on the agenda, which sounded like it would help with 2
+
+[10:18:04.0000] <devsnek>
+TIL you can Call SomeClass.constructor
+
+[10:20:05.0000] <devsnek>
+oh nvm that's just Function, i was thinking of SomeClass.prototype.constructor
+
+[11:02:56.0000] <shu>
+Bakkot: yep, it's part of the "constellation"
+
+[11:29:05.0000] <bradleymeck>
+shu: captured variables would be possible to retrofit but it would be weird now that i think about it. any way i can imagine it would require some boilerplate by programmer
+
+
+2020-11-14
+[23:10:56.0000] <jun-sheaf>
+Hello, are any delegates online?
+
+[01:41:33.0000] <jackworks>
+jun-sheaf what do you want?
+
+
+2020-11-16
+[04:47:28.0000] <jackworks>
+https://github.com/Jack-Works/proposal-serializer for any on interested
+
+[04:47:38.0000] <jackworks>
+cc @syg
+
+[04:48:36.0000] <jackworks>
+but my main motivation is store & read complex objects with custom algr and store the result in indexed db / post message through workers
+
+[08:23:05.0000] <jmdyck>
+Hm. It seems like InputElementRegExpOrTemplateTail is never called for. I.e., I don't see any context that permits both RegularExpressionLiteral and TemplateMiddle+TemplateTail. Am I missing something?
+
+[09:11:41.0000] <shu>
+jackworks: thx
+
+[10:03:21.0000] <gibson042>
+ jmdyck: I think this qualifies: ```function* generator(){ `${yield …}` }```
+
+[14:45:28.0000] <jmdyck>
+gibson042: Ah, thanks.
+
+
+2020-11-17
+[20:59:50.0000] <jun-sheaf>
+Anyone available?
+
+[21:00:10.0000] <jun-sheaf>
+I’m looking for a champion for a proposal.
+
+[21:00:50.0000] <jun-sheaf>
+Was wondering would anyone would be interested!
+
+[21:02:54.0000] <jun-sheaf>
+Does anyone want to talk??
+
+[21:22:38.0000] <jackworks>
+What's your proposal? Please post a repo link
+
+[01:53:58.0000] <ryzokuken>
+they didn't even drop a link :(
+
+[01:54:13.0000] <ljharb>
+i think it's findable on the discourse tho
+
+[02:13:08.0000] <ryzokuken>
+ah ok
+
+[02:13:10.0000] <ryzokuken>
+ty
+
+[02:13:37.0000] <ljharb>
+altho there may be more than one by that author
+
+[02:28:44.0000] <jackworks>
+devnsk: https://github.com/tc39/proposal-standardized-debug/issues/10
+
+[05:40:16.0000] <jackworks>
+Hope I can see compartment proposal comes true
+
+
+2020-11-18
+[18:33:27.0000] <jmdyck>
+Consider the regex /x*/u. According to clause 21.2, the parse involves `Term :: Atom Quantifier`, where `Atom` matches `x` and `Quantifier` matches `*`. All that's fine. Now look at the corresponding production in Annex B <https://tc39.es/ecma262/#prod-annexB-Term>. The rules say I should consider the `Atom Quantifier` alternative only if the previous alternatives don't match. But the previous alternative (Term :: Atom)
+
+[18:33:27.0000] <jmdyck>
+m presumably forced to use that (which then leads to Syntax Error, because the remaining `*` can't be parsed as another Term).
+
+[18:34:32.0000] <jmdyck>
+So I'm thinking either the alternatives should be in the opposite order (as with ExtendedAtom below), or there's something weird in the interpretation of the ordering rule.
+
+[18:39:23.0000] <jmdyck>
+(since Annex  B claims to not change the syntax of unicode patterns under [+U])
+
+[20:18:34.0000] <jackworks>
+eshost -s -x "let a = {then(resolve){print('then called'); resolve(42)}}; let f = async () => { return a }; f()"
+
+[20:18:47.0000] <jackworks>
+I'm wondering why all engines report "then called"
+
+[20:19:10.0000] <Bakkot>
+jackworks https://masteringjs.io/tutorials/fundamentals/thenable
+
+[20:19:21.0000] <jackworks>
+I know it's thenable
+
+[20:19:28.0000] <jackworks>
+https://tc39.es/ecma262/#sec-return-statement-runtime-semantics-evaluation
+
+[20:19:48.0000] <jackworks>
+But return Expression didn't mention "Await(expr)" to a non-generator.
+
+[20:20:21.0000] <jackworks>
+And I have searched for "Await(" or "PerformPromiseThen" in the document, not finding the result
+
+[20:22:36.0000] <jackworks>
+Oh maybe it is done in PromiseCapability.[[Resolve]] let me check
+
+[20:23:44.0000] <Bakkot>
+yeah, promises auto-flatten
+
+[20:25:45.0000] <Bakkot>
+it is the same reason that `let a = {then(resolve){print('then called'); resolve(42)}}; new Promise(res => res(a))` hits the 'then called'
+
+[20:25:52.0000] <jackworks>
+I found it https://tc39.es/ecma262/#sec-async-functions-abstract-operations-async-function-start
+
+[20:26:47.0000] <jackworks>
+AsyncFunctionStart step 4.d (arrow async function) or 4.e
+
+[20:34:10.0000] <jackworks>
+I have a problem now with auto-unwraping behavior, https://tc39.es/ecma262/#sec-promise-resolve-functions (26.6.1.3.2 Promise Resolve Functions) step 9 "Let then be Get(resolution, "then")."
+
+[20:36:20.0000] <Bakkot>
+what's the issue?
+
+[20:36:43.0000] <jackworks>
+I have an RPC library and I use proxy to return a function for any methods on it. Now I have a problem with "then". If it checks HasProperty(resolution, "then") before "Get", I still have a chance to fix that in hasProperty trap, but unfortunately it doesn't
+
+[20:40:08.0000] <Bakkot>
+is the problem that you want to have a promise for the proxy, rather than auto-unwrapping? if so, I don't think you can fix it; this is a fundamental and irreparable defect in the design of promises
+
+[20:40:30.0000] <Bakkot>
+if the problem is something else, can you post a code snippet to make it clearer?
+
+[20:41:27.0000] <Bakkot>
+(the "solution" to the problem is to just never name a method "then" on any object anywhere.)
+
+[20:43:06.0000] <jackworks>
+🤷 very unlucky but yes
+
+[20:52:36.0000] <jmdyck>
+Hm. In the log for this channel, my earlier comment got borked. The sentence with the missing bit is: But the previous alternative (Term :: Atom) *does* match, so I'm presumably forced to use that (which then leads to Syntax Error, because the remaining `*` can't be parsed as another Term).
+
+[20:58:14.0000] <Bakkot>
+hmmm, yeah
+
+[20:58:44.0000] <Bakkot>
+I think the intent is probably more like "only if the previous alternatives do not lead to a valid parse", but that's pretty ugly
+
+[20:59:36.0000] <Bakkot>
+I think probably just switching those two works, given that the "each alternative is considered only if..." rule doesn't apply to the rest of the Pattern grammar, just the parts ini B.1.4
+
+[20:59:57.0000] <Bakkot>
+(otherwise the same issue would arise with e.g. Disjunction)
+
+[21:00:31.0000] <Bakkot>
+I wonder why this isn't just `Atom Quantifier_opt`, though
+
+[21:01:45.0000] <Bakkot>
+I guess that wouldn't really help given that `_opt` is basically a macro which expands into two RHSes, which need to be ordered when in the annex B pattern grammar because of this rule
+
+[21:02:08.0000] <jmdyck>
+And it would be unclear what the "order" is.
+
+[21:02:26.0000] <Bakkot>
+Right.
+
+[21:03:19.0000] <jmdyck>
+Though it could presumably have been Quantifier_opt in the main body.
+
+[21:03:44.0000] <jmdyck>
+(when it was introduced)
+
+[21:05:58.0000] <Bakkot>
+I'd approve a PR switching those two alternatives if you care to make one; I'll get to it myself at some point otherwise
+
+[21:06:40.0000] <Bakkot>
+the fact that the `ExtendedAtom` variants have the `Quantifier` one first makes me pretty sure this was just an oversight
+
+[21:06:55.0000] <jmdyck>
+Yeah, I'll probably make a PR.
+
+[21:11:40.0000] <jmdyck>
+Patterns were introduced in 3rd edition. The "opt" subscript was in use, so Term could have said `Atom Quantitifer_opt`. Maybe whoever wrote that up didn't like "opt".
+
+[21:14:19.0000] <jmdyck>
+I'm also concerned about your suggested intent behind the "only if previous production alternatives do not match" wording, as that would be normatively different from my reading.
+
+[21:30:21.0000] <Bakkot>
+Yeah, I thought about it more and realized that was wrong
+
+[21:30:42.0000] <jmdyck>
+ok
+
+[07:27:54.0000] <jmdyck>
+Bakkot: https://github.com/tc39/ecma262/pull/2228
+
+[12:14:33.0000] <rkirsling>
+leobalter: ack, sorry to have you clean up after me :(
+
+[12:14:59.0000] <leobalter>
+rkirsling: that's not an easy renaming
+
+[12:15:11.0000] <leobalter>
+item and at are too common words
+
+[12:15:30.0000] <rkirsling>
+hehehe it's true
+
+[12:17:01.0000] <leobalter>
+the tests would be easily spotted in eventual test runs as well, they wouldn't lead anyone to wrong implementations, I believe so :)
+
+[12:17:43.0000] <rkirsling>
+true
+
+
+2020-11-19
+[13:55:05.0000] <Domenic>
+Can someone remind me what the point of AsyncFromSyncIterator is again? I know I wrote the spec, but now I can't figure out when it's used...
+
+[13:55:48.0000] <Domenic>
+In particular, I can only find GetIterator(, async) calls in for-await-of, which already uses Await() on the return value of next(), so doesn't seem like it'd need it.
+
+[13:55:55.0000] <Domenic>
+(Since Await() does promise-unwrapping.)
+
+[13:57:15.0000] <Domenic>
+Oh... https://github.com/tc39/ecma262/issues/1765
+
+[13:57:40.0000] <Bakkot>
+I assume exe-boss's comment is the reason, revisiting that thread
+
+[13:58:06.0000] <Domenic>
+Maybe... I wonder if I did that on purpose or not...
+
+[13:58:17.0000] <Bakkot>
+or, wait, maybe that comment is not true
+
+[13:58:39.0000] <Bakkot>
+yeah I think that comment is false
+
+[13:58:50.0000] <Bakkot>
+so yeah I have no idea why this is here, except maybe the microtask ticks?
+
+[13:59:46.0000] <Domenic>
+https://github.com/tc39/proposal-async-iteration/issues/15#issuecomment-247768427 maybe
+
+[14:00:04.0000] <Domenic>
+No, that doesn't seem to be it
+
+[14:00:18.0000] <Domenic>
+(I got there via https://github.com/tc39/proposal-async-iteration/commit/fc15b0a8cd06dad4e84e3f7c38b1cb435b6b8292 )
+
+[14:03:38.0000] <Domenic>
+exe-boss's comment is accurate in the Chrome console
+
+[14:03:46.0000] <Domenic>
+Although I'm not sure it's because AFSI
+
+[14:06:56.0000] <Bakkot>
+Right, that's what I meant.
+
+[14:07:20.0000] <Bakkot>
+`for await` does unwrap yielded promises, but it does that because of the `Await` you mention, not because of AFSI
+
+[14:07:32.0000] <Domenic>
+I think AFSI is necessary to unwrap .value properties
+
+[14:07:43.0000] <Domenic>
+I only see code in for-await to unwrap Promise<{ value, done }>
+
+[14:08:13.0000] <Domenic>
+But if you have Promise<{ value: Promise, done }>, or you have just { value: Promise, done }, then AFSI gets involved
+
+[14:09:41.0000] <Domenic>
+If that's true, it sure seems like overkill...
+
+[14:35:47.0000] <Bakkot>
+aha! yeah, that seems likely to be the reason.
+
+[14:38:13.0000] <Bakkot>
+Which I guess is what exe-boss was saying in the first place; I just confused myself about "a promise for the iterator result" and "an iterator result holding a promise"
+
+
+2020-11-20
+[18:36:38.0000] <howdoi>
+Super interested in dealing with TC39 data. I recall previous efforts of having a crawler help us with it.
+
+[18:36:38.0000] <howdoi>
+If the proposal repos follow the template repo or of they have meta.json in the repo it will make things easier?
+
+[18:36:38.0000] <howdoi>
+https://jsfeatures.in was one such effort.
+
+[18:36:38.0000] <howdoi>
+//cc ystartsev ljharb
+
+[19:17:57.0000] <devsnek>
+what is AFSI
+
+[19:18:03.0000] <devsnek>
+oh AsyncFromSyncIterator
+
+[20:39:22.0000] <DerekNonGeneric>
+is `.item()` now called `.at()`?
+
+[21:02:49.0000] <ljharb>
+DerekNonGeneric: yes
+
+[21:11:19.0000] <DerekNonGeneric>
+ljharb, are meeting notes available yet?
+
+[21:12:56.0000] <Bakkot>
+the meeting ended ~15 hours ago; notes don't get published for a couple weeks
+
+[21:12:58.0000] <Bakkot>
+(so, no)
+
+[21:14:58.0000] <jmdyck>
+meeting notes first have to be certified by state legislatures.
+
+[21:15:37.0000] <DerekNonGeneric>
+did not know that, thanks :)
+
+[21:16:38.0000] <Bakkot>
+the state legislatures comment was a joke, to be clear
+
+[21:17:00.0000] <Bakkot>
+but we do need to wait for delegates to have an opportunity to review
+
+[21:17:47.0000] <DerekNonGeneric>
+sgtm
+
+[12:09:08.0000] <shu>
+devsnek: one thing i forgot to add to the relative indexing method spec was adding the method to Array.prototype[@@unscopables], which i just did
+
+[12:09:18.0000] <shu>
+devsnek: are you up for a v8 patch for that?
+
+[12:13:45.0000] <devsnek>
+shu: sure, can have that later today
+
+[12:16:21.0000] <shu>
+excellent, ty
+
+[12:17:43.0000] <devsnek>
+I'm also working on some call reducer passes
+
+[12:20:49.0000] <Bakkot>
+I am glad the regex syntax in other languages is also cursed: https://twitter.com/thingskatedid/status/1314117156208959490
+
+[12:21:41.0000] <shu>
+devsnek: oh great, a welcome surprise
+
+[12:22:12.0000] <shu>
+Bakkot: i think humans are pretty good at dealing with everything-is-a-special-case tbh
+
+[12:23:11.0000] <Bakkot>
+shu that would be more of a comfort if I ever wrote code directly instead of writing code which writes code
+
+[12:23:42.0000] <Bakkot>
+I might be ok at dealing with special cases but teaching the computer about all of them breaks me
+
+[12:23:51.0000] <Bakkot>
+on the plus side I have an increasingly diverse collection of fuzzers
+
+[12:24:00.0000] <shu>
+Bakkot: remember when waldemar suggested applying ML models to mitigate the matchIndices performance issue
+
+[12:24:10.0000] <Bakkot>
+which reminds me I finally got permission to publish that one I was talking to devsnek about; gotta do that
+
+[12:24:17.0000] <shu>
+perhaps a fully generalizable answer!
+
+[12:24:21.0000] <Bakkot>
+shu yeah that was... a surprising comment
+
+[12:25:03.0000] <shu>
+perhaps we can rebrand programming as "machine teaching"
+
+[12:31:47.0000] <devsnek>
+gotta take the auth service to computer school this afternoon
+
+[14:01:15.0000] <gibson042>
+oh, pretty much everything about Perl syntax is cursed, _especially_ regular expressions
+
+[14:04:07.0000] <Bakkot>
+still not as bad as `$[`
+
+[14:04:11.0000] <gibson042>
+straight from their own documentation: "o  - pretend to optimize your code, but actually introduce bugs", "/d is the old, problematic, pre-5.14 Default character set behavior. Its only use is to force that old behavior."
+
+[14:04:30.0000] <gibson042>
+https://perldoc.perl.org/perlre
+
+
+2020-11-21
+[11:12:09.0000] <devsnek>
+https://github.com/conartist6/babel/pull/1
+
+[13:00:54.0000] <Bakkot>
+plz no
+
+[13:01:10.0000] <Bakkot>
+I appreciate the attempt but that is way too ugly to be built in
+
+[13:02:03.0000] <Bakkot>
+if you need maximum performance you are probably going to have to do something bespoke; that's almost always how it is
+
+[13:10:04.0000] <ljharb>
+there's an es-discourse thread by the same author if anyone feels like providing feedback
+
+[13:31:24.0000] <Bakkot>
+I will leave a comment I guess.
+
+[13:42:36.0000] <Bakkot>
+k done
+
+[14:37:00.0000] <devsnek>
+Bakkot: i hope their link to v8's orinoco blog post helps you learn 😆
+
+[14:37:29.0000] <Bakkot>
+I mean I appreciate the effort
+
+[14:53:19.0000] <ljharb>
+there's also that any type that's `X | Promise<X>` is inherently z̲̗̼͙̥͚͛͑̏a̦̟̳͋̄̅ͬ̌͒͟ļ̟̉͌ͪ͌̃̚g͔͇̯̜ͬ̒́o̢̹ͧͥͪͬ, but i didn't want to dismiss all their effort just by pointing that out
+
+[14:54:04.0000] <Bakkot>
+we did that with waitAsync, tbf
+
+[14:55:05.0000] <devsnek>
+well we also said that was only ok because humans don't use it
+
+[14:55:11.0000] <devsnek>
+and we swore not to use it as precedent
+
+[14:55:12.0000] <Bakkot>
+true true
+
+[14:55:58.0000] <devsnek>
+should've named it `waitAsyncDoNotUseOrYouWillBeFired`
+
+[15:04:03.0000] <ljharb>
+ship it, if it breaks anyone, see the new name
+
+[15:04:49.0000] <devsnek>
+lol
+
+
+2020-11-23
+[15:28:09.0000] <rkirsling>
+rwaldron-: whenever you've got a chance, I just wanted to check in with you about test coverage for https://github.com/tc39/ecma262/pull/2210 and https://github.com/tc39/ecma262/pull/2221
+
+[15:28:36.0000] <rkirsling>
+lemme know if that's on your radar (even if not for this week, say) or if you'd prefer I do it
+
+
+2020-11-24
+[06:28:16.0000] <rwaldron->
+rkirsling has everything been resolved w/r to shu's comments in 2221?
+
+[06:29:16.0000] <rwaldron->
+rkirsling I need to do a review of tests for https://github.com/tc39/ecma262/pull/2210
+
+[06:43:52.0000] <jackworks>
+https://lea.verou.me/2020/11/the-case-for-weak-dependencies-in-js/
+
+[07:11:53.0000] <bradleymeck>
+jackworks: I'm still not convinced we need any such thing, just use a global. We spent a lot of time on the same problem with polyfills and builtin modules and came to that conclusion
+
+[07:13:13.0000] <jackworks>
+Fine
+
+[07:16:14.0000] <bradleymeck>
+We did see `importNow` in the Realms API but that has since been removed
+
+[09:48:36.0000] <shu>
+a question about well-formedness of UTF16 and lone surrogates: strictly speaking, AFAICT, valid UTF16 can't include lone surrogates
+
+[09:48:55.0000] <Bakkot>
+yes
+
+[09:48:57.0000] <shu>
+however, JS strings can certainly include unpaired surrogates despite our saying they are UTF16
+
+[09:49:01.0000] <Bakkot>
+also yes
+
+[09:49:17.0000] <shu>
+(also AFAICT, this dispensation is pretty widespread)
+
+[09:49:21.0000] <Bakkot>
+we don't actually say that, I thnk
+
+[09:49:34.0000] <Bakkot>
+we say they are vectors of 16-bit scalar values
+
+[09:49:50.0000] <Bakkot>
+String value: primitive value that is a finite ordered sequence of zero or more 16-bit unsigned integer values
+
+[09:49:53.0000] <shu>
+probably not, though our StringToCodePoints AO explicitly deals with unpaired surrogates instead of erroring out
+
+[09:49:59.0000] <Bakkot>
+A String value is a member of the String type. Each integer value in the sequence usually represents a single 16-bit unit of UTF-16 text. However, ECMAScript does not place any restrictions or requirements on the values except that they must be 16-bit unsigned integers.
+
+[09:50:09.0000] <shu>
+ah, i see
+
+[09:50:35.0000] <shu>
+so my actual question is: what's the interaction with ecma404 (JSON)? JSON says its input is a sequence of code*points*
+
+[09:51:07.0000] <shu>
+if we pass it a JS string that has an unpaired surrogate, is that supposed to error on a strict reading?
+
+[09:51:30.0000] <Bakkot>
+See JSON.parse step 2: https://tc39.es/ecma262/#sec-json.parse
+
+[09:52:06.0000] <shu>
+right, but that happily encodes an unpaired surrogate as an invalid codepoint in https://tc39.es/ecma262/#sec-codepointat
+
+[09:52:14.0000] <shu>
+we don't error out on the JS side
+
+[09:52:49.0000] <Bakkot>
+\u{d800} is a code point; if all that 404 says is "a sequence of code points", there's no problem
+
+[09:52:57.0000] <shu>
+oh, it is a code point?
+
+[09:53:01.0000] <shu>
+just one that's not assigned to a character?
+
+[09:53:40.0000] <Bakkot>
+> Code Point. (1) Any value in the Unicode codespace; that is, the range of integers from 0 to 10FFFF_16. (See definition D10 in Section 3.4, Characters and Encoding.) Not all code points are assigned to encoded characters.
+
+[09:53:47.0000] <shu>
+a ha, great, thanks
+
+[09:53:49.0000] <Bakkot>
+from https://unicode.org/glossary/
+
+[09:54:35.0000] <shu>
+so the spec, neither 262 nor 404, actually rejects input sequences with lone UTF16 surrogate
+
+[09:54:54.0000] <shu>
+presumably neither does https://tools.ietf.org/html/rfc4627 but i'm not sure
+
+[09:58:19.0000] <Bakkot>
+the fact that that RFC talks about "Unicode characters" doesn't give me a lot of hope that it will be unambiguous on this question
+
+[10:09:46.0000] <Bakkot>
+(apparently the word for "code point other than surrogate pairs" is "Unicode scalar value" - https://unicode.org/glossary/#unicode_scalar_value)
+
+[10:10:23.0000] <Bakkot>
+(these are... not great definitions; naively I would definitely have assumed "scalar value" was the full range and "code point" was the non-surrogate ones. but whatever, at least they're precise.)
+
+[10:27:03.0000] <shu>
+yes they definitely sound backwards
+
+[10:27:08.0000] <shu>
+"scalar, but not the full scale!"
+
+[10:27:29.0000] <shu>
+vs "points, but actually every point inclusive on the scale"
+
+[11:03:13.0000] <rkirsling>
+rwaldron-: yup! both PRs should be all set
+
+[11:03:43.0000] <rwaldron->
+rkirsling thanks :)
+
+
+2020-11-25
+[08:55:34.0000] <binyamin>
+I see that algorithmic numbering systems are part of unicode (https://github.com/unicode-org/cldr/blob/latest/common/bcp47/number.xml), but not ecmascript (https://tc39.es/ecma402/#table-numbering-system-digits). Why is this?
+
+[09:29:54.0000] <binyamin>
+I found a relevant issue (https://github.com/tc39/ecma402/issues/95). I'm still not clear why it _shouldn't_ be implemented
+
+[09:30:12.0000] <binyamin>
+oops, didn't realize that would underline it
+
+[10:40:03.0000] <jmdyck>
+Bakkot: I notice that the spec hasn't changed in 21 days. Is there a moratorium on merges while you're working on #1950?
+
+[11:06:39.0000] <Bakkot>
+jmdyck: no, the editors are all just independently busy with non-tc39 stuff
+
+[11:06:55.0000] <Bakkot>
+plus the meeting, and recovering from the meeting
+
+[11:09:12.0000] <jmdyck>
+ok
+
+[11:30:26.0000] <devsnek>
+can we move text encoding into the language so its fast enough to be useful
+
+[11:31:31.0000] <devsnek>
+actually that gives me an idea
+
+[11:34:43.0000] <Bakkot>
+devsnek: https://developer.mozilla.org/en-US/docs/Web/API/TextEncoder ?
+
+[11:52:08.0000] <devsnek>
+Bakkot: that's very slow though
+
+[11:52:33.0000] <devsnek>
+oh right yes that is what i was talking about
+
+[11:52:52.0000] <devsnek>
+forgot how i phrased that earlier 😓
+
+
+2020-11-27
+[20:43:18.0000] <Bakkot>
+everyone always forgets about Symbol.toPrimitive
+
+[20:43:40.0000] <Bakkot>
+was there any justification for adding it in ES6 other than "it's necessary to self-host Date"?
+
+[21:37:54.0000] <ljharb>
+that's the one i'm aware of. what was the justification for Symbol.hasInstance?
+
+[22:15:31.0000] <Bakkot>
+implementors had life too easy, presumably :P
+
+
+2020-11-28
+[19:30:21.0000] <jackworks>
+/me uploaded an image: image.png (92KiB) < https://matrix.org/_matrix/media/r0/download/matrix.org/NhBREryjnzrEwsqILtkgcWQF/image.png >
+
+[19:30:53.0000] <jackworks>
+it makes things harder on tooling around generators 😂
+
+[19:34:29.0000] <jackworks>
+/me uploaded an image: image.png (134KiB) < https://matrix.org/_matrix/media/r0/download/matrix.org/aouUdIFPBtwyaSKvfbJakASi/image.png >
+
+[19:35:12.0000] <jackworks>
+I use `yield` in the `finally` block to archive this
+
+
+2020-11-29
+[18:27:12.0000] <Bakkot>
+PerformPromiseAllSettled has a step which goes up to `aa`
+
+[18:27:25.0000] <Bakkot>
+I'm not sure I could have told you that `aa` was the thing that came after `z`
+
+[18:56:59.0000] <jmdyck>
+Bakkot: see https://html.spec.whatwg.org/multipage/grouping-content.html#attr-ol-type
+
+[18:57:34.0000] <Bakkot>
+yeah, makes sense
+
+[19:00:42.0000] <Bakkot>
+jmdyck: also, re: https://github.com/tc39/ecma262/issues/1672
+
+[19:01:18.0000] <Bakkot>
+I agree with your reading that this change was likely unintentional, but looking into it, it seems all engines accept `/\u0000/u` as a regexp matching "\0"
+
+[19:01:53.0000] <Bakkot>
+\u0000 is derived from RegExpUnicodeEscapeSequence but only in the absence of the `u` flag
+
+[19:02:26.0000] <Bakkot>
+so it seems - unless I'm missing something, which is quite likely because this part of the spec is terrible - that engines have implemented the spec as written rather than as intended
+
+[19:02:54.0000] <Bakkot>
+actually, wait
+
+[19:02:58.0000] <Bakkot>
+no that is false
+
+[19:03:14.0000] <Bakkot>
+it's derived by `\uHexNonSurrogate`
+
+[19:04:48.0000] <jmdyck>
+(ee, 15 months ago. gonna take a while to page in.)
+
+[19:04:54.0000] <Bakkot>
+yup, sorry about that
+
+[19:05:10.0000] <Bakkot>
+had a free hour so I'm trying to clean up some of the older outstanding issues
+
+[19:05:29.0000] <Bakkot>
+you can ignore me though, I misread RegExpUnicodeEscapeSequence
+
+[19:07:53.0000] <Bakkot>
+a better thing to look at is IdentityEscape; all engines reject /\z/u, which means that are indeed interpreting `AtomEscape[U, N] :: CharacterEscape[~U, ?N]` as if the latter were `?U` rather than `~U` - otherwise they'd allow `\z`, as it's permitted by `CharacterEscape` when given `~U`
+
+[19:13:41.0000] <Bakkot>
+anyway, you want to make the one-character PR, or shall I?
+
+[19:14:11.0000] <jmdyck>
+I'll do it.
+
+[19:14:17.0000] <Bakkot>
+thanks!
+
+[19:17:47.0000] <jmdyck>
+Normative or Editorial? (I labelled #1672 as Normative, but now I'm not sure.)
+
+[19:18:35.0000] <jmdyck>
+if all major engines behave as if it's '?', then changing it to '?' seems editorial
+
+[19:19:23.0000] <Bakkot>
+I could go either way. Editorial, I guess, since it contradicts the claim in Annex B (that it does not change `+U` syntax) and hence is contradictory as written.
+
+[19:19:32.0000] <jmdyck>
+right
+
+[19:26:55.0000] <jmdyck>
+wah, github offline?
+
+[19:27:37.0000] <Bakkot>
+seems up to me?
+
+[19:27:39.0000] <jmdyck>
+ah, back now
+
+[19:28:41.0000] <jmdyck>
+hm, but I'm not getting the usual prompt to make PR
+
+[19:55:52.0000] <jmdyck>
+I now have 14 open PRs against ecma262. That might be a personal max.
+
+[20:03:42.0000] <Bakkot>
+16% of open PRs! Though that's actually less than I'd expect; you also have 21% of total commits to the spec
+
+[20:04:07.0000] <Bakkot>
+(though I guess that's not a fair comparison; your PRs contain more commits-to-spec than average)
+
+[20:04:31.0000] <Bakkot>
+Hopefully we'll get some of those closed soon; I've pinged the other editors about a couple
+
+[20:04:40.0000] <jmdyck>
+tx
+
+[20:06:47.0000] <Bakkot>
+we've actually been doing alright with PRs overall; there were over a hundred earlier this year
+
+[20:06:48.0000] <jmdyck>
+some of the should be pretty easy.
+
+[20:07:00.0000] <Bakkot>
+still, I was hoping we'd get that number down faster
+
+[20:07:02.0000] <Bakkot>
+yup
+
+[20:07:02.0000] <jmdyck>
+s/the/them/
+
+[20:09:00.0000] <jmdyck>
+Hm, can github show you a graph of open PRs for the repo over time? I'm not seeing it
+
+[20:09:40.0000] <Bakkot>
+Don't think so; this is just from memory (I try to pay attention to the number)
+
+[20:19:38.0000] <jmdyck>
+Looks like they can, but only for fancy accounts.
+
+[20:20:24.0000] <jmdyck>
+maybe
+
+[20:22:24.0000] <Bakkot>
+jmdyck: re https://github.com/tc39/ecma262/pull/2018, I believe that's just blocked on naming of "CodePointToString", and I think all the editors are OK with "UTF16EncodeCodePoint"
+
+[20:24:16.0000] <Bakkot>
+I can confirm with the other editors if you like; this is just from memory and the discussion in the thread there. but I'm pretty sure.
+
+[20:26:46.0000] <jmdyck>
+I guess, with the thumbs-ups, everyone is covered.
+
+[22:35:07.0000] <Bakkot>
+finally got around to https://github.com/tc39/ecmarkup/pull/270
+
+[22:35:45.0000] <Bakkot>
+I should probably prioritize minor quality-of-life stuff like this higher
+
+
+2020-11-30
+[18:15:27.0000] <devsnek>
+Bakkot: does that also include step numbers being part of copy/paste?
+
+[18:15:55.0000] <Bakkot>
+devsnek presumably; the PR is only about grammar nodes
+
+[18:16:10.0000] <devsnek>
+ah ok
+
+[18:16:23.0000] <devsnek>
+very cool either way
+
+[18:16:37.0000] <Bakkot>
+do you want step numbers to be a part of copy/paste?
+
+[18:17:01.0000] <Bakkot>
+that might be tricky since they're <li>s
+
+[18:17:15.0000] <devsnek>
+i'd like that
+
+[18:17:31.0000] <devsnek>
+but if its not something browsers like to do that's fine
+
+[18:19:03.0000] <Bakkot>
+quick google suggests it's not a thing; I'd presumably have to synthesize hidden text nodes and get them included in the copy-paste output
+
+[18:19:09.0000] <Bakkot>
+which I'm not super inclined to do
+
+[18:19:23.0000] <Bakkot>
+or do my own layout, which I'm _really_ not inclined to do
+
+[18:20:07.0000] <devsnek>
+yeah i think its best to use standard layout as much as possible
+
+[18:20:30.0000] <devsnek>
+copying numbers definitely not worth it at that point
+
+[02:47:06.0000] <croraf>
+Is a TypedArray always backed up by ArrayBuffer?
+
+[09:04:30.0000] <bradleymeck>
+croraf: yes https://tc39.es/ecma262/#sec-typedarray-objects
+
+[13:09:08.0000] <rkirsling>
+Bakkot: is there still an open PR for \mathbb{F} usage?
+
+[13:09:18.0000] <rkirsling>
+that applies to, e.g., https://tc39.es/ecma262/#sec-array.prototype.findindex ?
+
+[14:07:48.0000] <Bakkot>
+uhhh nope I just missed that one I guess
+
+[14:08:33.0000] <Bakkot>
+I expect there's still a couple places we missed out there
+
+[14:08:44.0000] <Bakkot>
+2007 was a big PR
+
+[14:08:51.0000] <Bakkot>
+I'll submit the fix, one sec
+
+[14:09:08.0000] <rkirsling>
+cool
+
+[14:09:14.0000] <rkirsling>
+just making sure it's covered
+
+[14:11:27.0000] <croraf>
+bradleymeck, thanks
+
+[14:13:08.0000] <Bakkot>
+https://github.com/tc39/ecma262/pull/2238
+
+[14:14:37.0000] <Bakkot>
+also: https://ci.tc39.es/preview/tc39/ecma262/pull/2237 has copyable whitespace in the grammar productions now! things copy as e.g. `break [no LineTerminator here] LabelIdentifier[?Yield, ?Await] ;
+
+[14:14:38.0000] <Bakkot>
+` instead of `break[no LineTerminator here]LabelIdentifier[?Yield, ?Await];`
+
+[14:57:52.0000] <rkirsling>
+what the heck
+
+[14:58:37.0000] <rkirsling>
+"work of fiction" is a standards term, no? and yet I'm having trouble googling a place that describes that phrase
+
+[14:58:54.0000] <rkirsling>
+evidently isn't part of HTML's design principles
+
+[14:59:14.0000] <rkirsling>
+all I could find was this page: https://www.webstandards.org/2009/05/13/interview-with-ian-hickson-editor-of-the-html-5-specification/index.html
+
+[15:24:06.0000] <ljharb>
+rkirsling: in what way is it a standards term?
+
+[15:24:47.0000] <rkirsling>
+it's the hazard of a standard gone unimplemented
+
+[15:25:50.0000] <rkirsling>
+oh
+
+[15:25:51.0000] <rkirsling>
+https://developers.google.com/web/updates/2018/03/smooshgate
+
+[15:26:08.0000] <rkirsling>
+mathiasbynens does link to the thing I pasted above
+

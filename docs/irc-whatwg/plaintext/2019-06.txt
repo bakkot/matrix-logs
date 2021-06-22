@@ -1,0 +1,2320 @@
+2019-06-03
+[14:14:26.0000] <jwalden>
+more stupid encoding questions, if I have data:text/html,... is there a guaranteed encoding that will always be used to interpret the ..., or if not does it detect UTF-8 based on what heuristic for what the bytes (possibly URL-encoded) in ... are?  my assumption would be Windows-1252 if you don't tag, but all the sniffing-fu postdates my knowledge really
+
+
+2019-06-04
+[23:42:30.0000] <Domenic>
+jwalden: from what I can tell in the specs that'll make its way down through fetch with no modifications to the `text/html` content-type, so it'll just enter the HTML parser's usual unknown charset logic, and thus probably windows-1252 for en-US.
+
+[01:04:51.0000] <annevk>
+Maybe we should make that fixed somehow for data: URLs
+
+[06:35:09.0000] <TabAtkins>
+Yeah, if we could patch that to utf-8 it would probably be fine?
+
+[07:08:12.0000] <annevk>
+I suspect windows-1252 would be safer
+
+[07:10:19.0000] <TabAtkins>
+Would it tho? HTML uses 1252 because of significant legacy content predating heavy utf-8 deployment. It's not immediately clear to me that data: urls would suffer from the same constraints. The 1252 default already breaks *modern* pages commonly, why wouldn't it break data: urls?
+
+[07:11:56.0000] <annevk>
+That's fair, I don't know for sure and given how URLs are parsed UTF-8 would make sense; I guess it'd require some research
+
+[07:12:40.0000] <TabAtkins>
+yeah
+
+[07:13:35.0000] <TabAtkins>
+also oh gosh, yes, i'm not even sure what it would mean for the url to be utf-8 encoded but contain html content that's 1252 encoded.
+
+[07:22:42.0000] <zcorpan>
+data:,å -> data:,%C3%A5 -> Ã¥
+
+[07:27:39.0000] <hsivonen>
+data: URLs have been around for quite a long time, so there has been plenty of time for them to develop a dependency on the current behavior.
+
+[07:33:29.0000] <gsnedders>
+I mean an initial qusetion could be how many text/html data URLs contain non-ASCII
+
+[07:44:44.0000] <hsivonen>
+I'm not necessarily opposed to making data: default to UTF-8 if Chrome experiments with the compat fallout. I don't really have apetite for risking making Gecko the first mover on this one.
+
+[07:46:32.0000] <hsivonen>
+(OTOH, considering that HTML in data: is mainly for test cases, it's unclear that making it diverge from http: and https: serves the use case well.)
+
+[12:04:28.0000] <jugglinmike>
+It's not clear to me what is actually being displayed when an "inactive" drop-down-style <select> element is rendered. Is it simply the `<select>` element? Or is the `<select>` element acting as a container for the selected `<option>` element?
+
+[12:07:02.0000] <TabAtkins>
+Undefined.
+
+[12:07:13.0000] <TabAtkins>
+(intentionally, currently)
+
+[12:07:30.0000] <TabAtkins>
+Per CSS, <select> is a replaced element; it's a rectangle whose contents are completely opaque.
+
+[12:08:14.0000] <jugglinmike>
+TabAtkins thought so. Does that mean that styling <optgroup> and <option> is also undefined?
+
+[12:08:23.0000] <TabAtkins>
+Definitely.
+
+[12:09:43.0000] <jugglinmike>
+Well, that's a relief
+
+[12:10:08.0000] <jugglinmike>
+TabAtkins: think we can remove those from here: https://html.spec.whatwg.org/multipage/rendering.html#form-controls
+
+[12:22:35.0000] <zcorpan>
+jugglinmike: it's indeed currently undefined. But the values there are needed for web compat, and more should be added per https://github.com/whatwg/html/issues/1046
+
+[12:23:08.0000] <zcorpan>
+jugglinmike: also, we should make it well-defined at least for appearance: none
+
+[12:25:23.0000] <jugglinmike>
+zcorpan: How can we standardize styling for elements whose rendering we intentionally do not standardize
+
+[12:26:01.0000] <zcorpan>
+it's a bit messy to try to make incremental improvements without a solid foundation, but I think for example the text-transform fix is a clear improvement even if it's still undefined what the effect of text-transform on <select> is, since browsers do allow it to have an effect
+
+[12:26:34.0000] <jugglinmike>
+Oh, I'm not suggesting we remove text-indent for `select`
+
+[12:27:07.0000] <jugglinmike>
+I want to remove `option` and `optgroup`
+
+[12:28:57.0000] <jugglinmike>
+since the effect of styling those is "definitely" undefined
+
+[12:28:57.0000] <zcorpan>
+<button> moved from intentionally undefined to intentionally defined in https://github.com/whatwg/html/pull/4143 :)
+
+[12:29:03.0000] <TabAtkins>
+A problem here is that what I just described is half-true. CSS officially is hands-off, but in practice some things *do* work in (most?) UAs. That's ocvered by that stylesheet.
+
+[12:29:34.0000] <TabAtkins>
+And we are *trying* to get to a point where CSS's interaction with form controls is well-defined. (Have been trying for at least twenty years.)
+
+[12:29:41.0000] <TabAtkins>
+(But actually maybe happening now.)
+
+[12:31:19.0000] <jugglinmike>
+That'd be great, and congrats on <button>
+
+[12:32:24.0000] <zcorpan>
+jugglinmike: "option, optgroup" should be removed because from the spec it doesn't match what what browsers have in their UA stylesheets
+
+[12:32:54.0000] <jugglinmike>
+Firefox does it
+
+[12:33:16.0000] <jugglinmike>
+https://dxr.mozilla.org/mozilla-central/rev/c909c105f914f69054b9a7c6b189ee39fa1cad44/layout/style/res/forms.css#354
+
+[12:33:20.0000] <jugglinmike>
+https://dxr.mozilla.org/mozilla-central/rev/c909c105f914f69054b9a7c6b189ee39fa1cad44/layout/style/res/forms.css#388
+
+[12:34:08.0000] <zcorpan>
+Ah. I stand corrected. So that's different from webkit/chromium
+
+[12:34:18.0000] <jugglinmike>
+yeah...
+
+[12:34:36.0000] <jugglinmike>
+I can appreciate that we're trying to define form controls
+
+[12:34:55.0000] <jugglinmike>
+Especially in the presence of `appearance: none`
+
+[12:36:28.0000] <jugglinmike>
+but I also think consistency is important. The spec currently seems internally inconsistent because it leaves this area as implementation defined but also specifies parts of it
+
+[12:38:55.0000] <jugglinmike>
+Also, is there any text that explains the spec's contours around form controls?
+
+[12:39:31.0000] <jugglinmike>
+I'm going to close https://github.com/whatwg/html/issues/4675, and I'd like to cite something if possible
+
+[12:40:38.0000] <zcorpan>
+You're right that it's inconsistent, and this is not really explained in the spec I think. We could add a note about it.
+
+[12:42:00.0000] <zcorpan>
+But technically, the rules in the rendering section are just expected to be in the UA stylesheet, and the effect should be as per CSS rules. If CSS rules says any CSS property's behavior is undefined for a particular element, then that just means that it's undefined
+
+[12:42:20.0000] <zcorpan>
+You can still check what is in the UA stylesheet with getComputedStyle
+
+[12:43:25.0000] <jugglinmike>
+I could, but the value of doing so seems questionable
+
+[12:44:41.0000] <zcorpan>
+Baby steps towards the end goal of having defined & interoperable form controls rendering :)
+
+[12:46:15.0000] <zcorpan>
+in particular, if something (like text-transform on select) is wasting web developers' time, and adding a property to the UA stylesheet in one browser fixes it, then we can specify and test that without waiting for rendering rules of <select> to be defined
+
+[12:46:58.0000] <zcorpan>
+In the case of text-indent of option, I don't know if it's an important interop issue or not
+
+[12:47:21.0000] <jugglinmike>
+Agreed. And we have evidence (in the form of "CSS normalizer" projects) that text-transform on select is wasting web developers' time
+
+[12:47:52.0000] <zcorpan>
+Removing option/optgroup and leaving a spec issue open to investigate seems reasonable
+
+[12:48:10.0000] <zcorpan>
+But leaving it as-is and having the issue also seems reasonable
+
+[12:49:36.0000] <jugglinmike>
+I'd be comfortable leaving it as-is if the new issue were referenced in the specification
+
+[12:50:04.0000] <jugglinmike>
+It'd still be inconsistent, but at least the inconsistency would be obvious
+
+[12:50:47.0000] <zcorpan>
+Sure
+
+[12:56:28.0000] <jugglinmike>
+zcorpan: still, I don't think I can report this issue
+
+[12:56:57.0000] <jugglinmike>
+due to my unfamiliarity with the problem
+
+[12:57:31.0000] <zcorpan>
+jugglinmike: OK, I can report it
+
+[12:57:32.0000] <jugglinmike>
+Even just limited to the <select> element, I can't say what we can/should standardize
+
+[12:58:39.0000] <zcorpan>
+Yeah, I don't know that either. <select> is pretty complex though
+
+[12:58:58.0000] <zcorpan>
+Things like buttons and checkboxes are simpler
+
+[13:19:20.0000] <jugglinmike>
+zcorpan: doesn't match what webkit-derived browsers have in their stylesheets
+
+[13:19:20.0000] <jugglinmike>
+oops, ignore that zcorpan
+
+[13:33:55.0000] <zcorpan>
+jugglinmike: https://github.com/whatwg/html/issues/4676
+
+[13:39:20.0000] <oliverdunk>
+zcorpan: I don't know if this is relevant to what you're discussing, but I'm currently looking into letting option elements increment CSS counters in Chrome
+
+[13:41:25.0000] <zcorpan>
+oliverdunk: interesting! It's relevant for the discussion of what the effect of CSS is on form controls, though myself and jugglinmike haven't looked at counters
+
+[13:41:42.0000] <zcorpan>
+oliverdunk: what's the motivation?
+
+[13:44:50.0000] <oliverdunk>
+zcorpan: My only association is that I wanted to make a contribution to Chromium, and found this bug as one to try: https://bugs.chromium.org/p/chromium/issues/detail?id=799465
+
+[13:45:06.0000] <oliverdunk>
+The use case is letting a changed select input alter a counter value: https://codepen.io/kizu/pen/PEJgpr
+
+[13:45:17.0000] <jugglinmike>
+I didn't know CSS counters existed
+
+[13:45:33.0000] <TabAtkins>
+oliverdunk: I'm curious about the motivation too. ^_^ Blink implements CSS counters in a broken hacky way on the box tree; they're *specified* to work over the element tree (but pay attention to whether the element generates a box or not). That all said, since option/optgroup aren't rendered by CSS, it's not clear whether they "generate a box" or not, and thus whether they should increment counters or not.
+
+[13:45:45.0000] <TabAtkins>
+Probably if you do a strict reading, they don't generate boxes, and so shouldn't increment counters.
+
+[13:46:55.0000] <oliverdunk>
+Interesting TabAtkins. I suspect you know a lot more than me, I just assumed from the bug that implementing them was right.
+
+[13:47:07.0000] <TabAtkins>
+I wrote the spec for counters. ^_^
+
+[13:47:28.0000] <oliverdunk>
+In that case, you _definitely_ know a lot more than me!
+
+[13:47:43.0000] <oliverdunk>
+Forgive my ignorance :P
+
+[13:47:50.0000] <TabAtkins>
+But whether the spec is describing the ideal reality, compared with current browser impls, is unclear. And the ideal interaction of replaced-element descendants and counters definitely wasn't explicitly considered.
+
+[13:48:42.0000] <TabAtkins>
+I"ll open an issue in csswg
+
+[13:50:57.0000] <TabAtkins>
+oliverdunk: Does that code currently work in any browser?
+
+[13:51:17.0000] <oliverdunk>
+TabAtkins: definitely Firefox, and apparently the old Edge.
+
+[13:54:18.0000] <TabAtkins>
+https://github.com/w3c/csswg-drafts/issues/4004
+
+[13:58:16.0000] <oliverdunk>
+TabAtkins: Thanks! Out of interest, when you say "rendered by CSS", does that just mean if CSS applies or not?
+
+[14:07:29.0000] <TabAtkins>
+I mean "rendering is fully explained by the CSS box model".
+
+[14:07:56.0000] <TabAtkins>
+option/optgroup aren't explained at all by CSS currently.
+
+[14:15:27.0000] <oliverdunk>
+TabAtkins: Gotcha. Once a decision is made on that bug, assuming the changes aren't too major, I'd love to try making them.
+
+
+2019-06-05
+[03:16:08.0000] <Domenic>
+Does anyone remember any clashes between user code and specs for the global object? (Not prototype properties/methods.)
+
+[03:24:28.0000] <Ms2ger>
+What do you mean?
+
+[03:35:08.0000] <annevk>
+Ms2ger: e.g., someone added the FooBar class and it clashed with foobar.js
+
+[03:37:16.0000] <ondras>
+is this even observable? if the (standardized) FooBar is not read-only...
+
+[03:39:38.0000] <ondras>
+I mean: I have probably used my own global "Window" function for some popup-like structure many times in the past, but there apparently is a standard window.Window...
+
+[03:41:00.0000] <Domenic>
+Well TC39 failed to do `global` because of this and had to rename to `globalThis`. This is the only example we have so far.
+
+[03:44:03.0000] <Ms2ger>
+Does indexedDB count?
+
+[04:21:15.0000] <Domenic>
+Ms2ger: Did we have trouble adding it? I wasn't around.
+
+[04:57:16.0000] <Ms2ger>
+We had trouble unprefixing, because var indexedDB = indexedDB || mozIndexedDB; doesn't work if indexedDB is on the prototype
+
+[04:57:34.0000] <Ms2ger>
+That's why they're on the object itself
+
+[05:02:56.0000] <Domenic>
+Hmm yeah that kind of counts
+
+[06:14:01.0000] <hober>
+Domenic: there was the translate attribute thing from years ago
+
+[06:18:52.0000] <hober>
+Domenic: https://lists.w3.org/Archives/Public/public-whatwg-archive/2012Mar/0203.html
+
+[06:19:40.0000] <hober>
+oh wait, nvm, you don't want prototype examples
+
+
+2019-06-06
+[18:34:46.0000] <jolvera>
+i'd like to contribute again and i'm looking at https://github.com/whatwg/html/issues/4626 but i'm not sure what a "WPT test" is
+
+[18:37:21.0000] <jolvera>
+nvm i just read the readme.md
+
+[22:17:16.0000] <annevk>
+jolvera: great, be sure to let this channel know if you run into issues
+
+[01:17:18.0000] <annevk>
+Domenic: per https://w3c.github.io/ServiceWorker/#importscripts importScripts() will return a network error which I guess will result in a script error so we might have some of those on whatwg.org?
+
+[01:25:49.0000] <annevk>
+JakeA: https://github.com/tc39/proposal-top-level-await/issues/79
+
+[01:29:13.0000] <JakeA>
+annevk: yep, I agree. I can't think of anything good you could do with top-level await in service workers
+
+[01:33:28.0000] <annevk>
+JakeA: cool, I think littledan is open to making this change and hopefully nobody in TC39 cares too much about some agents not having it
+
+[01:33:45.0000] <annevk>
+JakeA: though it reached stage 3 just now, so it'd be hard to block anyway :p
+
+[01:45:27.0000] <littledan>
+as an example of somewhere this might come up, if you want to use a WebAssembly module, it'd run into this restriction, since we like to give Wasm time to compile itself off the main thread
+
+[01:45:59.0000] <littledan>
+but I guess people could get around this by loading the Wasm module later, after initial startup (?)
+
+[01:46:35.0000] <littledan>
+JakeA: Does that sound reasonable to you? I'm happy to write this up in spec text if this is what we're agreeing on
+
+[01:47:46.0000] <annevk>
+Ideally a service worker is a Wasm module I think
+
+[01:48:06.0000] <JakeA>
+littledan: how is the wasm imported into the service worker in this case?
+
+[01:48:25.0000] <littledan>
+I was getting at, it could be with an import statement, with Wasm/ESM integration.
+
+[01:48:40.0000] <littledan>
+(which isn't implemented anywhere, but everyone seems to buy into it)
+
+[01:49:11.0000] <JakeA>
+So `import wasmModule from './whatever.wasm'` - are you saying this uses top level await internally?
+
+[01:49:19.0000] <littledan>
+JakeA: Yes, that's the proposal
+
+[01:49:55.0000] <littledan>
+JakeA: So Wasm "compilation" takes place when fetching/parsing ,but some engines (currently JSC, but maybe more in the future) do significant work when "instantiating", which happens in the ESM evaluation phase
+
+[01:50:08.0000] <littledan>
+JakeA: So, the spec is, "in parallel, queue a task  to..."
+
+[01:50:42.0000] <JakeA>
+littledan: how is its use of `await` observably different from the parse time a regular script does when importing?
+
+[01:51:25.0000] <JakeA>
+I guess I'm trying to figure out what it means to use `await` 'internally'
+
+[01:51:26.0000] <littledan>
+JakeA: Not sure what you mean by "observably". It's like, if you have one module which imports another, the dependency doesn't run its top-level statements until the inner `await` resolves
+
+[01:51:54.0000] <littledan>
+and then, at the top level, there's a concept of when we've asynchronously finished executing the module graph, rather than synchronously (but it's fine to ignore this--HTML doesn't use it for much)
+
+[01:53:34.0000] <littledan>
+JakeA: Here's a simple, silly example: https://github.com/tc39/proposal-top-level-await#solution-top-level-await
+
+[01:54:06.0000] <JakeA>
+littledan: what if `import wasmModule from './whatever.wasm'` didn't use `await` internally, and it just waited. What would the observable difference be?
+
+[01:54:25.0000] <JakeA>
+littledan: but those examples aren't an internal use of `await`, they're author-written
+
+[01:54:49.0000] <JakeA>
+or have I misunderstood how `import wasmModule from './whatever.wasm'` is supposed to work?
+
+[01:55:24.0000] <littledan>
+JakeA: Right, in the draft spec for Wasm modules, we *always* queue a task (for consistency), so if that module calls into JS from its start function, you can see the timing difference
+
+[01:56:09.0000] <littledan>
+smaug____ and others were pretty strong in encouraging consistency on whether we're queueing a task or just preceding synchronously (in an earlier draft, it was "optional")
+
+[01:56:47.0000] <JakeA>
+littledan: consistency with what? (sorry I'm being dumb)
+
+[01:57:02.0000] <littledan>
+JakeA: Among engines, or within an engine, what the timing will be
+
+[01:57:58.0000] <JakeA>
+littledan: but if wasm modules consistently _didn't_ queue a task, would that be inconsistent with something else?
+
+[02:01:19.0000] <littledan>
+JakeA: Well, it'd mean we're running compilation on the main thread, which isn't so great
+
+[02:01:38.0000] <littledan>
+not sure how deep you're interested in the details of why that'd happen
+
+[02:02:14.0000] <littledan>
+Working out these Wasm module interactions is why I got started on top-level await
+
+[02:03:10.0000] <JakeA>
+littledan: Gotcha. I guess this relates more to https://github.com/tc39/proposal-top-level-await/issues/79#issuecomment-499402046 then. Allowing `import()` means you can kick off the import early but not be blocked by the compilation
+
+[02:04:09.0000] <littledan>
+right, I could imagine telling SW programmers, "sorry, Wasm has to be done with import()". I would be a little sad about that, but not the end of the world
+
+[02:04:33.0000] <littledan>
+JakeA: Is this what you're thinking?
+
+[02:04:50.0000] <littledan>
+JakeA: Or are you thinking, we do compilation on the main thread in this case, and off the main thread in that case?
+
+[02:04:55.0000] <JakeA>
+littledan: The alternative is "WASM can be imported statically within a service worker, but oh god please don't"
+
+[02:05:45.0000] <JakeA>
+littledan: Nah I wasn't thinking about switching to main thread compilation
+
+[02:06:04.0000] <littledan>
+well, I still have to learn more about SW to understand exactly how bad this is. This isn't the same order as waiting for network stuff, I think
+
+[02:06:14.0000] <JakeA>
+littledan: The choice still feels like "disallow it" vs "allow it but firefight people actually doing it"
+
+[02:06:27.0000] <JakeA>
+littledan: Service worker startup is never blocked on network stuff
+
+[02:06:49.0000] <JakeA>
+littledan: except the very first time, but at that point the service worker isn't needed for an important event
+
+[02:07:08.0000] <littledan>
+OK, so, I'll draft up this text to prohibit async modules for serviceworkers and socialize it a bit, and we'll go from there
+
+[02:07:14.0000] <littledan>
+JakeA: Thanks for talking this through
+
+[02:09:42.0000] <JakeA>
+littledan: When a service worker is first run, it's in an 'installing' state. It isn't in the blocking path for fetch/push/sync/etc events. At this point we take everything it imports via `importScripts` (we'd do the same with static imports) and cache them alongside the worker script. Then, when the service worker is in the middle of those important events, we just pull the imported scripts from disk (potentially precompiled). If
+
+[02:09:42.0000] <JakeA>
+it tries to `importScripts` anything it hasn't already imported, it throws.
+
+[02:10:54.0000] <littledan>
+so, if we're importing something that's already cached in the SW, maybe it can be synchronous?
+
+[02:11:24.0000] <JakeA>
+littledan: if it can be cached, yeah
+
+[02:12:07.0000] <JakeA>
+littledan: but if one of the static imports `await`s a load of IDB work (for instance), which adds 100s if ms to the `fetch` event being dispatchable, that's what we want to avoid
+
+[02:12:27.0000] <littledan>
+I see
+
+[02:12:36.0000] <JakeA>
+of ms*
+
+[02:12:52.0000] <littledan>
+JakeA: yeah, I imagine TLA would be used for exactly that kind of thing
+
+[02:13:15.0000] <littledan>
+and when it's "dispatchable" is really about, when the module has run?
+
+[02:13:22.0000] <JakeA>
+yeah
+
+[02:13:54.0000] <JakeA>
+We can't dispatch it until `addEventListener('fetch', listener)` has had time to be called
+
+[02:14:08.0000] <JakeA>
+Which is once the script has run
+
+[03:54:32.0000] <GPHemsley>
+looks like I'm gonna be updating the wiki this weekend, as our current version of MediaWiki is going EOL this month
+
+[04:41:08.0000] <Domenic>
+<3 GPHemsley
+
+
+2019-06-07
+[00:24:30.0000] <TimothyGu>
+anyone knows what "Hopefully Kam and Tess won't notice they're covered by these acknowledgments three times!" means in HTML's source comment
+
+[00:31:38.0000] <annevk>
+TimothyGu: I know it made sense when it was added
+
+[00:31:52.0000] <TimothyGu>
+lol probably
+
+[00:32:02.0000] <annevk>
+TimothyGu: I’d have to check if it still does
+
+[00:35:40.0000] <annevk>
+TimothyGu: given all the groups it prolly still does, but not sure
+
+[00:54:34.0000] <TimothyGu>
+time to update all tc39.github.io links to tc39.es?
+
+[00:54:42.0000] <TimothyGu>
+(former redirects to latter)
+
+[01:32:04.0000] <gsnedders>
+TimothyGu: Tess by name in the huge paragraph, the #whatwg crew, and by name in custom elements. Kam by name in the main ack section, #mrt(.no)?, dunno about the third for him. Tess is arguably covered a fourth time by "all the contributors to the various W3C HTML WG lists and…"
+
+[01:32:27.0000] <gsnedders>
+Or at least that's how I can justify that?
+
+[01:32:43.0000] <gsnedders>
+oh, Tess is also in the RICG list
+
+[01:34:52.0000] <gsnedders>
+tl;dr: all Tess, all the time
+
+[01:34:55.0000] <gsnedders>
+(Sorry hober)
+
+[01:44:51.0000] <MikeSmith>
+JakeA++ (for serving up a richness of ServiceWorker updates)
+
+[01:46:02.0000] <JakeA>
+MikeSmith: Cheers! Matt & I did a sprint on it this week. Although naturally a couple of "this will be a quick fix" things ate most of the time
+
+[01:46:17.0000] <MikeSmith>
+heh
+
+[01:46:31.0000] <annevk>
+TimothyGu: I guess we should update those links, yes
+
+[07:27:45.0000] <annevk>
+dtapuska: let me know if you're still waiting for me with https://github.com/whatwg/html/pull/4664 now Domenic gave feedback
+
+[07:30:29.0000] <hober>
+hahaha
+
+[07:39:56.0000] <annevk>
+gsnedders: hober: PRs accepted for making that a 4 😛
+
+[07:43:31.0000] <gsnedders>
+annevk: but not 5?
+
+[07:44:02.0000] <annevk>
+gsnedders: oh sorry, should have kept rereading
+
+[07:44:31.0000] <gsnedders>
+:)
+
+[07:44:43.0000] <gsnedders>
+YOU CAN NEVER HAVE TOO MUCH hober
+
+[07:45:15.0000] <annevk>
+very true ❤️
+
+[08:05:08.0000] <hober>
+dawwwwwwh
+
+[08:05:12.0000] <hober>
+/me blushes
+
+[08:06:12.0000] <hober>
+i'm pretty sure i have the lowest "magnitude of impact on the spec" / "number of acks" ratio ever
+
+[08:09:31.0000] <TabAtkins>
+Nah, you've done more than 5x the impact of at least *some* of the single-mention people. ^_^
+
+[09:00:05.0000] <Mek>
+huh, https://w3c.github.io/webappsec-secure-contexts/#is-origin-trustworthy explicitly treats "file:" URLs as "potentially trustworthy", but only if the URL didn't actually have an opaque origin, while url "encourages" browsers to treat "file:" as opaque origins...
+
+[11:04:42.0000] <TimothyGu>
+gsnedders: ah Tess = hober. Sorry for being completely ignorant
+
+[12:01:42.0000] <gsnedders>
+TimothyGu: (Kam you probably won't know; friend of Hixie's from uni, also ex-Opera)
+
+[12:18:27.0000] <annevk>
+Very good at Ricochet Robots
+
+[13:52:35.0000] <dtapuska>
+annevk: I just gotta get time to get back to that PR maybe next week sometime
+
+[14:23:45.0000] <Domenic>
+Ricochet Robots is the worst
+
+
+2019-06-08
+[08:07:57.0000] <GPHemsley>
+wiki updated to MediaWiki 1.27.7 (last release for 1.27.x branch)
+
+[08:08:53.0000] <GPHemsley>
+gonna take a little longer to do the switch to 1.31.x, as I have research and setup to do first
+
+[08:10:03.0000] <GPHemsley>
+(I know you're all waiting with bated breath)
+
+[09:26:56.0000] <annevk>
+🥳
+
+[09:28:05.0000] <annevk>
+Domenic: I challenge thee
+
+[15:45:36.0000] <GPHemsley>
+OK, upgrade to MediaWiki 1.31.x complete
+
+[15:45:48.0000] <GPHemsley>
+let me know if you have any problems or want any new extensions turned on
+
+[15:46:00.0000] <GPHemsley>
+https://www.mediawiki.org/wiki/MediaWiki_1.31
+
+[15:46:46.0000] <GPHemsley>
+I have enabled the new Timeless for those who may want to use it
+
+[15:46:55.0000] <GPHemsley>
+https://wiki.whatwg.org/index.php?title=Main_Page&useskin=timeless
+
+[15:47:33.0000] <GPHemsley>
+(Vector remains the default)
+
+[15:47:53.0000] <GPHemsley>
+*Timeless skin
+
+[15:48:11.0000] <TimothyGu>
+is there a way to make WHATWG Wiki be on the same line on Timeless
+
+[15:48:27.0000] <GPHemsley>
+no idea
+
+[15:48:33.0000] <TimothyGu>
+https://usercontent.irccloud-cdn.com/file/MTLVqxUT/Screenshot%20from%202019-06-08%2015-48-22.png
+
+[15:49:02.0000] <GPHemsley>
+I imagine that's something you'll need to take up with the skin authors
+
+[15:49:30.0000] <GPHemsley>
+(who have probably only tested with "Wikipedia" or the like)
+
+[15:49:34.0000] <TimothyGu>
+ugh ok
+
+[15:51:44.0000] <GPHemsley>
+FTR, I didn't actually look at how it rendered until I pasted that link, so you and I have exactly the same amount of experience with that skin
+
+[15:52:48.0000] <GPHemsley>
+anyway, see you again somewhere between June 2020 and June 2021 ;)
+
+[15:52:59.0000] <TimothyGu>
+ah lol
+
+[15:53:07.0000] <GPHemsley>
+https://www.mediawiki.org/wiki/Version_lifecycle
+
+[16:18:21.0000] <GPHemsley>
+cool, I think wiki.whatwg.org stopped responding to pings
+
+
+2019-06-09
+[09:26:49.0000] <howdoi>
+Happy Birthday Domenic! :-)
+
+[11:51:14.0000] <innovati_>
+HTML defines a bunch of attributes, and lets you invent new ones using data-* attributes, my question is if there are there any intentionally off-limits names that we know no future attributes will ever be invented to match
+
+[16:44:48.0000] <Domenic>
+innovati: no future attributes will be invented that start with data-
+
+
+2019-06-10
+[17:14:33.0000] <GPHemsley>
+annevk: Any thoughts offhand about https://mimesniff.spec.whatwg.org/#matching-an-archive-type-pattern ? A bunch of tickets just came in from a golang contributor looking to expand the list.
+
+[17:16:03.0000] <GPHemsley>
+This section only exists because I broke the original long list into categories, and I never added anything to it (like the obvious tar, bz2, xz, etc.)
+
+[17:17:08.0000] <GPHemsley>
+Domenic: You may also have thoughts ^
+
+[17:17:45.0000] <GPHemsley>
+I don't think I ever did any extensive cross-browser testing on these - and even if I did, I'm sure it'd be out of date now
+
+[17:21:03.0000] <GPHemsley>
+(side note: the code that is supposedly implementing this claims that our RAR byte pattern is wrong)
+
+[00:02:30.0000] <howdoi>
+Domenic: is there an example of what the output would look like after hiding the functionality? as in .toString() will not display it, that's it?
+
+[01:19:22.0000] <annevk>
+GPHemsley: ask the person to do the testing?
+
+[02:18:26.0000] <JakeA>
+What's the deal with flags vs booleans in specs these days? Do we still use flags?
+
+[03:41:47.0000] <annevk>
+JakeA: we try not to
+
+[03:41:59.0000] <annevk>
+JakeA: and migrate
+
+[03:42:15.0000] <JakeA>
+Gotcha. Will do the same.
+
+[05:09:45.0000] <innovati>
+Domenic while no attributes will start with data, there isn't a data-* attribute I can write that I can be certain you won't invent (if that makes sense)
+
+[07:08:44.0000] <domfarolino>
+Whoah, async iterators are themselves iterable https://tc39.es/ecma262/#sec-asynciteratorprototype-asynciterator
+
+[07:13:24.0000] <Domenic>
+GPHemsley: my opinion is that the categorizations should only be in the spec in so far as they can be backed by web platform tests (possibly manual?) on browser behavior in some specific scenario. So like XML and JSON MIME types are important in the HTML navigation algorithm. I don't know where any of the archive/ZIP mime types are important, but they should be tested in that place.
+
+[07:13:32.0000] <Domenic>
+howdoi: I don't know what you're referring to.
+
+[07:13:41.0000] <Domenic>
+innovati: that doesn't make sense to me; too many negatives.
+
+[07:35:54.0000] <domfarolino>
+Domenic: as per spec, passing an iterator to something that expects an iterable, will indeed invoke the method in the above link, right?
+
+[07:36:07.0000] <Domenic>
+domfarolino: yep!
+
+[07:36:15.0000] <Domenic>
+Same for sync iterators
+
+[07:36:25.0000] <Domenic>
+E.g. you can pass someMap.values() to anything that expects a sequence<>
+
+[07:36:25.0000] <domfarolino>
+nifty
+
+[07:36:34.0000] <domfarolino>
+nice :)
+
+[07:37:38.0000] <domfarolino>
+for a while i was digging in the spec looking for "If |iterable| *is already an iterator*...no need to call GetIterator(...)"
+
+[09:50:43.0000] <innovati>
+It's not safe to use 'something' as an attribute name because it's possible an attribute named 'something' could exist. It's not safe for me to use 'data-something' because that's specifically allowed for anybody to invent for whatever they want. Is there some legal attribute name that the platform, nor authors would ever use? Like is '--something' or `$something` or some other name something safe for me to use under the assumption
+
+[09:50:43.0000] <innovati>
+ that neither the platform, nor authors would ever be writing something like that?
+
+[10:49:08.0000] <Domenic>
+innovati: no. If you could use it, then someone else could. There's nothing that is reserved only for innovati in the spec.
+
+[10:50:13.0000] <innovati>
+and there's nothing that is known to be off-limits for future spec use, and thus also not open for author use either, even if it's not just for my personal 'innovati' use alone? ;)
+
+[10:51:11.0000] <Domenic>
+Correct.
+
+[10:51:20.0000] <innovati>
+thanks!
+
+[10:51:31.0000] <Domenic>
+That said, I can personally guarantee you the platform will never use an attribute starting with innovati$$_$_$_$
+
+[10:51:37.0000] <Domenic>
+My word is my bond on that.
+
+[10:54:41.0000] <innovati>
+Are there anything like the vendor prefixes for CSS properties like '-moz-appearance' instead of 'appearance' used on attributes by any browsers for their own internal use or anything like this out there already?
+
+[11:07:24.0000] <Domenic>
+No, browsers don't use attributes internally.
+
+[11:08:52.0000] <innovati>
+I think Edge outputs class names to represent form validity status, which is surprising to me since it's mixed right in with author class names as well, would be very easy to conflict
+
+[11:11:42.0000] <Domenic>
+Well, I guess some browsers have bugs :)
+
+[11:12:08.0000] <innovati>
+hehe
+
+[12:14:03.0000] <Domenic>
+annevk: FYI https://github.com/whatwg/storage/pull/69 from a first-time contributor should be ready for editor review now, I did all the editorial review.
+
+
+2019-06-11
+[05:49:01.0000] <JakeA>
+If an argument is specified as a `unsigned long`, and a negative number is passed, should it throw?
+
+[05:49:57.0000] <JakeA>
+I'm looking at https://heycam.github.io/webidl/#es-unsigned-long, but I'm not really familiar with how the ES spec does things, so I don't know what happens if there's an abrupt completion
+
+[05:54:04.0000] <JakeA>
+Ah, I missed the [EnforceRange] bit. Ignore me.
+
+[05:57:26.0000] <JakeA>
+When should we [EnforceRange] / [Clamp] / neither? For method arguments, it seems right to [EnforceRange], but it doesn't seem like many APIs do that
+
+[05:57:34.0000] <JakeA>
+Is it considered bad practice?
+
+[06:03:39.0000] <yhirano>
+annevk: yt?
+
+[06:05:15.0000] <annevk>
+yhirano: yes
+
+[06:05:43.0000] <yhirano>
+regarding https://github.com/whatwg/html/issues/4175
+
+[06:06:43.0000] <annevk>
+yhirano: I didn't immediately reply there was I wasn't sure I quite understood your question
+
+[06:07:42.0000] <yhirano>
+annevk: yeah, i want to make sure if I understand the situation correctly
+
+[06:08:50.0000] <annevk>
+yhirano: okay, I guess I can ask some questions about your comment, what is "none" sameness?
+
+[06:08:59.0000] <yhirano>
+annevk: do we need to create a new browsing context group when CORP-P of navigation source and destination are different each other?
+
+[06:09:24.0000] <annevk>
+yhirano: only if COOP mismatches
+
+[06:09:40.0000] <annevk>
+yhirano: CORP-P by itself cannot provide total isolation
+
+[06:10:09.0000] <yhirano>
+annevk: hmm... I don't understand then.
+
+[06:10:16.0000] <annevk>
+yhirano: okay
+
+[06:11:13.0000] <yhirano>
+annevk: Assume a frame A opens a popup B, and they belong to the same origin and have the same COOP
+
+[06:11:30.0000] <annevk>
+yhirano: okay
+
+[06:11:51.0000] <yhirano>
+annevk: if A opts into CORP-P and B doesn't, we want to isolate them each other, right?
+
+[06:12:44.0000] <annevk>
+yhirano: B won't load in that case (note also that A would have to specify unsafe-allow-origin for this, iirc)
+
+[06:12:53.0000] <annevk>
+allow-outgoing ugh
+
+[06:14:14.0000] <annevk>
+yhirano: so COOP can allow something, but CORP-P could prevent the fetching if it were to end up in the same browsing context group
+
+[06:14:29.0000] <yhirano>
+annevk: hm, then, what happens when both A and B opt into CORP-P? Both frame cannot navigate to a CORP-P disabled resource, even if it is same-origin?
+
+[06:14:35.0000] <annevk>
+(well not the fetching, but block the response from entering)
+
+[06:16:20.0000] <annevk>
+yhirano: hmm so if A defines COOP and CORP-P, can it navigate to COOP but no CORP-P
+
+[06:18:39.0000] <yhirano>
+annevk: sorry, you meant A can navigate to another frame, say C, which has a matching COOP but no CORP-P, right?
+
+[06:18:59.0000] <annevk>
+yhirano: I meant to add a ? at the end there
+
+[06:19:06.0000] <yhirano>
+annevk: i see
+
+[06:19:12.0000] <annevk>
+yhirano: I'm not sure we considered that case well enough
+
+[06:19:33.0000] <annevk>
+yhirano: for popups it'd fail, but for a non-popup that doesn't seem great
+
+[06:21:06.0000] <yhirano>
+annevk: thanks I think we should think about the case... I will try to post a comment on the thread.
+
+[06:21:42.0000] <yhirano>
+annevk: I agree that limiting navigation from the opener would be confusing to users
+
+[06:21:59.0000] <annevk>
+yhirano: I suspect in that case the combination of COOP and CORP-P should result in replacing behavior
+
+[06:22:55.0000] <annevk>
+yhirano: it seems better to let the navigation succeed
+
+[06:23:05.0000] <yhirano>
+annevk: sorry i don't understand the replacing bahavior
+
+[06:23:09.0000] <annevk>
+yhirano: this is also something we could still tweak for popups
+
+[06:23:31.0000] <annevk>
+yhirano: if you navigate A and A' doesn't have CORP-P (but does have matching COOP)
+
+[06:24:17.0000] <annevk>
+yhirano: (the replacing behavior is what COOP defines, closing the current browsing context and creating a new one in a new browsing context group)
+
+[06:24:51.0000] <yhirano>
+annevk: thanks!
+
+[06:25:37.0000] <annevk>
+yhirano: I have limited bandwidth for 2 weeks, but hope to get back to this after that
+
+[06:26:01.0000] <annevk>
+yhirano: thanks for highlighting this scenario some more though, it's important
+
+[06:26:59.0000] <yhirano>
+annevk: what would happen when we do that whenever we see CORP-P unmatch?
+
+[06:27:17.0000] <yhirano>
+annevk: thank you, too!
+
+[06:27:57.0000] <annevk>
+yhirano: it wouldn't work for frames, but it would work for all top-level navigations, including popups, I think
+
+[06:28:16.0000] <annevk>
+yhirano: the question is to what extent popups should work like frames
+
+[06:31:37.0000] <yhirano>
+annevk: i see, thanks again.
+
+[06:41:56.0000] <Domenic>
+https://github.com/dotnet/corefx/issues/38421 someone asking .NET to implement the URL Standard.
+
+[06:42:25.0000] <Domenic>
+JakeA: https://w3ctag.github.io/design-principles/#numeric-types
+
+[06:44:53.0000] <JakeA>
+Domenic: I did not know about this doc. Perfect. So why is [EnforceRange] used so rarely? Looking in Chromium, it only seems to be used by IDB, RTC, and a couple of canvas methods. Is it just new (guidance)?
+
+[06:45:06.0000] <Domenic>
+JakeA: yeah that's my take.
+
+[06:45:18.0000] <Domenic>
+Not too many new APIs accepting integer types, from what I can tell?
+
+[06:47:46.0000] <JakeA>
+Interesting. Cheers!
+
+[07:25:02.0000] <JakeA>
+Domenic: Could you give https://github.com/w3ctag/design-principles/issues/130 an approving nod if you agree. Heard from a couple of teams trying to require empty option objects.
+
+[07:26:17.0000] <annevk>
+JakeA: it's optional but also provided
+
+[07:27:43.0000] <JakeA>
+annevk: In this case I'm seeing folks suggest that `foo()` should throw, and developers must use `foo({})`
+
+[07:29:09.0000] <annevk>
+JakeA: for that particular case that'd be in violation of IDL as is now pointed out on the issue
+
+[07:29:14.0000] <annevk>
+JakeA: https://github.com/heycam/webidl/issues/76 might be somewhat interesting
+
+[07:29:20.0000] <annevk>
+JakeA: for more involved cases
+
+[07:30:32.0000] <JakeA>
+Ohh cheers!
+
+[15:50:19.0000] <bkardell>
+Domenic: on https://github.com/tkent-google/std-switch/pull/17 - I feel like I have a question that a) feels like it requires a bit to articulate b) probably doesn't belong there - I simply asked there because the text in that made me think of it...
+
+[15:50:58.0000] <bkardell>
+do you think maybe I could send you some text and you could possibly direct me to a productive/appropriate place to ask it?
+
+[16:12:33.0000] <Domenic>
+bkardell: sure, happy to email.
+
+[16:15:12.0000] <TimothyGu>
+Domenic: re https://github.com/whatwg/html/issues/3989, I'm having some trouble understanding how about:srcdoc fits into the override URL issue. does adding back override URL fix the srcdoc issue, or are they relatively independent but just got inadvertently merged into the same bug?
+
+[16:16:22.0000] <Domenic>
+TimothyGu: it does seem to have gotten pretty off-topic. But the origin of the merger was https://github.com/whatwg/html/issues/3989#issuecomment-419470921 where bz was mentioning that javascript: URLs executed in srcdoc documents might inherit the about:srcdoc URL.
+
+[16:17:54.0000] <TimothyGu>
+Ah okay. The recent Chrome navigation cleanups are pretty exciting though
+
+[16:21:43.0000] <bkardell>
+Domenic: excellent - sent to your domain email.  Very much appreciate it. I am keen to discuss/understand but also not keen to make unhelpful q's in the wrong place
+
+
+2019-06-12
+[17:04:09.0000] <domfarolino>
+yoav: would you say https://github.com/whatwg/html/pull/3752/files#r269950600 is "resolved", given your latest comment?
+
+[21:09:26.0000] <domfarolino>
+annevk: is there no way to determine the "destination", or resource type of a response? seems you can only get that from request?
+
+[21:37:57.0000] <annevk>
+domfarolino: resource type?
+
+[21:39:09.0000] <domfarolino>
+annevk: Well, I guess I am just wondering if you can get the request's `destination`, from a #concept-response
+
+[21:39:40.0000] <annevk>
+domfarolino: you cannot
+
+[21:44:05.0000] <domfarolino>
+annevk: Ok. Right now a #concept-request can only get its integrity metadata set for a few destinations ("", "style", and "script" from what I can tell).
+
+[21:44:44.0000] <domfarolino>
+To enable `integrity` on rel=preload w/o enabling SRI on a bunch of destinations that SRI currently cannot affect (like "object"), I'm thinking of having SRI spec define a set of "sri-compatible destinations", and having Fetch gate calling into the SRI spec based on whether the destination is "compatible"
+
+[21:45:17.0000] <domfarolino>
+Looks like I can just use request's destination, and pass that to the SRI spec for it to determine whether or not a dest is "compatible"
+
+[21:46:09.0000] <annevk>
+domfarolino: why would we not support it for all with rel=preload?
+
+[21:47:08.0000] <domfarolino>
+https://w3c.github.io/webappsec-subresource-integrity/#verification-of-html-document-subresources mentions that a "future version of this document" would include support, just by tweaking a couple things in the Preload/HTML standards
+
+[21:47:53.0000] <domfarolino>
+Perhaps it'd be sensible to allow SRI verification on destinations that you can preload, if and only if you can perform SRI verification on that destination w/o the preload
+
+[21:48:39.0000] <domfarolino>
+(for example, there's no way of setting an <audio> request's integrity metadata, so maybe we should not honor it on its preload, since SRI spec isn't expecting that atm
+
+[21:48:54.0000] <annevk>
+Why?
+
+[21:49:24.0000] <annevk>
+fetch() supports it, the infra is there
+
+[21:50:10.0000] <domfarolino>
+True...I guess I like the idea of the SRI spec being in control of where SRI verification can take place, since it kind of attempts to do that now
+
+[21:50:41.0000] <annevk>
+Ignoring the infra despite the attribute being set seems likely to lead to issues in the future if we do want more “destinations”
+
+[21:51:16.0000] <annevk>
+domfarolino: if it does that’s dumb, as Fetch and HTML are in control
+
+[21:52:07.0000] <domfarolino>
+ok that makes sense. This note in SRI spec should probably be gone then "Note: A future revision of this specification is likely to include integrity support for all possible subresources, i.e., a, audio, embed, iframe, img, link, object, script, source, track, and video elements."
+
+[21:52:07.0000] <annevk>
+domfarolino: the main callout Fetch has to SRI is about running the check on the response body
+
+[21:52:39.0000] <annevk>
+Unless I’m missing something
+
+[21:53:14.0000] <domfarolino>
+No that makes sense, just I assumed that SRI spec was trying to be in control of where it is supported, given the partial IDL interfaces it has, and the note ^
+
+[23:35:54.0000] <annevk>
+domfarolino: it having partial IDL seems wrong too
+
+[23:36:58.0000] <annevk>
+domfarolino: unless it’s somehow made non-normative and not indexable, but that might be needlessly confusing too
+
+[23:37:29.0000] <TimothyGu>
+it seems like the right approach is interface mixin + `includes`
+
+[23:37:38.0000] <TimothyGu>
+(right?)
+
+[00:02:01.0000] <annevk>
+TimothyGu: well, I haven't looked but in this case I think it's duplicating HTML as the partial interfaces were upstreamed and integrated there
+
+[00:02:09.0000] <annevk>
+(iirc)
+
+[00:03:42.0000] <domfarolino>
+That is my impression too
+
+[05:42:10.0000] <TimothyGu>
+oh ok
+
+[05:54:43.0000] <zcorpan>
+Hmm whatpr.org versions of the HTML spec don't have link-fixup.js or html-dfn.js
+
+[05:56:34.0000] <MikeSmith>
+zcorpan: I vaguely recall maybe that was intentional, because we don’t actually want people using those drafts for any actual information needs?
+
+[06:17:31.0000] <zcorpan>
+MikeSmith: it makes it harder to review though :-|
+
+[06:18:58.0000] <zcorpan>
+maybe link-fixup isn't necessary to review, but I wanted html-dfn.js now
+
+[06:19:38.0000] <zcorpan>
+Where do I file an issue for this?
+
+[06:20:31.0000] <Domenic>
+zcorpan: MikeSmith: whatpr is only running wattsi, not full HTML build, because we only have a wattsi server, not a html-build server.
+
+[06:21:32.0000] <Domenic>
+Probably best tracked at https://github.com/whatwg/html-build/issues, although I thought we had an issue already; maybe it is somewhere else.
+
+[06:22:08.0000] <MikeSmith>
+ah sorry I realize now whatpr is for pull requests? I was (mis)thinking it had something to with the lawyer drafts
+
+[06:23:49.0000] <zcorpan>
+Domenic: ok. could it just load the URL https://html.spec.whatwg.org/html-dfn.js ?
+
+[06:25:35.0000] <Domenic>
+MikeSmith: yeah just for pull requests
+
+[06:25:56.0000] <MikeSmith>
+k
+
+[06:26:03.0000] <Domenic>
+zcorpan: I think that'd be hard because currently tobie's setup just calls to the web service, but maybe it could work
+
+[06:27:26.0000] <zcorpan>
+Domenic: I mean changing the <script src> in whatwg/html source
+
+[06:29:18.0000] <Domenic>
+Oh, interesting
+
+[06:29:35.0000] <Domenic>
+I guess we could, but I wonder where that stops; do we do it for all the images and such?
+
+[06:29:44.0000] <Domenic>
+I think it also won't work because we don't generate the json file
+
+[06:29:54.0000] <Domenic>
+Or maybe we do, I forget whether that's wattsi or html-build...
+
+[06:40:55.0000] <MikeSmith>
+for the dfn's?
+
+[06:40:58.0000] <MikeSmith>
+wattsi generates the json
+
+[07:14:44.0000] <zcorpan>
+Domenic: I suppose having images would also be nice, but seems less important since images are rare. We already load file-issue.js with an absolute URL fwiw
+
+[14:36:35.0000] <zcorpan>
+TIL http://software.hixie.ch/utilities/js/live-dom-viewer/saved/7001
+
+
+2019-06-13
+[23:40:37.0000] <MikeSmith>
+annevk: https://stackoverflow.com/questions/56563807/firefox-cant-read-fetch-response-header
+
+[23:41:03.0000] <MikeSmith>
+> I want to read the value of the WWW-Authenticate response header. This works fine on Chrome, but on Firefox, I'm unable to see the WWW-Authenticate header, even though it's included in the Access-Control-Expose-Headers header of my response.
+
+[23:59:20.0000] <annevk>
+MikeSmith: that’s a known bug 😟
+
+[00:00:57.0000] <annevk>
+Having dfn.js work on whatpr would be great btw
+
+[00:16:45.0000] <MikeSmith>
+annevk: yeah I figured it might but, so I already looked through Mozilla bugzilla, but I couldn’t find something that looked like a match
+
+[00:16:56.0000] <MikeSmith>
+maybe I didn’t look hard enought
+
+[00:16:59.0000] <MikeSmith>
+*enough
+
+[00:17:28.0000] <MikeSmith>
+annevk: maybe you can comment on that SO question if you have time, or even post an answer
+
+[01:27:13.0000] <annevk>
+MikeSmith: done
+
+[02:15:57.0000] <MikeSmith>
+annevk: thanks
+
+[02:16:08.0000] <MikeSmith>
+https://stackoverflow.com/questions/56575716/content-security-policy-inside-iframe-affects-whole-page-on-firefox
+
+[02:17:57.0000] <MikeSmith>
+annevk: next one :) I haven't tried to reproduce it yet, but if that's really happening the way the op says, there's a pretty bad bug
+
+[02:56:00.0000] <annevk>
+MikeSmith: can take a look tomorrow, suspect it might due to about:blank not copying or some such, but I thought that got clarified already
+
+[03:12:15.0000] <MikeSmith>
+annevk: OK, thanks
+
+[04:13:31.0000] <domfarolino>
+annevk: Just heads up I’m going to make a PR to HTML “allowing” integrity attribute to appear on link preloads (now its only “allowed” for rel=stylesheet)
+
+[04:13:58.0000] <domfarolino>
+I imagine we’ll want WPTs for integrity attr on rel=preload for every possible ‘as’ destination?
+
+[04:27:25.0000] <annevk>
+domfarolino: that’d be nice I suppose, also for invalid values
+
+[09:06:26.0000] <domfarolino>
+👍
+
+[16:10:25.0000] <TimothyGu>
+Domenic/annevk: when you have a flag in HTML, do you say "set/unset" or "set to true/false"
+
+[16:15:59.0000] <Domenic>
+TimothyGu: we're moving away from flags and toward booleans, which are true/false.
+
+[16:16:09.0000] <TimothyGu>
+Domenic: okay, thanks
+
+[16:26:20.0000] <domfarolino>
+yoav: ping https://github.com/w3c/preload/pull/134 (old PR)
+
+
+2019-06-14
+[22:32:27.0000] <MikeSmith>
+https://developer.apple.com/safari/technology-preview/release-notes/
+
+[22:32:45.0000] <MikeSmith>
+> Implemented imagesrcset and imagesizes attributes on link rel=preload
+
+[08:19:16.0000] <annevk>
+TimothyGu: oooh explicit state for initial about:blank is great
+
+[09:47:28.0000] <MikeSmith>
+annevk: so by the way https://stackoverflow.com/questions/56575716/content-security-policy-inside-iframe-affects-whole-page-on-firefox did turn out to be a bug in Firefox 68 and earlier, maybe due to regression caused by some refactoring, I dunno
+
+[09:47:43.0000] <MikeSmith>
+but anyway fixed in Firefox 69
+
+[09:48:22.0000] <MikeSmith>
+KWierso used mozregression to isolate it
+
+[09:48:48.0000] <MikeSmith>
+well, to identify the patch which fixed it
+
+[09:50:07.0000] <Domenic>
+annevk or anyone: is there any prevention for fetches from inactive documents? E.g. `inactiveIframe.eval('fetch("https://example.com/")')`
+
+[10:04:28.0000] <annevk>
+Domenic: it's an open issue (as is canceling when documents become inactive)
+
+[10:05:12.0000] <annevk>
+MikeSmith: ah cool, thanks for the update (I did not get to it, evidently)
+
+[10:05:51.0000] <Domenic>
+I recall canceling when documents become inactive being vaguely defined, if not fully hooked up.
+
+[10:08:02.0000] <annevk>
+Domenic: true, but it's unclear to me if the specific timing is interoperable across implementations, based on bugs I've seen come by but not have prioritized
+
+[10:08:27.0000] <Domenic>
+Yeah, I was just unclear whether there was an intention of preventing future fetches or just canceling ongoing ones.
+
+[10:09:39.0000] <annevk>
+Domenic: there probably ought to be a prevention as well as the user has no way to deal with inactive documents
+
+[10:09:52.0000] <annevk>
+Domenic: otherwise they could likely be used to load resources the user has no control over
+
+[10:11:55.0000] <annevk>
+Reading more whatwg/html backlog and it seems TimothyGu has been touching many interesting bits recently
+
+[10:12:08.0000] <annevk>
+Looking forward to being able to catch up with all of that
+
+[10:33:12.0000] <Domenic>
+Yeah I think we just need someone to write WPTs for him :)
+
+[13:05:43.0000] <innovati>
+Just a historical curiosity - why is <div> named DIV, rather than something like <box> which seems self-explanatory and is just as short?
+
+[13:06:15.0000] <innovati>
+was there precedent for <div> in markup languages before HTML?
+
+[13:47:05.0000] <astearns>
+innovati: looks like it was only added in HTML3 (though HTML2 uses it in an example: https://tools.ietf.org/html/rfc1866 )
+
+[14:06:02.0000] <innovati>
+astearns am I reading that correct that in the HTML2 example <div> is given as an example of an unsupported made-up tag?
+
+[14:06:38.0000] <astearns>
+that was my reading, too
+
+[14:06:46.0000] <innovati>
+thanks for finding this :D HTML history is so interesting
+
+
+2019-06-16
+[01:52:10.0000] <MikeSmith>
+https://stackoverflow.com/questions/56615302/how-to-postmessage-to-a-sandboxed-iframe-without-using-as-the-origin is an interesting question
+
+[05:15:55.0000] <annevk>
+MikeSmith: downvoted? comment seems accurate
+
+[06:06:37.0000] <MikeSmith>
+annevk: yeah after reading the answer there, the question is less interesting. Now I don’t know what actual problem the OP is trying to solve
+
+
+2019-06-17
+[17:31:35.0000] <TimothyGu>
+we should probably switch out NPAPI for something more interesting in https://html.spec.whatwg.org/multipage/introduction.html#abstract
+
+[17:32:02.0000] <TimothyGu>
+ServiceWorker?
+
+[00:48:24.0000] <annevk>
+MikeSmith: all Review Draft PRs are failing on "./deploy.sh: line 185: /usr/lib/jvm/java-8-oracle/jre/bin/java: No such file or directory"
+
+[00:48:34.0000] <annevk>
+MikeSmith: https://travis-ci.org/whatwg/compat/builds/546616392
+
+[10:06:16.0000] <TabAtkins>
+TimothyGu: Lol at npapi showing up in that diagram.
+
+[10:06:41.0000] <TabAtkins>
+Luckily the image is an SVG, so it can be trivially editted.
+
+[10:09:27.0000] <TabAtkins>
+https://github.com/whatwg/html/issues/4711
+
+
+2019-06-18
+[19:40:03.0000] <MikeSmith>
+annevk: I’ll get it fixed
+
+[22:34:42.0000] <MikeSmith>
+annevk: can you please rubberstamp https://github.com/whatwg/whatwg.org/pull/256
+
+[22:35:01.0000] <MikeSmith>
+or foolip or Domenic if you are around
+
+[04:13:59.0000] <annevk>
+MikeSmith: I’m on Vancouver time plus jetlag this week
+
+[04:17:20.0000] <MikeSmith>
+annevk: ah OK
+
+[04:38:45.0000] <MikeSmith>
+annevk: (still) working on fixing the HTML checker breakage now
+
+[04:39:06.0000] <MikeSmith>
+(another) fix just pushed
+
+[04:39:12.0000] <MikeSmith>
+(fingers crossed)
+
+[04:40:53.0000] <MikeSmith>
+...and green
+
+[04:41:03.0000] <MikeSmith>
+w00t https://travis-ci.org/whatwg/compat/builds/546616392
+
+[04:45:35.0000] <annevk>
+MikeSmith: aaah, thanks so much!
+
+[04:45:47.0000] <annevk>
+Domenic: whenever you wake up you can land the RDs I think
+
+[05:51:55.0000] <annevk>
+mkwst: thanks for setting up https://mikewest.github.io/corpp/
+
+[05:52:08.0000] <annevk>
+mkwst: are you envisioning using that repository for issues going forward?
+
+[05:52:30.0000] <annevk>
+mkwst: or should I create a new topic label on whatwg/html and file issues there?
+
+[06:33:34.0000] <mkwst>
+I think people are already paying attention to whatwg/html conversations. Let's not give them a new place to file bugs.
+
+[06:34:06.0000] <mkwst>
+I'm not sure this document needs to live past the PRs we eventually land, so let's keep the conversations in the main repo. I'll note that in the doc.
+
+[06:49:27.0000] <annevk>
+mkwst: sounds good, thanks for the quick reply
+
+[06:50:04.0000] <mkwst>
+It's a nice counterpoint to the ~month delay in getting you the document in the first place.
+
+
+2019-06-19
+[21:08:22.0000] <MikeSmith>
+I’m a bit baffled by how version control for the ES BigInt proposal seems to be handled
+
+[21:08:46.0000] <MikeSmith>
+I raised a pull request against what I assumed is the source at https://github.com/tc39/proposal-bigint
+
+[21:09:35.0000] <MikeSmith>
+the pull request gets merged there, but with a comment:
+
+[21:09:40.0000] <MikeSmith>
+> Thanks for the fix. Can we make sure this is done against the main PR as well? @caiolima
+
+[21:09:45.0000] <MikeSmith>
+https://github.com/tc39/proposal-bigint/pull/206#issuecomment-502538709
+
+[21:10:07.0000] <MikeSmith>
+oh I see now littledan is actually here
+
+[21:11:21.0000] <MikeSmith>
+I still don’t know what “main PR” means there, though I did go ahead and submit the same patch at https://github.com/caiolima/ecma262/pull/5
+
+[21:11:56.0000] <MikeSmith>
+I can’t figure out why there are two repos or what the relationship between them is..
+
+[21:15:02.0000] <MikeSmith>
+botie: inform bkardell congrats on joining Igalia
+
+[21:15:02.0000] <botie>
+will do
+
+[22:34:20.0000] <Domenic>
+MikeSmith: I think the BigInt spec is graduating from incubation, so to speak, so you've caught them in an awkard in-between period.
+
+[22:34:41.0000] <Domenic>
+MikeSmith: what do you mean by having the checker ignore the warnings? In the global deploy.sh script, or only for encoding, or for the checker in general, or...?
+
+[22:37:12.0000] <MikeSmith>
+Domenic: we can do it only for Encoding
+
+[22:37:34.0000] <MikeSmith>
+this is exactly what I made that CHECKER_FILTER environment variable for
+
+[22:37:35.0000] <Domenic>
+That sounds very nice. I guess we added an environment variable we can set in Travis CI?
+
+[22:37:39.0000] <MikeSmith>
+right
+
+[22:37:46.0000] <MikeSmith>
+I’ll try it now
+
+[22:38:09.0000] <Domenic>
+Ah, I misunderstood and thought CHECKER_FILTER was only for file filters, not warning filters.
+
+[22:38:11.0000] <Domenic>
+Thank you
+
+[22:38:16.0000] <MikeSmith>
+cheers
+
+[22:38:55.0000] <MikeSmith>
+Domenic: I guess I should also document somewhere what CHECKER_FILTER is for..
+
+[22:39:21.0000] <Domenic>
+Yeah I guess the build/ readme in the whatwg.org repo maybe
+
+[22:39:52.0000] <Domenic>
+https://github.com/whatwg/whatwg.org/blob/master/resources.whatwg.org/build/README.md
+
+[22:42:54.0000] <MikeSmith>
+OK
+
+[22:51:09.0000] <MikeSmith>
+damn, running the HTML checker on the Encoding output takes about 3 minutes on my machine
+
+[22:51:24.0000] <MikeSmith>
+makes me wonder if I regressed the performance of the checker somehow
+
+[23:02:23.0000] <MikeSmith>
+Domenic: OK, made the fix locally and it works; will make a patch
+
+[23:02:31.0000] <Domenic>
+\o/
+
+[23:11:39.0000] <MikeSmith>
+Domenic: https://github.com/whatwg/encoding/pull/179
+
+[23:12:32.0000] <Domenic>
+Aww frig participation check
+
+[23:12:54.0000] <MikeSmith>
+oh
+
+[23:13:03.0000] <MikeSmith>
+what should we do about that?
+
+[23:13:23.0000] <MikeSmith>
+teh patch doesn’t touch the spec source
+
+[23:14:32.0000] <Domenic>
+Yeah
+
+[23:14:40.0000] <Domenic>
+Sigh
+
+[23:14:52.0000] <Domenic>
+I feel like that should be editor judgement to say it's OK
+
+[23:15:03.0000] <Domenic>
+But I guess I would like to wait for annevk at least to confirm
+
+[23:15:11.0000] <Domenic>
+I would normally like to check with SG but they are quite slow.
+
+[23:15:46.0000] <MikeSmith>
+damn it didn’t work anyway
+
+[23:15:53.0000] <MikeSmith>
+https://travis-ci.org/whatwg/encoding/builds/547557634
+
+[23:16:10.0000] <MikeSmith>
+why why why
+
+[23:16:25.0000] <Domenic>
+> After the IPR Policy becomes effective, Editors are responsible for ensuring that material included in their Living Standards is governed by a Contributor and Workstream Participant Agreement.
+
+[23:16:48.0000] <Domenic>
+So I think to be sure we are on the up-and-up we should have annevk be the one to say it's OK
+
+[23:16:49.0000] <MikeSmith>
+ah OK that gives the editor discreion
+
+[23:16:53.0000] <MikeSmith>
+yeah
+
+[23:17:20.0000] <Domenic>
+That also makes it pretty clear that not touching the source text means it should be fine
+
+[23:17:29.0000] <MikeSmith>
+yeah
+
+[23:17:48.0000] <Domenic>
+Anyway could it be bash escaping the .*s or something
+
+[23:18:15.0000] <MikeSmith>
+that was not problem when I tested locally
+
+[23:18:55.0000] <MikeSmith>
+I am assuming that doing env:global:CHECKER_FILTER="foo" in .travis.yml will actually propagate to the deploy.sh script when it’s called
+
+[23:19:07.0000] <MikeSmith>
+I mean, the ENCRYPTION_LABEL value does, right?
+
+[23:20:48.0000] <MikeSmith>
+/me re-tests locally
+
+[23:21:08.0000] <MikeSmith>
+oh I think I see
+
+[23:21:13.0000] <MikeSmith>
+/me tries something
+
+[23:30:16.0000] <MikeSmith>
+space
+
+[23:30:38.0000] <MikeSmith>
+spaces were the cause of the problem
+
+[23:30:57.0000] <MikeSmith>
+will make another patch now
+
+[23:51:40.0000] <Domenic>
+Still doesn't seem to be working, hrm
+
+[00:02:07.0000] <littledan>
+MikeSmith: Yeah, that's what I meant
+
+[00:02:23.0000] <MikeSmith>
+littledan: gotcha, thanks
+
+[00:02:48.0000] <littledan>
+For version control, we don't usually have things so denormalized, it's just because we're almost done
+
+[00:05:25.0000] <MikeSmith>
+littledan: yeah, Domenic said as much just a bit earlier here
+
+[00:42:46.0000] <MikeSmith>
+Domenic: OK, dunno if you still awake, but I made https://github.com/whatwg/whatwg.org/pull/258 to switch the checker invocation to use the --filterfile argument (to read the filter pattern from a file rather than directly from the command line)
+
+[00:43:15.0000] <Domenic>
+MikeSmith: I'm in Tokyo next couple of weeks :). I'm trying to find if any of the repos use FILTER_PATTERN...
+
+[00:43:42.0000] <MikeSmith>
+I thikn they don’t. I checked that yesteday
+
+[00:43:59.0000] <MikeSmith>
+CHECKER_FILTER
+
+[00:44:16.0000] <MikeSmith>
+/me does another rg CHECKER_FILTER to double-check
+
+[00:45:20.0000] <MikeSmith>
+yeah OK none do as far as rg claims
+
+[01:00:16.0000] <MikeSmith>
+Domenic: OK, https://github.com/whatwg/whatwg.org/pull/258 updated
+
+[01:00:40.0000] <Ms2ger>
+Domenic, I'm assuming bz is at the Mozilla All Hands, btw
+
+[01:01:05.0000] <Domenic>
+Ah, thanks Ms2ger.
+
+[01:21:54.0000] <MikeSmith>
+Domenic: green
+
+[01:21:57.0000] <MikeSmith>
+https://travis-ci.org/whatwg/encoding/builds/547594227
+
+[01:22:07.0000] <MikeSmith>
+thanks for the reviews and patience
+
+[01:23:49.0000] <MikeSmith>
+after all that I realize now that probably the cause of the problem with the CHECKER_FILTER variable was that it was being overwritten by the value in the encoding/Makefile file
+
+[01:24:39.0000] <MikeSmith>
+and that’s also what caused it to break when I switched the deploy.sh to using the binary version of the checker rather than the jar
+
+[01:25:39.0000] <Domenic>
+Ahhhh
+
+[01:25:46.0000] <MikeSmith>
+yeah :(
+
+[01:25:47.0000] <Domenic>
+Frigging makefiles, nobody thinks to look there...
+
+[01:26:00.0000] <MikeSmith>
+yeah  I dunno how I missed it
+
+[01:26:50.0000] <MikeSmith>
+but anyway with the previsou java -jar invocation, the --filterpattern arg was read by the java command-line-arg parser and had no problem with escaping
+
+[01:27:44.0000] <Domenic>
+That kinda makes sense
+
+[01:27:55.0000] <MikeSmith>
+yeah, with the binary version, I guess it gets parsed by the shell first and some escaping problem happens
+
+[01:27:58.0000] <MikeSmith>
+I guess
+
+[01:28:21.0000] <Domenic>
+OK well I'm heading out for the night, but we need annevk to follow policy anyway, so I think we did our job. Thanks so much.
+
+[01:28:22.0000] <MikeSmith>
+anyway, reading it from a file is more robust for the long term, less error prone
+
+[01:28:26.0000] <MikeSmith>
+ok
+
+[01:28:27.0000] <MikeSmith>
+cheers
+
+[01:28:31.0000] <MikeSmith>
+have a good evening
+
+[04:06:50.0000] <annevk>
+MikeSmith: you still there?
+
+[04:06:54.0000] <annevk>
+MikeSmith: this is about merging https://github.com/whatwg/encoding/pull/179?
+
+[04:11:09.0000] <MikeSmith>
+annevk: heya
+
+[04:11:16.0000] <MikeSmith>
+yeah, that PR
+
+[04:11:38.0000] <MikeSmith>
+needs your OK as editor
+
+[04:12:20.0000] <MikeSmith>
+..to determine if the Participation Agreement it relevant or not
+
+[04:12:44.0000] <annevk>
+MikeSmith: Meta: commits ought to be fine
+
+[04:13:06.0000] <MikeSmith>
+yeah I would think so
+
+[04:13:17.0000] <annevk>
+Okay, so I need to rebase the RD PR
+
+[04:13:19.0000] <MikeSmith>
+should I explicitly prefix it that way?
+
+[04:13:31.0000] <annevk>
+MikeSmith: I did when landing
+
+[04:13:38.0000] <MikeSmith>
+ah OK thanks
+
+[04:14:15.0000] <MikeSmith>
+and sorry for breaking stuff
+
+[04:14:43.0000] <annevk>
+MikeSmith: no worries
+
+[04:15:06.0000] <MikeSmith>
+ the bright side is that this updated setup will be much less prone to breakage going forward
+
+[04:25:38.0000] <annevk>
+MikeSmith: cool, you can land https://github.com/whatwg/html-build/pull/198 yourself right?
+
+[04:25:45.0000] <annevk>
+MikeSmith: or do you want me to do it?
+
+[05:10:05.0000] <MikeSmith>
+annevk: I can
+
+[14:08:39.0000] <oliverdunk>
+I think I'm understanding the fetch spec right, but just to check - is it intended then when fetching a resource with {redirect: "manual"}, the response type is always "cors" (even with Access-Control-Allow-Origin set to *), unless there's a redirect, in which case the response type is "opaqueredirect"?
+
+[14:10:43.0000] <annevk>
+oliverdunk: for same-origin it would not be "cors"
+
+[14:11:52.0000] <oliverdunk>
+annevk: thanks. I did spot that one but luckily it doesn't matter for my use case :)
+
+[14:12:00.0000] <oliverdunk>
+Do you agree for all non same-origin requests?
+
+[14:12:14.0000] <annevk>
+oliverdunk: could be a network error
+
+[14:13:06.0000] <annevk>
+(for various reasons, e.g., the response not implementing the CORS protocol)
+
+[14:13:13.0000] <annevk>
+oliverdunk: also, mode of the request is set to "cors"?
+
+[14:17:02.0000] <oliverdunk>
+Hah, I should've expected thorough answers in a channel like this. Redirect was the only option I was planning on setting, but I can change that. Probably best I explain why I'm asking - I want to detect if a site implements the /.well-known/change-password page, which performs a redirect. Network errors aside, wanted to make sure the behaviour I was seeing was safe to rely on.
+
+
+2019-06-20
+[21:30:23.0000] <annevk>
+oliverdunk: you won't get a response with type "cors" if the request didn't ask for CORS
+
+[21:36:28.0000] <annevk>
+MikeSmith: https://travis-ci.org/whatwg/encoding/builds/547664070 is still failing so we can't publish the RD for Encoding
+
+[21:36:37.0000] <annevk>
+MikeSmith: maybe it's taking to long?
+
+[21:37:24.0000] <MikeSmith>
+annevk: it takes ~8 minutes to run
+
+[21:37:56.0000] <MikeSmith>
+annevk: I just restarted it
+
+[21:38:05.0000] <annevk>
+MikeSmith: hmm yeah, given that it fails 10min in I guess it's not the time
+
+[21:38:05.0000] <MikeSmith>
+I see it timed out after 10 minutes
+
+[21:38:19.0000] <annevk>
+MikeSmith: I did a restart once already fwiw
+
+[21:38:30.0000] <MikeSmith>
+ah OK
+
+[21:38:59.0000] <MikeSmith>
+https://www.w3.org/2019/06/12-w3m-minutes.html#item05
+
+[21:39:03.0000] <MikeSmith>
+Decision: Signing the Consortia letter to DoC
+
+[21:39:54.0000] <MikeSmith>
+https://lists.w3.org/Archives/Team/w3mreq/2019Jun/att-0053/01-part
+
+[21:49:30.0000] <MikeSmith>
+oofs
+
+[21:49:35.0000] <MikeSmith>
+sorrt
+
+[00:12:29.0000] <MikeSmith>
+annevk: so I can “fix” the Encoding build issue by making the checker emit that name of every filename it checks
+
+[00:13:33.0000] <MikeSmith>
+that way there will be continuous log output while it’s checking, and we won’t his the Travis no-log-output-for-more-than-10-minutes timeout
+
+[00:19:00.0000] <MikeSmith>
+annevk: that also has the advantage of making it not look like the build is hanging, when in fact it’s actually running the HTML checker but just on a really large number of files (as is the case with the Encoding standard)
+
+[00:45:21.0000] <MikeSmith>
+actually the reason that checking the Encoding files takes so long isn’t just due to there being so many files to check (66 files), it’s also that 30+ of the files are bigger than 4MB
+
+[00:58:11.0000] <MikeSmith>
+annevk: https://github.com/whatwg/whatwg.org/pull/259 will fix the Encoding build-timeout issue
+
+[01:32:38.0000] <Domenic>
+MikeSmith: approved
+
+[01:33:08.0000] <Domenic>
+These kinds of things were why I was wondering whether maybe we should not check the encoding tables. But I guess it's still a good thing to do.
+
+[02:57:20.0000] <MikeSmith>
+Domenic: yeah but the changes are general improvements that we’re better off with anyway, so I guess it’s a net win
+
+[03:18:26.0000] <MikeSmith>
+Domenic: hmm well take a look at the current log output at https://travis-ci.org/whatwg/encoding/builds/547664070
+
+[03:19:17.0000] <MikeSmith>
+are there multiple subdirectories there under encoding.spec.whatwg.org/commit-snapshots/ ?
+
+[03:19:22.0000] <MikeSmith>
+or just one?
+
+[03:20:05.0000] <MikeSmith>
+if there are subdirectories there for all previous snapshots.. that’s gonna take a while
+
+[03:23:02.0000] <Domenic>
+There should only be one per build
+
+[03:24:20.0000] <MikeSmith>
+OK
+
+[03:27:41.0000] <MikeSmith>
+OK, green
+
+[03:27:43.0000] <MikeSmith>
+https://travis-ci.org/whatwg/encoding/builds/547664070
+
+[03:27:51.0000] <MikeSmith>
+>  Ran for 11 min 39 sec
+
+[03:27:53.0000] <Domenic>
+Woohoo!
+
+[03:27:59.0000] <MikeSmith>
+yeah :)
+
+[03:28:35.0000] <MikeSmith>
+so another reason it takes so long is that it’s essentionally checking all the files 3 times
+
+[03:29:34.0000] <MikeSmith>
+once in encoding.spec.whatwg.org/commit-snapshots/753f0d461b3a1f04d0f8355052a5491e2629799e, once in encoding.spec.whatwg.org/review-drafts/2019-06, and once in the root encoding.spec.whatwg.org/
+
+[03:30:17.0000] <MikeSmith>
+each run takes about 3 minutes and checks ~180MB of files, 66 files total
+
+[03:30:37.0000] <MikeSmith>
+so it’s checking more than .5GB of HTML source in total
+
+[03:31:26.0000] <MikeSmith>
+so it takes on average about 2.7 seconds to check each doc
+
+[03:32:51.0000] <Domenic>
+Not so bad :)
+
+[03:33:25.0000] <MikeSmith>
+well actually for normal-sized docs, it takes only a few hundred milliseconds
+
+[03:34:11.0000] <MikeSmith>
+but in the case of Encoding, it’s heavily weighted by the fact that almost half the docs are 4MB+
+
+[03:34:56.0000] <MikeSmith>
+anyway, I think we now have everything fixed as far as getting the review drafts built
+
+[04:01:11.0000] <Domenic>
+Yeah, a wild review draft has appeared! https://encoding.spec.whatwg.org/review-drafts/2019-06/
+
+[04:01:30.0000] <Domenic>
+Thanks for all your help :D
+
+[04:01:51.0000] <annevk>
+\o/
+
+[04:05:00.0000] <Domenic>
+https://travis-ci.org/whatwg/html/builds/548150617#L927 wattt svg <rect>s and <foreignObject>s need their width/height set as content attributes? CSS seems like it should work fine...
+
+[04:06:42.0000] <Domenic>
+MikeSmith: I know it's getting late but IMO https://github.com/whatwg/html/pull/4713/files#diff-36cd38f49b9afa08222c0dc9ebfe35ebR88225 should be valid SVG. But it fails the build. I couldn't find any requirements in https://www.w3.org/TR/SVG2/shapes.html#RectElement to support the validator error.
+
+[04:07:02.0000] <MikeSmith>
+Domenic: looking now
+
+[04:07:41.0000] <MikeSmith>
+it might actually be because the SVG WG changed the spec
+
+[04:07:52.0000] <Domenic>
+Hmmmm
+
+[04:07:56.0000] <MikeSmith>
+https://www.w3.org/TR/SVG2/Overview.html is from 04 October 2018
+
+[04:08:27.0000] <MikeSmith>
+I know they made other changes that relaxed previous restrictions
+
+[04:08:48.0000] <Domenic>
+https://www.w3.org/TR/SVG11/shapes.html#RectElement seems pretty similar
+
+[04:10:06.0000] <MikeSmith>
+/me looks there too
+
+[04:16:08.0000] <MikeSmith>
+Domenic: OK, yeah, the #REQUIRED restriction was in https://www.w3.org/TR/2003/REC-SVG11-20030114/shapes.html#RectElement
+
+[04:16:40.0000] <Domenic>
+Oh fascinating
+
+[04:17:16.0000] <Domenic>
+DTDs with requirements imposed via comments. (Or is the # syntax not comments?)
+
+[04:18:31.0000] <MikeSmith>
+Domenic: I don’t actually remember how it was done for DTDs
+
+[04:18:40.0000] <MikeSmith>
+kinda glad I don’t remember :p
+
+[04:19:07.0000] <MikeSmith>
+anyway, as far as I can see, the current spec doesn’t define any attributes as required
+
+[04:19:30.0000] <MikeSmith>
+which seems like maybe it’s an oversight
+
+[04:19:43.0000] <Domenic>
+I dunno, given how (almost?) everything can be set via CSS, it kind of makes sense to me.
+
+[04:20:03.0000] <MikeSmith>
+well I see the prose of the original spec never defined anything as required either
+
+[04:20:28.0000] <MikeSmith>
+it was only indicated with that #REQUIRED thing in the DTD
+
+[04:21:23.0000] <MikeSmith>
+sigh, I really don’t want to bash other groups’ work but this is really really annoying
+
+[04:22:24.0000] <MikeSmith>
+I mean it’s now completely ambiguous whether they actually intend for no attributes to be required, or whether they just didn’t bother to carry any of the restrictions over
+
+[04:22:36.0000] <Domenic>
+True :-/
+
+[04:23:13.0000] <MikeSmith>
+OK, anyway, in the checker schema I can un-require the problem attributes
+
+[04:23:39.0000] <MikeSmith>
+I need to do this for foreignObject too, I think (becuase we are getting errors for that too)
+
+[04:23:54.0000] <Domenic>
+I can also add them to all the code I guess, just feels redundant given I could instead do it in CSS
+
+[04:23:57.0000] <MikeSmith>
+will do that right now and push a new checker build
+
+[04:24:20.0000] <MikeSmith>
+nah, easier to change the checker
+
+[04:24:45.0000] <Domenic>
+<3
+
+[04:26:21.0000] <Domenic>
+Oh, wait
+
+[04:26:30.0000] <Domenic>
+Firefox does not seem to like setting width and height via CSS
+
+[04:30:53.0000] <Domenic>
+MikeSmith: yeah, cancel that checker update, those errors prevented me from writing code that doesn't work in Firefox. Which means we have a separate interop issue, but meh...
+
+[04:31:17.0000] <MikeSmith>
+Domenic: ah OK
+
+[04:35:41.0000] <Domenic>
+Now I can show you all my beautiful diagram https://whatpr.org/html/4713/webappapis.html#module-script-fetching-diagram
+
+[04:35:58.0000] <Domenic>
+(actually Hiroshige's, but I did the SVG conversion)
+
+[04:39:19.0000] <MikeSmith>
+/me looks
+
+[04:39:56.0000] <MikeSmith>
+Domenic: very ... utilitarian
+
+[04:40:03.0000] <Domenic>
+lol
+
+[04:40:13.0000] <MikeSmith>
+I believe this style is called “brutalism”
+
+[04:40:39.0000] <Domenic>
+hahahaha
+
+[04:48:40.0000] <Domenic>
+I suppose we could borrow some styles from https://html.spec.whatwg.org/multipage/parsing.html#overview-of-the-parsing-model
+
+[05:11:31.0000] <MikeSmith>
+Domenic: so by the way, we actually have existing tests that would fail if I made that SVG schema change
+
+[05:11:37.0000] <MikeSmith>
+https://github.com/web-platform-tests/wpt/blob/master/conformance-checkers/html-svg/struct-dom-19-f-novalid.html
+
+[05:12:28.0000] <MikeSmith>
+and https://github.com/web-platform-tests/wpt/blob/master/conformance-checkers/html-svg/struct-dom-17-f-novalid.html
+
+[05:13:11.0000] <MikeSmith>
+so even if I had merged the schema change, I would have had to change those tests — because the checker build fails if any tests fail
+
+[05:17:10.0000] <Domenic>
+Always good to have test coverage :)
+
+[05:17:25.0000] <MikeSmith>
+yeah
+
+[05:17:59.0000] <MikeSmith>
+especially if the tests came from a 3rd-party contributor, which those are
+
+[05:28:26.0000] <annevk>
+Anyone here familiar with https://www.w3.org/TR/trace-context/?
+
+[05:28:40.0000] <annevk>
+Is this a web application protocol not intended to be natively implemented in browsers?
+
+[05:29:39.0000] <annevk>
+"A simplistic regex-based implementation can be found in the test folder. This implementation has 100% compliance to the test suite." not browsers then
+
+[05:33:50.0000] <MikeSmith>
+annevk: I can doublecheck with plh (it’s his group) but as far as what I know about it, it’s not intended to be natively implemented in browsers
+
+[05:36:40.0000] <annevk>
+MikeSmith: someone filed https://github.com/whatwg/fetch/issues/911
+
+[05:42:54.0000] <MikeSmith>
+/me looks
+
+[07:16:05.0000] <MikeSmith>
+annevk: so, nowhere in the issue description at https://github.com/whatwg/fetch/issues/911 does the OP provide any explanation of any problem specific to exchanging “distributed trace contexts” that is caused by the CORS preflight
+
+[07:17:30.0000] <MikeSmith>
+the two items described in the “this poses two challenges for observability providers” part are general problems/costs of the preflight for any case at all
+
+[07:17:50.0000] <annevk>
+MikeSmith: yeah, true
+
+[07:18:28.0000] <annevk>
+MikeSmith: might be worth asking about
+
+[07:19:22.0000] <MikeSmith>
+well the two things that OP lists are, 1) The preflight request increases the latency for the original HTTP request and 2) Unless the server… is modified to respond appropriately to the preflight request the request would fail
+
+[07:20:51.0000] <MikeSmith>
+as far as the second point, the server system already must be modified to do something with the `traceparent` and `tracestate` request headers
+
+[07:22:11.0000] <MikeSmith>
+so it’s not clear why an admin of such a server system would not also be able to CORS-enable the server system, or why it would be any more trouble to do so
+
+[07:22:35.0000] <MikeSmith>
+annevk: anyway, I will add a comment there
+
+[07:30:51.0000] <oliverdunk>
+annevk: did you see my last message last night?
+
+[07:31:55.0000] <annevk>
+oliverdunk: I replied, no? See the logs
+
+[07:35:23.0000] <oliverdunk>
+Missed that somehow, thanks. Wouldn't it be set to cors by the otherwise of 4.1 step 5?
+
+[07:38:25.0000] <annevk>
+oliverdunk: oh if we’re talking fetch(), yes
+
+[07:40:16.0000] <oliverdunk>
+Cool. So for detecting a redirect with fetch(), everything sounds alright?
+
+[07:41:51.0000] <annevk>
+oliverdunk: I think so, but it’s been a while and have not looked at all steps
+
+[07:42:02.0000] <oliverdunk>
+No worries, I appreciate your help :)
+
+
+2019-06-21
+[18:38:09.0000] <MikeSmith>
+domfarolino: Domenic: HTML checker updated to allow 'integrity' for link[rel=preload|modulepreload|stylesheet]; update pushed to https://validator.w3.org/nu/ and also released dev build of the CLI checker https://github.com/validator/validator/releases
+
+[18:38:27.0000] <domfarolino>
+\o/
+
+[18:38:35.0000] <domfarolino>
+ta
+
+[18:39:12.0000] <MikeSmith>
+domfarolino: thanks for the spec update
+
+[18:39:25.0000] <domfarolino>
+MikeSmith: no problem!
+
+[21:28:23.0000] <Domenic>
+littledan or Ms2ger: can you figure out what I meant about tests in https://github.com/WICG/kv-storage/pull/53#pullrequestreview-210801545 ?
+
+[21:28:54.0000] <Domenic>
+I cannot remember in what ways not being in the module map would be different from throwing an exception on load
+
+[21:29:05.0000] <Domenic>
+Maybe I was forgetting that import statements get hoisted?
+
+[21:32:39.0000] <Domenic>
+Oh, right, I think if I have another module _before_, it'll work...
+
+[23:51:45.0000] <littledan>
+Yeah there's a couple ways to observe it. That's a good one. Another will be import-map fallback
+
+[23:52:09.0000] <littledan>
+Also the exception type thrown will be different
+
+[23:52:30.0000] <littledan>
+Domenic: ^
+
+[23:53:24.0000] <littledan>
+You would also be able to observe more fetches being done, I think
+
+[23:59:46.0000] <Domenic>
+littledan: thanks :). I didn't test more fetches being done, but I did https://github.com/web-platform-tests/wpt/pull/17424/files
+
+[00:03:23.0000] <littledan>
+Heh funny timing. Uncaught exceptions too! Seems good for
+
+[00:04:00.0000] <littledan>
+The fetch thing sounds hard to test anyway
+
+[00:04:14.0000] <Domenic>
+I've seen people do it using web performance APIs
+
+[00:04:21.0000] <Domenic>
+For e.g. preload tests
+
+[11:27:19.0000] <phenoxis>
+Hello, I was wondering what the procedure is to request a new web feature
+
+[16:12:05.0000] <AlArz>
+hello there!
+
+[16:12:20.0000] <AlArz>
+so, i've been reading this: https://infra.spec.whatwg.org/#byte-sequence-starts-with
+
+[16:12:46.0000] <AlArz>
+and now i'm slightly puzzled by step 2.3
+
+[16:13:08.0000] <AlArz>
+it says "If aByte is null, then return true"
+
+[16:13:31.0000] <AlArz>
+so let's say sequence a is `abc` and sequence b is `abcd`
+
+[16:15:28.0000] <AlArz>
+and following the algorithm described we get that `abc` starts with `abcd`, right?
+
+[16:16:23.0000] <AlArz>
+which to me actually doesn't seem right
+
+[16:17:55.0000] <AlArz>
+am i missing something?
+
+[16:22:03.0000] <Mek>
+yes, I agree, that seems to be backwards
+
+
+2019-06-22
+[17:07:27.0000] <annevk>
+AlArz: also a problem in https://infra.spec.whatwg.org/#code-unit-prefix
+
+[17:07:38.0000] <annevk>
+AlArz: ugh, I should have more carefully verified when touching that, will you file an issue?
+
+[17:09:53.0000] <AlArz>
+sure. a single issue for both?
+
+[17:30:26.0000] <annevk>
+AlArz: yeah
+
+[18:07:37.0000] <AlArz>
+annevk: this will do i guess https://github.com/whatwg/infra/issues/256
+
+[18:15:35.0000] <AlArz>
+might try to submit a PR later, if that's okay with you
+
+[23:08:23.0000] <annevk>
+That’d be great! Hope you see the logs
+
+
+2019-06-23
+[17:35:51.0000] <MikeSmith>
+JakeA: any clue what might be the cause of https://stackoverflow.com/questions/56719340/fetch-request-immediately-failing-in-service-worker-running-through-android-we ?
+
+[17:36:25.0000] <MikeSmith>
+JakeA: see the comments in the answer too
+
+
+2019-06-24
+[01:44:57.0000] <JakeA>
+MikeSmith: the question doesn't really give me much to go on. I posted a simple example, but I can't recreate the issue.
+
+[02:27:30.0000] <MikeSmith>
+JakeA: OK, thanks
+
+[06:20:11.0000] <wanderview>
+MikeSmith: JakeA: I wonder if we're getting the Accept header wrong or something
+
+[06:21:14.0000] <JakeA>
+wanderview: we can only guess really. It works fine for me, and we don't really have any more specific details. Could be anything.
+
+[06:31:27.0000] <wanderview>
+JakeA: well, I tested and we seem to get the accept header right
+
+
+2019-06-25
+[06:37:39.0000] <iliakan>
+hello
+
+[06:38:02.0000] <iliakan>
+Per spec, is it ok if setTimeout(f) triggeres before default browser action for input.onkeydown event?
+
+[06:38:47.0000] <iliakan>
+input.onkeydown = function() {   setTimeout(() => console.log(this.value)); };
+
+[06:39:00.0000] <iliakan>
+in other words, the logged value above must be the new one, or no?
+
+
+2019-06-27
+[19:28:06.0000] <innovati>
+Is window.matchMedia() the only API that parses media query strings in JavaScript?
+
+[09:14:36.0000] <annevk>
+Is Travis overloaded? Why doesn't https://github.com/whatwg/html/pull/4729 build?
+
+[12:57:16.0000] <TabAtkins>
+innovati: I think so, yeah. (Not counting HTML attributes that contain MQs.)
+
+[12:58:02.0000] <innovati>
+behold my abomination of HTMLElement.matchMedia() 😂😭 I wish it was real https://gist.github.com/tomhodgins/c04f7c509d5f88fd331e87b0594a0ed2
+
+
+2019-06-28
+[21:12:35.0000] <domfarolino>
+The "await a stable state" dfn in HTML mentions "When an algorithm running in parallel is .....". However, when we use "await a stable state" in https://html.spec.whatwg.org/multipage/images.html#updating-the-image-data, that algorithm is not running in parallel at that time right?
+
+[21:15:09.0000] <domfarolino>
+Seems like we're running "synchronously" on the "main thread", and then we queue a microtask to simply resume the algorithm's "synchronous steps" later, before going in parallel in step 23
+
+[00:20:35.0000] <annevk>
+domfarolino: update the image data is not always invoked synchronously necessarily, though it's really too vague
+
+[00:21:15.0000] <annevk>
+domfarolino: that is, "A user agent that obtains images on demand must update the image data of an img element whenever it needs the image data" could be a thing the compositor thread invokes I suppose?
+
+[00:21:26.0000] <annevk>
+domfarolino: (not that the spec defines a compositor)
+
+[00:21:58.0000] <domfarolino>
+yikes. i see i see
+
+[00:25:43.0000] <annevk>
+domfarolino: there's a lot of "topic: img" and it could really do with refactoring...
+
+[00:26:13.0000] <annevk>
+domfarolino: as with other parts of the HTML spec figuring out fact from fiction is the annoying bit
+
+[00:28:49.0000] <domfarolino>
+annevk: hah, that's the impression I get too. makes me want to do something like a feature freeze and a huge rewrite, but ya know, time...
+
+[00:29:45.0000] <annevk>
+domfarolino: feature freeze would give us time
+
+[00:30:09.0000] <domfarolino>
+this is true
+
+[02:43:59.0000] <annevk>
+JakeA: so "run module script" does script + microtasks
+
+[02:44:38.0000] <annevk>
+JakeA: so if you race the return value of run module script with the equivalent of Promise.resolve().then(), would that work?
+
+[02:45:09.0000] <annevk>
+JakeA: and reject if the evaluationPromise is not fulfilled by then
+
+[02:49:44.0000] <JakeA>
+annevk: By the time our algorithm gets evaluationPromise, any microtasks will already have been processed, right?
+
+[02:50:23.0000] <JakeA>
+So if it's "pending", that means it has a top-level await that wasn't simply a microtask
+
+[02:51:16.0000] <annevk>
+JakeA: from what you're telling me that sounds correct, I haven't checked myself
+
+[02:51:58.0000] <annevk>
+JakeA: I guess my suggestion would only aid in not checking internal state in that case, but we could spell the equivalency out in a note I suppose
+
+[02:52:45.0000] <annevk>
+JakeA: the main problem with checking internal state that I see is that JS is more often refactored than you'd think
+
+[02:56:30.0000] <JakeA>
+annevk: All we need is a way to query if the script has 'evaluated' (or whatever it's called in a post top-level-await world). But yeah, problematic if that property moves around.
+
+[05:18:22.0000] <zcorpan_>
+MikeSmith: thanks for the rapid fix! But can you please avoid mentioning folks in commit messages? it can cause useless notification (especially if there are forks)
+
+[05:36:53.0000] <annevk>
+GitHub should just stop supporting that at this point
+
+[07:15:21.0000] <nox>
+annevk: Wishful thinking :P
+
+[13:54:39.0000] <MikeSmith>
+JakeA: so about the problem in the SW+WebView question https://stackoverflow.com/questions/56719340/fetch-request-immediately-failing-in-service-worker-running-through-android-we, it turned out to be a bug https://bugs.chromium.org/p/chromium/issues/detail?id=977784
+
+[13:56:51.0000] <MikeSmith>
+already fixed in 76
+
+[14:16:41.0000] <JakeA>
+MikeSmith: yes! I only found out later today too. I wonder why I couldn't recreate it
+
+[14:46:57.0000] <MikeSmith>
+JakeA: dunno but reading through the bug comments, seems like maybe thereare some additional conditions needed to reproduce
+
+
+2019-06-30
+[05:07:56.0000] <MikeSmith>
+R.I.P PGP https://gist.github.com/rjhansen/67ab921ffb4084c865b3618d6955275f
+

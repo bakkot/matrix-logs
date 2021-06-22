@@ -1,0 +1,2259 @@
+2021-05-02
+[05:41:39.0000] <croraf>
+Is "frame" the top level "container" for the application in the browser?
+
+[05:58:02.0000] <andreubotella>
+croraf: Are you talking about the (very old) <frame> element, or about something else?
+
+[05:59:07.0000] <croraf>
+I'm not talking about any HTML element actually. But conceptually the structure of the application "context" in the browser.
+
+[06:02:11.0000] <croraf>
+In chrome a tab is separate process. So there is a strict separation between tabs. When I go to an URL in the tab, the browser will fetch this initial resource. I guess if this resource is of the HTML type the browser starts creating some "context" in which it holds the web application represented by this HTML file?
+
+[06:03:05.0000] <andreubotella>
+Oh, I see
+
+[06:04:10.0000] <andreubotella>
+The name for "tab" in the specs used to be top-level browsing context, except its security properties turned out not to be enough (due to Spectre), and a lot of specs were using that name with assumptions, I believe
+
+[06:04:42.0000] <andreubotella>
+Now a tab is a browsing session (still not fully defined), which itself can contain a top-level browsing context
+
+[06:05:18.0000] <andreubotella>
+https://html.spec.whatwg.org/#browsing-session
+
+[06:07:56.0000] <croraf>
+Oh. I see. If you move away from the current "application" in the same tab you will be in the same browsing session even though you exited the application, right?
+
+[06:08:15.0000] <andreubotella>
+right
+
+[06:09:29.0000] <andreubotella>
+The concept of "web apps" is relatively recent, and the specs don't specify things that way
+
+[06:09:50.0000] <andreubotella>
+For the difference between what you might think as different applications, you should look into origins and sites
+
+[06:11:33.0000] <andreubotella>
+Not quite "relatively recent" actually, it's from 2005-2008 or so!
+
+[06:11:49.0000] <andreubotella>
+I learned HTML when I was a teen in the early 2000's
+
+[06:11:53.0000] <croraf>
+When in this browsing session you open a new item (that is you navigate by typing in the url bar, or by doing a refresh) you are creating a new "top-level browsing context"?
+
+[06:13:13.0000] <andreubotella>
+I'm not sure about that, that's tricky stuff related to the security measures introduced in 2018 after the Spectre vulnerability was found out
+
+[06:13:39.0000] <andreubotella>
+A top-level browsing context is basically a tab, except a tab can switch its browsing context during some navigation
+
+[06:14:09.0000] <croraf>
+Exactly.
+
+[06:14:20.0000] <andreubotella>
+But it's not every time you refresh or navigate
+
+[06:15:40.0000] <croraf>
+i think navigating by pressing enter in the URL bar or refreshing should discard the old and create the new browsing context.
+
+[06:17:05.0000] <andreubotella>
+In any case it discards the old document and creates a new one
+
+[06:18:11.0000] <croraf>
+OK, so below the browsing context there is always the "document"?
+
+[06:19:58.0000] <andreubotella>
+A browsing context (top-level or not; <iframe> for example) contains a Document object (the one you get with `window.document`)
+
+[06:26:32.0000] <croraf>
+OK. What I was exploring the sources tab in Chrome devtools: https://pasteboard.co/K026e3t.png
+
+[06:28:30.0000] <croraf>
+Or this is the example of coinmarketcap.com application: https://pasteboard.co/K0276E9.png
+
+[06:30:05.0000] <croraf>
+These that look like a small window icon are browsing contexts?
+
+[06:32:56.0000] <croraf>
+Their Documentation says that "top" represents an HTML frame.
+
+[06:33:23.0000] <croraf>
+Giving the link to the w3 definition of frame.
+
+[06:33:31.0000] <croraf>
+https://developer.chrome.com/docs/devtools/javascript/sources/
+
+[06:40:28.0000] <andreubotella>
+I believe those are browsing contexts
+
+[06:40:48.0000] <andreubotella>
+and linking to the definition of the <frame> element doesn't help today's developers
+
+[11:06:37.0000] <annevk>
+croraf: andreubotella: you’re looking for agent clusters
+
+[12:14:27.0000] <croraf>
+annevk, wdym? what are those?
+
+
+2021-05-03
+[21:42:39.0000] <annevk>
+croraf: they are the conceptual process boundary and also the web’s shared memory boundary
+
+[02:20:01.0000] <andreubotella>
+annevk: While searching for WPT tests that might break with https://github.com/whatwg/html/pull/6624, I noticed that Firefox and Safari don't convert to scalar value strings when constructing the entry list
+
+[02:20:12.0000] <andreubotella>
+This means that FormData's names and values aren't really USVStrings
+
+[02:20:31.0000] <andreubotella>
+But it doesn't make much sense to hold Chrome to that
+
+[02:25:09.0000] <annevk>
+andreubotella: pointer to a test? afaik Fx has the correct IDL bindings
+
+[02:26:04.0000] <andreubotella>
+annevk: https://wpt.fyi/results/html/semantics/forms/form-submission-0/form-data-set-usv.html?label=experimental&label=master&aligned
+
+[02:32:28.0000] <andreubotella>
+It seems like for Firefox at least, the IDL bindings restrict incoming values but not outgoing ones
+
+[02:34:02.0000] <annevk>
+Yeah, that's a bug (not necessarily the IDL behavior, but putting non scalar value strings into FormData is
+
+[02:34:08.0000] <annevk>
+)
+
+[02:34:22.0000] <andreubotella>
+Indeed
+
+[02:35:38.0000] <andreubotella>
+I'll file bugs for it
+
+[02:35:45.0000] <annevk>
+\o/
+
+[02:48:54.0000] <annevk>
+andreubotella: FYI: https://github.com/web-platform-tests/wpt/pull/28770
+
+[02:50:26.0000] <andreubotella>
+That checks out
+
+[02:50:37.0000] <andreubotella>
+I also noticed https://github.com/web-platform-tests/wpt/pull/3950#issuecomment-253510359
+
+[02:51:54.0000] <annevk>
+andreubotella: interesting, that suggests it ought to work somewhat, but they seem to throw for these cases
+
+[02:55:12.0000] <andreubotella>
+My serializer algorithm always outputs one boundary, and I thought that was compatible with WebKit, but apparently not
+
+[02:56:44.0000] <andreubotella>
+Oh, it used to but now it doesn't
+
+[02:57:15.0000] <annevk>
+andreubotella: presumably they still serialize the request to something if you go to the server
+
+[02:57:41.0000] <annevk>
+but maybe that also creates an exception? that would be even weirder
+
+[02:57:50.0000] <andreubotella>
+WebKit does serialize an emtpy FormData as a non-empty body, but apparently it didn't use to, I meant
+
+[02:58:18.0000] <andreubotella>
+https://wpt.fyi/results/fetch/api/request/request-consume-empty.any.html?label=master&label=experimental&aligned
+
+[03:46:02.0000] <croraf>
+Does it make sense that the browser allows focusing the elements which are not clickable (because there is an overlay positioned over them)?
+
+[04:10:18.0000] <andreubotella>
+annevk: These tests checking for the normalization on constructing the entry list, when updated, should be marked as historical, right?
+
+[04:10:20.0000] <andreubotella>
+https://github.com/web-platform-tests/wpt/blob/master/html/semantics/forms/form-submission-0/newline-normalization.html
+
+[04:11:41.0000] <annevk>
+andreubotella: historical tests are for obsolete features; I would expect us to update the pass condition (to not expect newline normalization)
+
+[04:13:01.0000] <andreubotella>
+ok
+
+[05:20:48.0000] <andreubotella>
+annevk: https://bugzilla.mozilla.org/show_bug.cgi?id=1709066, https://bugs.webkit.org/show_bug.cgi?id=225299
+
+[08:25:23.0000] <zcorpan>
+MikeSmith: thanks. I don't know but I've forwarded to the right folks
+
+[10:12:24.0000] <annevk>
+TIL getRandomValues() operates on the passed in view (and also returns it)
+
+
+2021-05-04
+[05:56:33.0000] <MikeSmith>
+JakeA: I can’t find where ServiceWorkerContainer.prototype.onerror is defined
+
+[05:57:03.0000] <MikeSmith>
+we have it documented at https://developer.mozilla.org/en-US/docs/Web/API/ServiceWorkerContainer/onerror but it’s not in the spec
+
+[05:58:13.0000] <MikeSmith>
+OK I found https://github.com/w3c/ServiceWorker/issues/912
+
+[06:01:41.0000] <MikeSmith>
+I guess it just needs to be marked deprecated in MDN (and BCD)
+
+
+2021-05-06
+[19:35:33.0000] <TimothyGu>
+annevk/Domenic: I just made https://timothygu.me/urltester/, which will hopefully make it easier to test some non-browser URL parsers. I can also look into adding some other parsers like https://uriparser.github.io/ or https://docs.rs/url/
+
+[19:36:00.0000] <Domenic>
+Oh cool!
+
+[21:40:46.0000] <MikeSmith>
+TimothyGu: possible to add https://github.com/smola/galimatias ?
+
+[21:41:18.0000] <MikeSmith>
+I guess you know that’s what we’re using for URL parsing in the HTML checker
+
+[21:43:09.0000] <MikeSmith>
+ah I see you have the other non-browser ones enabled by way of WASM
+
+[21:46:05.0000] <annevk>
+TimothyGu: nice! Next step is adding a unified interface and running WPT on them? 😅
+
+[21:51:00.0000] <MikeSmith>
+for Java-to-WASM, https://teavm.org/ • https://github.com/konsoletyper/teavm seems to be the thing
+
+[21:54:20.0000] <MikeSmith>
+found https://github.com/dalexandrov/WebAssemblyFromJava too — maybe will give it a try myself and see
+
+[21:57:03.0000] <MikeSmith>
+but now that I think about this, I remember that to be able to handle IDN stuff, galimatias depends on icu4j — which is massive; so I don’t know if/how the tooling handles statically linking that in (or whatever the appropriate terminology is)
+
+[22:28:39.0000] <TimothyGu>
+MikeSmith: cool I’ll take a look!
+
+[22:30:15.0000] <TimothyGu>
+annevk: that’s slightly difficult, as different parsers have different terminology. (Go is an offender here: each URL can have Query, RawQuery, and EscapedQuery(), and same for fragment)
+
+[22:34:36.0000] <annevk>
+TimothyGu: interesting, though shouldn't one of those aim match the/a standard?
+
+[22:39:49.0000] <TimothyGu>
+*sorry, I actually meant Path, RawPath, EscapedPath()
+
+[22:39:59.0000] <TimothyGu>
+I think EscapedPath() is closest to `url.pathname`, but users are probably more likely to read and manipulate `Path`, which is the unescaped path
+
+[22:40:48.0000] <TimothyGu>
+The complexity here is because of escaped slashes (like http://example.com/ab%2fcd). EscapedPath() would be ab%2fcd (same as `pathname`), but Path would be ab/cd
+
+[00:56:56.0000] <annevk>
+TimothyGu: wow that sounds like a security bug waiting to happen
+
+[02:59:53.0000] <annevk>
+JakeA: as long as the process is kept alive it's likely there's some login remnants in there too
+
+[03:00:52.0000] <JakeA>
+annevk: maybe clear-site-data should do a BCG switch
+
+[03:03:19.0000] <annevk>
+JakeA: there was a thing like that (still in the spec) but it caused problems for Firefox to deploy it
+
+[11:32:57.0000] <TimothyGu>
+annevk: It looks like several libraries don't do IDNA ToASCII until HTTP request time, which skews the results a bit
+
+[11:47:02.0000] <Domenic>
+Even Safari doesn't do ToASCII perfectly to spec...
+
+[12:01:15.0000] <nox>
+Domenic: Well ASCII is a pretty new standard
+
+[12:01:34.0000] <Domenic>
+heh
+
+
+2021-05-07
+[18:15:20.0000] <MikeSmith>
+Why is that when I examine Location.prototype, it has no href, hash, etc., members?
+
+[18:16:52.0000] <MikeSmith>
+ah, it’s an “Interface”
+
+[18:17:01.0000] <MikeSmith>
+I think I have asked this question before...
+
+[18:17:28.0000] <MikeSmith>
+so then why is Location exposed at all?
+
+[18:17:55.0000] <MikeSmith>
+I thought it used to be not exposed to script
+
+[21:34:20.0000] <annevk>
+MikeSmith: that’s because of the unforgeable annotations, you could still add things to the prototype
+
+[21:35:06.0000] <MikeSmith>
+annevk: thanks yeah, now vaguely recalling having learned about this before
+
+[21:35:48.0000] <MikeSmith>
+URLUtilsReadOnly left behind a mess in MDN
+
+[21:35:55.0000] <annevk>
+MikeSmith: but it’s fairly magic overall due to being cross-origin accessible
+
+[21:35:56.0000] <MikeSmith>
+spent a lot of time today cleaning it up
+
+[21:36:05.0000] <MikeSmith>
+oh
+
+[21:36:25.0000] <MikeSmith>
+I didn’t realize the cross-origin part affected it
+
+[21:36:34.0000] <annevk>
+Aaah yeah, we had to stop doing that for Location because it was special
+
+[21:36:41.0000] <MikeSmith>
+yeah
+
+[21:36:45.0000] <MikeSmith>
+OK
+
+[21:37:10.0000] <MikeSmith>
+well FYI https://github.com/mdn/content/pull/4772 is the MDN cleanup part
+
+[21:37:31.0000] <annevk>
+Location and WindowProxy share a lot of logic because of the cross-origin stuff
+
+[21:38:22.0000] <MikeSmith>
+ah WindowProxy is another bit of esoteric I needed to review something for in MDN recently
+
+[21:39:13.0000] <MikeSmith>
+there are some things that MDN should not attempt to do anything more than minimal mentions of
+
+[21:39:23.0000] <MikeSmith>
+WindowProxy is one of those
+
+[21:40:11.0000] <MikeSmith>
+https://github.com/mdn/content/pull/4630#issuecomment-832467852
+
+[21:40:49.0000] <MikeSmith>
+anyway, I didn’t actually end up needing to touch anything about Location in MDN today
+
+[21:40:53.0000] <MikeSmith>
+thankfully
+
+[21:41:17.0000] <MikeSmith>
+just WorkerLocation
+
+[21:41:32.0000] <MikeSmith>
+which is slightly less mystifying
+
+[21:42:39.0000] <annevk>
+Yeah readonly and no cross-global access helps 😊
+
+[21:43:31.0000] <MikeSmith>
+yup
+
+[21:44:01.0000] <MikeSmith>
+annevk: btw about WindowProxy, the SO answer at https://stackoverflow.com/a/19194052/441757 seems pretty neat
+
+[21:44:25.0000] <MikeSmith>
+I wonder if it would be good to have something like that in the spec
+
+[21:44:28.0000] <MikeSmith>
+diagrams
+
+[21:44:45.0000] <MikeSmith>
+short of that, I may add some variation of it to MDN
+
+[21:45:48.0000] <MikeSmith>
+hmm well on looking at it again, I guess the diagrams don’t actually add much
+
+[21:46:01.0000] <MikeSmith>
+the explanation is good though
+
+[21:47:09.0000] <MikeSmith>
+but now I find myself changing my mind again — maybe the less that’s said about this in MDN, the better
+
+[21:47:27.0000] <MikeSmith>
+I think I’ll just add a See Also link to that SO answer
+
+[22:18:01.0000] <annevk>
+MikeSmith: those images seem oddly Gecko-inspired
+
+[22:18:34.0000] <annevk>
+MikeSmith: anyway, yeah, more diagrams would be neat, but I'm always lost at "how"
+
+[00:36:42.0000] <TimothyGu>
+found a URL parsing bug in Go: https://golang.org/issue/46033
+
+[00:37:13.0000] <TimothyGu>
+also, made the UI a lot prettier and also added Rust's url crate: https://timothygu.me/urltester/
+
+[01:03:18.0000] <annevk>
+<textarea>&#x0A;</textarea> ends up as empty, but <textarea>&#x0D;</textarea> ends up containing LF
+
+[01:03:50.0000] <annevk>
+It seems this is an HTML parser thing I forgot about
+
+[01:03:53.0000] <andreubotella>
+huh, is that consistent across browsers?
+
+[01:03:54.0000] <andreubotella>
+oh
+
+[01:04:02.0000] <andreubotella>
+right
+
+[01:04:25.0000] <annevk>
+I guess you have to actually insert it through the DOM
+
+[01:04:37.0000] <andreubotella>
+That's what I'm doing in my tests
+
+[01:05:23.0000] <andreubotella>
+That's right, the initial newline gets handled by the tree construction after the charrefs are replaced
+
+[01:06:12.0000] <annevk>
+andreubotella: was your thinking on the <textarea> case what I wrote down in reply to Mason?
+
+[01:06:42.0000] <andreubotella>
+annevk: yeah, but I kinda got sidetracked by his mention that these changes only affected filenames
+
+[01:07:13.0000] <andreubotella>
+I was writing a long reply (during which I found https://github.com/whatwg/html/pull/6287#issuecomment-834135433), before I stepped back and realized that that was an off-hand mention
+
+[01:07:21.0000] <annevk>
+I hadn't actually really thought through why we wanted LF there until I wrote that
+
+[01:07:47.0000] <annevk>
+Cause initially I was thinking, sure, we can keep CRLF here
+
+[01:08:32.0000] <andreubotella>
+sure
+
+[01:09:07.0000] <andreubotella>
+Actually, I went and took a look at the Chromium code that implements that transformation, and I'm pretty sure it normalizes to LF just like WebKit
+
+[01:09:23.0000] <andreubotella>
+it's just that the normalization during the entry list construction doesn't special case textarea
+
+[01:10:20.0000] <annevk>
+It's actually weird how that was all set up in the spec
+
+[01:10:50.0000] <annevk>
+But undoing this 3-value thing for textarea will also be some work
+
+[01:11:27.0000] <annevk>
+andreubotella: adding a comment about the Chromium code might help I think
+
+[01:11:35.0000] <andreubotella>
+ok
+
+[01:17:39.0000] <annevk>
+I guess I just remove API value and it's good. That seems like a nice simplification
+
+[01:18:01.0000] <andreubotella>
+There's the wrap=hard case
+
+[01:18:18.0000] <andreubotella>
+but I guess it can be a simple transformation on top of API value
+
+[01:20:49.0000] <annevk>
+andreubotella: ah yeah, where does that happen? Should that happen in construct the entry list?
+
+[01:21:45.0000] <andreubotella>
+The textarea wrapping transformation does the CRLF normalization and wraps with CRLF if wrap=hard
+
+[01:22:10.0000] <andreubotella>
+I don't think it's a very good idea to move that to construct the entry list
+
+[01:23:59.0000] <annevk>
+andreubotella: where else is it observable though?
+
+[01:24:36.0000] <andreubotella>
+I haven't looked at it in any depth
+
+[01:25:17.0000] <andreubotella>
+But I'll have to do that before I open the PR
+
+[01:25:21.0000] <annevk>
+If it doesn't affect what the API returns it will only affect new FormData and co, at which point construct the entry list is the place
+
+[01:25:46.0000] <annevk>
+Ah you're volunteering for the PR? 🙂
+
+[01:26:08.0000] <andreubotella>
+sure 😀
+
+[01:26:34.0000] <andreubotella>
+I believe there's some interdepent stuff with, say, maxlength
+
+[01:26:57.0000] <andreubotella>
+but it doesn't really seem to be returned through any API
+
+[01:29:01.0000] <annevk>
+https://software.hixie.ch/utilities/js/live-dom-viewer/saved/9245
+
+[01:29:31.0000] <annevk>
+Chrome and Safari appear to use a different wrapping algorithm as well
+
+[01:31:21.0000] <andreubotella>
+I noticed that Safari was failing the current WPT for wrap=hard, because it seems to be measuring the size of the rendered text
+
+[01:31:46.0000] <andreubotella>
+Setting font-family: monospace on the textarea fixed it
+
+[01:32:45.0000] <annevk>
+Oh wow, it doesn't use cols at all, it uses the rendered width
+
+[01:32:53.0000] <annevk>
+That's kinda bananas
+
+[01:32:58.0000] <andreubotella>
+yeah
+
+[01:33:06.0000] <andreubotella>
+Maybe the difference is because Chrome has textarea { font-family: monospace} in its UA style sheet
+
+[01:33:15.0000] <annevk>
+Yeah, Chrome does the same bullshit
+
+[01:33:33.0000] <annevk>
+Just add style=width:1000px in my demo
+
+[01:34:38.0000] <annevk>
+^ hsivonen in case you wanted to read up on how wrap=hard is even more terrible than you might have thought
+
+[01:36:05.0000] <andreubotella>
+I had to make sure that my test for wrapping in https://github.com/web-platform-tests/wpt/pull/28798 had a long text with very small cols
+
+[01:43:16.0000] <annevk>
+If you do display:none there's no wrapping; I'm not sure we should solve this at the same time as this would also require obsoleting cols and such
+
+[01:44:11.0000] <andreubotella>
+Yeah, it's best to first change the wrapping algorithm to use LF, and then figure out how to fix the rest
+
+[01:45:06.0000] <annevk>
+That's reasonable, I'll file a follow-up
+
+[01:48:34.0000] <andreubotella>
+It seems like wrap=hard was always intended to submit the value as the user saw it? 🙄
+
+[01:48:35.0000] <andreubotella>
+https://lists.w3.org/Archives/Public/public-whatwg-archive/2006Aug/0082.html
+
+[01:57:14.0000] <annevk>
+andreubotella: hmm yeah, there's been a fair bit of Ian reimagining the world and then implementations not following up (or not knowing they would have to follow up); anything touched recently shouldn't have that problem, but there's still a somewhat large legacy
+
+[01:57:38.0000] <annevk>
+andreubotella: I filed https://github.com/whatwg/html/issues/6662 on follow-ups
+
+[02:01:58.0000] <andreubotella>
+👍️
+
+[05:47:25.0000] <mham>
+is this channel whatwg ?
+
+[05:47:50.0000] <mham>
+hello ?
+
+[05:47:59.0000] <mham>
+am i lagged ?
+
+[06:02:11.0000] <andreubotella>
+yes, this is the whatwg channel
+
+[06:08:00.0000] <mham>
+hi
+
+[06:08:13.0000] <mham>
+i need to start html again
+
+[06:08:22.0000] <mham>
+only ever used 2.0
+
+[06:08:39.0000] <mham>
+whatwg is about html ?
+
+[06:09:11.0000] <andreubotella>
+WHATWG is a standards body that defines HTML, among other web things
+
+[06:09:45.0000] <andreubotella>
+if you ever wrote HTML 2.0 that was supported by browsers, chances are today's browsers will keep supporting it
+
+[06:09:52.0000] <andreubotella>
+we take backwards compatibility very seriously
+
+[06:10:07.0000] <andreubotella>
+but if you need to relearn it or a refresher, you should check out MDN
+
+[06:10:28.0000] <andreubotella>
+https://developer.mozilla.org/en-US/docs/Web
+
+[06:11:13.0000] <mham>
+ty
+
+[07:59:10.0000] <Domenic>
+MikeSmith: I added an answer to SO that might help. https://stackoverflow.com/questions/16092835/windowproxy-and-window-objects/67437299#67437299
+
+[08:06:38.0000] <Domenic>
+TimothyGu: oh wow that UI is much nicer, sweet
+
+[08:16:02.0000] <MikeSmith>
+Domenic: looking now
+
+[08:16:42.0000] <MikeSmith>
+aha
+
+[08:17:04.0000] <MikeSmith>
+yeah that is definitely helpful
+
+[08:18:06.0000] <MikeSmith>
+I did today already add a See Also link to that question, in the https://developer.mozilla.org/en-US/docs/Glossary/WindowProxy page
+
+[08:18:16.0000] <Domenic>
+Perfect
+
+[08:18:37.0000] <MikeSmith>
+yeah, it doesn’t show up in production yet, but will within 24 hours or so
+
+[08:18:46.0000] <MikeSmith>
+thanks for adding that answer
+
+[08:22:01.0000] <MikeSmith>
+also did manage to fully expunge URLUtilsReadOnly from both MDN and BCD today, and in place of it get WorkerLocation filled out somewhat properly
+
+[08:23:17.0000] <Domenic>
+Very nice
+
+[12:18:08.0000] <harupiyo>
+I have a question about the hgroup element.
+
+[12:18:09.0000] <harupiyo>
+MDN clearly states that the hgroup element is 'deprecated', but Living Standard doesn't seem to have such an indication yet. What is the reason or history behind this?
+
+[12:18:11.0000] <harupiyo>
+MDN: https://developer.mozilla.org/en-US/docs/Web/HTML/Element/hgroup
+
+[12:18:14.0000] <harupiyo>
+Living Standard: https://html.spec.whatwg.org/multipage/sections.html#the-hgroup-element
+
+[13:16:19.0000] <Krinkle>
+harupiyo: not sure, but there's two open issues that may be related: https://github.com/whatwg/html/issues?q=hgroup+is%3Aissue+is%3Aopen+
+
+[13:17:03.0000] <Krinkle>
+https://github.com/whatwg/html/issues/83#issuecomment-531520522
+
+[13:17:21.0000] <Krinkle>
+variosu suggestions that a (new) outline algo is needed and that hgroup should perhaps not be a part of that
+
+[14:11:54.0000] <harupiyo>
+Krinkle: Hmmm. Thanks for the valuable information.
+
+[14:11:55.0000] <harupiyo>
+I know that there is certainly some debate about the outline algorithm. However, since MDN deprecated it, I assume that there was some sort of agreement.
+
+[14:11:58.0000] <harupiyo>
+Should I ask the MDN side about this? If anyone has any other information, I would appreciate any advice.
+
+[14:49:28.0000] <Krinkle>
+harupiyo: perhaps yeah, or reply on one of those whatwg issues asking whether deprecation has consensus and whether pehaps some kind of warning can be added now in the spec or not.
+
+[14:49:39.0000] <Krinkle>
+from the MDN page-> Source on GitHub
+
+[14:49:41.0000] <Krinkle>
+https://github.com/mdn/content/commits/main/files/en-us/web/html/element/hgroup/index.html
+
+[14:49:50.0000] <Krinkle>
+https://github.com/mdn/content/pull/2902
+
+[14:50:19.0000] <Krinkle>
+https://github.com/mdn/content/pull/2786
+
+[14:50:28.0000] <Krinkle>
+https://lists.w3.org/Archives/Public/public-html-admin/2013Apr/0003.html
+
+[14:50:59.0000] <Krinkle>
+I don't know if this might be one of those "w3 vs whatwg" things that ended up reversed and/or is still undecided
+
+[15:55:43.0000] <TimothyGu>
+MikeSmith: I tried using TeaVM on galimatias. Unfortunately, TeaVM doesn't have implementations of some stdlib classes that icu4j uses, like java.util.ConcurrentHashMap
+
+[16:20:56.0000] <MikeSmith>
+TimothyGu: yeah I imagined something like that might be the case
+
+[16:21:22.0000] <MikeSmith>
+it’s a bit sad, because other galimatias has zero dependencies
+
+[16:22:01.0000] <MikeSmith>
+needing to support IDN is what makes it hard
+
+[16:23:18.0000] <MikeSmith>
+I’m curious what other implementations do without needing to pull in whatever ICU implementation/equivalent there is for their runtime
+
+[16:36:35.0000] <TimothyGu>
+MikeSmith: you don't need the entire set of Unicode tables + CLDR data just to implement IDN. https://github.com/jsdom/tr46 (used by whatwg-url) does it by extracting only the needed data from published Unicode tables. same for https://pkg.go.dev/golang.org/x/net/idna
+
+
+2021-05-08
+[18:22:00.0000] <MikeSmith>
+TimothyGu: I see. Then I may attempt to do something similar for galimatias
+
+[02:01:25.0000] <Sirisian>
+Curious, has anyone suggested creating an API for getting a list of all html tag names a browser supports and the supported attributes of those built in tags?
+
+[02:02:44.0000] <andreubotella>
+You can have a <nonexistent-element with-non-existent="attribute"> tag no problem. No browser will complain.
+
+[02:03:20.0000] <andreubotella>
+But that's not what people mean by "supported"
+
+[02:03:56.0000] <andreubotella>
+I recently found the MDN compat data was saying Firefox supported textarea
+
+[02:04:11.0000] <andreubotella>
+textarea's wrap attribute, just because it had a getter/setter in the DOM
+
+[02:04:17.0000] <andreubotella>
+but the attribute did nothing
+
+[02:16:39.0000] <Sirisian>
+Yeah, exactly. I wrote a small dom generation library a while ago and I essentially scraped the spec files and MDN for naive lists (of what I use more or less). That worked, but it's not that elegant. Looks like this: https://pastebin.com/t8yVHnPm (Ignore how naive it is, I know it can be written more robustly). Could imagine an API with tag names and attributes would simplify that of code. It's a rather niche use case though.
+
+[02:16:39.0000] <Sirisian>
+I get that it might be brittle on non-standard browsers.
+
+[02:18:23.0000] <andreubotella>
+What does it mean to support something, though?
+
+[02:18:24.0000] <andreubotella>
+MDN compat tables are full of annotations like "browser X supports this feature with so and so but not with so and so"
+
+[02:23:35.0000] <andreubotella>
+If you want to overshoot (i.e. maybe count things as supported when they aren't), I'd check the class of an element when you construct it, and for attributes, check if they have DOM getters
+
+[02:23:50.0000] <andreubotella>
+but I believe there's some cases where you'll also undershoot
+
+[02:23:55.0000] <Sirisian>
+I get what you mean. Maybe it would be better to specifically list out the tag names and their attributes in a static schema type format? This would stop browsers from having non-standard things listed when querying. I'm imagining a method on custom elements similar to observedAttributes that returned similar schema information.
+
+[02:26:59.0000] <andreubotella>
+I'm not only talking about non-standard things
+
+[02:27:46.0000] <andreubotella>
+Even when the standard attempts to match the browsers as well as the browsers attempting to match the standards, there are differences.
+
+[02:28:02.0000] <andreubotella>
+Firefox, for example, is taking many years to implement the standard's <dialog> element
+
+[02:28:12.0000] <andreubotella>
+or to ship it at least
+
+[02:29:15.0000] <andreubotella>
+and non-standard things can become standard, since WHATWG standards attempt to match browsers rather than "writing fiction"
+
+[02:30:49.0000] <andreubotella>
+I don't see a static list of supported elements and attributes. But that's my two cents, someone else might disagree
+
+[02:32:46.0000] <Sirisian>
+I wouldn't say it would be supported anymore. I'd go with a list defined in the spec only. The ones listed in the current element tables.
+
+[02:36:37.0000] <andreubotella>
+The element tables are for HTML authors, browsers don't care about them.
+
+[02:36:38.0000] <andreubotella>
+That doesn't mean they couldn't store and return them, of course, but why not get them from the spec if you need them?
+
+[02:36:45.0000] <andreubotella>
+I fail to see a use case for this
+
+[02:37:31.0000] <Sirisian>
+yeah, this is seeming to be more niche than I thought. Even searching online only a handful of people have ever asked about this ever.
+
+[02:38:48.0000] <andreubotella>
+Again, if you need to know whether a browser supports an element or attribute, you can feature detect.
+
+[05:41:01.0000] <harupiyo>
+Krinkle: Krinkle: Thanks for the useful information and the link. I'll ask MDN.
+
+
+2021-05-09
+[20:50:17.0000] <arkain>
+Q: Is it illegal for the shadow dom of a custom element to distribute its parts to multiple slots outside the owning custom element?
+
+[20:53:13.0000] <arkain>
+For instance, suppose the html looked like this: <ce-a><ce-b><h1>Testing...</h1></ce-b></ce-a>
+
+[20:54:19.0000] <arkain>
+Now let's say that <ce-a> has a shadow dom like this: <slot name="header"></slot><slot></slot>
+
+[20:55:16.0000] <arkain>
+Let's also say that <ce-b> has a shadow dom like this: <div slot="header">Some content</div><div> Some other stuff</div>
+
+[20:56:56.0000] <arkain>
+What I want is for <div slot="header"> to appear in <ce-a>'s header slot while everything else goes to the default slot. However, all I can get is the whole <ce-b> tag moved to <ce-a>'s header.
+
+[20:57:11.0000] <arkain>
+Is this how it's supposed to be?
+
+[21:21:26.0000] <annevk>
+arkain: you can only distribute child nodes of the host
+
+[21:22:31.0000] <arkain>
+Is there any particular reason for that limitation?
+
+[21:27:30.0000] <arkain>
+I understand that there's a rule: in the body of a given tag with a shadow dom containing slots, only the top level elements of that body can be distributed to slots. However, it seems that a top level tag in such a body containing a shadow dom with slotted elements will cause the entire tag to be slotted accordingly, as if the tag itself had been
+
+[21:27:30.0000] <arkain>
+assigned to a slot.
+
+[21:27:44.0000] <arkain>
+The behavior seems inconsistent.
+
+[21:28:48.0000] <arkain>
+If elements of the shadow dom can cause the whole tag to be slotted, it should either be that the individual shadow element can be slotted individually, or shadow dom slot assigning shouldn't be effective outside of the shadow dom.
+
+[21:29:32.0000] <arkain>
+Sorry, I did try to check my sense of logic at the door, but it followed me in anyway.
+
+[21:57:55.0000] <annevk>
+I don’t really understand what you’re saying
+
+
+2021-05-10
+[03:21:48.0000] <annevk>
+TabAtkins: hey, could you have a look at https://github.com/whatwg/fetch/pull/1224? I think I need your help to determine the root cause of that problem
+
+[03:22:44.0000] <annevk>
+TabAtkins: in particular why despite having `type:idl;url:dom-domhighrestimestamp;text:DOMHighResTimeStamp` (following `urlPrefix:https://w3c.github.io/hr-time/#;spec:hr-time`) it ends up linking to `...TR/hr-time-2/...` instead
+
+[07:01:28.0000] <TabAtkins>
+Yeah, sorry for the Friday, I was on vacation last week
+
+[07:01:37.0000] <TabAtkins>
+*delay
+
+[07:07:09.0000] <annevk>
+TabAtkins: no need to apologize for taking breaks, but appreciate the context
+
+[07:07:21.0000] <annevk>
+TabAtkins: hope you had fun
+
+
+2021-05-11
+[00:13:22.0000] <yoav>
+annevk: Do you mind if I add a "resource timing" label to Fetch issues and PRs that are related to RT and e.g. would benefit from WebPerfWG discussions?
+
+[00:17:54.0000] <annevk>
+yoav: maybe "topic: timing"?
+
+[00:18:11.0000] <annevk>
+yoav: as there's also navigation timing and in principle it's a low-level API that could get other consumers
+
+[00:18:26.0000] <annevk>
+yoav: but yeah, that seems good
+
+[00:18:30.0000] <yoav>
+SGTM!
+
+[04:04:00.0000] <annevk>
+zcorpan: ecobos: if <picture> has multiple <img> children, which is picked for aspect-ratio?
+
+[04:04:12.0000] <annevk>
+zcorpan: ecobos: the spec just has "sibling img element"
+
+[04:04:35.0000] <annevk>
+zcorpan: ecobos: presumably it's the first?
+
+[04:09:24.0000] <annevk>
+I guess it doesn't matter, since the source element is returned by asking the img element, it's just worded a bit indirectly
+
+[04:10:49.0000] <annevk>
+That's actually a really weird sentence, I wish we had done a bit more work on that to make it part of the img data model somehow
+
+[04:19:08.0000] <ecobos>
+annevk: I think it's the img who makes that decision yeah
+
+[10:18:15.0000] <zcorpan>
+annevk: each <img> renders an image
+
+[10:21:47.0000] <zcorpan>
+the wording could maybe be tweaked
+
+[10:55:04.0000] <annevk>
+zcorpan: so I think the rendering requirements should really follow from img
+
+[10:55:47.0000] <annevk>
+zcorpan: so img finds the source and then does its thing; the current setup for aspect-ratio is really weird
+
+[10:59:34.0000] <gsnedders>
+is there any way to determine if a same-origin iframe load has resulting in a 4xx or 5xx status?
+
+[11:01:26.0000] <annevk>
+gsnedders: no
+
+[11:19:29.0000] <zcorpan>
+annevk: do you mean this wording? "The width and height attributes on an img element's dimension attribute source map to the dimension properties 'width' and 'height' on the img element respectively. They similarly map to the aspect-ratio property of the img element."
+
+[11:24:38.0000] <annevk>
+zcorpan: the thing that says sibling img element
+
+[12:31:39.0000] <zcorpan>
+annevk: "These attributes can map to the aspect-ratio property as well as the rendered dimensions of sibling img element, if source element's parent is a picture element and source element's source set is returned as a result of update the source set for that sibling img."?
+
+[12:32:14.0000] <zcorpan>
+That's a statement of fact, not normative
+
+[12:33:48.0000] <zcorpan>
+that sentence should use <code> instead of <span> for picture, source, img
+
+[12:52:35.0000] <annevk>
+zcorpan: ah, maybe you should double check my aspect-ratio PR
+
+[12:57:06.0000] <zcorpan>
+annevk: https://github.com/whatwg/html/pull/6529/files#diff-41cf6794ba4200b839c53531555f0f3998df4cbb01a4d5cb0b94e3ca5e23947dR114496 is the relevant normative part, which LGTM
+
+
+2021-05-12
+[21:43:24.0000] <annevk>
+MikeSmith: https://swimlanes.io/ might be good for certain diagrams (via Greg Whitworth)
+
+[22:20:49.0000] <MikeSmith>
+/me looks
+
+[22:21:49.0000] <MikeSmith>
+oh wow yeah
+
+[04:29:19.0000] <annevk>
+zcorpan: care to look at https://github.com/whatwg/html/pull/6529 once more before I land it?
+
+[05:38:57.0000] <smaug____>
+Anyone have a coop page for testing
+
+[05:44:39.0000] <zcorpan>
+annevk: reviewed
+
+[05:49:43.0000] <jgraham>
+smaug____: twitter.com?
+
+[05:50:03.0000] <smaug____>
+Found https://first-party-test.glitch.me/coop
+
+[05:50:09.0000] <smaug____>
+oh, twitter uses it
+
+[05:51:44.0000] <zcorpan>
+smaug____: also https://photos.google.com/ and i guess various other google sites
+
+[06:07:29.0000] <annevk>
+zcorpan: thanks!
+
+[06:07:51.0000] <annevk>
+smaug____: there's also html/coop/ in wpt
+
+[06:08:04.0000] <annevk>
+oh wait, might be html/cross-origin-opener-policy/
+
+[06:08:36.0000] <smaug____>
+Wasn't sure how to load anything from there. Loading a test opens new windows and closes them
+
+[06:10:07.0000] <jgraham>
+If you just want a random page with coop, the wpt server will allow you to add the header to any page with something like `http://web-platform.test/?pipe=header(Cross-Origin-Opener-Policy,same-origin)
+
+[06:10:12.0000] <jgraham>
+`
+
+[08:16:29.0000] <JakeA>
+annevk: Domenic: https://github.com/whatwg/html/issues/6680 - the redirects & traversal things I mentioned. Also covers my plan for "document state"
+
+[08:26:40.0000] <annevk>
+JakeA: thanks!
+
+[08:27:29.0000] <annevk>
+I kinda want to file an issue on the discrepancy between contentDocument and onload, but I'm not sure how actionable any of it is
+
+[08:38:01.0000] <annevk>
+Domenic: it seems like GitHub might have changed how they organized release URLs and so now the validator URL in our build script 404s...
+
+[08:43:01.0000] <annevk>
+MikeSmith: ^^ I cannot find a new URL that fulfills the same purpose
+
+[08:50:03.0000] <annevk>
+There is nothing on https://github.blog/changelog/
+
+[08:50:09.0000] <annevk>
+Am I missing something?
+
+[08:55:36.0000] <annevk>
+I found a URL that would still work, https://github.com/validator/validator/releases/latest/download/vnu.linux.zip
+
+[08:55:44.0000] <annevk>
+Via https://stackoverflow.com/questions/24987542/is-there-a-link-to-github-for-downloading-a-file-in-the-latest-release-of-a-repo
+
+[08:56:20.0000] <annevk>
+There's also lots of people doing this with multiple fetches, as per https://gist.github.com/steinwaywhw/a4cd19cda655b8249d908261a62687f8
+
+[08:56:31.0000] <annevk>
+What I don't understand is why our current link is suddenly broken though
+
+[08:59:00.0000] <smaug____>
+Domenic: you mentioned about some feedback about multiple respondsWith callers
+
+[08:59:07.0000] <smaug____>
+is that in some spec issue?
+
+[09:00:15.0000] <Domenic>
+smaug____: yeah, https://github.com/WICG/app-history/issues/89#issuecomment-816092233 + continue discussion in https://github.com/WICG/app-history/issues/94 (since that comment was in a thread whose original topic was different)
+
+[10:37:54.0000] <TimothyGu>
+annevk: do you remember why query and special query are treated differently for percent encoding?
+
+[11:15:18.0000] <annevk>
+TimothyGu: not offhand, I suspect it’s captured in blame though you might have to go back a couple times
+
+[11:26:25.0000] <TimothyGu>
+okay, I can check it out
+
+[11:33:07.0000] <TimothyGu>
+hmm, looks like https://github.com/whatwg/url/issues/348 was about encoding ' in special URLs at all, but no convo about encoding ' in non-special URLs
+
+[12:21:39.0000] <annevk>
+TimothyGu: ah okay, maybe that could be simplified then; Chrome being willing to make changes would certainly help
+
+[13:08:14.0000] <MikeSmith>
+annevk: yeah I don’t know what happened there — will look into it
+
+[13:23:26.0000] <annevk>
+MikeSmith: if GitHub did not make a change could it be that a linux tag was removed from the repo? It seems there’s still a windows tag
+
+[13:24:37.0000] <annevk>
+The URL we’re using now seems more robust though
+
+[14:17:54.0000] <MikeSmith>
+annevk: yeah the build removed the linux tag
+
+[14:18:14.0000] <MikeSmith>
+the build deletes and removes that tag
+
+[14:18:59.0000] <MikeSmith>
+which is hacky, but it is the only way I could figure out to work around the arcane GitHub requirements for how releases need to be done
+
+[14:19:40.0000] <MikeSmith>
+so the cause was that the build broke partway through, due to my GPG signing key having expired
+
+[14:20:21.0000] <MikeSmith>
+so I have now removed all the GPG signing from the build, and re-running the build now
+
+[14:21:18.0000] <MikeSmith>
+the limitation of that https://github.com/validator/validator/releases/latest/download/vnu.linux.zip URL is that it’s for the latest stable release
+
+[14:22:12.0000] <MikeSmith>
+..which was nearly 1 year ago (I am long overdue for doing a new stable release...)
+
+[14:22:57.0000] <MikeSmith>
+https://github.com/validator/validator/releases/download/linux/vnu.linux.zip is for the latest snapshot from the current sources
+
+[14:24:04.0000] <MikeSmith>
+anyway, https://github.com/validator/validator/releases/download/linux/vnu.linux.zip now works again
+
+[14:24:18.0000] <MikeSmith>
+so I will raise a PR to switch it back
+
+[14:25:42.0000] <MikeSmith>
+I need to migrate the CI from Travis to GitHub Actions, but what’s been blocking that is that GitHub Actions doesn’t provide the same means for doing snapshot releases — or it didn’t the last time I checked at least
+
+
+2021-05-13
+[08:32:07.0000] <JakeA>
+zcorpan: is http archive just root pages, as in `/`?
+
+[08:33:04.0000] <JakeA>
+I'm planning to look at results where `page = url`, which I assume means page rather than subresource
+
+
+2021-05-14
+[21:55:31.0000] <MikeSmith>
+what spec defines a onloadend property for Document and Window?
+
+[22:27:53.0000] <TimothyGu>
+MikeSmith: bisection shows that HTML used to define it, but it was removed in https://github.com/whatwg/html/commit/af7cff772293db8d35198128c36e1297cb0fd1d4
+
+[22:56:16.0000] <MikeSmith>
+TimothyGu: aha! — thanks!
+
+[22:56:37.0000] <MikeSmith>
+but it is still in implementations, right?
+
+[22:58:35.0000] <MikeSmith>
+ah, just Gecko I guess
+
+[23:01:02.0000] <TimothyGu>
+looks like it can get one of those red boxes on MDN
+
+[23:01:13.0000] <TimothyGu>
+with a trash can
+
+[23:14:42.0000] <MikeSmith>
+TimothyGu: thanks yeah I already wrote up a patch
+
+[01:45:44.0000] <zcorpan>
+JakeA: yes, or whatever that redirects to. including subresources like iframes
+
+[01:46:17.0000] <zcorpan>
+JakeA: indeed page = url will be only the top-level page
+
+[01:57:56.0000] <JakeA>
+zcorpan: Is that just a limitation of httparchive? I was expecting to see `/articles/exciting-story/` etc
+
+[01:59:04.0000] <zcorpan>
+JakeA: yeah. they chose to collect more sites instead of going deeper with fewer sites
+
+[01:59:30.0000] <JakeA>
+cool. Just making sure I wasn't messing up my query
+
+[02:18:39.0000] <TimothyGu>
+https://crbug.com/1018721 makes me sad :(
+
+[02:19:39.0000] <TimothyGu>
+well, https://crbug.com/1018721#c9 in particular
+
+[16:30:00.0000] <howdoi>
+WebSockets over HTTP/2 is shipped in any of the nightly builds already?
+
+
+2021-05-17
+[13:45:04.0000] <Domenic>
+GPHemsley: would you be able to find some time to upgrade MediaWiki to 1.35.2? I'm trying to see about hosting it on the new DigitalOcean platform but I think there's a schema mismatch between the database dump from the current version (1.31.14) and the one I'm trying to use on DigitalOcean (1.35.2)
+
+
+2021-05-18
+[23:46:12.0000] <annevk>
+Ooh, tools.ietf.org now redirects, good times
+
+[08:08:43.0000] <annevk>
+Nice to see the <output> test issue is already resolved, thanks Domenic!
+
+[08:09:03.0000] <Domenic>
+Yeah, the whole <output> thing came because I wanted to get jsdom to pass the tests
+
+[08:41:13.0000] <annevk>
+Domenic: can we close https://github.com/whatwg/html/issues/6516? It seems all browsers have landed their fixes recently
+
+[08:41:24.0000] <Domenic>
+annevk: yes
+
+[08:42:33.0000] <Domenic>
+annevk: did Gecko fix its thing too?
+
+[08:42:53.0000] <annevk>
+Domenic: the bug mentioned in one of the early comments got resolved seven days ago
+
+[08:43:03.0000] <Domenic>
+Ah perfect
+
+[08:43:56.0000] <Domenic>
+Good job everyone; a rock-solid <output> implementation...
+
+[08:49:19.0000] <annevk>
+Only took us seventeen years
+
+
+2021-05-19
+[19:01:49.0000] <TimothyGu>
+Does anyone know how to contact Unicode people to report bugs about UTS 46?
+
+[20:52:02.0000] <Domenic>
+Haven't we done that a couple times semi-successfully through the contact form? With just a long lag time?
+
+[21:40:13.0000] <annevk>
+Yeah, that’s the way
+
+[21:40:48.0000] <annevk>
+We can also contact some people out-of-band
+
+[05:22:06.0000] <nox>
+Are we moving off Freenode?
+
+[05:22:26.0000] <nox>
+https://gist.github.com/joepie91/df80d8d36cd9d1bde46ba018af497409
+
+[05:47:21.0000] <GPHemsley>
+Domenic: Double check my e-mail, but IIRC, we can't upgrade to 1.35 on our current setup because the PHP is too old.
+
+[05:48:26.0000] <GPHemsley>
+Domenic: But you should be able to run the database migration script in your env if schema is the problem.
+
+[06:45:40.0000] <jgraham>
+Might be possible to move to matrix? idk what the situation is for getting free hosting there.
+
+[07:24:07.0000] <mathiasbynens>
+freenode 301 libera.chat
+
+[07:25:39.0000] <mathiasbynens>
+good to see nox already claimed #whatwg on libera.chat (thanks!)
+
+[07:26:03.0000] <nox>
+IT’S MINE NOW
+
+[07:26:09.0000] <nox>
+Just kidding :p
+
+[07:26:24.0000] <nox>
+I’ll relinquish to the Powers That Be if we do migrate there
+
+[07:38:43.0000] <annevk>
+We could probably get a room on Mozilla's Matrix instance (if that's even how it works, I'm not sure how Matrix works)
+
+[07:53:19.0000] <annevk>
+Anyone want to open an issue on whatwg/meta to discuss this? If we have to move it'll require some site changes and such as well.
+
+[08:09:06.0000] <jgraham>
+We definitely can just create a room on mozilla's matrix, as long as people are happy with that venue
+
+[08:15:15.0000] <jgraham>
+https://github.com/whatwg/meta/issues/210
+
+[08:39:18.0000] <nox>
+I would like to stay off Mozilla's Matrix, I don't like to visit offices of my former employer 🙃
+
+[15:07:46.0000] <Krinkle>
+Domenic: GPHemsley: If you run into any issues with MediaWiki or have questions, do feel free to ask any time! (I work full-time to develop and deploy its codebase for Wikipedia).
+
+[15:21:00.0000] <Domenic>
+Krinkle: thanks! If you have any experience with Dockerized deployments that'd be great, but so far it's going reasonably well for me
+
+[15:21:27.0000] <hober>
+today i was surprised to learn that html "simple color" doesn't include 3-hexit colors like #fff
+
+[15:21:53.0000] <hober>
+specifically, that <input type=color value=#fff> doesn't do what i expected it to
+
+[15:23:25.0000] <Krinkle>
+Domenic: Not personally, no. But I can see how that can introduce a challenge. Is the database within the same container? Or is the challenge to get a shell running that has the codebase, config and needed php packages present in order to run the update script?
+
+[15:25:03.0000] <Domenic>
+Krinkle: mostly the latter, although it's probably not actually hard, just requires some time to sit down and work it out
+
+[15:25:12.0000] <Krinkle>
+/me reads up
+
+[15:26:48.0000] <Krinkle>
+Yeah, PHP 7.0 support was removed in 1.34 I think, and 1.35 requires PHP 7.3+
+
+[15:27:21.0000] <Krinkle>
+I suppose you'd want to first deploy a new webserver host with a newer PHP version and otherwise the same. That should be a smooth switchover.
+
+[15:29:16.0000] <Domenic>
+Yeah that makes sense. It'll be interesting to see how database/schema upgrades work in the the containerized world, but probably OK...
+
+[15:33:02.0000] <Krinkle>
+Does the wiki run based on a git clone or based on tarballs?
+
+[15:33:58.0000] <Krinkle>
+https://wiki.whatwg.org/.git/
+
+[15:34:02.0000] <Krinkle>
+oh, I guess that answers that
+
+[15:35:25.0000] <Krinkle>
+that certainly makes upgrading a fair bit easier
+
+[15:36:20.0000] <Krinkle>
+depending on whether you want to do it live or not, could have another 'new webserver' host in which you do the various pulls and checkouts, and then running update.php should be all that's needed, in theory :)
+
+[15:52:21.0000] <Krinkle>
+You'll want to do a backup of the db beforehand, just in case ends up not working out as smoothly. I don't know if we have those regularly already. DigitalOcean has some automatic features for that but they're also not cheap.
+
+
+2021-05-20
+[01:26:40.0000] <annevk>
+domfarolino: are you also checking the other referrer policy PRs? Cannot land the Fetch PR without the HTML PR for instance
+
+[01:55:15.0000] <MikeSmith>
+nox: if we decided to use Matrix, we wouldn’t need to use Mozilla’s server, but could instead have it elsewhere, right?
+
+[01:56:43.0000] <MikeSmith>
+I’ve had some interaction with the Matrix folks in the past and I feel pretty sure they’d be happy to help us with getting something set up
+
+[02:01:19.0000] <jgraham>
+MikeSmith: Yeah, there's no need to use Mozilla's server, and I think there are probably good reasons to avoid that. I think we can just run something on matrix.org if we go down that route
+
+[02:01:52.0000] <MikeSmith>
+jgraham: OK yeah that’s what I reckoned, thanks
+
+[02:03:39.0000] <nox>
+U Y hate IRC tho
+
+[02:03:45.0000] <jgraham>
+(if we're doing a "consider every possible messaging service" thing, I think a fuller list of possibilities is something like "irc, matrix, discord, zulip, gitter", and e.g. servo ended up on zulip, and lots of rust stuff on discord, so there are at least precedents for several. But I also worry that making this a "consider every possible messaging service" exercise will end up with no action)
+
+[02:03:52.0000] <nox>
+I can't slang today apparently
+
+[02:06:05.0000] <jgraham>
+(I've been using IRC for like 20 years at this point and running irssi in a terminal is a super convenient messaging service, but I think there's a reasonable argument that IRC doesn't easily provide the featureset that most people want, and acts as a barrier to entry for new contributors)
+
+[02:06:13.0000] <jgraham>
+s/service/UI/
+
+[02:09:06.0000] <nox>
+/me rants about how sad he is that IRCv3 isn't getting more traction when clearly all the drafts that exist for that protocol show that you can have modern IRC
+
+[02:15:46.0000] <MikeSmith>
+I do the same thing that jgraham said — running irssi in a terminal (remote, ssh’ing in)
+
+[02:16:01.0000] <MikeSmith>
+so I’ve personally still been pretty happy with IRC. But I’ve been enlightened a bit by other folks (including TabAtkins here) that it may not be the greatest thing for all parts of the community
+
+[02:18:47.0000] <MikeSmith>
+as far as other alternatives mention, I like gitter a lot but relatively very few other people seem to; there is near-zero activity on the channels I am on there
+
+[02:23:15.0000] <MikeSmith>
+as far Discord, I am bit disappointed that Rust ended up there, because I don’t have a great impression of it. Maybe I need to broaden my understanding, but the main thing I see about Discord from the outside are frequent postings to the python tag on Stack Overflow from people trying to get help on writing bots to do abusive stuff that violate Discord’s ToS
+
+[02:24:14.0000] <MikeSmith>
+well, and along with that, hearing that far-right-wing groups in the US at least seem to have adopted Discord as one of their preferred forums
+
+[03:18:55.0000] <jgraham>
+I have also not understood the excitement about discord, but I've also used it ~once.
+
+[03:52:14.0000] <jgraham>
+It has been pointed out that W3C IRC is now bridged onto matrix.org so theoreticaly one could use matrix for all of ones standards-related messaging
+
+[03:52:36.0000] <jgraham>
+(I mean I don't know what the IETF use. Probably like hum-over-carrier-pigeon or something)
+
+[03:55:34.0000] <andreubotella>
+I've been accessing this and other freenode channels through the matrix.org bridge
+
+[04:02:19.0000] <GPHemsley>
+Domenic: keep me in the loop on what/where you're working... I don't think I ever shared the details of how I maintain the wiki anywhere
+
+[05:03:03.0000] <annevk>
+andreubotella: you happen to be around?
+
+[05:11:33.0000] <andreubotella>
+annevk: Yeah
+
+[05:11:54.0000] <annevk>
+andreubotella: ah sorry, I was thinking maybe I should double check the commit messages, but then felt confident enough
+
+[05:12:21.0000] <annevk>
+andreubotella: the one change I made is that I haven't resolved the URL issue yet as I want to write a PR for that to remove URL's talking about files
+
+[05:12:32.0000] <annevk>
+(and then close it from that change)
+
+[05:13:04.0000] <andreubotella>
+annevk: I opened https://github.com/whatwg/url/pull/585 back in February
+
+[05:13:29.0000] <annevk>
+andreubotella: ah, good I haven't done anything :-)
+
+[05:13:39.0000] <annevk>
+andreubotella: the issue somehow still got closed anyway
+
+[05:15:37.0000] <andreubotella>
+Yeah, I set the first PR to close that issue because it solved the problem; the rest is just editorial
+
+[05:16:36.0000] <annevk>
+I see, in my mind editorial issues are issues too 🙂
+
+[05:17:18.0000] <annevk>
+Really happy this all got landed now. That was a long journey. 🙂
+
+[05:17:35.0000] <andreubotella>
+Yeah 😅
+
+[06:27:23.0000] <jgraham>
+So, entirely different topic, WebDriver-BiDi and (presumably) WebExtensions are going to want to specify "run a script in a sandbox (gecko) / isolated world (blink) such that you have access to the underlying DOM from some Window object, and possible extra APIs", and I assume that this is not really a thing that exists in spec-land today and is going to be an unmitigated nightmare to add?
+
+[06:29:27.0000] <jgraham>
+"unmodified" here meaning that you get a seperate reflection of the underlying C++ objects (in blink) and "you get the same object, but without any changes made by js code" (in gecko)
+
+[06:29:47.0000] <jgraham>
+(oouc, which it is possible I do not)
+
+[06:29:52.0000] <jgraham>
+*iiuc
+
+[07:02:11.0000] <annevk>
+andreubotella: if you don't have a blog, you'd be welcome to post on blog.whatwg.org btw about the changes (just saw your tweets)
+
+[07:04:06.0000] <andreubotella>
+annevk: I was going to write up something on gist, but I might take you up on that offer
+
+[07:04:53.0000] <annevk>
+andreubotella: sounds good, we'd really love to have more technical content on the blog, but lately nobody has really gotten around to it
+
+[08:30:11.0000] <domfarolino>
+annevk: Yes, at the time of reviewing fetch, I had forgotten that referrer policy wasn't moved to policy container and didn't see my review request on HTML. I should be able to review that today
+
+[08:31:23.0000] <annevk>
+domfarolino: cool, might also be one against RP itself? Not sure. We're moving the policies one-by-one.
+
+[08:31:57.0000] <domfarolino>
+There is, yeah
+
+[08:32:12.0000] <domfarolino>
+That one should be really quick to review
+
+[11:49:06.0000] <eris>
+Remember Bitcoin in 2008??? Pi is a new digital currency developed by Stanford PhDs, To claim your piece of pi goto https://minepi.com and use "ilkde" as your invitation code. Get your piece of the pi now
+
+[12:01:05.0000] <eris>
+Remember Bitcoin in 2008??? Pi is a new digital currency developed by Stanford PhDs, To claim your piece of pi goto https://minepi.com and use "ilkde" as your invitation code. Get your piece of the pi now!
+
+[12:02:31.0000] <eris>
+Remember Bitcoin in 2008??? Pi is a new digital currency developed by Stanford PhDs, To claim your piece of pi goto https://minepi.com and use "ilkde" as your invitation code. Get your piece of the pi now!
+
+[12:03:01.0000] <jgraham>
+Problems with irc: exhibit A
+
+[12:04:03.0000] <ondras>
+:)
+
+[12:05:02.0000] <eris>
+Remember Bitcoin in 2008??? Pi is a new digital currency developed by Stanford PhDs, To claim your piece of pi goto https://minepi.com and use "ilkde" as your invitation code. Get your piece of the pi now!
+
+[12:42:02.0000] <shu>
+wait till you see editors'-drafts-as-NFTs!
+
+[12:43:04.0000] <andreubotella>
+a blockchain of increasingly official working drafts too
+
+[12:46:33.0000] <shu>
+great idea
+
+[12:48:12.0000] <jgraham>
+And to think, the main environmental concern with web standards used to be the someone might try to print the HTML spec.
+
+[12:50:40.0000] <ondras>
+I don't think there are paper trays big enough in contemporary printers.
+
+[12:57:21.0000] <jgraham>
+Firefox claims it's 1201 pages when printed, so https://store.hp.com/UKStore/Merch/Product.aspx?id=L0H18A&opt=&sel=ACC seems more than sufficent
+
+[12:57:41.0000] <ondras>
+:D
+
+[12:58:14.0000] <ondras>
+I was afraid to open the Print preview. It is not very long ago when my Firefox actually crashed only by opening the single-page version.
+
+[13:35:40.0000] <Domenic>
+Firefox is by far better than Chrome for the singlepage HTML spec
+
+[13:35:49.0000] <Domenic>
+I hear Safari is pretty good too
+
+[13:36:40.0000] <Domenic>
+Sadly my attempts to get people to fix this have been met with discussions about how such long documents are not "typical" and we should "look for changes that have an impact on real users" and "use field data to drive what performance projects we invest in", pshaw.
+
+[16:17:02.0000] <shu>
+over in js spec land our attempts have been met with try content-visibility, but that significantly messed up the scrolling enough we didn't roll it out
+
+
+2021-05-21
+[17:49:19.0000] <Domenic>
+https://gist.github.com/cbiesinger/f2378dbcd215495c3a1daf9696a8e91f seems potentially promising in that regard, with https://infrequently.org/2020/12/resize-resilient-deferred-rendering/ being the thing we could try in the meantime
+
+[19:31:16.0000] <MikeSmith>
+shu: the multipage version of the ES spec is great
+
+[19:31:44.0000] <MikeSmith>
+I have no idea when y’all added that, but I somehow didn’t realize it until quite recently
+
+[19:32:52.0000] <MikeSmith>
+for MDN/BCD, I have been thinking about changing all the spec URLs for the JavaScript docs to use the multipage spec URLS
+
+[19:34:29.0000] <MikeSmith>
+MDN spec links (which are now actually maintained in the BCD repo) currently reference the full spec — but I think it would be better user experience for readers if switched them all to the corresponding multipage URLs
+
+[19:35:21.0000] <MikeSmith>
+for the HTML spec, all the spec URLs (now also in BCD) consistently now reference the multipage URLs
+
+[19:37:25.0000] <MikeSmith>
+shu: but if we were the switch to the multipage URLs for the ES spec, we’d ideally want to have a guarantee that the filenames won’t change
+
+[19:39:38.0000] <MikeSmith>
+but it seems like they are not likely to change, given that from what I have seen, the splits seem to all be done at the top-level section/chapter, with no further finer-grained splitting any lower than at that level
+
+[19:46:49.0000] <TimothyGu>
+MikeSmith: it looks like the ES spec supports HTML-style filling in the filename from the hash. E.g., https://tc39.es/ecma262/multipage/#prod-IdentifierReference gets redirected to https://tc39.es/ecma262/multipage/ecmascript-language-expressions.html#prod-IdentifierReference
+
+[19:47:23.0000] <TimothyGu>
+so as long as the hash stays the same (which is more likely than filenames staying the same), the link should be stable
+
+[19:47:28.0000] <MikeSmith>
+ah excellent
+
+[19:49:40.0000] <MikeSmith>
+yeah for BCD, when considering whether to use those file-less HTML URLs, the issue any consumers of that data would need to have JavaScript support to be able to get the actual document content
+
+[19:50:44.0000] <MikeSmith>
+I don’t know what existing use cases there actually are for anybody doing anything with BCD that would include processing of the document content at the spec URLs
+
+[19:53:04.0000] <MikeSmith>
+but it seemed better to try to accommodate/anticipate use cases that might need to do that — scraping just from a normal python or whatever script — rather than needing puppeteer or such just to be able to get the document conten
+
+[19:54:27.0000] <MikeSmith>
+Bakkot: poking around in the ES spec repo now, I see maybe you’re the one who put the machinery together for generating the multipage version
+
+[19:54:39.0000] <Bakkot>
+indeed
+
+[19:54:49.0000] <MikeSmith>
+well then, thanks much
+
+[19:56:10.0000] <MikeSmith>
+Bakkot: so are the file splits in fact consistently at the top-level sections/chapters?
+
+[19:56:20.0000] <Bakkot>
+yup, that's how they're determined
+
+[19:56:25.0000] <MikeSmith>
+OK cool
+
+[19:57:01.0000] <Bakkot>
+(if we ever rename a top-level section I'll need to add a mechanism to generate a page at the previous url, so as to not break links, but I haven't bothered yet)
+
+[19:57:13.0000] <MikeSmith>
+OK
+
+[19:57:37.0000] <MikeSmith>
+can cross that bridge when we come to it
+
+[19:58:20.0000] <MikeSmith>
+for BCD I anyway have a script that checks for spec-URL breakage — including if the fragment IDs/anchors break
+
+[19:59:24.0000] <Bakkot>
+sorry, what is BCD?
+
+[19:59:32.0000] <Bakkot>
+anyway, yeah, we try not to break links, though occasionally there's not a good place to put an old anchor and it just gets dropped
+
+[19:59:46.0000] <MikeSmith>
+BCD is https://github.com/mdn/browser-compat-data
+
+[19:59:52.0000] <Bakkot>
+aha
+
+[20:00:19.0000] <MikeSmith>
+yeah that is what the Browser Compatibility tables in MDN is generated from
+
+[20:00:54.0000] <MikeSmith>
+and now also all the Specifications tables (at least so far all the ones for the JavaScript docs)
+
+[20:01:42.0000] <MikeSmith>
+anyway, I am now convinced I should put together a patch for BCD that switches all the JavaScript spec URLs to use the multipage spec
+
+[20:01:58.0000] <MikeSmith>
+all 785 of them
+
+[20:03:41.0000] <Bakkot>
+should be pretty straightforward, I think
+
+[20:03:59.0000] <MikeSmith>
+yeah
+
+[20:04:16.0000] <Bakkot>
+if you want to link to the right subsections instead of the top-level `multipage/` (and so avoid a redirect) you can read the map out of the `multipageMap` defined in https://tc39.es/ecma262/multipage/multipage.js
+
+[20:04:35.0000] <MikeSmith>
+/me looks
+
+[20:05:10.0000] <Bakkot>
+the map is inverted from what you need but it's easy enough to invert
+
+[20:05:21.0000] <MikeSmith>
+excellent
+
+[20:05:30.0000] <MikeSmith>
+yeah that makes it easy
+
+[20:06:01.0000] <Bakkot>
+`Object.fromEntries(Object.entries(multipageMap).flatMap(([k, v]) => v.map(s => [s, k])))`
+
+[20:06:23.0000] <Bakkot>
+(how did we live without Object.fromEntries for so long)
+
+[20:06:39.0000] <MikeSmith>
+well I was gonna write it python anyway :p
+
+[20:07:01.0000] <MikeSmith>
+just kidding — all the BCD scripting is JavaScript anyway
+
+[20:08:01.0000] <MikeSmith>
+although anyway the script for this would just be a one-time need, I guess — no need to add the script to repo, maybe
+
+[20:08:29.0000] <Bakkot>
+yeah, I think you can probably assume future contributors can get the multipage link themselves
+
+[20:08:37.0000] <Bakkot>
+soon I will add a keyboard shortcut for that to the spec
+
+[20:09:23.0000] <MikeSmith>
+you mean a keyboard shortcut to switch between the full spec and multipage?
+
+[20:09:28.0000] <Bakkot>
+yup
+
+[20:09:39.0000] <Bakkot>
+(the shortcut is `m`)
+
+[21:39:27.0000] <TimothyGu>
+Bakkot: wait es spec has keyboard shortcuts
+
+[21:40:00.0000] <TimothyGu>
+?
+
+[23:03:58.0000] <Bakkot>
+TimothyGu technically, yes, `/` brings you to the search box
+
+[23:04:07.0000] <Bakkot>
+but that is the only one until I land and upstream my pr adding `m`
+
+[23:04:20.0000] <TimothyGu>
+ah I see
+
+[10:19:54.0000] <devsnek>
+shout-out to the creator of this image https://gc.gy/f126133f-1e66-404e-b360-53928d7f8edd.png
+
+[10:34:28.0000] <miketaylr>
+it's beautiful
+
+[10:49:42.0000] <TabAtkins>
+I have minor complaints about the contrast of the red digits against their gray backgrounds, but otherwise yes, the image is perfect and must never be replaced.
+
+[14:36:32.0000] <philipp64_>
+Hi. Is there an IRC channel for CBOR-LD, and if so, what is it? Thanks
+
+
+2021-05-22
+[03:17:13.0000] <croraf>
+Hi. I'm having a login form with only a password. And Chrome console warns the following:
+
+[03:17:15.0000] <croraf>
+[DOM] Password forms should have (optionally hidden) username fields for accessibility: (More info: https://goo.gl/9p2vKq)
+
+[03:17:22.0000] <croraf>
+Am not sure what this means?
+
+[03:23:26.0000] <andreubotella>
+Password managers are used to associating usernames or emails with passwords, and having just a password in the form might throw them off
+
+[04:03:59.0000] <ondras>
+also, following and reading the mentioned 'more info' link might provide the required information
+
+[09:09:55.0000] <croraf>
+ondras, I did read it, still unclear
+
+[09:10:27.0000] <croraf>
+So I should make a dummy username field, with empty value, and make it hidden?
+
+[09:10:51.0000] <croraf>
+Because I dont have username, just password. andreubotella
+
+[09:12:42.0000] <andreubotella>
+I don't know why you would have no username, unless you were making something like an admin panel for a one-user blog.
+
+[09:13:36.0000] <andreubotella>
+And even then, a username would be beneficial for increasing the security.
+
+[09:14:02.0000] <andreubotella>
+This is of course a warning, feel free to skip it if you feel it doesn't apply.
+
+[11:56:35.0000] <eduardo1974>
+this is fetch api help irc channel ?
+
+[11:58:22.0000] <andreubotella>
+eduardo1974: It's the IRC channel for WHATWG specifications, including the fetch spec
+
+[11:58:53.0000] <eduardo1974>
+es que tengo una duda sobre fech en una query ajax....
+
+[11:59:03.0000] <eduardo1974>
+y dicen que aqui te pueden explicar o ayudar no ??
+
+[11:59:52.0000] <andreubotella>
+This channel is about developing web standards, not about helping developers with questions about them
+
+[12:00:01.0000] <andreubotella>
+Try StackOverflow or some other support forum
+
+[12:01:39.0000] <eduardo1974>
+thanks and sorry
+
+[12:02:20.0000] <andreubotella>
+it's okay
+
+[12:36:13.0000] <croraf>
+andreubotella, I'm making an admin panel for one user actually. But what is the problem if more users? How does username add to security?
+
+[12:40:05.0000] <andreubotella>
+I was thinking that if an attacker has no knowledge of the system or its possible users, they'd have to guess a username and a password, so it's an effective security of more than the concatenation of the username and the password
+
+
+2021-05-23
+[07:13:28.0000] <croraf>
+andreubotella, having both username and pass gives only minor improvement in that sense.
+
+[07:14:09.0000] <croraf>
+I have another question. I made a login form, and for some reason my Mobile Chrome doesn't want to store credentials, while my desktop Chrome does.
+
+[07:14:26.0000] <croraf>
+https://garage-87697.web.app/login  why?
+
+[07:16:51.0000] <croraf>
+When I synced with desktop it also correctly took and did autofil, but on its own it doesnt ask for save password.
+
+[07:21:55.0000] <croraf>
+Oh, I found the reason. Chrome offers "Never save" option which I checked.
+
+
+2021-05-24
+[19:18:33.0000] <MikeSmith>
+philipp64_: about CBOR-LD chat, if manu is around here, he could tell you
+
+[19:19:42.0000] <MikeSmith>
+devsnek: that image, I think the world has Hixie to thank for that
+
+[19:20:10.0000] <MikeSmith>
+best way to show your appreciation would be to build all your apps using Flutter from now on
+
+[23:59:07.0000] <MikeSmith>
+fg
+
+[09:01:21.0000] <andreubotella>
+How come the text/plain enctype isn't disallowed for authors or even deprecated in the HTML spec?
+
+[09:04:30.0000] <Domenic>
+Why would it be?
+
+[09:08:34.0000] <andreubotella>
+I believe it's widely considered as a historical feature that shouldn't be used anymore
+
+[09:08:44.0000] <andreubotella>
+though I guess it's useful for mailto actions
+
+[09:08:52.0000] <Domenic>
+I am not aware of any such consensus
+
+[11:42:52.0000] <jgraham>
+The HTML spec doesn't expose the surface needed to explain force-reload (i.e. a navigation in which all fetches are cache mode "reload")?
+
+[11:45:05.0000] <Domenic>
+jgraham: yeah, I don't think it does
+
+[11:53:33.0000] <jgraham>
+Hmm. So I guess I need to add that. Making the initial request for the main document set the right flags seems easy enough, but I'm not sure if there's an easy way to tell that a subsequent resoure load was initiated by the parser (assuming that's the right metric)?
+
+[11:55:36.0000] <jgraham>
+Looks suspiciously like this all uses a COMEFROM style :(
+
+[12:03:47.0000] <Domenic>
+domfarolino has been looking into something similar for prerendering, where all resource fetches will need to use a special cache key. (Although there I think it will impact fetch/XHR/etc. as well, which might be easier...)
+
+[12:11:55.0000] <jgraham>
+Yeah, so I think that this "just" requires a boolean flag which sets the reqeust object's cache mode flag, and that the fetch spec already has the actual functionality. The hard part seems to be all the algorithms for loading subresources which are "when [a large list of things happen] do the following: [...] Create a new request [...]", and now you need to get that flag down into the request only in the
+
+[12:12:01.0000] <jgraham>
+case that the condition you hit was caused by something the parser did (probably; I didn't actually check what happens if you have some resource whose load is initiated by something a script does)
+
+[12:14:02.0000] <annevk>
+There’s some service worker reload navigation state thingie
+
+[12:21:22.0000] <jgraham>
+"If request is a navigation request and the navigation triggering it was initiated with a shift+reload or equivalent, return null." - that?
+
+[12:23:10.0000] <jgraham>
+(literally refering to a specific UI convention in the spec text as if that's a normative requirement is quite something)
+
+[12:26:15.0000] <jgraham>
+It also looks like that doesn't apply to most kinds of subresource load?
+
+[16:15:13.0000] <philipp64_>
+MikeSmith: manu?
+
+[16:38:14.0000] <manu>
+philipp64_ MikeSmith: yes?
+
+[16:38:52.0000] <manu>
+/me reads backlog.
+
+[16:38:55.0000] <philipp64_>
+it was suggested you might know something about CBOR-LD implementations?
+
+[16:39:28.0000] <philipp64_>
+or a channel where people discuss it.
+
+[16:39:44.0000] <manu>
+philipp64_: yep, sure... some background on CBOR-LD: https://docs.google.com/presentation/d/1ksh-gUdjJJwDpdleasvs9aRXEmeRvqhkVWqeitx5ZAE/edit
+
+[16:40:17.0000] <manu>
+philipp64_: Javascript implementation (works in browser and node.js): https://github.com/digitalbazaar/cborld
+
+[16:40:59.0000] <manu>
+philipp64_: as for a chat channel... none -- CBOR-LD is new and experimental... the closest thing would be public-credentials⊙wo -- https://lists.w3.org/Archives/Public/public-credentials/
+
+[16:41:12.0000] <manu>
+(for a community that's actively using it)
+
+[16:41:51.0000] <philipp64_>
+manu: I’m working in Python (for prototyping protocols) and eventually production implementations in C++.
+
+[16:41:54.0000] <manu>
+but, you'd be very much on the bleeding edge... feel free to ping me in this channel, or #json-ld on freenode
+
+[16:42:21.0000] <manu>
+but really, you should probably switch over to the #json-ld channel on freenode as this is definitely not a #whatwg thing.
+
+[16:42:32.0000] <philipp64_>
+for something that’s experimental, IANA seems to be registering a lot of tags for canonical types!
+
+[16:42:56.0000] <manu>
+huh? link?
+
+[16:43:35.0000] <philipp64_>
+manu: https://www.iana.org/assignments/cbor-tags/cbor-tags.xhtml
+
+[16:44:40.0000] <manu>
+yeah, that registry has some serious scalability problems...
+
+[16:44:52.0000] <manu>
+/me switches over to #json-ld to chat with philipp64.
+
+[16:44:58.0000] <philipp64|work>
+eh? 32768-18446744073709551615	First Come First Served
+
+[16:45:04.0000] <philipp64|work>
+doh!
+
+
+2021-05-25
+[05:09:13.0000] <annevk>
+TabAtkins: if you're around I'm still curious about https://github.com/whatwg/fetch/pull/1224
+
+[10:09:16.0000] <TabAtkins>
+annevk: Thanks for the ping and apologies for the delay, I'll look at that right now.
+
+[10:40:02.0000] <annevk>
+domfarolino: ping on https://github.com/whatwg/html/pull/6677
+
+[11:04:48.0000] <TabAtkins>
+annevk: Dropped a suggestion into the PR that'll fix the issue.
+
+[11:28:07.0000] <annevk>
+TabAtkins: thank you!
+
+
+2021-05-26
+[21:42:48.0000] <fireglow>
+https://twitter.com/GrapheneOS/status/1397402818324140033 if anyone was on the fence about moving networks
+
+[00:00:22.0000] <blue_penquin>
+Yup, #k-9,#newpipe, #archlinux-pacman,security, #lichess, #btrfs, #systemd and more were taken down by Freenode staff due to having "libera" in the topic.
+
+[03:33:40.0000] <ondras>
+repost from the new libera channel
+
+[03:33:41.0000] <ondras>
+<ondras> a question - js embedded in svg that is linked via <img src=.svg> - is this defined/specced somewhere? how is its execution restricted?
+
+[03:34:02.0000] <ondras>
+i was unable to find a definitive resolution written anywhere...
+
+[03:35:28.0000] <andreubotella>
+ondras: https://svgwg.org/svg2-draft/conform.html#secure-static-mode
+
+[03:36:28.0000] <jgraham>
+FWIW I created a WHATWG room on matrix.org, just to reserve it: https://app.element.io/#/room/!AGetWbsMpFPdSgUrbs:matrix.org
+
+[03:36:49.0000] <andreubotella>
+although I'm not sure if there's a specification anywhere that says browsers have to use such processing mode
+
+[03:36:57.0000] <ondras>
+andreubotella: hmh, that implies that svg animations are also forbidden in <img src=...> ?
+
+[03:37:38.0000] <andreubotella>
+I'm not an expert on this stuff, I just remembered seeing those tables
+
+[03:38:34.0000] <ondras>
+also, I am not sure whether v2 is *the* currently generally implemented version
+
+[03:39:02.0000] <ondras>
+thanks for the link anyway!
+
+[04:58:30.0000] <annevk[m]>
+So there's freenode_#whatwg:matrix.org, whatwg:matrix.org, and whatwg:mozilla.org on Matrix...
+
+[05:03:09.0000] <jgraham>
+So the freenode_ one is presumably a bridge to this channel. I think nox's objection to the :mozilla.org one is reasonable (or at least I think the concern that the channel should be in a vendor-neutral space is reasonable)
+
+[05:05:47.0000] <annevk>
+I see and I guess although technically whatwg:whatwg.org would be nice, the infra burden is too painful
+
+[05:06:48.0000] <jgraham>
+Yes, I'm assuming that we don't want to host our own matrix server, but if we did that would avoid relying on third party governance at the server level
+
+[05:43:24.0000] <andreubotella>
+ * I'm not an expert on this stuff, I just remembered seeing those tables.
+
+[05:43:52.0000] <andreubotella>
+My bad, I was testing reaction emojis and editing with the matrix -> IRC bridge
+
+[05:50:26.0000] <jgraham>
+Oh yeah, editing is a good point
+
+[05:50:50.0000] <andreubotella>
+Let me test deleting
+
+[05:51:06.0000] <andreubotella>
+Deleting does nothing
+
+[06:39:14.0000] <Cienisty>
+can we move to libera?
+
+[06:58:36.0000] <jgraham>
+Cienisty: There is an ongoing discussion about the right next steps.
+
+[06:58:51.0000] <Cienisty>
+ok
+
+[07:42:23.0000] <nox>
+The Libera/Matrix bridge is in the works
+
+[09:03:31.0000] <annevk>
+jgraham: FWIW, I don't think IRC has to remain the default or what we suggest first; mainly trying to accommodate Domenic there
+
+[09:04:07.0000] <Domenic>
+I still have seen no downsides remaining on freenode; this seems like some sort of political fight. I think I'll just let the community move wherever and keep hanging out here.
+
+[09:06:25.0000] <annevk>
+From the discussion it seems we'll at least lose public logs on IRC and they might be a feature that Matrix offers?
+
+[09:07:25.0000] <Domenic>
+I mean, our logging service shut down, but that's not freenode's fault.
+
+[09:07:41.0000] <Bakkot>
+There's also this: https://twitter.com/shadowcat_mst/status/1396838984341495816
+
+[09:08:09.0000] <Bakkot>
+eskimo is this person: https://removeddit.com/r/irc/comments/d45jow/_/f0cwghv/ https://i.arxius.io/d86309a1.png [nb slurs]
+
+[09:08:30.0000] <Bakkot>
+In light of all this I am personally uncomfortable continuing to hang out in freenode, so I'm hoping whatwg migrates soon.
+
+[09:08:34.0000] <Bakkot>
+otherwise I guess I can just DM people on twitter.
+
+[09:11:01.0000] <Domenic>
+Seems pretty clear people are trying to build a narrative here (even without evidence), so as I said, I hope the community finds a good place to migrate that they're all comfortable with.
+
+[09:13:03.0000] <annevk>
+Bakkot: TC39 is also moving to Matrix, right? Do you know if they will use matrix.org rooms?
+
+[09:13:42.0000] <Bakkot>
+Domenic I mean I linked some screenshots from someone listed on https://freenode.net/people; I'm not sure what evidence you want
+
+[09:14:04.0000] <Domenic>
+Bakkot: https://twitter.com/shadowcat_mst/status/1396903151060635655 says there's no evidence?
+
+[09:15:28.0000] <Bakkot>
+Domenic for the claim in that tweet, agreed. but I did also link screenshots of behavior I am personally not super enthusiastic about, from a person who is now staff according to freenode.net.
+
+[09:15:59.0000] <Bakkot>
+and if you are hanging out in #engine262 or whatever you can scroll up and see that it has in fact had changes imposed on it from the new staff
+
+[09:16:16.0000] <Bakkot>
+or #zig or whatever
+
+[09:16:33.0000] <annevk>
+Yeah, I saw a bunch of channels got removed for having Libera in the topic
+
+[09:16:35.0000] <Bakkot>
+annevk: we haven't formally made a decision, but yes, tc39's matrix instance is hosted on matrix.org
+
+[09:21:03.0000] <andreubotella>
+I don't know half the story here, but one of Bakkot's screenshots show them engaging in behavior that, regardless of Bakkot's opinions, goes against the WHATWG code of conduct
+
+[09:21:31.0000] <andreubotella>
+And while the code of conduct of course doens't bind freenode staff, it'd say things about us if we ignored that behavior
+
+[09:25:49.0000] <Bakkot>
+(fwiw, I don't mean to suggest whatwg ought to feel obligated to judge freenode new staff's past comments, just that it makes me personally unenthusiastic about being here. but you'll never make everyone comfortable; it's just a data point, not a determining argument.)
+
+[09:38:52.0000] <jgraham>
+I think unless we are happy for the WHATWG community to ossify we need to consider the requirements for new contributors to be at least as significant as those for existing contributors. It's pretty clear that IRC doesn't meet the expectations of many new contributors either for functionality or moderation. The recent FreeNode changes have precipitated thinking about this, but I think the conclusion that
+
+[09:38:58.0000] <jgraham>
+we should change services would hold anyway
+
+[09:39:13.0000] <jgraham>
+Otherwise "we use IRC" becomes the WHATWG equivalent of "we only publish specs in plain text"
+
+[09:43:47.0000] <Domenic>
+I don't think that's clear at all; you've been pushing that line repeatedly but I don't find it to hold in my experience onboarding new contributors.
+
+[09:45:20.0000] <Domenic>
+And I think Matrix especially is not going to be more new-contributor friendly, given its reputation. If that's your goal choose Discord, or maybe Slack.
+
+[09:47:04.0000] <Domenic>
+(Discord if you want zoomers, slack if you want millenials, roughly ^_^)
+
+[09:49:20.0000] <jbauman[m]>
+As a newish contributor with IRC experience, I'll say that Matrix isn't perfect, but I find it by far preferable to discord and slack for open standards work
+
+[11:59:44.0000] <jgraham>
+Well Mozilla's experience with Matrix was that the number of people using the chat expanded dramatically past anything we'd seen with IRC, so I think there's at least some data that supports the position that it works better for people on average. It's also improved quite a lot in the meantime, so experiences from more than a few months ago aren't necessarily very relevant.
+
+[12:01:24.0000] <jgraham>
+However I'm certainly not claiming it's the most user friendly of all the chat applications. But AIUI slack is invite-only and discord and others seem more questionable in terms of their long term commitment to running a free service.
+
+[12:02:12.0000] <jgraham>
+But sure, if you want to advocate one of the other options go for it.
+
+[12:02:47.0000] <jbauman[m]>
+Slack is also terrible for working in the open (ask me how I know) because the free plan doesn't maintain much history and the paid plans are far too expensive, even with a hefty OSS discount
+
+[12:04:25.0000] <jgraham>
+Speaking for myself, slack seems like the worst of all the options. It just fundamentally seems to be set up for company-internal messaging and not for communities.
+
+[12:11:59.0000] <Bakkot>
+if you do end up using slack, I wrote a bot which logs history: https://github.com/bakkot/slack-archive-bot
+
+[12:12:12.0000] <Bakkot>
+so that issue is at least surmountable, though someone would need to host it
+
+[12:12:35.0000] <Bakkot>
+annevk tc39 is officially moving to matrix, we've just decided
+
+[12:13:03.0000] <Bakkot>
+I'm going to write an archive bot for it also, so the archives are available in plain text somewhere outside the janky clients
+
+[12:18:57.0000] <annevk>
+Bakkot: cool, I think we should follow then
+
+[12:20:21.0000] <annevk>
+And hopefully we can make a case for W3C to follow as well as their current Slack trend isn’t great for reasons folks mentioned
+
+[12:25:57.0000] <andreubotella>
+<Bakkot "I'm going to write an archive bo"> There's https://view.matrix.org, which seems to be logging every channel whose history can be viewed by guests, but I can't find how it's powered
+
+[12:26:27.0000] <Bakkot>
+andreubotella ooh, neat! I hadn't found that somehow
+
+[12:27:05.0000] <Bakkot>
+oh but it doesn't let you see older logs except by clicking "load older" repeatedly, booooo
+
+[12:27:36.0000] <andreubotella>
+yeah, it seems to be a thin wrapper over the client-server API
+
+[12:27:55.0000] <andreubotella>
+(which I was also reading earlier today to see how hard it'd be to make an easy logbot)
+
+[12:47:55.0000] <devsnek>
+I would consider slack unacceptable due to a lack of user-to-user moderation options
+
+[12:48:15.0000] <devsnek>
+and then you get into the message history, which they actually store but won't let you read unless you pay them
+
+[15:39:58.0000] <MikeSmith>
+annevk: as far as W3C, I will make a proposal for W3C formally setting something up on Matrix
+
+[15:40:37.0000] <MikeSmith>
+that can be in addition to the existing Slack set up for W3C, and existing W3C IRC
+
+[15:41:11.0000] <MikeSmith>
+doesn’t need to be an either-or
+
+[15:42:07.0000] <MikeSmith>
+we can set up some W3C presence on Matrix and just let it evolve as people show up
+
+[15:44:01.0000] <MikeSmith>
+The existing W3C Slack has not really taken off — at least not the channels there that I am on. There is not daily activity there, nor even weekly (most weeks)
+
+[15:46:57.0000] <MikeSmith>
+but I guess that’s the nature of Slack — you kind of need to seed/populate it with some set of people. And the W3C Slack doesn’t have a big enough set yet maybe. And nobody is actively adding others there — or sending invites (which is I guess the only way people would know about it and and be able to get added)
+
+[15:49:14.0000] <MikeSmith>
+so setting something up for W3C on Matrix that people can discover and join directly seems uncontroversial
+
+[15:50:24.0000] <MikeSmith>
+but as far as getting W3C leadership buy-in for putting some support behind it, TC39 being there certainly is meaningful
+
+[15:51:23.0000] <MikeSmith>
+and being able to assert that WHATWG is there would also be meaningful
+
+[15:52:06.0000] <MikeSmith>
+again in general it doesn’t need to be an either-or
+
+[15:52:36.0000] <MikeSmith>
+doesn’t seem like anybody is arguing it should be
+
+[15:56:19.0000] <MikeSmith>
+I mean, WHATWG doesn’t need to formally declare this channel dead or something before we can set up something also recognized (and documented) on Matrix (or wherever else, though it seems Matrix is the only thing we so far have rough consensus on as an additional forum)
+
+[15:58:13.0000] <MikeSmith>
+that said, if we were to want to let people here know about the Matrix room, I think we would have a problem if we were to mention it in the topic
+
+[15:59:40.0000] <MikeSmith>
+...because that is apparently what other channels did which caused Andrew Lee to take admin control of the channels and de-op the existing ops, and change the topic back
+
+[16:04:25.0000] <MikeSmith>
+and Andrew also retroactively changed the topic on the #freenode to “Remember, we do not support spamming or advertising other networks in channels topics or in other forms.
+
+[16:06:32.0000] <MikeSmith>
+but the “advertising other networks in channels” rule is not actually documented in https://freenode.net/policies nor anywhere else
+
+[16:06:58.0000] <MikeSmith>
+...because it doesn’t actually exist
+
+[16:08:57.0000] <MikeSmith>
+instead it’s something Andrew apparently came up with on his own, unilaterally, and also unilaterally applied on his own, without even consulting any of the other current admins, to all the channels he took control of
+
+[16:10:12.0000] <MikeSmith>
+that is, he apparently singlehandly went in and did all those channel changes himself
+
+[16:12:23.0000] <MikeSmith>
+so anyway, this now seems like a place where we can’t even safely change our own channel topic without fear that we might offend the one guy ultimately in control
+
+
+2021-05-27
+[21:19:25.0000] <annevk>
+Yeah I was thinking we would update the IRC page and blog/tweet about it; we could also have that in the topic I suspect as it would be hard to find with a regexp
+
+[21:44:55.0000] <andreubotella>
+If we update the topic, we should link the WHATWG IRC page rather than matrix or libera
+
+[21:45:29.0000] <andreubotella>
+Oh, I see that's what you were saying, my bad
+
+[00:38:25.0000] <jgraham>
+MikeSmith: If you get a matrix server for W3C I'm happy to advocate moving the testing channel there. Might cut down on the number of people using it to test their client ;) For #webdriver the problem is we're still using the various bots for meetings
+
+[00:50:16.0000] <MikeSmith>
+jgraham: yeah I guess the RRSAgent and Zakim and Trackbot bots are the main reason most WGs have for sticking with IRC
+
+[00:50:45.0000] <MikeSmith>
+being able to easily generate formatted meeting minutes directly from chat logs is a pretty handy thing
+
+[00:51:26.0000] <MikeSmith>
+and having an automated way to manage a speaker queue during a meeting is also pretty handy
+
+[00:52:33.0000] <MikeSmith>
+and Trackbot is minimally useful for setting all the meeting boilerplate, and making sure RRSAgent and Zakim are actually there
+
+[00:54:13.0000] <jgraham>
+I don't know if I even knew about trackbot. But yeah RRSAgent and Zakim have become table stakes for W3C meetings, which is good because they're useful, but is bad because it increases the cost of switching platforms.
+
+[01:15:22.0000] <MikeSmith>
+annevk: jgraham: andreubotella: https://github.com/whatwg/whatwg.org/pull/363 (to rename https://whatwg.org/irc to https://whatwg.org/chat, and add Matrix info to it)
+
+[01:16:19.0000] <MikeSmith>
+⬆️  also anybody else on the channel who cares about communication around this stuff
+
+[01:16:53.0000] <MikeSmith>
+jgraham: can you turn on logging for the Matrix room?
+
+[01:17:29.0000] <MikeSmith>
+once logging is enabled, I think https://view.matrix.org/room/!AGetWbsMpFPdSgUrbs:matrix.org/ is where the logs will show up
+
+[01:18:09.0000] <MikeSmith>
+I added a link to https://view.matrix.org/room/!AGetWbsMpFPdSgUrbs:matrix.org in the patch for https://github.com/whatwg/whatwg.org/pull/363
+
+[01:18:33.0000] <MikeSmith>
+...but of course it won’t work until logging is enabled for the room
+
+[01:18:47.0000] <MikeSmith>
+right now it says:
+
+[01:18:50.0000] <MikeSmith>
+> User @2985302:matrix.org not in room !AGetWbsMpFPdSgUrbs:matrix.org, and room previews are disabled (M_FORBIDDEN)
+
+[01:33:34.0000] <MikeSmith>
+MikeSmith: as far as “good because they're useful, but is bad because it increases the cost of switching platforms”, time for me to queue my obligatory mention that CVS is what’s still being used for version control of the vast majority of what’s on https://www.w3.org/ (because W3C has not found a way to move away from that which isn’t gonna be prohibitively costly)
+
+[01:34:38.0000] <MikeSmith>
+and CVS was a pretty useful way to do it back in the day (pre-git, and even pre-SVN, I think)
+
+[01:37:01.0000] <jgraham>
+Yeah, SVN was basically supposed to be CVS but with repo-wide state rather than per file state. There's a whole talk about how the key decision was to not change too much relative to CVS. Then git came along and entirely ate their lunch. So that aged badly.
+
+[01:48:38.0000] <annevk>
+MikeSmith: thanks!
+
+[03:38:23.0000] <sknebel>
+if you bridge matrix to some IRC room you can keep the bots IRC side. afaik even things like IRC voiced status translate across the bridge
+
+
+2021-05-28
+[12:01:09.0000] <travisleithead>
+Would love to get a read from this community on a potentially controversial idea: creating a new HTML attribute whose behavior may depend on ARIA roles/states.
+
+[12:01:18.0000] <travisleithead>
+My sense is that today ARIA attributes are purely for communicating intent and semantics down to the browser accessibility API layer.
+
+[12:01:27.0000] <travisleithead>
+e.g., when an author adds role=button to <div>, nothing special (observable to JS) happens. Authors must write the logic to make the thing act like a button.
+
+[12:01:35.0000] <travisleithead>
+Was considering proposing a *new* HTML attribute (not an ARIA role/state attribute) but whose native behavior would potentially change depending on the presence of particular ARIA role/state attributes.
+
+[12:01:44.0000] <travisleithead>
+e.g., Do X by default if included on <div>, but do Y instead if role=button or some such (the dependency on the ARIA attribute case).
+
+[12:01:52.0000] <travisleithead>
+My instinct is that this type of dependency wouldn't fly, but would love to hear this community's thoughts.
+
+[12:04:29.0000] <devsnek>
+i think the only hard cutoff is that the website should never be able to tell if/how someone is using accessibility information
+
+[12:04:48.0000] <devsnek>
+but there might be other background i'm not familiar with
+
+[12:07:27.0000] <Domenic>
+travisleithead: yeah I don't think that's a good idea, ARIA is always about AT and shouldn't affect non-AT things, otherwise people will end up abusing ARIA to create certain experiences and give AT users the wrong experience
+
+[12:58:55.0000] <travisleithead>
+Domenic: that makes sense. My initial idea was that such a dependency would actually encourage authors to use ARIA correctly as the new behavior would reinforce ARIA authoring practices. But it may not be a healthy dependency long-term if the platform gains new behaviors that obsolete certain ARIA features.
+
+[13:28:13.0000] <Domenic>
+In general it's better to encourage authors to use <button>s for buttons than it is to encourage authors to use role=button for buttons.
+
+[13:32:57.0000] <travisleithead>
+👍
+
+
+2021-05-30
+[14:20:05.0000] <Sirisian>
+Am I thinking of this wrong. With web components if you have nested web components and use cloneNode(true) on the root it just constructs new web component nodes. All of their public/private data isn't copied. Also cloneNode(true) doesn't recursively call cloneNode on children, so you can't just override it in your web component to copy over the members. It seems assumed that everything public/private member is backed by an
+
+[14:20:05.0000] <Sirisian>
+attribute so that cloning creates a perfect copy?
+
+[14:21:26.0000] <Sirisian>
+The closest discussion I found is this: https://github.com/WICG/webcomponents/issues/176
+
+
+2021-05-31
+[20:34:18.0000] <Domenic>
+Sirisian: that's right. The way to think about it is that "clone node" is a purely DOM operation, operating on nodes and attributes. It doesn't know anything about JavaScript stuff.
+
+[21:02:10.0000] <Sirisian>
+Makes sense. I made my own clone operation which works well. It just requires every web component I have to optionally implement it. Good enough for my drag/drop helpers.
+
+[05:48:23.0000] <zcorpan>
+sideshowbarker[m: any ideas about https://github.com/w3c/aria-practices/issues/960 ?
+
+[07:32:48.0000] <annevk>
+Wanted to let everyone know that the Matrix channel is now established and that I hope we can all move there over time. https://whatwg.org/chat has instructions. And let me know if you have any questions.
+

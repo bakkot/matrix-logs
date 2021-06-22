@@ -1,0 +1,2036 @@
+2019-04-03
+[10:15:08.0000] <wuz__>
+Hey friends! Looking to get some feedback on a proposal - what is a good way to do that?
+
+[10:32:16.0000] <jmdyck>
+wuz__: You could post a link here or in es-discuss or https://es.discourse.group/
+
+[11:11:08.0000] <wuz__>
+I'll check thos other places too jmdyck, but here is the link: https://github.com/wuz/proposal-range
+
+[12:11:30.0000] <ljharb>
+wuz__: also check out http://array.build
+
+[12:12:23.0000] <ljharb>
+wuz__: also you may want to talk about, in your readme, why/how `Array.range(x, y).map(f)` is better than `Array.from({ length: y - x }, (_, i) => f(x + i))`
+
+[12:13:20.0000] <wuz__>
+Good advice! Thanks!
+
+[12:15:25.0000] <wuz__>
+That array build is interesting too! It's a bit different, as it is more around creating a prefilled Array. I think my ideal implementaiton would be within the iterable specification. I feel like that makes it extensible across a number of usecases
+
+[12:15:51.0000] <ljharb>
+wuz__: also i'd want to see some use cases for a "string range", that one seems strange - and also why the step is useful (i don't find it so) - and also why you'd want "int8"s instead of just integers
+
+[12:16:00.0000] <ljharb>
+also how would it interact with BigInt
+
+[12:16:29.0000] <ljharb>
+also how it'd interact with https://github.com/tc39/proposal-slice-notation/
+
+[12:17:23.0000] <ljharb>
+wuz__: also how it'd be better than a user writing `function* range(x, y) { for (let i = x; i < y; i++) { yield i; }`
+
+[12:20:06.0000] <wuz__>
+All good questions! Making notes to include some information around that in the next iteration. The "why is it better than the user writing" question is one I have thought about a bit. Part of the answer is "almost every other major language a concept of ranges builtin", but it also means you have to write specific range functions for each use case you might have in an application.
+
+[12:21:15.0000] <wuz__>
+That slice notation is super cool, and could fit very well into the concept of ranges
+
+[12:23:59.0000] <wuz__>
+One major use case for the step operator could be something like: `Date.range(new Date("01-01-2019"), new Date("05-01-2019"), 7)` which would return an array of dates between the two listed dates, but only return every 7 days
+
+[12:54:07.0000] <ljharb>
+that's true - but a counter argument might be, the alternative is that the language has to address every use case everyone might have in an application
+
+[12:54:34.0000] <ljharb>
+wuz__: for dates, i'd look at the Temporal proposal, which may or may not have a "duration" concept, but either way would provide the building blocks for one
+
+[13:46:51.0000] <wuz__>
+ljharb: that is a good point about having to implement it in many places. I think having general uses or implementations on specific generics is a good start - people can define their own functions that interact with those basic generics.
+
+[13:49:47.0000] <wuz__>
+The Temporal proposal is really cool and I could see it working really well with the concept of ranges. You could call something like `CivilDateTime.range(date1, date2, CivilDateTime.hour)` to get a range of all the hours between two dates
+
+[13:54:15.0000] <ljharb>
+right
+
+[13:54:42.0000] <ljharb>
+wuz__: note that i'm not arguing against your proposal here, just trying to ask questions that will be asked eventually anyways :-)
+
+[13:55:21.0000] <ljharb>
+proposals that answer more potential questions like this often either advance more quickly, or it becomes apparent that the time and effort aren't worth it, either of which is a win :-)
+
+[15:52:56.0000] <TabAtkins>
+Argument for "step" seems to be rather self-evident? You sometimes don't want to count by consecutive integers; evens or odds, etc are useful. Doing that without step is possible but frustrating and non-obvious.
+
+[15:53:56.0000] <TabAtkins>
+Plus step is exposed in every single range API in any language that isn't limited to a mere two arguments by syntax (like `1..10`).
+
+[16:07:44.0000] <ljharb>
+TabAtkins: i'd find it useful to document those use cases; that it's supported doesn't mean i've used/needed it more than a handful of times in my entire career :-)
+
+[16:09:02.0000] <TabAtkins>
+Yeah, it's a minority usage, but I've still used it a handful of times. Value of -1 is the most common I've used. ^_^
+
+
+2019-04-04
+[18:16:45.0000] <devsnek>
+have read-only arraybuffers ever been discussed? (https://github.com/nodejs/node/issues/27080)
+
+[18:31:27.0000] <Domenic>
+devsnek: I vaguely remember such discussions from the es-discuss days. Something something too complicated something something create higher-level abstractions on top of SharedArrayBuffer is what I remember.
+
+[18:34:42.0000] <Domenic>
+wycats had a gist with a design that proxied a typed array and turned off sets, IIRC
+
+[18:46:30.0000] <devsnek>
+i think it would need to be done at the arraybuffer level though to prevent `new TArray(immutable.buffer)`
+
+[18:54:45.0000] <ljharb>
+and since the arraybuffer works with slots and not properties, freeze and Proxy won’t really work
+
+[18:55:04.0000] <ljharb>
+we’d probably need a constructor arg like the rekey proposal
+
+[18:55:39.0000] <ljharb>
+(in general I’m pretty enamored with that pattern for overriding internal operations without adding much to observable operations)
+
+[18:55:45.0000] <Domenic>
+If you mediate all access to the ArrayBuffer through a proxy it works
+
+[18:56:09.0000] <ljharb>
+borrowing prototype methods and .calling them?
+
+[18:56:19.0000] <Domenic>
+You never let them see the ArrayBuffer instance
+
+[18:56:32.0000] <ljharb>
+sure but the Proxy won’t have the slots
+
+[18:56:42.0000] <Domenic>
+Sure so you can't .call() methods on it, which is the point
+
+[18:57:07.0000] <ljharb>
+yeah i guess so, seems like it doesn’t achieve the full purpose if it breaks that idiom tho.
+
+[18:57:23.0000] <ljharb>
+ie, all robust code would suddenly break on it, instead of just working more reliably
+
+[12:11:03.0000] <wuz__>
+ljharb: just saw your message from yesterday! Definitely understand where you are coming from with the questions. It's super helpful! I'd down for anyone to poke holes in my proposal so I can try and patch them :)
+
+
+2019-04-05
+[09:45:28.0000] <rwaldron>
+devsnek https://travis-ci.org/bterlson/eshost/builds/516238347
+
+[09:45:30.0000] <rwaldron>
+:D
+
+[09:45:42.0000] <devsnek>
+oooooo
+
+[09:45:55.0000] <devsnek>
+lol i love how many time warnings there are
+
+[09:47:22.0000] <devsnek>
+rwaldron: is exposing `$` a problem? i can remove it
+
+[09:47:24.0000] <rwaldron>
+I still have some clean up to do, but I think I'll have this published by early next week. I want to update the readme/docs as well
+
+[09:48:04.0000] <rwaldron>
+devsnek naw, JSC does the same thing—I lifted that strategy from my old implementation of the JSC runtime.
+
+[09:48:22.0000] <rwaldron>
+You don't have to remove anything
+
+[09:48:32.0000] <devsnek>
+alright
+
+[09:52:03.0000] <rwaldron>
+Moving the error output to stderr allowed me to remove a bunch of code that I really disliked, so thanks for being flexible :)
+
+[09:52:59.0000] <devsnek>
+👍
+
+[11:08:37.0000] <rwaldron>
+devsnek so far so good...
+
+[11:08:38.0000] <rwaldron>
+https://ci.appveyor.com/project/bterlson/eshost/build/job/yghg7jovh0v7bkar#L11
+
+[11:08:44.0000] <rwaldron>
+(sorry about the <enter> ^^>
+
+[11:12:25.0000] <rwaldron>
+lol. "engine262.exe"...ugh.
+
+[11:30:38.0000] <rwaldron>
+devsnek https://i.gyazo.com/6a8703a6baff4df4d3efed7fa930c551.png
+
+[11:31:12.0000] <devsnek>
+woo
+
+
+2019-04-08
+[00:45:12.0000] <annevk>
+littledan: why is https://github.com/tc39/proposal-temporal/issues/129#issuecomment-480374088 marked as outdated?
+
+[00:45:33.0000] <annevk>
+it's rather confusing as it pings a bunch of people
+
+[01:07:35.0000] <annevk>
+mathiasbynens: you around? Have you considered String.prototype.containsLoneSurrogates?
+
+[01:08:03.0000] <annevk>
+mathiasbynens: https://github.com/whatwg/encoding/issues/174 has context; I think hsivonen has a point that putting it on String might be better
+
+[01:08:39.0000] <annevk>
+mathiasbynens: or something like isUTFSafe
+
+[01:08:58.0000] <mathiasbynens>
+annevk: I see, or isWellFormed
+
+[01:09:39.0000] <mathiasbynens>
+annevk: tbh, I hadn't really considered standardizing anything like it because it's "easy enough" to do manually nowadays with lookbehinds
+
+[01:10:25.0000] <annevk>
+mathiasbynens: is that a RegExp thing?
+
+[01:10:48.0000] <mathiasbynens>
+annevk: yeah. i guess i have to read the thread for full context
+
+[01:11:20.0000] <annevk>
+mathiasbynens: the main context is that Wasm only has first-class support for UTF-8
+
+[01:11:48.0000] <annevk>
+mathiasbynens: and some other things do too, e.g., CSS in Fx
+
+[01:12:07.0000] <annevk>
+mathiasbynens: so it might be nice to detect weirdness in your JS string before passing it on
+
+[01:12:36.0000] <annevk>
+mathiasbynens: in particular as most such contexts have non-fatal lossy error handling
+
+[01:17:56.0000] <mathiasbynens>
+String.prototype.isWellFormed = function() { return !/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(this); };
+
+[01:18:31.0000] <annevk>
+mathiasbynens: it does seem nice not to have to copypasta that around
+
+[02:19:04.0000] <littledan>
+Annevk, sorry for wasting your time there; I posted it to try to raise a question that others raised separately; I didn't have a good internet connection and so I didn't see the duplication until after it was posted and everybody was pinged. Unhid the comment.
+
+
+2019-04-09
+[11:43:31.0000] <caitp>
+you know how you can push multiple items to an Array with .push()?
+
+[11:43:41.0000] <caitp>
+what if you could do that with Sets too
+
+[11:43:48.0000] <caitp>
+that would be pretty neat huh
+
+[12:21:50.0000] <ljharb>
+caitp: it’d break anyone doing `arr.forEach(set.add.bind(set))` tho, unless it was a new method
+
+[16:44:57.0000] <caitp>
+it would? how?
+
+
+2019-04-10
+[17:19:28.0000] <caitp>
+I don’t see how supporting Set.p.add(thing1, thing2, ...otherThings); would break that, but I guess I’m missing something
+
+[17:19:43.0000] <caitp>
+oh wait, I see now
+
+[17:21:06.0000] <caitp>
+but how common is that really?
+
+[20:35:21.0000] <TabAtkins>
+ljharb: At this point why would anyone ever type the .bind form, when `x=>set.add(x)` is both shorter and easier to understand.
+
+[20:39:05.0000] <ljharb>
+TabAtkins: no Babel, es6-shim, and supporting browsers that don’t have arrows is still necessary for most demographics.
+
+[20:40:05.0000] <ljharb>
+caitp: I’m not really sure but i suspect common enough that changing add and set is a nonstarter
+
+[07:00:36.0000] <caitp>
+well maybe it would have to be a new method, which isn't great but maybe not that bad
+
+[07:01:09.0000] <caitp>
+I dunno, I'm not here proposing and working to reach concensus, what do I know!
+
+[08:35:19.0000] <ErrorIsNullError>
+Would `arr.forEach(set.add.bind(set))` break because of the extra index parameter?
+
+[08:55:46.0000] <caitp>
+it would add extra things to the set than expected, yes
+
+[08:56:15.0000] <caitp>
+if add behaved like A.p.push
+
+[10:22:54.0000] <ljharb>
+also the array parameter
+
+[16:16:09.0000] <devsnek>
+ljharb: however you're landing things looks like it's getting proper dates, thanks
+
+[16:16:28.0000] <ljharb>
+devsnek: thanks for confirming, i've been checking too
+
+[16:16:51.0000] <devsnek>
+gonna need it for when I need to do all the changes to engine262
+
+[16:17:22.0000] <devsnek>
+everything between 2018 and 2019 is in a void though :(
+
+[16:17:56.0000] <ljharb>
+not sure what you mean
+
+[16:18:07.0000] <ljharb>
+oh you just mean the github bug
+
+[16:18:16.0000] <ljharb>
+look at the log on the command line ¯\_(ツ)_/¯ git orders it properly
+
+[16:18:30.0000] <devsnek>
+I have no idea what things that happened between es2018 and es2019 (small normative and editorial) are in engine262
+
+[16:19:09.0000] <ljharb>
+`git log --oneline es2018..es2019` should print it out just fine
+
+[16:19:24.0000] <devsnek>
+at some point I need to go through and do that yeah
+
+[16:19:58.0000] <ljharb>
+i think you can even do a "compare" view on github between those branches/shas and it'll show you on the web
+
+
+2019-04-11
+[22:27:50.0000] <boneskull>
+am I reading this correctly?  in 9.5.11[[OwnPropertyKeys]] ( ), step 12 means essentially "the List of keys must be either String or Symbol primitives"?  meaning if it encountered an Object in the List, it would *not* attempt to use the ToPrimitive algorithm to coerce these into primitives?
+
+[22:31:19.0000] <boneskull>
+...and if that is true, is there a use-case for the "ownKeys" Proxy trap other than side-effects?  if that trap returns a key that is not actually present, the key is discarded (because of step 16a)
+
+[22:31:52.0000] <boneskull>
+I suppose you could omit certain keys from the list
+
+[22:31:59.0000] <boneskull>
+but certainly not add any that weren't there
+
+[04:52:02.0000] <jmdyck>
+boneskull: No, the assertion means that it *cannot* encounter an Object in the List.
+
+[08:59:58.0000] <devsnek>
+ljharb: https://github.com/tc39/ecma262/commit/3fc53bc4a56d58b3ba757764baa2add7aacf2614#diff-3540caefa502006d8a33cb1385720803L30893
+
+[09:00:03.0000] <devsnek>
+this line got intended
+
+[09:00:11.0000] <devsnek>
+indented*
+
+[09:00:21.0000] <devsnek>
+was this intentional?
+
+[09:00:37.0000] <jmdyck>
+It couldn't have been
+
+[09:00:45.0000] <devsnek>
+i'm assuming it wasn't
+
+[09:00:54.0000] <jmdyck>
+because the preceding line is unconditional return
+
+[09:01:07.0000] <devsnek>
+indeed
+
+[09:01:40.0000] <jmdyck>
+I've got a commit that fixes it (among several), should PR within an hour.
+
+[09:02:20.0000] <devsnek>
+👍
+
+[09:20:47.0000] <devsnek>
+jmdyck: did you catch https://tc39.github.io/ecma262/#sec-asyncfromsynciteratorcontinuation step 5
+
+[09:20:56.0000] <devsnek>
+should be value instead of [value]
+
+[09:23:19.0000] <jmdyck>
+yup, back in February: https://github.com/tc39/ecma262/pull/1456/commits/20068280eb736fcc0484cdcd8f7ffa099d821994
+
+[09:32:28.0000] <devsnek>
+oof
+
+[09:32:43.0000] <jmdyck>
+oof?
+
+[09:37:44.0000] <devsnek>
+jmdyck: unfortunate that it's been open so long
+
+[09:37:59.0000] <jmdyck>
+yeah, sigh.
+
+[09:50:01.0000] <boneskull>
+jmdyck I don't think I understand the distinction.  if you return a list of Objects from a `ownKeys` Proxy handler trap, then something throws a `TypeError` when you try to use `Object.keys()` on that object.  is it not that assertion?
+
+[09:50:55.0000] <boneskull>
+s/on that object/on that Proxy
+
+[09:52:18.0000] <devsnek>
+assertions aren't evaluated
+
+[09:52:26.0000] <devsnek>
+they're marking invariants of the spec
+
+[09:55:46.0000] <boneskull>
+maybe I'm asking in the wrong channel
+
+[09:56:13.0000] <boneskull>
+am I referring to implementation details?
+
+[09:57:23.0000] <jmdyck>
+If your `ownKeys` handler returns a list of Objects, then Proxy's [[OwnPropertyKeys]]'s call to CreateListFromArrayLike will throw  a TypeError, it looks like.
+
+[09:57:53.0000] <boneskull>
+jmdyck thanks, I think that's what I was lokoing for.
+
+[09:58:06.0000] <boneskull>
+4lokoing for?
+
+[09:58:19.0000] <devsnek>
+l:eyes:king
+
+[09:58:26.0000] <devsnek>
+l👀king
+
+[09:59:19.0000] <jmdyck>
+PR is almost ready, but I must break for lunch
+
+[10:14:59.0000] <ljharb>
+devsnek: no, not intentional; i'll take care of it
+
+[10:15:17.0000] <ljharb>
+jmdyck: as for 1456, i'll try to get that in today
+
+[10:15:34.0000] <ljharb>
+jmdyck: for future reference tho it's easier when PRs are for a single change instead of "misc editorial" ;-)
+
+[10:48:31.0000] <jmdyck>
+ljharb: not easier for me
+
+[11:55:12.0000] <jmdyck>
+ljharb: my commits are ready to push, but I can hold back if a change in master is imminent
+
+[12:09:14.0000] <ljharb>
+jmdyck: nah go ahead, i won't get to it for another hour or three
+
+[12:11:40.0000] <jmdyck>
+an hour or three I can wait.
+
+[12:12:44.0000] <jmdyck>
+one thing though: 1456 has conflicts. I have commits to resolve those, but I'm not sure how to push them and not the rest of the branch.
+
+[12:18:13.0000] <jmdyck>
+would it work to do a hard reset to the conflict-resolving commit, then push, then hard reset to the current HEAD commit?
+
+[12:53:45.0000] <jmdyck>
+Yay, that seemed to work.
+
+
+2019-04-12
+[20:04:35.0000] <devsnek>
+mathiasbynens: for the JSON.stringify fix, how would one get to the "List containing in order the code points of value when interpreted as a sequence of UTF-16 encoded code points" it requires using only pure JS
+
+[20:05:19.0000] <devsnek>
+from what i can tell this could be very difficult due to js strings being outwardly ucs-2
+
+[05:11:32.0000] <mathiasbynens>
+devsnek: that quote is followed by "as described in 6.1.4" which details it
+
+[05:11:50.0000] <mathiasbynens>
+unless i misunderstand your question
+
+[05:13:31.0000] <mathiasbynens>
+see "However, ECMAScript does not restrict the value of or relationships between these code units, so operations that further interpret String contents as sequences of Unicode code points encoded in UTF-16 must account for ill-formed subsequences [...]"
+
+[05:14:07.0000] <mathiasbynens>
+devsnek: iow implementing this in JS is super easy
+
+[05:15:03.0000] <annevk>
+saying UTF-16 encoded is rather misleading though as that typically means lone surrogates are gone
+
+[05:15:24.0000] <mathiasbynens>
+i don't disagree
+
+[05:15:53.0000] <mathiasbynens>
+devsnek: you want `const codePoints = [...value];`
+
+[05:16:18.0000] <devsnek>
+mathiasbynens: everything I've tried to split the string gives those json invalid ones as single items instead of split surrogate pairs
+
+[05:16:33.0000] <devsnek>
+which is what is needed as far as i can tell
+
+[05:16:53.0000] <mathiasbynens>
+devsnek: you don't want to split surrogate pairs, you only want to have lone surrogates as individual items
+
+[05:17:04.0000] <mathiasbynens>
+devsnek: the string iterator does that for you, which is why `[...string]` works
+
+[05:18:10.0000] <annevk>
+What might help here is that the process of making "code points" out of "code units" is in particular about keep surrogate pairs together as they are two code units, but one code point
+
+[05:18:18.0000] <devsnek>
+but isn't the change looking for \dc8whatever as a lone surrogate
+
+[05:19:02.0000] <mathiasbynens>
+devsnek: yeah, it is
+
+[05:19:35.0000] <annevk>
+devsnek: if you do [..."\uD800remainder"] the "\uD800" will be standalone still
+
+[05:19:47.0000] <mathiasbynens>
+^ and that's exactly what you want here
+
+[05:20:18.0000] <annevk>
+mathiasbynens: do you have any plans to tidy up the language?
+
+[05:20:30.0000] <annevk>
+mathiasbynens: I looked into it briefly at some point, but it seemed like quite a bit of work
+
+[05:21:08.0000] <mathiasbynens>
+in `[...'_\uDC00\uD800_💩_']` you want 💩 (a surrogate pair) to remain a single unit; it needs no escaping. otoh, you want `\uDC00\uD800` (a surrogate pair in the wrong order, i.e. two consecutive lone surrogates) to be two separate units
+
+[05:22:07.0000] <mathiasbynens>
+annevk: hmm, i'm sure the editors would be open to a PR that tidies things up. i'm mostly interested in observable changes (like the recent change to make `JSON.stringify()` output well-formed)
+
+[05:24:41.0000] <devsnek>
+mathiasbynens: maybe there is some other issue, but spreading the string didn't seem to work, when I'm in front of the code again I will take another look
+
+[05:25:12.0000] <mathiasbynens>
+devsnek: happy to take a look
+
+[05:26:04.0000] <devsnek>
+quotejsonstring is here https://github.com/devsnek/engine262/blob/master/src/intrinsics/JSON.mjs
+
+[05:26:13.0000] <devsnek>
+I haven't pushed up the changes yet
+
+[06:03:29.0000] <devsnek>
+mathiasbynens: back to computer, getting weird behaviour out of this
+
+[06:03:35.0000] <devsnek>
+https://www.irccloud.com/pastebin/7iT65YLf/agh.js
+
+[06:03:49.0000] <mathiasbynens>
+you're using charCodeAt instead of codePointAt
+
+[06:04:12.0000] <mathiasbynens>
+devsnek: and fromCharCode instead of fromCodePoint
+
+[06:04:17.0000] <devsnek>
+ey alright
+
+[06:04:43.0000] <devsnek>
+should UnicodeEscape also use codePointAt
+
+[06:05:03.0000] <devsnek>
+oh that's not in the paste
+
+[06:05:28.0000] <mathiasbynens>
+it will never be reached for non-BMP code points, so it doesn't matter there
+
+[06:05:37.0000] <mathiasbynens>
+i.e. code points above U+FFFF
+
+[06:06:00.0000] <mathiasbynens>
+\uXXXX only works with exactly 4 hex digits anyhow
+
+[06:06:35.0000] <devsnek>
+and for UTF16Encoding()
+
+[06:06:51.0000] <devsnek>
+right now i return an array from it
+
+[06:06:59.0000] <devsnek>
+should i do String.fromCodePoint(cu1, cu2)
+
+[06:07:23.0000] <devsnek>
+(i never had to use UTF16Encoding before now lol)
+
+[07:51:20.0000] <devsnek>
+is there an eslint to prevent `const x = expression that uses accidentally uses x`
+
+[08:45:25.0000] <ljharb>
+devsnek: I’m pretty confident there is, since that’d always be a tdz error
+
+[08:46:06.0000] <devsnek>
+I couldn't find one, but maybe I'm just bad at reading
+
+[08:46:28.0000] <ljharb>
+if not, make one and PR it into core :-)
+
+[11:52:26.0000] <Bakkot>
+devsnek / ljharb: you'll never get it to be complete, because `const x = () => x` is fine but `const x = (() => x)()` is a TDZ error, and distinguishing between those two is (in general) uncomputable
+
+[11:53:20.0000] <Bakkot>
+but you can at least lint against the case where it's not in a closure, yeah
+
+[11:53:52.0000] <devsnek>
+halting problem is ez
+
+[11:58:49.0000] <ljharb>
+yeah true, the non-closure case is easy
+
+[11:59:30.0000] <ljharb>
+but i suspect the lint rule would want to warn on `() => x` too - ie, it wouldn't just be for avoiding a tdz error, it'd be for likely mistakes
+
+[11:59:47.0000] <Bakkot>
+I don't think that's a likely mistake?
+
+[12:00:17.0000] <ljharb>
+i'm sure there's nonzero use cases for a function that returns itself but i can't imagine there's many
+
+[12:00:53.0000] <Bakkot>
+oh, I just meant like
+
+[12:00:56.0000] <Bakkot>
+`const fib = n => n <= 0 ? 1 : fib(n - 1) + fib(n - 2)`
+
+[12:01:07.0000] <Bakkot>
+returning itself is probably a mistake, but _referencing_ itself isn't
+
+[12:01:38.0000] <devsnek>
+a partial evaluator could help here
+
+[12:01:54.0000] <devsnek>
+prepack or engine262 with some slight modifications
+
+[12:01:55.0000] <Bakkot>
+true of many problems, but perhaps overkill for a linter
+
+[12:02:13.0000] <devsnek>
+sometimes you gotta bring out the big guns
+
+[12:02:29.0000] <ljharb>
+yeah fair
+
+[12:06:50.0000] <Bakkot>
+rather than a new rule, probably the thing to do is make no-use-before-undef also give errors in the case where the RHS of the initial assignment references the LHS in a not-closure way
+
+[12:07:02.0000] <Bakkot>
+but it's really quite hard to get eslint to accept new rules or changes these days
+
+[12:07:25.0000] <Bakkot>
+been considering starting up a new project to be a home for all the good eslint rules which core has refused to accept
+
+[12:08:50.0000] <devsnek>
+Bakkot: I'd give that a star
+
+[13:29:46.0000] <jmdyck>
+ljharb: any forecast re merges to master?
+
+[13:30:19.0000] <ljharb>
+jmdyck: sorry about the delay; i'll get to it today :-)
+
+[13:30:29.0000] <jmdyck>
+ok
+
+[13:46:18.0000] <devsnek>
+I wonder how many spec bugs could be prevented by requiring a pr to engine262
+
+[14:56:33.0000] <ljharb>
+TimothyGu: heads up that https://github.com/tc39/ecma262/pull/1406 needs a rebase, but also i'm still waiting for waldemar to review it
+
+[16:23:20.0000] <devsnek>
+are there tests for the change to await to reduce the ticks?
+
+[16:24:54.0000] <ljharb>
+devsnek: https://github.com/tc39/ecma262/pull/1250 links to https://github.com/tc39/test262/pull/1843
+
+[16:25:00.0000] <devsnek>
+hmmm
+
+[16:25:14.0000] <devsnek>
+i just noticed AsyncGeneratorResumeNext in engine262 wasn't updated for that change
+
+[16:25:17.0000] <devsnek>
+but no tests were failling
+
+[16:25:19.0000] <devsnek>
+failing*
+
+
+2019-04-13
+[22:09:36.0000] <aidansw>
+Forgive me for asking, as I am sure this has been asked before.  But is there any reason for not allowing nested multiline comments?
+
+[22:11:18.0000] <jmdyck>
+backwards-incompatibility, I expect
+
+[22:11:24.0000] <ljharb>
+i also assume there's grammar difficulties in parsing it - you'd have to keep track of how many multiline comments you're inside
+
+[22:11:30.0000] <ljharb>
+but yeah at this point it couldn't be changed
+
+[22:12:21.0000] <aidansw>
+Ok, thanks.  Should've expected whenever something doesn't make sense it is legacy haha
+
+[22:20:53.0000] <ljharb>
+aidansw: well i'm not sure it's *just* legacy. like i said, it'd likely make parsing much much harder for not much value
+
+[22:26:51.0000] <aidansw>
+That is fair, but I don't exactly get how it would make parsing harder.  From what I have seen(I have never done parsing so I wouldn't know) it just ends all multiline comments when it sees */.  But } for example doesn't have the same effect.  Why would */ not hav been made to behave basically the same as } but for comments?
+
+[22:29:42.0000] <ljharb>
+not really sure. i assume that with comments it has to be greedy - consuming everything until it sees a stop token - but with braces it has all sorts of grammar rules to apply
+
+[22:29:50.0000] <ljharb>
+maybe it also would affect code performance
+
+[22:29:56.0000] <ljharb>
+hopefully someone who works on engines can weigh in :-)
+
+[22:30:39.0000] <aidansw>
+Yeah, you are likely right.  I can see how that could effect compile times
+
+[05:37:37.0000] <devsnek>
+you just need to keep a counter you increment on /* and decrement on */
+
+[05:37:57.0000] <devsnek>
+the only issue is that it makes `/* /* */` invalid
+
+[05:38:13.0000] <devsnek>
+which would be a breaking change
+
+[05:41:06.0000] <devsnek>
+rust has a state stack in their lexer which allows them to do things like have a multiline comment within a doc comment
+
+[16:09:33.0000] <devsnek>
+why does DataView default to BE
+
+[16:09:35.0000] <devsnek>
+LE seems way more common
+
+
+2019-04-14
+[20:24:42.0000] <devsnek>
+rwaldron: when's the next release of eshost-cli
+
+[23:11:55.0000] <FireFly>
+"network order" being big-endian does make it a reasonable choice as the default, I'd think
+
+[10:19:24.0000] <Bakkot>
+Domenic (or anyone else who knows): what fora is get-originals likely to be discussed in, if not TC39? I am still extremely concerned that it is going to break virtualization, and I think I and other people relying on that functionality probably need to be more involved in the conversation in whatever group is appropriate.
+
+[10:50:25.0000] <devsnek>
+Bakkot: looks like its current for whatwg
+
+[10:50:28.0000] <devsnek>
+currently*
+
+[12:28:28.0000] <ErrorIsNullError>
+Bakkot, I'm still trying to digest your case for virtualization.  I'd be interested in contributing to that discussion too.
+
+[12:32:25.0000] <devsnek>
+what is virtualization in this context
+
+[12:44:27.0000] <ErrorIsNullError>
+devsnek, https://github.com/domenic/get-originals/issues/18
+
+[12:44:43.0000] <devsnek>
+oh
+
+[12:45:05.0000] <devsnek>
+TIL we call this virtualization
+
+[12:46:33.0000] <ErrorIsNullError>
+"Virtualization" is used in the sense of presenting an interface with the same shape.  Kevin takes some time in there to define terms.
+
+[12:48:30.0000] <devsnek>
+yeah
+
+[12:49:09.0000] <devsnek>
+i wonder... with the realms api, could there be an api to override the initial props of a new realm or compartment?
+
+[12:49:19.0000] <devsnek>
+seems to fit in really nicely
+
+[13:24:23.0000] <Bakkot>
+ErrorIsNullError: happy to talk about it at arbitrary length!
+
+[13:25:55.0000] <Bakkot>
+devsnek: that's actually a core part of and motivation for the realms API, IIRC
+
+[13:26:17.0000] <devsnek>
+Bakkot: it seems to make sense
+
+[13:26:37.0000] <Bakkot>
+though as I mention in the issue linked above, it isn't sufficient for the use case I'm concerned about
+
+
+2019-04-15
+[06:49:21.0000] <rwaldron>
+devsnek My plan is for today :D
+
+[06:49:42.0000] <devsnek>
+exciting!
+
+[08:48:36.0000] <rwaldron>
+devsnek I waited for appveyor to start my CI tasks for over an hour. The first task started about 10 minutes ago.
+
+[08:48:59.0000] <rwaldron>
+Once that's green, I will publish a new version of eshost-cli
+
+[08:49:12.0000] <rwaldron>
+eshost 6.1.0 is already published
+
+[08:49:32.0000] <rwaldron>
+test262-harness 6.1.0 is already published
+
+[08:50:01.0000] <rwaldron>
+I want to align eshost-cli's version number with eshost. I need to read the semver rules about that.
+
+[09:56:06.0000] <devsnek>
+rwaldron: is eshost-cli⊙4 the release?
+
+[09:56:43.0000] <rwaldron>
+devsnek yes
+
+[09:56:45.0000] <devsnek>
+woo
+
+[10:04:36.0000] <rwaldron>
+devsnek engine262 is now included in the example output: https://github.com/bterlson/eshost-cli#examples
+
+[10:04:44.0000] <devsnek>
+oo that's fancy
+
+[10:04:54.0000] <devsnek>
+look at that beautiful zero
+
+[10:18:37.0000] <rwaldron>
+lol... You passed!
+
+[10:19:15.0000] <rwaldron>
+devsnek but that's way less interesting than this: https://github.com/bterlson/eshost-cli/blob/master/appveyor.yml#L19-L24
+
+[10:19:18.0000] <rwaldron>
+no pressure.
+
+[10:19:20.0000] <rwaldron>
+;)
+
+[10:19:48.0000] <rwaldron>
+https://github.com/bterlson/eshost-cli/blob/master/test/bin/eshost.js#L458-L476
+
+[10:20:13.0000] <rwaldron>
+ok, lunch time.
+
+[10:20:19.0000] <devsnek>
+👍
+
+[12:54:01.0000] <ljharb>
+rwaldron: use peer deps instead of aligning the version numbers
+
+[12:54:57.0000] <rwaldron>
+I just meant that I wanted the two modules to have the same version number for the sake my sanity.
+
+[12:55:57.0000] <ljharb>
+i get it, but it's always a mess for users imo when maintainers do that :-/ jest and babel have to unnecessarily bump versions of things all the time, and it causes lots of extra churn
+
+[13:25:24.0000] <devsnek>
+increment versions by `Math.round(Math.random() * current_version)`
+
+
+2019-04-16
+[17:15:22.0000] <Bakkot>
+ljharb / zenparsing: been a few months since my last ping, I think: it would be good to get #1158 and #1137, or equivalents, in to master at some point. 1158 needs updated wording but is waiting on 1137.
+
+[17:49:05.0000] <jmdyck>
+Bakkot: I don't think 1158 needs to wait on 1137.
+
+[17:50:42.0000] <Bakkot>
+jmdyck: agreed, but jugglinmike said he was waiting for it: https://github.com/tc39/ecma262/pull/1137#issuecomment-421834992
+
+[23:38:16.0000] <ljharb>
+Bakkot: we’ll take a look at 1137 in this week’s meeting
+
+
+2019-04-17
+[02:02:02.0000] <howdoi>
+review request, stage0 to stage4 code samples -> https://gist.github.com/hemanth/51578482ab61b51e0d3c067350d9f514
+
+[02:13:35.0000] <howdoi>
+I am maintaining https://github.com/hemanth/es-next would like to update it as it was pending from a decent amount of time, before updating it, I created this gist for the review from editors and authors whenever they have some time to spare, thanks a ton!
+
+[02:13:50.0000] <howdoi>
+ystartsev: 🙏
+
+[02:16:06.0000] <ystartsev>
+if I understood our chat in tc39-website -- The list is examples for proposals stage 0 to stage 4. you are looking for feedback on correctness. let me know if i got that right howdoi
+
+[02:18:19.0000] <howdoi>
+ystartsev: yes, correction and any other enhancements, suggestions if at all :)
+
+[10:47:48.0000] <devsnek>
+howdoi: i appreciate you putting the obligatory cryptocurrency reference in there
+
+
+2019-04-18
+[12:25:26.0000] <devsnek>
+i just realized binast has an actual spec text
+
+[12:25:33.0000] <devsnek>
+pretty interesting
+
+[13:15:40.0000] <jmdyck>
+devsnek: https://github.com/tc39/proposal-binary-ast ?
+
+[13:18:53.0000] <devsnek>
+jmdyck: yeah
+
+[13:18:58.0000] <devsnek>
+it has a gh-pages
+
+[13:21:58.0000] <jmdyck>
+Ah, https://tc39.github.io/proposal-binary-ast/  Odd the repo doesn't point to it.
+
+[13:27:35.0000] <devsnek>
+jmdyck: yeah for a long time I thought it just didn't have any spec text
+
+
+2019-04-19
+[15:33:19.0000] <caitp>
+it's not possible to export something from a module with a symbol-key is it?
+
+[15:54:39.0000] <TabAtkins>
+No, exports need a string name I'm pretty sure
+
+[16:40:54.0000] <ljharb>
+correct
+
+
+2019-04-21
+[05:22:14.0000] <howdoi>
+Where can I read more about the relationship proposal?
+
+
+2019-04-22
+[23:01:05.0000] <howdoi>
+What does 39 in TC39 stands for?
+
+[23:20:18.0000] <ljharb>
+howdoi: https://web.archive.org/web/20160804042554/http://wiki.ecmascript.org/doku.php?id=strawman:relationships, and it's the 39th technical committee
+
+[23:21:20.0000] <howdoi>
+ljharb: thanks on the "39" clarification, also, when through that link and the pdf, was looking for the repo.
+
+[23:21:47.0000] <ljharb>
+there is no repo
+
+
+2019-04-23
+[06:58:55.0000] <devsnek>
+rwaldron: seems like there might be an issue with the jsc runner? https://gc.gy/23732912.png
+
+[12:45:25.0000] <caitp>
+is there an annex B or web compat reason why all vms seem to ignore changes to property `enumerable`-ness during for-in loops?
+
+[12:52:25.0000] <caitp>
+e.g. https://jsfiddle.net/y6sdgm2b/
+
+[13:00:14.0000] <caitp>
+I mean I know it's "undefined", except that afaict all the vms match, but the way they match is incongruent with the example implementation in the spec
+
+[13:28:38.0000] <Bakkot>
+caitp: I don't think that's actually true; Chakra matches the spec
+
+[13:28:49.0000] <Bakkot>
+also XS, though I dunno if we're counting it
+
+[13:29:10.0000] <Bakkot>
+I have that case in https://github.com/bakkot/for-in-exploration/blob/master/made-enum.js
+
+[13:29:20.0000] <caitp>
+I was thinking "browsers", and I dunno if chakra really counts there anymore
+
+[13:30:00.0000] <Bakkot>
+anyway, in reseaching this a while back I couldn't find any references to people depending on that behavior
+
+[13:30:17.0000] <caitp>
+the behaviour of the engines I've tried (v8/jsc/sm) seem pretty consistent, so I thought it would be good if the spec actually reflected it
+
+[13:30:18.0000] <Bakkot>
+unlike some other genuinly interop semantics: https://github.com/bakkot/for-in-exploration#real-constraints
+
+[13:30:59.0000] <Bakkot>
+I am intending to bring to the committee a proposed spec text for some interop semantics at the June meeting
+
+[13:31:05.0000] <Bakkot>
+though that will depend on me actually running it
+
+[13:31:35.0000] <Bakkot>
+and also, since Chakra differs here (and that mattered when I was first doing this), I did not consider this particular case to be within the interop semantics
+
+[13:32:03.0000] <Bakkot>
+(s/actually running/actually writing/)
+
+[13:33:46.0000] <caitp>
+interesting, you've done a lot more work on it than me
+
+[13:34:39.0000] <Bakkot>
+I'm guessing this is coming from you following up one of my JSC bugs which came out of this process?
+
+[13:35:03.0000] <Bakkot>
+if there's some other for-in stuff you're working on I'd be interested in following along
+
+[13:38:49.0000] <caitp>
+no it is still your filed bugs --- the JSC behaviour and all the matching VMs seem to pre-filter enumerable properties at the start of the loop, and then do another [[GetOwnProperty]] for each key to see if it exists (but ignore the DontEnum-ness)
+
+[13:39:13.0000] <caitp>
+so it's a little awkward to get the expected semantics
+
+[13:41:16.0000] <caitp>
+its' weird for proxies because you observably do [[GetOwnProperty]] for each key twice, once during the pre-filtering and again during the loop, which based on what the spec illustrates as an example implementation, shouldn't happen
+
+[13:45:36.0000] <Bakkot>
+so, since you're looking at this, can I ask - my plan was to say that engines are required to implement the spec's semantics for proxies in particular
+
+[13:45:58.0000] <Bakkot>
+with the thought that they'd just have a special case for proxies
+
+[13:46:03.0000] <Bakkot>
+does that seem reasonable?
+
+[13:47:39.0000] <Bakkot>
+(the other half of the plan was to somehow nail down the "normal" case - no proxies or other exotics, no prototype changes, no enumerability changes, no non-enumerable properties shadowing enumerable properties, etc - and then say that you can do whatever you want as long as it matches the spec algorithm in those cases, which all engines already do)
+
+[13:48:43.0000] <caitp>
+in JSC's case it's doable, I don't know if I like them having different semantics since any difference would be observable (e.g. wrt changes to enumerability affecting keys that are handled in the loop)
+
+[13:51:00.0000] <Bakkot>
+hm, yeah. my intent was to minimize the observable differences between engines, rather than between similar-ish cases on a single engine, but I don't know how to prioritize those.
+
+[13:51:14.0000] <Bakkot>
+currently engines all behave radically differently when for-in'ing a proxy
+
+[13:52:10.0000] <Bakkot>
+(the proxy-trapped test in the above repo illustrates this)
+
+[14:02:28.0000] <caitp>
+I think https://gist.github.com/caitp/db5eae82a62b27d9e8ee9f7ab6b20a01 comes pretty close to what jsc does, I dunno if that exactly matches other engines
+
+[14:03:52.0000] <caitp>
+in the proxy case
+
+[14:06:55.0000] <Bakkot>
+no, not quite
+
+[14:07:08.0000] <Bakkot>
+though that also doesn't match JSC, at least on my local copy
+
+[14:08:36.0000] <Bakkot>
+that gist differs from other engines mainly in that no engine other than JSC will print a non-enumerable property which shadows an enumerable one
+
+[14:08:45.0000] <caitp>
+you might not have r244330 locally
+
+[14:08:45.0000] <Bakkot>
+i.e. JSC is unique in printing `x` in https://github.com/bakkot/for-in-exploration/blob/master/enumerable-shadowed.js
+
+[14:09:50.0000] <caitp>
+yeah, I haven't done a lot of testing with the prototype object
+
+[14:13:34.0000] <Bakkot>
+hm. just updated, now on v244563, but still seeing the same proxy traps hit for JSC
+
+[14:16:15.0000] <caitp>
+right now upstream:
+
+[14:17:12.0000] <caitp>
+if the proxy has no ownKeys handler, we do the normal [[GetOwnPropertyNames]] for the target object, and [[GetOwnProperty]] isn't run through the proxy
+
+[14:17:27.0000] <caitp>
+if it does have the ownKeys trap, then...
+
+[14:20:04.0000] <caitp>
+ownKeys is called, the returned object is converted into a list, configurable/extensible invariants are performed etc, and at the end, the list is re-filtered, kicking out DontEnum keys, before ever reaching the loop body
+
+[14:21:31.0000] <caitp>
+then, in the loop, for each key returned from `ProxyObject::performGetOwnPropertyNames()`, the loop body is evaluated only if `Boolean([[GetOwnProperty]](proxy, key))` is true
+
+[14:22:06.0000] <caitp>
+so there should be an ownKeys trap call, and 2 gopd trap calls per key, assuming "ownKeys" exists
+
+[14:22:30.0000] <caitp>
+and no trap calls (except for the gopd done in the for-in loop) if it does not exist
+
+[14:25:04.0000] <Bakkot>
+sounds about right. gets a little weirder in the presence of prototypes.
+
+[14:27:07.0000] <Bakkot>
+other engines are consistent about only ever invoking gopd once per key, even when (as in spidermonkey) that leads to spec-prohibited behavior ( https://bugzilla.mozilla.org/show_bug.cgi?id=1486656 )
+
+[14:28:07.0000] <Bakkot>
+i'd prefer that, if we spec behavior for proxies, we do it in such a way that gopd is invoked only once per property
+
+[14:38:19.0000] <caitp>
+v8 seems to follow your suggestions (ignoring anything wrt prototype shadowing), so for proxies, filtering is deferred until each loop iteration, and enumerability is checked there, but for non-proxies it's all pre-filtered
+
+[14:41:08.0000] <caitp>
+it wouldn't be the worst thing if all impls matched that, but I think it's not great to have the inconsistent behaviour between proxies and non-proxies, so I'd be happier to just forbid pre-filtering when it's observable, and let turbofan/DFG/etc do it if they decide they can
+
+[14:41:31.0000] <caitp>
+what's the worst that could happen
+
+[14:43:47.0000] <Bakkot>
+I've been trying to avoid doing anything with the case where it's observable
+
+[14:44:07.0000] <Bakkot>
+mostly because that would require engines to make changes for non-proxy cases, which historically has been... basically impossible
+
+[14:44:58.0000] <Bakkot>
+sorry, for the case where it's observable without proxies; I have higher hopes for getting engines to change where proxies are involved
+
+[14:55:35.0000] <Domenic>
+> Previous discussions (Yes, I have read every comment in every one of these threads.)
+
+[14:55:38.0000] <Domenic>
+I love it
+
+[14:59:47.0000] <devsnek>
+`proxy-trapped.js` is pretty crazy
+
+[15:00:55.0000] <devsnek>
+nothing except engine262 and XS agree in proxy-trapped.js
+
+[15:03:21.0000] <devsnek>
+lmao jsc has an abrupt completion in this what even
+
+[15:04:40.0000] <Bakkot>
+wait, where?
+
+[15:05:27.0000] <devsnek>
+Bakkot: https://gc.gy/23762126.png
+
+[15:05:50.0000] <devsnek>
+x apparently doesn't get bound in the loop iteration
+
+[15:06:49.0000] <devsnek>
+actually wait `loop: x` is there
+
+[15:06:56.0000] <devsnek>
+i dunno
+
+[15:10:56.0000] <Bakkot>
+devsnek: I think this might be an old eshost bug or something
+
+[15:11:01.0000] <devsnek>
+oh
+
+
+2019-04-24
+[17:34:13.0000] <caitp>
+if you find it actually is a jsc bug, plz file it and CC me so I can justify my existence in this company
+
+[06:51:38.0000] <cloudshu>
+could someone remind me of the history for FinalizationGroups over registering finalizers per-weakref?
+
+[06:52:05.0000] <cloudshu>
+is it simply efficiency since "classes" of objects will tend to share the finalizer?
+
+
+2019-04-25
+[07:02:40.0000] <devsnek>
+is it acceptable to spec generator methods using `GeneratorYield` instead of a prototype with a next method?
+
+[07:03:20.0000] <devsnek>
+that came out awkwardly
+
+[07:03:49.0000] <devsnek>
+is it acceptable to spec functions in the spec that return iterators as generators and use GeneratorYield or something, instead of returning the big prototype+next thing
+
+[07:20:10.0000] <Domenic>
+devsnek: the decision in the past has always been a new prototype. There was a thread about this at some point. I think it might be worth reconsidering, but I would give a 70% chance we stay the course.
+
+[07:46:41.0000] <devsnek>
+Domenic: I feel like people might change their minds with the iterator methods proposal
+
+[07:47:03.0000] <Domenic>
+Maybe. There's already tons of iterators on the web platform, and I asked if we should consolidate, and people said we should not.
+
+[07:47:23.0000] <devsnek>
+being able to say "a generator function that when called performs the following steps" seems so nice
+
+[07:47:50.0000] <devsnek>
+would also get rid of having to manually define error and return handling
+
+[07:52:46.0000] <Domenic>
+I think you should just macro harder
+
+[07:52:55.0000] <Domenic>
+Create spec infra that will generate your iterator prototypes etc. for you
+
+[07:54:17.0000] <devsnek>
+like the typed arrays?
+
+[08:01:36.0000] <Domenic>
+Yeah, something like that
+
+[08:02:13.0000] <Domenic>
+Or figure out a way to write a generator function-ish body that generates a set of next()/throw()/return() function
+
+[08:17:08.0000] <devsnek>
+that sounds like "a generator function that when called runs the following steps"
+
+[08:29:28.0000] <Domenic>
+Yep but the spec text generates some new prototype
+
+[10:21:03.0000] <jmdyck>
+So if there's a PR against tc39/ecma262, that doesn't have any existence in the tc39/ecma262 repo, right?
+
+[10:22:07.0000] <ljharb>
+jmdyck: github auto-creates a ref for every PR, so you can get to it programmatically if you want. but git won't fetch those refs by default
+
+[10:22:35.0000] <jmdyck>
+ah, so how do it get to it?
+
+[10:23:35.0000] <ljharb>
+jmdyck: https://gist.github.com/piscisaureus/3342247
+
+[10:27:05.0000] <jmdyck>
+wah, so many rull requests.
+
+[10:27:14.0000] <jmdyck>
+-s/rull/pull/
+
+[10:27:21.0000] <ljharb>
+lol yeah it'll be more useful on future fetches
+
+[10:28:24.0000] <jmdyck>
+(hoping to detect editorial stuff before it gets merged into master.)
+
+[10:31:31.0000] <ljharb>
+jmdyck: if you have any kind of reliable programmatic mechanism it'd be great to add it to CI on every PR :-D
+
+[10:34:08.0000] <jmdyck>
+not reliable, no.
+
+[10:34:28.0000] <jmdyck>
+not until ecmaspeak has a reliable spec.
+
+[10:35:48.0000] <jmdyck>
+Mind you, checking for well-formedness of markup would be a good start.
+
+[10:36:17.0000] <jmdyck>
+There should be reliable utilities for that.
+
+[10:42:13.0000] <ljharb>
+/me any correctness or consistency tools that you'd like to add would be very welcome :-)
+
+[10:44:35.0000] <Domenic>
+We run validator.nu on every pull request for WHATWG specs
+
+[10:45:34.0000] <Domenic>
+https://github.com/whatwg/whatwg.org/blob/be5d39e4bce5248039816c9fdbccd02f9f840f86/resources.whatwg.org/build/deploy.sh#L179
+
+[10:50:44.0000] <jmdyck>
+I just ran validator.nu against spec.html: 19 errors + 5 warnings
+
+[10:55:48.0000] <jmdyck>
+A bunch would disappear once my editorial PR is merged ;)
+
+[10:55:57.0000] <jmdyck>
+but there'd still be some left.
+
+[11:03:47.0000] <Domenic>
+Well, spec.html isn't the interesting thing
+
+[11:03:54.0000] <Domenic>
+https://validator.nu/?doc=https%3A%2F%2Ftc39.github.io%2Fecma262 is the important one.
+
+[11:05:25.0000] <jmdyck>
+that too, but it's easier to fix spec.html's problems.
+
+[11:07:23.0000] <Domenic>
+ElementInternals & form-associated custom elements are one big topic
+
+[11:07:27.0000] <Domenic>
+Oops wrong channel
+
+[11:08:13.0000] <jmdyck>
+(and fixing spec.html is mostly a prerequisite to getting the rendered version error-free)
+
+[11:27:43.0000] <ljharb>
+we could validate both the raw and the built version on PRs.
+
+[12:00:28.0000] <Domenic>
+I just don't think validating the source document is useful.
+
+[12:02:11.0000] <jmdyck>
+It gives you a smaller set of problems to look at, that you know aren't caused by the rendering process. That seems moderately useful.
+
+[12:03:15.0000] <jmdyck>
+Moreover, once you've taken care of them, you know that all the errors in the rendered spec *are* caused by the rendering process.
+
+[12:03:45.0000] <Domenic>
+But it's not clear there's any mapping between errors in the source doc vs. the output. E.g. the tooling fixes up some errors or changes them.
+
+[12:03:57.0000] <Domenic>
+Like any well-formedness errors will get automatically fixed by the tooling.
+
+[12:04:03.0000] <Domenic>
+(Since it parses and serializes)
+
+[12:06:40.0000] <jmdyck>
+and yet the rendered spec *does* have well-formedness errors inherited from spec.html
+
+[12:11:39.0000] <ljharb>
+? validating build output is what i'd expect to be not useful (except for maintainers of the build tool); just like linting, validating the source is what provides actional feedback to PR authors
+
+[12:13:55.0000] <Domenic>
+The users see the build output
+
+[12:13:59.0000] <Domenic>
+The source isn't even HTML
+
+[12:14:06.0000] <Domenic>
+Validating it with a HTML validation tool is dubious
+
+[12:14:15.0000] <ljharb>
+oh sure, i agree with that
+
+[12:14:21.0000] <ljharb>
+what i think is useful on 262 tho is validating the source
+
+[12:14:44.0000] <ljharb>
+(which validator.nu may not be the right tool for)
+
+[12:15:37.0000] <jmdyck>
+based on the validator.nu ouput, it looks like spec.html is closer to being html than the rendered output is.
+
+[12:16:02.0000] <Bakkot>
+in my ideal world ecmarkup would just be really strict about what it accepted, such that "ecmarkup accepts it" would be sufficient to validate the source
+
+[12:16:20.0000] <ljharb>
+Bakkot: that would be totally great, and we could add that to CI too
+
+[12:16:27.0000] <Bakkot>
+if we were comfortable assuming ecmarkup only produced well-formed output we would not then need to run the output through validator.nu; if we weren't we could do that as well
+
+[12:17:38.0000] <Bakkot>
+while we're kicking all this around, prettier has this neat thing were every PR automatically gets a link to a place you can use the project as it would be after the PR merge (e.g. the link at the bottom of https://github.com/prettier/prettier/pull/5996 )
+
+[12:17:52.0000] <Bakkot>
+and having a similar bot linking the rendered spec to each PR would be nice
+
+[12:18:17.0000] <jmdyck>
+what if there are merge conflicts?
+
+[12:18:26.0000] <Bakkot>
+it just doesn't work, IIRC
+
+[12:18:39.0000] <Bakkot>
+updates when the branch updates, so when the conflicts are fixed you get a working link
+
+[12:20:16.0000] <Domenic>
+Yes, we have that on all web specs
+
+[12:20:23.0000] <jmdyck>
+Bakkot: my tools are pretty strict about what they accept, but that's why I have to change them frequently.
+
+[12:20:31.0000] <Domenic>
+See e.g. https://github.com/whatwg/html/pull/4383 after the <hr>
+
+[12:27:18.0000] <jmdyck>
+E.g., the dynamic import PR uses dl/dt/dt, which spec.html hasn't had before, so my code says (in effect) "what is this?" But it seems reasonable for the spec to use them, so I add them to my code. Which is why it'd be problematic to use my code in CI.
+
+[12:32:13.0000] <jmdyck>
+And it's not uncommon for algorithm-related PRs to use new pseudocode syntax.
+
+
+2019-04-26
+[17:57:25.0000] <ljharb>
+i made an attempt to specify web reality for Array.prototype.join on cyclic arrays, please tell me if it's horrible: https://github.com/tc39/ecma262/pull/1518
+
+[18:31:58.0000] <devsnek>
+mfw [[Seen]]
+
+[19:23:42.0000] <ljharb>
+devsnek: join sees you
+
+[19:24:51.0000] <devsnek>
+ljharb: is "i think strange global de-duplication is ugly" a good reason for annex b
+
+[19:25:13.0000] <ljharb>
+i dunno. we already have that in a number of places, i think
+
+[19:25:24.0000] <ljharb>
+for..in i think?
+
+[19:25:50.0000] <devsnek>
+for..in wouldn't have any issues with circular structures
+
+[19:26:26.0000] <devsnek>
+honestly i feel like randomly empty makes less sense than throwing
+
+[19:26:30.0000] <ljharb>
+yeah true, i think maybe setPrototypeOf and JSON.stringify are the only places that deal with circularity
+
+[19:27:17.0000] <devsnek>
+and they both throw
+
+[19:27:26.0000] <devsnek>
+instead of having nonsensical effects
+
+[19:28:20.0000] <ljharb>
+so would you want it to throw in the main spec but be empty in annex b?
+
+[19:28:31.0000] <ljharb>
+because i think the current spec behavior mandates an infinite loop, no?
+
+[19:28:33.0000] <devsnek>
+current behaviour is throw
+
+[19:28:40.0000] <devsnek>
+because of stack limits
+
+[19:28:44.0000] <devsnek>
+well implicit throw
+
+[19:28:54.0000] <ljharb>
+maybe not with tco
+
+[19:29:07.0000] <devsnek>
+uhhhh
+
+[19:29:19.0000] <devsnek>
+i don't think TCO applies here
+
+[19:29:59.0000] <devsnek>
+yeah TCO can't apply here
+
+[19:30:35.0000] <devsnek>
+easy tco "if the execution context stopped existing here could this function continue"
+
+[19:30:47.0000] <ljharb>
+you could rewrite the algorithm to be observably the same and recursive, no?
+
+[19:31:39.0000] <devsnek>
+hmmmmm
+
+[19:33:25.0000] <devsnek>
+it isn't just about being recursive
+
+[19:33:39.0000] <devsnek>
+the recursion has to occur in a place where the current execution context can be ditched
+
+[19:34:13.0000] <ljharb>
+right - so like, `return current + nextToString(arr, index)` or something?
+
+[19:34:53.0000] <TabAtkins>
+depending on language details, that can hold open the + expression, and thus not be tc0
+
+[19:36:22.0000] <devsnek>
+in the end
+
+[19:36:25.0000] <devsnek>
+engine262 throws
+
+[19:36:29.0000] <devsnek>
+and i like it that way :P
+
+
+2019-04-27
+[20:57:14.0000] <devsnek>
+i feel like spec that is this dense and complex invites bugs https://tc39.github.io/proposal-iterator-helpers/#sec-asynciteratorprototypemapiteratorprototype-next
+
+[20:57:26.0000] <devsnek>
+especially considering the amount of abstraction over the original intent
+
+[20:57:50.0000] <devsnek>
+which is basically `for await (const v of it) { yield await mapper(v) }`
+
+[20:59:37.0000] <devsnek>
+does anyone have any suggestions for how to make this better
+
+[21:34:17.0000] <jmdyck>
+eee
+
+[21:34:49.0000] <jmdyck>
+the title alone
+
+[21:50:29.0000] <devsnek>
+jmdyck: i know right :9
+
+[21:50:34.0000] <devsnek>
+:( *
+
+[23:05:02.0000] <Domenic>
+devsnek: hmm the async versions are much worse than the sync. Would using Await() help?
+
+[23:05:29.0000] <Domenic>
+I.e. I'm wondering if there's a way to make the async versions about as simple as the sync. (Which is still not fully simplified, but I think is a big improvement.)
+
+[23:06:51.0000] <Domenic>
+Oh I see it's already using Await()
+
+[23:07:17.0000] <TimothyGu>
+devsnek: how about just AsyncMapIteratorPrototype
+
+[23:09:17.0000] <Domenic>
+So the problems are: IfAbruptRejectPromise instead of ?, three-step process for brand-check rejection (can be replaced with return PromiseReject?), three-step process for return values (can be replaced with return PromiseResolve?), and not using IteratorStep (seems like you could?)
+
+[23:10:33.0000] <Domenic>
+For the IfAbruptRejectPromise, consider factoring all the sync steps out into a sub-algorithm or something, so that you can have a single IfAbruptRejectPromise around all of them.
+
+[23:17:35.0000] <Domenic>
+Something like this https://gist.github.com/domenic/17d0d9102c7c1fba6f0df9a71061942d
+
+[23:18:35.0000] <Domenic>
+You could even factor my SubMap() into something that took an async/sync argument and only did the Await()s if async
+
+[23:18:50.0000] <Domenic>
+Then you could re-use it for the sync version
+
+[04:24:30.0000] <devsnek>
+does the spec limit movement of values between agents
+
+[06:47:42.0000] <devsnek>
+Domenic: interesting approach
+
+[06:48:01.0000] <devsnek>
+if I can't get some better syntax in the spec I'll probably do that
+
+[11:26:40.0000] <Bakkot>
+https://github.com/immersive-web/webxr/pull/609#discussion_r279159519
+
+[11:26:55.0000] <Bakkot>
+we are not the only web spec which has to worry about "what about space?"
+
+[11:27:11.0000] <Bakkot>
+still think non-earth-based time systems ought to have been in scope for Temporal...
+
+[11:44:53.0000] <devsnek>
+Bakkot: that's rough
+
+
+2019-04-29
+[18:17:25.0000] <devsnek>
+from a language design perspective, what if loops over iterators broke after handling a done result instead of before
+
+[18:18:05.0000] <devsnek>
+is there a precedent for `{ value: undefined, done: true }`
+
+[21:04:15.0000] <ljharb>
+devsnek: not sure what you mean, that's typically the last iteration result for most iterators
+
+[21:10:42.0000] <devsnek>
+ljharb: yeah but loops don't eval their bodies for it
+
+[21:11:00.0000] <devsnek>
+i guess it makes sense to allow things that finish undefined
+
+[21:11:13.0000] <devsnek>
+the end might not be associated with a value
+
+[21:11:19.0000] <devsnek>
+just awkward interface i guess
+
+[21:12:58.0000] <ljharb>
+i'm still not sure what you're getting at
+
+[21:13:13.0000] <ljharb>
+do you mean like, if you eval a for..of loop, what's the completion value?
+
+[21:13:19.0000] <devsnek>
+no i'm talking about iteration
+
+[21:13:32.0000] <devsnek>
+its kind of awkward that `{ value: something, done: true }` is possible
+
+[21:13:45.0000] <ljharb>
+isn't that only when a generator returns something?
+
+[21:13:45.0000] <devsnek>
+but i am guessing the intention is that you aren't supposed to have `done: true` with some actual value
+
+[21:13:57.0000] <devsnek>
+i think so
+
+[21:14:02.0000] <devsnek>
+its just kind of awkward
+
+[21:14:03.0000] <ljharb>
+certainly in all user code i've seen, it never checks `.value` unless `.done` is false
+
+[21:14:10.0000] <devsnek>
+yeah
+
+[21:14:29.0000] <devsnek>
+(for context, i'm trying to figure out the design of iteration in slither)
+
+[07:42:16.0000] <caitp>
+it wouldn't be too difficult to do it
+
+[07:42:34.0000] <caitp>
+oh dang, znc was scrolled way up, did I just reply to something from the distant past?
+
+[07:42:44.0000] <caitp>
+this irc client, man ._.
+
+[07:48:04.0000] <devsnek>
+caitp: that depends on what you were replying to
+
+[07:49:03.0000] <caitp>
+it was about making `/* /* */ */` end the comment at the last `*/` instead of the first one
+
+[07:49:47.0000] <caitp>
+"wouldn't be hard to do it, but what other language does that? and whats the point?"
+
+[07:54:55.0000] <devsnek>
+rust does that
+
+[07:55:12.0000] <devsnek>
+makes commenting a large section without worrying about the contents less annoying
+
+[07:56:38.0000] <jmdyck>
+https://stackoverflow.com/questions/20528010/what-is-the-usage-of-nested-comments-in-some-programming-languages
+
+[07:57:05.0000] <jmdyck>
+xquery has nested comments
+
+[07:59:41.0000] <caitp>
+I think the only time when my internal dialogue is saying "wouldn't it be great if js had internal comments" is when commenting out big chunks of long unit tests to try to isolate exactly where something goes wrong --- and to work around it I just use the text editor's tools
+
+[07:59:58.0000] <caitp>
+s/internal/nested/
+
+[09:30:47.0000] <rkirsling>
+one easy workaround is not using /* */ for anything other than a header comment 😎
+
+[09:45:04.0000] <devsnek>
+rkirsling: are you suggesting `// //` for nested multiline
+
+[09:46:50.0000] <rkirsling>
+devsnek: oh no I just mean that if you only use `//` amidst code then you wouldn't have to worry about whether temporarily wrapping a section in `/* */` is going to work
+
+[09:48:16.0000] <rkirsling>
+(although code editors would generally insert `//` for you anyway but yeah)
+
+[09:50:29.0000] <rkirsling>
+having said that, I suppose it's kind of unreasonable if JSDoc expects multiline comments
+
+[11:33:18.0000] <caitp>
+proposal: C preprocessor for JS
+
+[11:33:34.0000] <caitp>
+solve this problem once and for all with #if false ... #endif
+
+[11:37:11.0000] <TabAtkins>
+Yeah, nestable block comments require you to actually do some level of parsing on the stuff inside the comment. Would be good anyway, as right now, you can validly write a string like `"foo*/bar"`, and then when you try to put that in a comment block, the block will end partway thru the string...
+
+[11:37:41.0000] <rkirsling>
+oh dear
+
+[11:38:47.0000] <TabAtkins>
+On the other hand, comment hacks like being able to toggle between two sections by doing `/**/ section one /*/ section two /**/`, and adding or removing the final slash on the first comment, are also widespread, so "fixing" comments now would break a lot of pages, I'd wager.
+
+[11:39:59.0000] <TabAtkins>
+(A variant can also be used to make toggling a single section a 1-char change, rather than 2-chars twice, by putting a `/**/` before and after the section; again, removing the last slash from the first comment will comment out the whole block.)
+
+[11:41:19.0000] <rkirsling>
+hmm you're right there could be a decent amount of that in prod code
+
+[11:41:43.0000] <caitp>
+yeah, it's technically very easy to solve the problem, but I wouldn't be surprised if there were compat problems with it (which I think was mentioned when this came up before)
+
+[11:44:02.0000] <devsnek>
+`'use nested multiline comments'`
+
+[11:49:25.0000] <Bakkot>
+I am absbolutely certain there would be webcompat problems
+
+[11:51:08.0000] <devsnek>
+`'*/use/*nested*/multiline/*comments*/'`
+
+
+2019-04-30
+[21:53:19.0000] <rkirsling>
+so I've got a question that's most likely shockingly newbish
+
+[21:54:32.0000] <rkirsling>
+does `Let R be the result of evaluating DefaultClause.` not carry any implication that we're actually going to evaluate something such that side effects would be seen? it seems that the answer has to be yes but I don't think I understand why
+
+[21:56:26.0000] <ljharb>
+rkirsling: is this like in a switch statement?
+
+[21:56:30.0000] <rkirsling>
+yessir
+
+[21:56:47.0000] <ljharb>
+it's a statement list, so yeah that sounds right
+
+[21:57:18.0000] <ljharb>
+i think there's something about the default clause not being required to be last, but it'll still be evaluated last?
+
+[21:57:26.0000] <ljharb>
+switch statements are weird
+
+[21:59:06.0000] <rkirsling>
+that's exactly what I opened the spec to search for
+
+[21:59:36.0000] <devsnek>
+rkirsling: so
+
+[21:59:43.0000] <rkirsling>
+but in the RS here https://tc39.github.io/ecma262/#sec-runtime-semantics-caseblockevaluation
+
+[21:59:59.0000] <devsnek>
+the evaluation of switch is defined such that the `DefaultClause` is plucked out
+
+[22:00:01.0000] <devsnek>
+and always run last
+
+[22:00:21.0000] <devsnek>
+because its defined as `Clauses DefaultClause Clauses_opt` or something like that
+
+[22:00:56.0000] <devsnek>
+oh yeah its those two syntax branches
+
+[22:01:39.0000] <rkirsling>
+yeah but it seems that we check the cases before the default in source order, then evaluate default and tentatively set its completion value as the overall completion value, then go through the cases after the default in source order
+
+[22:02:07.0000] <ljharb>
+that's probably so the spec can be written top down, but unobservably so that implementations can re-order the default clause and it works the same?
+
+[22:02:20.0000] <ljharb>
+totally throwing out guesses
+
+[22:02:32.0000] <devsnek>
+oh i see what you're saying
+
+[22:03:03.0000] <rkirsling>
+yeah I'm clearly missing something because the engines all do the right thing (no side effects putting default above the case that we want)
+
+[22:03:34.0000] <ljharb>
+hm, are you suggesting the spec implies that `default` should be ran always (when it's not last) even if it's not triggered? O.o
+
+[22:03:48.0000] <devsnek>
+its doing it this way for fallthrough
+
+[22:03:55.0000] <rkirsling>
+that's what I'm reading it as and feeling like I must be mistaken
+
+[22:04:11.0000] <devsnek>
+things in front of the default might still need to fall through to the default
+
+[22:04:15.0000] <devsnek>
+but things after don't
+
+[22:04:19.0000] <ljharb>
+aha
+
+[22:04:28.0000] <devsnek>
+which is why foundInB returns immediately
+
+[22:04:34.0000] <devsnek>
+but a only returns if its abrupt (throw or break)
+
+[22:05:00.0000] <devsnek>
+ngl this is confusing af
+
+[22:06:14.0000] <rkirsling>
+oh for crying out loud
+
+[22:06:26.0000] <devsnek>
+lol
+
+[22:06:45.0000] <rkirsling>
+I think my eyes just jumped over step 7
+
+[22:22:24.0000] <rkirsling>
+okay yeah I've fully got it now
+
+[22:35:05.0000] <rkirsling>
+anyway that's what I get for skimming too fast
+
+[22:39:03.0000] <rkirsling>
+since I wrote it out clearly for my own purposes, I'll copy-paste it here for closure's sake
+
+[22:39:52.0000] <rkirsling>
+1. we check the _before_ cases in order
+
+[22:39:53.0000] <rkirsling>
+2. if we match *and* hit a `break`/`return` somewhere before the `default`, we're done
+
+[22:39:53.0000] <rkirsling>
+3. otherwise, we check the _after_ cases in order
+
+[22:39:53.0000] <rkirsling>
+4. if we matched an _after_ case we're done (regardless of `break`/`return`)
+
+[22:39:53.0000] <rkirsling>
+5. otherwise, we evaluate the `default`
+
+[22:39:53.0000] <rkirsling>
+6. if we *still* haven't hit a `break`/`return` we evaluate on into the _after_ cases as necessary
+
+[22:40:13.0000] <rkirsling>
+so that matches expected behavior
+
+[22:42:37.0000] <rkirsling>
+(this all started because I was reading one of LLVM's tutorial docs and they've got a (C++) switch with default first, and I literally never thought about that being valid to do before now...)
+
+[22:44:22.0000] <devsnek>
+i think the only valid thing to do is avoid c style switch cases
+
+[22:45:37.0000] <rkirsling>
+we all know ljharb agrees ;)
+
+[22:46:28.0000] <rkirsling>
+they're kind of like "goto's last bastion"
+
+[22:46:29.0000] <rkirsling>
+heh
+
+[22:47:16.0000] <ljharb>
+lol yes, burn them with fire
+
+[22:47:39.0000] <devsnek>
+`do { break label } while (false);`
+
+[22:48:07.0000] <devsnek>
+actually can you jump to labels that are defined later
+
+[22:48:26.0000] <devsnek>
+aw you can't
+
+[09:51:40.0000] <cloudshu>
+what if i LIKE gotos huh??
+
+[09:55:44.0000] <ljharb>
+cloudshu: then i can suggest somewhere for you to goto :-p
+
+[09:56:13.0000] <cloudshu>
+when i say jump i want the cpu to say how high
+
+[09:56:48.0000] <devsnek>
+Domenic: can you tell i don't do browser js very often :P
+
+[09:56:53.0000] <Domenic>
+Hehe :)
+
+[09:58:41.0000] <devsnek>
+Domenic: would that be `document.body.insertAdjacentHTML('afterbegin', WARNING_HTML)`
+
+[10:01:40.0000] <Domenic>
+Seems likely
+
+[10:02:38.0000] <devsnek>
+Domenic: also it seems like jsdom messed up the encoding of the <title> of the page
+
+[10:02:44.0000] <devsnek>
+`ECMAScriptÂ® 2020 Language Specification`
+
+[10:03:07.0000] <devsnek>
+(before and after removing 'utf8' in readFile)
+
+[10:03:09.0000] <Domenic>
+Oh the source document doesn't have a meta charset doesn't it
+
+[10:03:17.0000] <Domenic>
+Because it's not really HTML
+
+[10:03:20.0000] <devsnek>
+lol
+
+[10:03:25.0000] <Domenic>
+Yeah then I guess that advice doesn't work
+
+[10:03:34.0000] <devsnek>
+is jsdom adding a meta charset
+
+[10:03:53.0000] <Domenic>
+No it's doing encoding sniffing and with no meta charset it defaults to windows1252
+
+[10:04:03.0000] <devsnek>
+ouch
+
+[10:04:17.0000] <Domenic>
+Valid HTML needs to include a meta charset
+
+[10:04:24.0000] <Domenic>
+But ecmarkup inserts it for you automatically
+
+[10:04:43.0000] <Domenic>
+So the source document isn't really following the normal rules that jsdom expects
+
+[10:04:59.0000] <devsnek>
+well i'm not passing the source
+
+[10:05:02.0000] <Domenic>
+Maybe you should be running this as a post-processing step actually?
+
+[10:05:04.0000] <devsnek>
+i'm passing the result of ecmarkup
+
+[10:05:05.0000] <Domenic>
+Oh weird
+
+[10:05:15.0000] <Domenic>
+Does ecmarkup not insert a meta charset then
+
+[10:05:27.0000] <Domenic>
+Maybe I misremembered
+
+[10:06:07.0000] <devsnek>
+passing string instead of buffer works
+
+[10:06:11.0000] <devsnek>
+oh well
+
+[10:08:26.0000] <Domenic>
+Can you check if the output of ecmarkup has a meta charset
+
+[10:08:34.0000] <Domenic>
+If it does then maybe jsdom bug I should fix
+
+[10:08:40.0000] <Domenic>
+If it doesn't then ecmarkup bug
+
+[10:09:03.0000] <devsnek>
+will do
+
+[10:09:45.0000] <devsnek>
+Domenic: it has `<meta charset="utf-8">`
+
+[10:10:12.0000] <Domenic>
+Ok dang potential jsdom bug then
+
+[10:10:54.0000] <devsnek>
+inb4 v8 memory corruption triggered by the sheer size of the spec
+
+[10:48:34.0000] <ljharb>
+devsnek: is the intention here that the spec build job that runs on every master commit would use this?
+
+[10:48:52.0000] <devsnek>
+ljharb: the intention was running it for pull requests
+
+[10:48:57.0000] <devsnek>
+but master snapshots could be pretty cool as well
+
+[10:49:08.0000] <ljharb>
+ah ok so it's just setting up scaffolding, but nothing's using it yet
+
+[10:49:11.0000] <devsnek>
+yeah
+
+[10:49:23.0000] <devsnek>
+i don't really have permission to install actual hooks and stuff on the repo
+
+[10:50:01.0000] <ljharb>
+so for this snapshot thing, how does it work on mobile, and is it keyboard accessible?
+
+[10:50:16.0000] <devsnek>
+it uses <details>
+
+[10:50:19.0000] <devsnek>
+which is part of the html spec
+
+[10:50:30.0000] <devsnek>
+which is why i don't need to define how it collapses
+
+[10:50:36.0000] <devsnek>
+so it should just work (tm)
+
+[10:50:53.0000] <ljharb>
+what does it do on older browsers that don't have <details>?
+
+[10:50:59.0000] <devsnek>
+look funny
+
+[10:51:09.0000] <ljharb>
+lol
+
+[10:51:18.0000] <devsnek>
+whatwg uses this same thing for their snapshots
+
+[10:51:22.0000] <devsnek>
+i actually copied most of it
+
+[10:51:27.0000] <Domenic>
+Master should not have this
+
+[10:51:30.0000] <Domenic>
+This redirects people to master
+
+[10:51:34.0000] <devsnek>
+so i assume it hasn't been a problem
+
+[10:51:38.0000] <ljharb>
+gotcha
+
+[10:51:41.0000] <Domenic>
+IMO the things on ecma-international.org should have this
+
+[10:51:44.0000] <devsnek>
+Domenic: i mean like renders of any point of master
+
+[10:51:46.0000] <devsnek>
+not of master itself
+
+[10:51:56.0000] <Domenic>
+Mmm OK
+
+[10:52:02.0000] <devsnek>
+like if `tc39.github.io/ecma262/abcdef` existed
+
+[10:52:09.0000] <devsnek>
+for every commit to master
+
+[10:52:13.0000] <devsnek>
+i dunno
+
+[10:52:17.0000] <Domenic>
+Right gotcha
+
+[10:52:27.0000] <Domenic>
+https://dom.spec.whatwg.org/commit-snapshots/
+
+[10:52:36.0000] <devsnek>
+or a nice list like that :P
+
+[10:52:56.0000] <Domenic>
+It's just a styled nginx directory listing :)
+
+[15:44:31.0000] <devsnek>
+ljharb: when bigint lands will it be part of 2019 or 2020
+
+[15:44:42.0000] <devsnek>
+assuming that pr doesn't sit there forever
+
+[15:44:50.0000] <ljharb>
+devsnek: 2019 was conceptually frozen in like january, and actually frozen in march
+
+[15:44:57.0000] <ljharb>
+more like november than january even
+
+[15:44:57.0000] <devsnek>
+ok
+
+[15:45:19.0000] <ljharb>
+certainly if it reaches stage 4 before november, then it'll be in 2020
+

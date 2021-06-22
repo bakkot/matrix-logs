@@ -1,0 +1,932 @@
+2021-05-05
+[10:47:02.0000] <ljharb>
+heads up that specs on ecma's website are all broken: https://github.com/tc39/Reflector/issues/372
+
+[12:27:43.0000] <akirose>
+cool
+
+[12:27:59.0000] <akirose>
+hey i have a question for anyone versed in the intricacies of Ecma bylaws
+
+[12:28:42.0000] <akirose>
+the ExecCom meeting is tuesday and I can't attend (in my capacity as TC39 chair). Are ordinary members allowed to attend? Can I send a proxy?
+
+[13:41:52.0000] <ystartsev>
+Test262 has been down for a while, who is the right person to get in touch with at bocoup?
+
+[13:46:02.0000] <leobalter>
+akirose: I believe littledan already looked into the details of attending ExecCom
+
+[15:58:32.0000] <shu>
+ystartsev: the repo is down?
+
+[16:09:05.0000] <rkirsling>
+nah the website
+
+[16:17:31.0000] <ljharb>
+test262.re-ort
+
+[16:17:34.0000] <ljharb>
+* test262.report
+
+
+2021-05-06
+[21:50:10.0000] <devsnek>
+idk anyone besides rick and leo and they are both at salesforce now
+
+[21:51:27.0000] <ljharb>
+and jory's at the js foundation
+
+[21:51:34.0000] <ljharb>
+valerie maybe?
+
+[07:18:39.0000] <ryzokuken>
+ljharb: no valerie isn't at bocoup either
+
+[07:18:45.0000] <ryzokuken>
+mike should be our best bet here
+
+[07:19:48.0000] <ryzokuken>
+let's try https://twitter.com/jugglinmike?lang=en ?
+
+[07:22:02.0000] <ystartsev>
+k, sent a message
+
+[07:23:26.0000] <ryzokuken>
+awesome
+
+[07:30:04.0000] <ljharb>
+ah k, til
+
+[10:24:01.0000] <ystartsev>
+mike is taking a look and going to try to get it online
+
+[10:24:04.0000] <ystartsev>
+thanks ryzokuken
+
+[10:30:13.0000] <ryzokuken>
+yay
+
+
+2021-05-07
+[18:12:48.0000] <rkirsling>
+wait for real? https://github.com/tc39/test262/blob/main/test/built-ins/Error/cause_property.js#L37
+
+[18:14:11.0000] <rkirsling>
+why would there be a difference between explicit `undefined` and non-existence in a options bag?
+
+[18:15:50.0000] <ljharb>
+rkirsling: differentiates between an error with no cause and one with a cause of `undefined`?
+
+[18:16:10.0000] <ljharb>
+perhaps, a “undefined is not a function” error :-p
+
+[18:16:15.0000] <rkirsling>
+lol
+
+[18:16:18.0000] <rkirsling>
+but it's not null
+
+[18:16:30.0000] <rkirsling>
+like, is there any precedent for that anywhere in the language?
+
+[18:17:37.0000] <ljharb>
+for presence and undefined being different? tons. it’s the first options bag tho
+
+[18:18:10.0000] <rkirsling>
+that's the thing
+
+[18:18:18.0000] <ljharb>
+(non-intl, at least)
+
+[18:18:42.0000] <ljharb>
+cause, and temporal, and growable array buffer, and import assertions, might be the first options bags, whichever lands first?
+
+[18:19:29.0000] <ljharb>
+but the way userland treats options bags does often pívot on presence and not undefined, i think
+
+[18:19:54.0000] <rkirsling>
+that would be shocking to me as a user
+
+[18:20:13.0000] <rkirsling>
+...assuming it resulted in anything noticeable
+
+[18:20:33.0000] <ljharb>
+i mean, in this case if you don’t differentiate between absent and undefined, error.cause will be undefined either way, so I’m not sure why it makes a difference :-)
+
+[18:21:04.0000] <rkirsling>
+because an implementation has to create a property descriptor for no reason whatsoever
+
+[18:21:51.0000] <ljharb>
+oh, you’re not talking about “it’s absent when absent” you’re surprised it’s present when undefined?
+
+[18:22:09.0000] <ljharb>
+the Get is observable
+
+[18:22:29.0000] <rkirsling>
+yeah like that's a userland object that may have been reused
+
+[18:22:42.0000] <ljharb>
+it seems strange to me to do the Get and not make the property
+
+[18:22:43.0000] <rkirsling>
+why would setting to undefined not be equivalent to deletion
+
+[18:22:53.0000] <rkirsling>
+from the API's standpoint
+
+[18:22:56.0000] <ljharb>
+because it’s not, for many things?
+
+[18:23:26.0000] <ljharb>
+anything using Object.keys/entries/values, or object spread/rest, will see the key if it’s present and undefined, but won’t if it’s absent
+
+[18:24:05.0000] <rkirsling>
+I mean yeah cases of enumeration are supposed to be the time where it makes a difference
+
+[18:24:09.0000] <ljharb>
+typically you don’t mutate objects either; you make a new one that lacks the property you don’t want
+
+[18:24:20.0000] <ljharb>
+I’m not sure why someone would mutate but not delete
+
+[18:24:31.0000] <rkirsling>
+this isn't enumerating anything, it's reaching in and taking action on undefined
+
+[18:24:39.0000] <rkirsling>
+I mean that was the old norm
+
+[18:24:49.0000] <ljharb>
+i don’t think it was
+
+[18:24:55.0000] <rkirsling>
+it absolutely was
+
+[18:24:57.0000] <ljharb>
+the old norm was delete. Then it shifted to “copy”
+
+[18:25:13.0000] <rkirsling>
+we have a whole webkit blog post about "hey it's no longer unperformant to use delete"
+
+[18:25:20.0000] <ljharb>
+the period of time where deletion was thought of as bad and mutation was also not thought of as bad is either very short or nonexistent
+
+[18:25:33.0000] <ljharb>
+well sure. But long before that came out, mutation fell out of vogue
+
+[18:25:53.0000] <ljharb>
+that there’s old code that’s now faster is great, but doesn’t affect user expectations imo
+
+[18:26:24.0000] <rkirsling>
+okay fine but it doesn't have to be a matter of reuse
+
+[18:26:26.0000] <ljharb>
+iow, that optimization was years too late to actually cause users to like using `delete`
+
+[18:27:56.0000] <ljharb>
+(here I’m arguing against “setting to undefined as deletion” as a justification; unrelated to whether we care about presence vs undefined or not)
+
+[18:28:19.0000] <rkirsling>
+if you were simply filtering existing options then you're not expecting setting undefined to do anything
+
+[18:29:05.0000] <rkirsling>
+`{ foo: originalOptions.foo }` or something
+
+[18:29:32.0000] <ljharb>
+true. but I’d expect you to spread the original object, and overwrite what you wanted, rather than doing it one at a time
+
+[18:29:58.0000] <ljharb>
+either way tho, having an own undefined cause property, versus lacking one - when do you expect that to cause a problem for users doing this?
+
+[18:30:36.0000] <rkirsling>
+I don't, I just see no benefit to having a property descriptor get created
+
+[18:31:04.0000] <rkirsling>
+if there's not a precedent for it then it seems like taking conscious action where none was desired
+
+[18:31:54.0000] <ljharb>
+right, so for these users, no difference - but for users who do care, the presence or absence of a property descriptor actually communicates something useful.
+
+[18:33:02.0000] <ljharb>
+unfortunately since we decided not to do an internal slot and a prototype accessor, this kind of choice comes up, but i think matching own-ness between the options bag and the error instance is actually a useful property.
+
+[18:33:11.0000] <rkirsling>
+it shouldn't?
+
+[18:33:34.0000] <rkirsling>
+like, I would call it harmful if it's viewed as not extraneous but usable
+
+[18:33:39.0000] <rkirsling>
+it's undefined not null
+
+[18:34:08.0000] <ljharb>
+why is that different
+
+[18:34:11.0000] <ljharb>
+Both are explicit values
+
+[18:34:39.0000] <ljharb>
+the belief that one means “explicitly empty” and one means “never set” is decidedly not a universal one (optional chaining and nullish coalescing operate on both, because of this)
+
+[18:35:31.0000] <rkirsling>
+how are you seeing optional chaining and nullish coalescing as supporting your point
+
+[18:37:15.0000] <rkirsling>
+it is not expected for mere existence to affect anything but enumeration
+
+[18:37:44.0000] <rkirsling>
+a user has no other way to opt out using an object literal
+
+[18:39:42.0000] <rkirsling>
+anyway I am completely exhausted and I didn't come here to debate minutiae; it genuinely seems like a bug, if there's no precedent to say otherwise
+
+[18:39:49.0000] <rkirsling>
+people code in different ways
+
+[18:39:54.0000] <rkirsling>
+this is not expected behavior
+
+[18:41:57.0000] <ljharb>
+i hear that you don't expect it
+
+[18:41:59.0000] <ljharb>
+i very much do
+
+[18:42:16.0000] <ljharb>
+i write code all the time that checks hasOwnProperty
+
+[18:48:15.0000] <rkirsling>
+was this ever pointed out in committee?
+
+[18:48:57.0000] <rkirsling>
+like, if this is going to be the thing to set the precedent then having such a conversation seems like a stage 4 blocker
+
+[18:50:46.0000] <ljharb>
+hm, not sure. If we didn’t explicitly decide it tho then i don’t think it could be a binding precedent really. I’ll try and find something in the notes and repo tho
+
+[19:02:02.0000] <Bakkot>
+https://github.com/tc39/proposal-error-cause/pull/26#discussion_r583989100
+
+[19:02:09.0000] <Bakkot>
+rkirsling ljharb ^
+
+[19:03:31.0000] <Bakkot>
+and also https://github.com/tc39/proposal-error-cause/issues/2#issuecomment-789375512
+
+[19:07:12.0000] <rkirsling>
+wow
+
+[19:07:16.0000] <rkirsling>
+that is fascinatingly weird
+
+[19:09:20.0000] <rkirsling>
+but that rationale combined with the knowledge that shu also brought this up makes me somewhat less queasy
+
+[19:10:02.0000] <rkirsling>
+Bakkot: are you concerned with this setting a precedent for options bag options in general though, even though the motivation here has nothing to do with that?
+
+[19:10:13.0000] <Bakkot>
+no, not especially
+
+[19:10:18.0000] <rkirsling>
+okay
+
+[19:12:41.0000] <Bakkot>
+like temporal has a bunch of options-bag-like cases and they all just do `get`
+
+[19:12:47.0000] <Bakkot>
+e.g.
+
+[19:13:22.0000] <Bakkot>
+which is fine, because they are not in the situation that "undefined" is a sensible value for the option to take plus also having different behavior for presence and absence of the option
+
+[19:13:27.0000] <Bakkot>
+that's a fairly unique scenario
+
+[19:13:55.0000] <Bakkot>
+I do want it to serve as precedent for options bags which meet both of those criteria, because I think it's the right behavior there
+
+[19:19:15.0000] <rkirsling>
+hmm
+
+[19:19:28.0000] <rkirsling>
+can you envision another (hypothetical) example?
+
+[19:22:46.0000] <Bakkot>
+not off the top of my head
+
+[19:22:55.0000] <Bakkot>
+most places are at least a little bit typed
+
+[19:23:31.0000] <Bakkot>
+the only reason this one isn't is because it's intended for use with existing untyped syntax
+
+[19:23:40.0000] <Bakkot>
+(namely throw/catch)
+
+[19:32:06.0000] <rkirsling>
+fair enough
+
+[19:32:48.0000] <ljharb>
+Bakkot: thanks for finding that
+
+[19:34:08.0000] <ljharb>
+i do agree that when `undefined` isn't a reasonable real value for an option - which will be almost every other case - then it should just do a Get
+
+[08:17:38.0000] <shu>
+perhaps we should introduce a 3rd nullish type to mean absent
+
+[08:17:49.0000] <shu>
+we can even name it *empty* so it's easily confused with ~empty~ in the spec
+
+[08:18:24.0000] <ljharb>
+`nil`
+
+[08:19:22.0000] <shu>
+will there be a separate concept of "nilish" vs "nullish"?
+
+[08:19:51.0000] <shu>
+then we can extend the JS trinity diagram
+
+[08:21:03.0000] <ljharb>
+i am reminded of https://github.com/BrendanEich/nil (which brendan resurrected but didn't create)
+
+[08:22:51.0000] <shu>
+oh my goodness, that toString semantics
+
+[10:17:00.0000] <robpalme>
+could I get a blessing here plz https://github.com/tc39/notes/pull/123
+
+[10:53:26.0000] <akirose>
+robpalme: i have edits. should I open a PR on your fork's branch?
+
+[10:53:55.0000] <akirose>
+ljharb: don't merge yet! i mean, you can, but 👆
+
+[10:55:13.0000] <ljharb>
+nah was just stamping per request
+
+[10:55:33.0000] <ljharb>
+i'll let yall handle it
+
+[12:39:41.0000] <robpalme>
+I won't merge. Please use suggestions on the PR.
+
+
+2021-05-08
+[10:48:48.0000] <Bakkot>
+littledan: just to confirm, the function created for class field initializers isn't ever observable, right? (as in the value itself isn't touchable from JS, at least until we add decorators.) I'm adding a note to that effect and wanted to confirm.
+
+[12:33:33.0000] <gsathya>
+i hope not
+
+[12:33:46.0000] <gsathya>
+v8 doesn't even create most of these functions
+
+[12:37:21.0000] <ljharb>
+i'm pretty sure a major sticking point for implementations was that they aren't ever observable
+
+
+2021-05-11
+[04:15:17.0000] <ystartsev>
+test262.report should be back up
+
+[16:00:16.0000] <rkirsling>
+ystartsev: evidently not :(
+
+[16:01:22.0000] <rkirsling>
+are there any delegates here who would care to share info with me about how their org goes about sponsoring OSS projects?
+
+[16:01:55.0000] <rkirsling>
+we're kind of behind on that as an org and it would be useful to know what common practices are
+
+[16:02:32.0000] <rkirsling>
+feel free to reach out via DM, I guess 🙇‍♂️
+
+[16:15:03.0000] <ljharb>
+rkirsling: happy to set up a call any time
+
+[16:18:39.0000] <rkirsling>
+ljharb: cool, I may take you up on that
+
+
+2021-05-12
+[09:03:55.0000] <ljharb>
+bterlson: https://tcq.app/ has a pretty 403 page :-p
+
+[16:21:47.0000] <Bakkot>
+devsnek: what's the state of the spec text for iterator-helpers
+
+[16:22:04.0000] <Bakkot>
+michael says he's happy to present it if the spec text can be gotten to a good state
+
+[16:23:49.0000] <devsnek>
+mozilla has an unfinished pr i think
+
+[16:23:54.0000] <devsnek>
+that might've been an intern project
+
+[16:41:18.0000] <Bakkot>
+devsnek assuming you mean https://github.com/tc39/proposal-iterator-helpers/pull/112, that looks pretty dead; I assume the champions will need to pick it up
+
+
+2021-05-13
+[19:37:10.0000] <littledan>
+There's an incubator call tomorrow about module fragments. It'd be great to have you there. See more at https://github.com/tc39/Reflector/issues/371
+
+[16:52:41.0000] <leobalter>
+ljharb, littledan, gibson042: stage 3 review, please? https://github.com/tc39/proposal-symbols-as-weakmap-keys
+
+
+2021-05-14
+[06:28:41.0000] <devsnek>
+freenode seems to be imploding
+
+[06:29:07.0000] <devsnek>
+https://fuchsnet.ch/privat/fn-resign-letter.txt
+
+[09:44:21.0000] <ljharb>
+devsnek: apparently it's just a draft and it leaked, nothing's happened yet
+
+[09:45:43.0000] <devsnek>
+🤷🏻
+
+
+2021-05-15
+[17:20:29.0000] <shu>
+i'm looking at `await`-as-identifier rules in v8's implementation of static blocks and i'm kind of confused
+
+[17:21:01.0000] <shu>
+it seems like the intention was that `await` is allowed as an identifier in both named function expressions and named class expressions
+
+[17:21:37.0000] <shu>
+but |ClassExpression| has BindingIdentifier[?Await]
+
+[17:22:00.0000] <shu>
+|FunctionExpression| has BindingIdentifier[~Await]
+
+[17:25:06.0000] <shu>
+also |FunctionExpression| has FunctionParameters[~Await] while |ArrowFunction| has ArrowParameters[?Await]
+
+[17:52:47.0000] <Bakkot>
+so there's a couple things going on there
+
+[17:53:06.0000] <Bakkot>
+> `await` is allowed as an identifier in both named function expressions
+
+[17:53:11.0000] <Bakkot>
+true, because it's a function boundary
+
+[17:53:15.0000] <Bakkot>
+> and named class expressions
+
+[17:53:39.0000] <shu>
+oh, i think the spec has been updated since i last looked at it
+
+[17:53:47.0000] <Bakkot>
+no, class bodies inherit the ability to `await` from the surrounding environment - e.g. in a class within an async function, you can do `class { [await x](){} }` or whatever
+
+[17:53:49.0000] <shu>
+it's now specced as an [~Await] on every statement item
+
+[17:54:05.0000] <Bakkot>
+> also |FunctionExpression| has FunctionParameters[~Await] while |ArrowFunction| has ArrowParameters[?Await]
+
+[17:54:14.0000] <shu>
+sorry, i didn't mean as identifiers _inside_ class bodies, i meant as the names
+
+[17:55:05.0000] <Bakkot>
+the reason `ArrowParameters` has `?Await`, unlike `FunctionParameters`, is because of the cover grammar - you don't know you're parsing arrow parameters until you get to the end, and you don't want to have to go back and re-parse, so they're parsed with `?Await` and then there's an early error for arrow parameters containing AwaitExpression
+
+[17:55:29.0000] <shu>
+right
+
+[17:55:45.0000] <shu>
+i suspect the BindingIdentifier[?Await] for the named class expressions is a spec bug?
+
+[17:56:06.0000] <Bakkot>
+why would it be? class bodies inherit async-ness, no reason the name shouldn't
+
+[17:56:29.0000] <shu>
+i see, okay, so...
+
+[17:56:55.0000] <shu>
+if the intention is that static blocks be parsed like async function bodies for future-proofing await inside static blocks...
+
+[17:57:22.0000] <shu>
+then `(class await {})` should not be allowed, even though `(function await() {})` is?
+
+[17:58:03.0000] <Bakkot>
+> if the intention is that static blocks be parsed like async function bodies for future-proofing await inside static blocks
+
+[17:58:03.0000] <Bakkot>
+yup
+
+[17:58:07.0000] <Bakkot>
+> then `(class await {})` should not be allowed, even though `(function await() {})` is?
+
+[17:58:10.0000] <Bakkot>
+that's my intuition, yes
+
+[17:58:23.0000] <Bakkot>
+(assuming you are in an async context for both those last code snippets)
+
+[17:59:10.0000] <shu>
+now, `async function f() { ((await)=>1); }` doesn't parse, right? that is, `await` is not parsed as identifiers for arrow function parameters inside async function bodies?
+
+[17:59:31.0000] <Bakkot>
+correct
+
+[17:59:36.0000] <Bakkot>
+because `ArrowParameters` has `?Await`
+
+[17:59:40.0000] <shu>
+right, exactly
+
+[18:00:11.0000] <shu>
+okay, then i think some of these test262 tests are wrong, as are some items in https://github.com/tc39/proposal-class-static-block/issues/43#issuecomment-812224819
+
+[18:00:18.0000] <shu>
+but this is all good news
+
+[18:00:30.0000] <shu>
+i am very much against a _new_ kind of context for determining where awaits are allowed as identifiers
+
+[18:00:57.0000] <shu>
+and static block == async function body is eminently workable
+
+[18:01:31.0000] <Bakkot>
+yeah I see that comment has `(class await {}); // legal`, which is wrong
+
+[18:02:28.0000] <Bakkot>
+otherwise I think it is correct
+
+[18:04:27.0000] <shu>
+yeah, ron's example doesn't have arrow params, https://github.com/tc39/test262/pull/2968#pullrequestreview-660291176 does unfortunately
+
+[18:04:34.0000] <Bakkot>
+oh, the next comment in that thread calls out that discrepancy, I see
+
+[18:04:37.0000] <shu>
+but not merged yet! so still time
+
+[18:05:43.0000] <shu>
+anyway i think the constraint must be "parsing `await` inside static blocks as you would inside async function bodies"
+
+[18:07:06.0000] <Bakkot>
+yeah
+
+[18:07:20.0000] <Bakkot>
+I really want it to be specified that way: https://github.com/tc39/proposal-class-static-block/issues/27#issuecomment-724955380
+
+[18:07:25.0000] <Bakkot>
+but that is not how it is currently written
+
+[18:09:08.0000] <shu>
+yeah, definitely +1 from me now for that approach after trying to understand these tests
+
+[18:17:42.0000] <Bakkot>
+I really ought to have insisted on it for stage 3
+
+[18:17:56.0000] <Bakkot>
+I would've if I'd remembered how many edge cases there are, with arrow parameters and so on
+
+
+2021-05-19
+[06:06:19.0000] <devsnek>
+ljharb: looks like it came to pass lol
+
+[06:23:24.0000] <ryzokuken>
+Freenode is in a little trouble if you all missed the notice
+
+[06:23:29.0000] <ryzokuken>
+https://www.kline.sh/
+
+[06:24:08.0000] <ryzokuken>
+https://gist.github.com/shadowcat-mst/998cea12794768bdb3da2daeff31baad
+
+[07:23:10.0000] <ljharb>
+it’s still not clear it’ll have any impact on anyone outside of the #freenode channel, but yeah it doesn’t look good
+
+[07:23:41.0000] <ryzokuken>
+well, it's still a different, likely malicious management
+
+[07:25:36.0000] <ljharb>
+it’s unclear if that’s FUD or not, and also if that will have any material impact. When it does, we’d of course have to react to it.
+
+[07:26:31.0000] <devsnek>
+why don't we just use imessage
+
+[07:27:11.0000] <ryzokuken>
+devsnek: should I give my reason or will you try to guess it? :P
+
+[07:27:35.0000] <devsnek>
+lol
+
+[08:35:16.0000] <ystartsev>
+This is a pretty shit situation
+
+[09:07:22.0000] <Bakkot>
+if only there were an irc server operated by an OSS web browser company we could migrate to
+
+[09:07:33.0000] <Bakkot>
+poor irc.mozilla.org, we hardly knew ye
+
+[09:07:42.0000] <devsnek>
+big f
+
+[09:07:44.0000] <ljharb>
+too soon
+
+[09:08:19.0000] <akirose>
+F
+
+[09:09:42.0000] <akirose>
+As discussed in the back channel, we’re already established on Matrix and will at bare minimum maintain a squatting presence on Libera as we figure out what our formal plan forward is
+
+[09:10:50.0000] <akirose>
+I’m in meetings all day but will try to get with the folks who have already grabbed the namespaced tc39 channels on libera and arrange the same structure we have here
+
+[09:13:52.0000] <shu>
+akirose: worth adding an agenda item to broadcast the decision when chair group decides
+
+[09:15:15.0000] <ljharb>
+akirose: looks like the tc39-* channels are already reserved, but they're not doing project registrations yet
+
+[09:15:27.0000] <ljharb>
+akirose: but mathias has ops so he's the one that can manage them/delegate in the meantime
+
+[09:16:27.0000] <ljharb>
+(it would also be wise for people to PM another tc39 person on freenode, from their regged account, with their libera reg name, to ensure they're the same person, so they can be vouched for)
+
+[09:22:53.0000] <ystartsev>
+Bakkot: *sob*
+
+[09:34:08.0000] <akirose>
+ystartsev Bakkot +1 😭
+
+[10:10:25.0000] <TabAtkins>
+Just for verification, I'm on libera now with the same name.
+
+[10:20:50.0000] <ljharb>
+(as am i)
+
+[10:30:03.0000] <akirose>
+what's the main libera irc:// url?
+
+[10:35:51.0000] <ljharb>
+akirose: irc.libera.chat:6697
+
+[10:40:53.0000] <mpcsh>
+for context for anyone who'd like to read, here's the current proposal to move to Matrix from the inclusion group: https://github.com/tc39/Admin-and-Business/issues/142
+
+[10:41:16.0000] <mpcsh>
+also, for verification, I'm now registered with libera's nickserv as `mpcsh` (same as here)
+
+[10:44:12.0000] <akirose>
+freenode akirose -> libera akirose
+
+[10:57:41.0000] <devsnek>
+libera snek
+
+[11:04:44.0000] <ystartsev>
+freenode ystartsev -> libera yulia/ystartsev
+
+[11:07:56.0000] <ljharb>
+ystartsev: which is the account?
+
+[11:15:18.0000] <ystartsev>
+yulia
+
+[11:18:52.0000] <ljharb>
+kk ty
+
+[11:55:55.0000] <rkirsling>
+irccloud doesn't seem to like libera?
+
+[11:56:15.0000] <mpcsh>
+rkirsling: it worked for me - dming
+
+[11:56:24.0000] <rkirsling>
+alrighty
+
+[11:59:42.0000] <mpcsh>
+for anyone else who might have that problem, looks like the solution is to use irccloud's "add a network" button, and just type in "libera", and it'll autocomplete
+
+[11:59:42.0000] <rkirsling>
+Mark helped me out; I didn't have the Secure checkbox checked for whatever reason
+
+[11:59:46.0000] <rkirsling>
+^
+
+[11:59:47.0000] <mpcsh>
+jinx
+
+[11:59:50.0000] <mpcsh>
+:D
+
+[11:59:57.0000] <rkirsling>
+I am indeed rkirsling over there too
+
+
+2021-05-20
+[01:30:16.0000] <robpalme>
+freenode robpalme -> libera robpalme
+
+[01:32:52.0000] <haxjs>
+It seems tcq.app is down?
+
+[02:08:28.0000] <robpalme>
+yes, it's down for me.  thanks for pointing it out.  i will speak to Brian
+
+[12:03:50.0000] <leobalter>
+robpalme: my manager wants to attend this specific TC39 meeting just for the Realms topic. Do we still require a complete registration in Admin-and-Business?
+
+[12:06:12.0000] <robpalme>
+For observers (that will not speak) sponsored by a member company, you just need to notify the chairs and announce it on the Reflector meeting post. See Yulia's post on the previous meeting.
+
+[12:06:28.0000] <leobalter>
+that's great, thank you!
+
+[14:29:24.0000] <akirose>
+also they still need to fill out attendance form
+
+[15:15:48.0000] <rickbutton>
+is Function(...) the only way to create a sloppy function from strict mode?
+
+[15:17:01.0000] <ljharb>
+rickbutton: `eval()` probably, but yeah basically
+
+[15:17:13.0000] <ljharb>
+rickbutton: also AsyncFunction, GeneratorFunction, AsyncGeneratorFunction
+
+[15:17:16.0000] <rickbutton>
+direct eval copies outer scope strictness?
+
+[15:17:24.0000] <rickbutton>
+and yeah the other Function constructors
+
+[15:17:28.0000] <ljharb>
+oh hm
+
+[15:17:32.0000] <rickbutton>
+im not sure actually
+
+[15:18:23.0000] <rickbutton>
+https://tc39.es/ecma262/#sec-performeval
+
+[15:18:28.0000] <rickbutton>
+strictCaller -> strictEval
+
+[15:18:39.0000] <rickbutton>
+presumably an indirect eval does not do this
+
+[15:19:06.0000] <ljharb>
+rickbutton: `'use strict'; (0,eval)('() => { with ({}) {} }')` works, direct eval throws
+
+[15:19:18.0000] <rickbutton>
+woo
+
+[15:19:19.0000] <rickbutton>
+thanks
+
+[15:19:45.0000] <ljharb>
+dare i ask :-p
+
+[15:20:33.0000] <rickbutton>
+im in hell
+
+[15:20:34.0000] <rickbutton>
+thats why
+
+[15:20:36.0000] <rickbutton>
+hahaha
+
+[15:21:32.0000] <ljharb>
+lol
+
+
+2021-05-21
+[12:35:03.0000] <leobalter>
+ystartsev hi! https://github.com/tc39/proposal-realms/issues/312 I hope we can eventually talk more about this and how this could be done
+
+
+2021-05-22
+[08:19:18.0000] <devsnek>
+sooner than I expected https://www.devever.net/~hl/freenode_abuse
+
+[10:04:52.0000] <ystartsev>
+leobalter: sure -- ill be off till tuesday but let's discuss it then
+
+[10:05:08.0000] <ystartsev>
+basically: we want to audit all of them and collect those present in all environments
+
+[11:00:33.0000] <ystartsev>
+devsnek: i think we need to make a move
+
+[11:08:48.0000] <devsnek>
+if we're gonna move
+
+[11:08:51.0000] <devsnek>
+i wouldn't be against leaving irc
+
+[11:09:03.0000] <devsnek>
+though i'm not a huge fan of matrix
+
+[11:17:51.0000] <ljharb>
+it's a much smaller change to go from one irc network to another, especially since all the chanserv/nickserv stuff is basically identical
+
+[13:22:00.0000] <devsnek>
+I'm not sure aiming for the smallest change is the inherent goal here
+
+[13:22:52.0000] <ljharb>
+is there really a "goal" here at all? we're just reacting to a change
+
+[13:43:33.0000] <rkirsling>
+I mean folks have been seeking to move to Matrix anyway and the primary force against it was inertia so
+
+[13:43:53.0000] <rkirsling>
+this definitely reduces inertia
+
+[13:46:01.0000] <ljharb>
+that is true
+
+
+2021-05-24
+[10:44:00.0000] <ljharb>
+does ecma's website not list members anymore?
+
+[10:45:18.0000] <rkirsling>
+https://www.ecma-international.org/about-ecma/members/
+
+[10:59:28.0000] <ljharb>
+rkirsling: thanks, where did you find that link?
+
+[11:11:33.0000] <rkirsling>
+just from the site header
+
+[11:11:54.0000] <ljharb>
+ahh not sure how i missed it, thanks
+
+[11:14:10.0000] <rkirsling>
+no prob :)
+
+[15:14:06.0000] <rickbutton>
+a curious history question: why does for/of only accept AssignmentExpressions on the rhs instead of just Expression?
+
+[15:14:55.0000] <rickbutton>
+(as opposed to for/in, which allows Expression)
+
+[16:17:33.0000] <rkirsling>
+oh god
+
+[16:17:42.0000] <rkirsling>
+it's because `for (x in 0, [1,2,3])` is valid
+
+[16:17:50.0000] <rkirsling>
+horrifying.
+
+[16:18:02.0000] <ljharb>
+ew
+
+
+2021-05-25
+[17:16:34.0000] <shu>
+sick
+
+[17:25:55.0000] <rickbutton>
+gotcha, it wasn't a impl or static analysis concern but a this syntax is gross concern
+
+[17:39:43.0000] <rkirsling>
+the funny thing is that while I'm glad `for (x of 0, [1,2,3])` is not valid, it actually seems less confusing since `of` isn't just usable in any old expression
+
+[09:55:22.0000] <ljharb>
+ooh, official jitsi app
+
+[10:11:35.0000] <rickbutton>
+jitsi iphone app works great
+
+[10:23:30.0000] <haxjs>
+I can't attend the meeting  because I have some health issue recent days and doctors warn me not burn the midnight oil (it's my 1:20AM now). I raised an issue about top-level await (https://github.com/tc39/proposal-top-level-await/issues/182 ), and hope the committee could at least aware that. Thank you.
+
+[10:24:00.0000] <ljharb>
+haxjs: i'll make sure it's brought up
+
+[10:59:06.0000] <akirose>
+TC39 beta "space" (more slack-/discord-like) link: https://matrix.to/#/!hmsRHUEXriRovkvcin:matrix.org?via=matrix.org&via=igalia.com&via=mozilla.org
+
+[14:02:54.0000] <rickbutton>
+question about strict mode and Function.prototype.arguments. `arguments` getter is `ThrowTypeError` for strict mode functions, does `Function.prototype` exotic-function-object count as a strict mode function?
+
+[14:07:09.0000] <rickbutton>
+ah, if I am correct, the answer lies in https://tc39.es/ecma262/#sec-createintrinsics, step 4 implies that Function.prototype has throwing versions of those properties defined on them explicitly, so it doesn't matter whether or not a "built-in" exotic-function-object `Function.prototype` is strict or not
+
+[14:07:13.0000] <ljharb>
+rickbutton: i mean, `Function.prototype.arguments` throws
+
+[14:07:23.0000] <ljharb>
+yes
+
+[14:07:43.0000] <rickbutton>
+awesome thanks for the gut check
+

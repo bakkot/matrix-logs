@@ -1,0 +1,1420 @@
+2019-09-01
+[18:16:20.0000] <domfarolino>
+annevk: I see, so it would just be an origin whose components are all the empty string?
+
+[18:17:27.0000] <domfarolino>
+(By the time main fetch is reached)
+
+[18:20:35.0000] <domfarolino>
+If that's the case, it sounds like a user-initiated navigation request would not be considered "same-origin" by the definition in https://www.w3.org/TR/referrer-policy/#same-origin-request, does that seem right?
+
+[18:22:02.0000] <domfarolino>
+(or more generally, any definition I guess)
+
+[21:08:06.0000] <annevk>
+domfarolino: maybe, I might have missed something
+
+
+2019-09-02
+[02:53:28.0000] <JakeA>
+TabAtkins: What's the correct bikeshed shorthand to link to an html attribute with custom link text & no monospace? My best guess was [=iframe/sandbox!!element-attr|Sandboxed=], but that doesn't work
+
+[11:33:25.0000] <smaug____>
+annevk: I've asked this before, but perhaps tooling has changed or so: how do you review spec changes?
+
+[11:33:40.0000] <smaug____>
+just by looking at the source code?
+
+[11:33:43.0000] <smaug____>
+(patch)
+
+[11:36:01.0000] <smaug____>
+or perhaps there is some documentation? "best practices for spec reviewing"
+
+[12:30:13.0000] <annevk>
+smaug____: WHATWG PRs have two links at the bottom of OP
+
+[12:31:10.0000] <annevk>
+smaug____: I personally read the source diff though most of the time, but sometimes the rendered one for additional insight
+
+[13:02:49.0000] <smaug____>
+annevk: and do you review all the links etc that they working correctly?
+
+[13:03:40.0000] <smaug____>
+or do we trust some tools to detect such
+
+
+2019-09-03
+[22:53:02.0000] <annevk>
+smaug____: I trust tools for WHATWG, except for some things in HTML, though you will need to verify it’s the correct variant, eg, origin or URL’s origin
+
+[22:53:52.0000] <annevk>
+Harder to have tooling for that
+
+[02:52:31.0000] <zcorpan>
+MikeSmith: https://checker.html5.org gives me 502 Bad Gateway
+
+[09:48:29.0000] <devsnek>
+is this one of those things w3 came up with without asking anyone if they would actually implement it https://www.w3.org/TR/tcp-udp-sockets/
+
+[10:59:15.0000] <gsnedders>
+devsnek: I mean really the W3C doesn't really come up with stuff, members come forward with proposals for work and if members want to work on something and provide resources to work on something, a spec may get written
+
+[10:59:45.0000] <devsnek>
+yeah i meant the humans at w3c
+
+[11:23:28.0000] <TabAtkins>
+JakeA: No monospace? Then you just want to do an <a> to avoid the additional styling. (And, hm, it might still get hit with the default styling...) Anyway, try <a element-attr for=iframe lt=sandbox>Sandboxed</a>.
+
+[11:24:19.0000] <TabAtkins>
+(Using [==] didn't work because that gives you the "dfn" type, and you can only use a manual type specifier to narrow down a wide shorthand type, not switch to something totally different.)
+
+
+2019-09-04
+[19:14:45.0000] <devsnek>
+how come browsers still add new history entries with replaceState?
+
+[00:55:30.0000] <annevk>
+gsnedders: well, W3C still enabled them to do so; I feel like that line of reasoning is too often used to absolve the W3C, which certainly carries a certain amount of authority and power on its own
+
+[02:26:40.0000] <Ms2ger>
+annevk, is https://infra.spec.whatwg.org/#list-contain supposed to be used with an item or an index?
+
+[02:55:53.0000] <hsivonen>
+annevk: Do we care if TextEncoder.encodeInto() can throw on OOM after already having written something to the provided buffer?
+
+[02:57:00.0000] <hsivonen>
+annevk: OOM can occur due to JS engine-internal bookkeeping when the input string is a rope
+
+[02:57:43.0000] <hsivonen>
+annevk: I _could_ make it so that all memory is allocated up front and OOM is thrown before anything is written, but that would be a tiny bit slower for the non-OOM case
+
+[03:00:59.0000] <hsivonen>
+how recoverable are OOM exceptions in JS anyway?
+
+[03:02:28.0000] <annevk>
+Ms2ger: either I think
+
+[03:03:09.0000] <annevk>
+hsivonen: JS OOM is undefined behavior unfortunately
+
+[03:03:39.0000] <hsivonen>
+annevk: not in the C sense, I hope
+
+[03:03:44.0000] <annevk>
+hsivonen: there’ve arguments that it should crash the agent cluster
+
+[03:04:10.0000] <hsivonen>
+annevk: I guess that means that it's OK to have written something in the buffer then
+
+[03:04:55.0000] <annevk>
+hsivonen: until OOM is defined, yes
+
+[03:05:00.0000] <hsivonen>
+annevk: thanks
+
+[05:35:23.0000] <gsnedders>
+hsivonen: OOM exceptions are… sometimes recoverable in JS?
+
+[05:35:38.0000] <gsnedders>
+hsivonen: normally with things that allocate big chunks
+
+[05:36:10.0000] <gsnedders>
+Things that cause smaller allocs should in theory be recoverable in all major VMs, AFAIK, but then you get into rarely tested OOM branches.
+
+[05:37:23.0000] <gsnedders>
+hsivonen: in general things like  TextEncoder.encodeInto() are kinda undefined if they OOM during the operation
+
+[06:06:20.0000] <hsivonen>
+gsnedders: OK. In this case, chances are the OOMing allocation would not necessarily be huge. could be 128*sizeof(void*) or any double of that
+
+[06:06:59.0000] <gsnedders>
+hsivonen: yeah, I wouldn't worry too much about behaviour in that case provided it is safe
+
+[07:34:03.0000] <JakeA>
+TabAtkins: ta, that worked
+
+[14:25:04.0000] <zcorpan>
+MikeSmith: "From the W3C specification for the Anchor tag:" https://www.bennadel.com/blog/3693-anchor-tags-can-contain-block-level-elements-as-of-html5.htm
+
+[14:25:19.0000] <zcorpan>
+points to http://w3c.github.io/html-reference/a.html#a-changes
+
+[14:26:23.0000] <zcorpan>
+maybe that needs a warning banner
+
+[14:54:51.0000] <MikeSmith>
+zcorpan: I thought I had already set up a redirect for that..
+
+[14:55:15.0000] <zcorpan>
+MikeSmith: the w3.org url redirects. not the w3c.github.io
+
+[14:55:25.0000] <MikeSmith>
+Ok
+
+[14:55:38.0000] <MikeSmith>
+I'll fix it today
+
+
+2019-09-05
+[18:50:12.0000] <Domenic>
+<3
+
+[06:16:17.0000] <Ms2ger>
+Is the code behind whatpr somewhere?
+
+[06:37:28.0000] <Domenic>
+Ms2ger: Thoughts on pushing this to next week, when I'm in Tokyo? (Thursday or Friday.) Still happy to meet if there's something specific to touch base on.
+
+[06:37:30.0000] <Domenic>
+Er
+
+[06:37:34.0000] <Domenic>
+Wrong copy and paste
+
+[06:37:39.0000] <Domenic>
+Ms2ger: https://github.com/tobie/pr-preview/
+
+[06:38:06.0000] <Ms2ger>
+I see, thanks
+
+[10:25:22.0000] <devsnek>
+does anyone know of a tool to get the diff of two html documents? all i've found is a 7 year old python library that can't handle input outside the ascii range
+
+[10:40:47.0000] <Domenic>
+devsnek: we use https://services.w3.org/htmldiff for WHATWG pull requests. I think it is backed by some perl script. It is not perfect; in particular it introduces whitespace in weird places. But it seems OK. Sample: https://whatpr.org/html/4796/2a397f6...99c8181/interaction.html (press "j" on keyboard to jump to first diff).
+
+[10:41:29.0000] <devsnek>
+lol y'all already made everything i'm trying to make for ecma262
+
+[10:42:47.0000] <devsnek>
+hmm i caused an internal service error
+
+[10:42:51.0000] <devsnek>
+is ecma262 too big
+
+[10:44:31.0000] <nitind>
+Like a structural diff?
+
+[10:44:47.0000] <devsnek>
+nitind: yes
+
+[10:45:14.0000] <devsnek>
+the second link that domenic posted is pretty much exactly what i'm trying to do
+
+[10:46:38.0000] <Domenic>
+devsnek: be sure to check out https://github.com/tobie/pr-preview/
+
+[10:47:01.0000] <devsnek>
+well i tried this https://services.w3.org/htmldiff?doc1=https%3A%2F%2Fecma262-snapshots.netlify.com%2F&doc2=https%3A%2F%2Fdeploy-preview-1685--ecma262-snapshots.netlify.com%2F
+
+[10:47:09.0000] <devsnek>
+it just dies
+
+[10:47:15.0000] <devsnek>
+probably because each document is like 8M
+
+[14:30:17.0000] <dtapuska>
+annevk, Domenic: Just wanted to ping this https://github.com/whatwg/html/pull/4617 before I head out for the day, perhaps you can look tomorrow
+
+[15:12:23.0000] <Domenic>
+dtapuska: Yeah, I really should, sorry about that. I think annevk is on vacation, but it's so close.
+
+[16:40:49.0000] <devsnek>
+Domenic: so is this intended or is htmldiff.pl having a hard time with ecma262 https://gc.gy/35431835.png
+
+
+2019-09-06
+[19:34:18.0000] <Domenic>
+devsnek: that looks about like what I'd expect.
+
+[20:05:39.0000] <devsnek>
+👍
+
+[06:08:30.0000] <domfarolino>
+Can't remember, are we doing flags or booleans these days?
+
+[06:10:45.0000] <domfarolino>
+(nvm, looks like bools)
+
+[06:25:47.0000] <domfarolino>
+annevk: Question about the lazyloading PR: IIRC, you want to enter the navigation steps synchronously, and when the steps go in parallel, if the navigation should happen "lazily", wait for the iframe to intersect the viewport etc
+
+[06:27:38.0000] <domfarolino>
+annevk: Can we wait for the intersection of an element while in-parallel?
+
+[06:28:25.0000] <domfarolino>
+annevk: Also, I'm not sure if we can refer to the "iframe element" that caused the navigation, from the navigation steps
+
+[15:59:40.0000] <jugglinmike>
+JakeA: just landed--link to the docs at the top of the website and readme https://web-platform-tests.org/
+
+[16:00:36.0000] <jugglinmike>
+which is a little redundant in that context
+
+[16:00:44.0000] <jugglinmike>
+but it works better here https://github.com/web-platform-tests/wpt/blob/master/README.md
+
+
+2019-09-07
+[00:45:17.0000] <JakeA>
+jugglinmike: yay! Cheers
+
+
+2019-09-11
+[07:36:01.0000] <annevk>
+Domenic: I found out today Fetch uses "promise-calling" for some ReadableStream stuff
+
+[07:36:08.0000] <annevk>
+Domenic: is there a quick fix?
+
+[07:36:20.0000] <annevk>
+Domenic: in https://fetch.spec.whatwg.org/#concept-construct-readablestream
+
+[07:39:18.0000] <Domenic>
+annevk: pretend you're given Web IDL callbacks instead of JS functions and use "invoke"
+
+[07:40:25.0000] <annevk>
+Domenic: and define the whole wrapper myself?
+
+[07:40:43.0000] <annevk>
+Domenic: nobody else needs the return value of a callback wrapped in a promise?
+
+[07:40:51.0000] <Domenic>
+What wrapper?
+
+[07:40:58.0000] <Domenic>
+Invoke returns a promise
+
+[07:41:44.0000] <annevk>
+Oh, there's another invoke
+
+[07:42:12.0000] <annevk>
+/me doesn't see it
+
+[07:44:56.0000] <Domenic>
+https://heycam.github.io/webidl/#es-invoking-callback-functions step 14
+
+[08:04:28.0000] <annevk>
+Domenic: ah so an IDL promise returning callback, interesting
+
+[08:11:08.0000] <annevk>
+Still seems like a bit of boilerplate but likely okay…
+
+[13:51:53.0000] <jyasskin>
+annevk/Domenic: I'm going to send you a User Agent definition some time in the next week. Do you have any further preference between Infra and HTML?
+
+
+2019-09-12
+[17:27:24.0000] <Domenic>
+Nothing really further... It just feels more like HTML, i.e. the core of the browser, than Infra, i.e. how to write specs.
+
+[18:22:26.0000] <Jessidhia>
+these substeps of step 14 look... scary, tbh
+
+[18:22:53.0000] <Jessidhia>
+maybe it makes sense in the context of an internal browser implementation, but these semantics have the infamous "zalgo problem"
+
+[18:22:55.0000] <Jessidhia>
+3. If completion is a normal completion, return completion.
+
+[18:22:55.0000] <Jessidhia>
+4. If completion is an abrupt completion and the callback function has a return type that is not a promise type, return completion.
+
+[18:22:55.0000] <Jessidhia>
+5. Let rejectedPromise be ! Call(%Promise_reject%, %Promise%, «completion.[[Value]]»).
+
+[18:22:55.0000] <Jessidhia>
+6. Return the result of converting rejectedPromise to the callback function’s return type.
+
+[19:35:08.0000] <Domenic>
+Jessidhia: they do not. This is just spec-ese for writing `try { steps() } catch (e) { return PRomise.reject(e); }`
+
+[19:39:03.0000] <Jessidhia>
+4. returns the abrupt completion before reaching the step where %Promise_reject% is invoked
+
+[19:40:54.0000] <Jessidhia>
+also, if there is a normal completion, it returns the completion as-is, without using the Promise capability to ensure the result is a Promise
+
+[19:41:32.0000] <Domenic>
+Yes, true, it does not return a promise if the operation is not promise-returning.
+
+[19:41:39.0000] <Domenic>
+This is as intended.
+
+[19:41:49.0000] <Domenic>
+Not all functions return promises.
+
+[19:49:21.0000] <Jessidhia>
+yeah, it just gets into that scary "this returns a Promise / is asynchronous but _only sometimes_" territory for which the Zalgo problem was named
+
+[19:52:15.0000] <Domenic>
+The same function will always return a promise, or always not return a promise. It is declared in the return type.
+
+[19:52:28.0000] <Domenic>
+This algorithm works on any declaration, but any given declaration will always behave the same.
+
+[19:53:35.0000] <Jessidhia>
+ah, right, this calls IDL functions which have a type declaration
+
+[21:01:31.0000] <annevk>
+Domenic: jyasskin: I think Infra as we should allow for user agents that implement URL, but not much other WHATWG standards; making it about browsers excludes too much.
+
+[21:56:24.0000] <Domenic>
+Hmm are those user agents? Like I don't think of Node or PHP as a user AGENT.
+
+[21:56:41.0000] <Domenic>
+(that was accidental caps, not purposeful emphasis)
+
+[22:52:41.0000] <annevk>
+They are traditionally, afaik
+
+[22:53:58.0000] <annevk>
+And would match the way we use the term, otherwise we ought to use some other term most of the time
+
+[23:51:20.0000] <JakeA>
+annevk: The service worker working group is on Monday. Are there particular parts of the day you'll be there? There's a couple of things that could do with your input, but happy to schedule around you
+
+[00:09:23.0000] <annevk>
+JakeA: I have something at 10:15-10:45 and there's an a11y thing or two zcorpan would know about, so there's definitely time somewhere
+
+[00:09:36.0000] <JakeA>
+taa
+
+[03:59:07.0000] <hsivonen>
+annevk: OTOH, it's easier to deal with naysaying the WHATWG specs are positioned as attempting to be normative over browsers and other kinds of software may be written to match if they care to interoperate
+
+[03:59:27.0000] <hsivonen>
+s/naysaying the/naysaying if the/
+
+[04:01:03.0000] <hsivonen>
+annevk: see e.g. http://www.open-std.org/pipermail/unicode/2019-August/000574.html
+
+[04:33:40.0000] <domfarolino>
+zcorpan: Just to be clear about your latest lazyload review, you're saying even disconnected images with `loading=lazy` specified would still load eagerly, right?
+
+[04:34:05.0000] <domfarolino>
+If that's what you mean, then I agree, the latest changes seem to overlook this
+
+[04:34:28.0000] <zcorpan>
+domfarolino: as specified that would happen, yes, afaict
+
+[04:34:38.0000] <domfarolino>
+zcorpan: Cool thanks, I'll address
+
+[04:34:48.0000] <zcorpan>
+nice!
+
+[04:50:13.0000] <annevk>
+hsivonen: it's tricky, as it does seem somewhat harmful for web-consuming software to not use the URL Standard as a reference
+
+[04:50:21.0000] <annevk>
+hsivonen: e.g., curl comes to mind
+
+[05:17:32.0000] <annevk>
+/me wonders when issues Domenic files will reach epic poem length
+
+[05:31:03.0000] <zcorpan>
+annevk: maybe should apply https://twitter.com/catherineols/status/1171503961662087169 to Domenic's issues
+
+[05:31:33.0000] <annevk>
+heh
+
+[05:41:22.0000] <annevk>
+Where's Ms2ger?
+
+[05:41:41.0000] <annevk>
+zcorpan: btw, while you're here, are we meeting Monday and on what times?
+
+[05:46:30.0000] <zcorpan>
+annevk: I haven't heard back yet. Pinged my email thread. I suggested 2pm Monday now
+
+[09:55:23.0000] <annevk>
+Domenic: for custom element ARIA role/states, what's the plan for built-ins?
+
+[09:55:32.0000] <annevk>
+Domenic: customized built-ins, in particular
+
+[11:28:46.0000] <jyasskin>
+annevk/Domenic: https://url.spec.whatwg.org/#writing does use "user agent", so I'll go for Infra: https://github.com/whatwg/infra/pull/269.
+
+[16:49:34.0000] <Domenic>
+annevk: IIRC attachInternals() throws for customized built-ins
+
+[16:50:04.0000] <Domenic>
+I think it could be made to work, with extra effort, but the demand is unclear.
+
+
+2019-09-13
+[21:12:16.0000] <annevk>
+Aah right, cool
+
+[00:10:32.0000] <annevk>
+Domenic: did you see https://github.com/whatwg/fetch/pull/937?
+
+[00:57:17.0000] <hsivonen>
+annevk: I agree that it's harmful for Web content-consuming software not to implement the WHATWG specs. It's just that not trying to push too hard on that point focuses energy more productively.
+
+[01:12:56.0000] <Domenic>
+annevk: thanks for the ping
+
+[03:38:13.0000] <littledan>
+annevk: Ms2ger is out for a few days
+
+[03:56:48.0000] <annevk>
+littledan: is Ms2ger there next week? You?
+
+[03:57:37.0000] <littledan>
+annevk: Oh, physically, in TPAC? No, neither of us is coming
+
+[03:57:52.0000] <littledan>
+Joyee Cheung and Brian Kardell from my team will be there, as well as many other Igalians
+
+[03:58:33.0000] <littledan>
+Joyee has been looking at using generated WebIDL bindings and web-platform-tests in Node.js, but isn't editing the WebIDL spec
+
+[03:59:08.0000] <littledan>
+annevk: Is there anything in particular you wanted to discuss at TPAC?
+
+[04:02:48.0000] <annevk>
+littledan: I wanted to say hi 😃
+
+[04:03:13.0000] <littledan>
+:) hi
+
+
+2019-09-15
+[22:56:06.0000] <zcorpan>
+y'all may be interested in https://github.com/w3c/modern-tooling/issues/85 ("Help with filing issues for browser engines for a given spec change")
+
+
+2019-09-16
+[19:15:00.0000] <Domenic>
+annevk: I suspect it's the /? that allows an optional /
+
+[19:49:49.0000] <annevk>
+zcorpan: so there’s also Web Components at 2pm with ARIA?
+
+[19:51:07.0000] <zcorpan>
+annevk: is there?
+
+[19:53:42.0000] <travisleithead>
+So... HTML has the 'pattern' attribute... Does that solution to pattern matching work for developers?
+
+[20:13:23.0000] <annevk>
+travisleithead: it creates really poor error messages for users of forms
+
+[20:13:52.0000] <annevk>
+zcorpan: I thought so
+
+[20:17:51.0000] <travisleithead>
+Yes, describing why the match failed is really hard with Regex, and then even harder to express to users.
+
+[20:19:21.0000] <travisleithead>
+These 'just throw' cases seem just as troubling...
+
+[21:28:13.0000] <Mek>
+hmm, bikeshed is non-deterministically seg-faulting on me... i.e. about half the time I run it (without making any changes) it segfaults before it finished processing...
+
+[21:38:10.0000] <Mek>
+(hah, segfaulting within libxml2...)
+
+[21:41:59.0000] <TabAtkins>
+Mek: Hm, that happened a bit ago with a particular libxml2 version, but they fixed the bug and my version anchoring should be preventing you from installing that version...
+
+[21:42:14.0000] <TabAtkins>
+If it's some new bullshit tho, I'd love to know.
+
+[21:42:24.0000] <Mek>
+how would version anchoring have anything to do with whatever version glinux installs?
+
+[21:42:48.0000] <Mek>
+i.e. it's using the libxml2 version that comes with glinux
+
+[21:50:35.0000] <TabAtkins>
+Mek: Ah, I mean lxml, not libxml. If you followed the instructions as written in the docs, `pip install` should be grabbing a good version.
+
+[21:51:15.0000] <Mek>
+I don't remember how I installed this, it seems to be using the system version of python-lxml as well, so probably not the way I was supposed to do things
+
+[21:51:26.0000] <TabAtkins>
+hehe, probably
+
+[21:53:17.0000] <Mek>
+yep, thanks. Re-running pip install seems to have fixed things
+
+[21:53:32.0000] <TabAtkins>
+Nice.
+
+[21:54:19.0000] <TabAtkins>
+Quite curious that it was non-deterministic, tho. The problem before was due to a specific issue with moving subtrees around the document, and that should be deterministic. But oh well.
+
+[21:55:28.0000] <zcorpan>
+annevk: ah yes, ok. 14:30 is html/aria
+
+[22:00:03.0000] <Mek>
+https://pastebin.com/zFqkfYsS was where it was crashing fwiw
+
+[22:09:44.0000] <TabAtkins>
+Ah yeah, that's the same issue, the old problem was exercised by my IDL tests too.
+
+[22:12:14.0000] <TabAtkins>
+https://pypi.org/project/lxml/4.3.2/ release notes talk about the bug ^^;
+
+[22:26:27.0000] <zcorpan>
+annevk: Domenic: reminder for html/aria
+
+[22:26:53.0000] <Domenic>
+Thanks, on my way
+
+[23:20:38.0000] <JakeA>
+Domenic: would you like to talk about top level await in service workers?
+
+[23:29:22.0000] <Domenic>
+JakeA: don't hold it for me. (Currently in ARIA for an unknown amount of time.)
+
+[23:31:46.0000] <JakeA>
+no problem
+
+[01:19:52.0000] <littledan>
+JakeA: Thanks for making sure ServiceWorker/TLA interaction is on the agenda for TPAC
+
+[02:08:32.0000] <JakeA>
+littledan: no problem, sorry the resolution didn't match the PR, and what I'd earlier agreed to, but I think it's the right route forward
+
+[03:00:27.0000] <littledan>
+JakeA: Not a problem at all. It's important that we think these things through well. FWIW I wouldn't mind the outcome Mozilla mentioned there, even though it also differs from the initial resolution.
+
+[03:09:09.0000] <littledan>
+JakeA: Oh, I just found https://github.com/w3c/ServiceWorker/issues/1407#issuecomment-531673790 . Thanks!
+
+[03:26:12.0000] <annevk>
+littledan: I think it was mostly me and JakeA that pushed for banning
+
+[03:26:57.0000] <littledan>
+s/Mozilla mentioned/asutherland mentioned/
+
+[03:27:07.0000] <annevk>
+littledan: Domenic was there, asuth, Ben Kelly, Alex Russell
+
+[03:27:18.0000] <littledan>
+annevk: Good to know; I'm happy with this resolution
+
+[03:27:22.0000] <littledan>
+(any Safari folks?)
+
+[03:27:47.0000] <annevk>
+Youenn, not sure he weighed in on this
+
+[03:28:19.0000] <littledan>
+OK, good to know they're in the loop
+
+[03:30:31.0000] <annevk>
+The reason that won btw is that you start a service worker to handle a specific event. Handling of that event should use await to avoid folks writing global awaiting that is unneeded for certain events.
+
+[03:31:14.0000] <annevk>
+Similar (to me) to how you should not use global state in a SW
+
+[03:41:57.0000] <howdoi>
+what would be an apt way to lazy load audio content with <audio> ?
+
+[03:43:13.0000] <howdoi>
+maybe load the audio on click?
+
+[03:45:35.0000] <howdoi>
+precaching audio makes sense?
+
+[05:02:06.0000] <littledan>
+annevk: Makes sense
+
+[07:57:58.0000] <Ms2ger>
+Who's working on websockets nowadays? https://wpt.fyi/results/websockets/Create-Secure-extensions-empty.any.html?label=master&label=experimental&aligned suggests that the test was overtaken by events
+
+[07:58:24.0000] <Domenic>
+Ms2ger: ricea is my go-to person for such things
+
+[12:44:23.0000] <devsnek>
+has there ever been any discussion of promisified/async iterated timeouts and intervals
+
+[12:44:36.0000] <devsnek>
+node is looking to add something so it would be good not to duplicate efforts
+
+[16:19:31.0000] <Domenic>
+devsnek: https://github.com/whatwg/html/issues/3875
+
+[16:19:43.0000] <Domenic>
+Or I guess https://github.com/whatwg/html/issues/617
+
+[16:19:56.0000] <Domenic>
+It got stalled on lack of cancelation. Now that AbortController exists, we can probably do it
+
+[16:20:05.0000] <Domenic>
+Just needs someone to do spec + tests, and implementer interest
+
+[16:20:17.0000] <devsnek>
+just those little things :P
+
+[16:24:56.0000] <Domenic>
+I mean, it's easier than adding async iterators to streams, and you managed to mostly finish that :)
+
+[16:28:54.0000] <devsnek>
+i mean i could probably do it at *some* point
+
+[16:29:14.0000] <devsnek>
+starting uni on friday so probably not this week :P
+
+[16:30:28.0000] <Domenic>
+Ooh, good lck!
+
+
+2019-09-17
+[00:06:40.0000] <zcorpan>
+annevk: Domenic: https://html.spec.whatwg.org/multipage/forms.html#dom-lfe-labels
+
+[00:07:27.0000] <zcorpan>
+"a live NodeList object associated with them" is a hidden reference
+
+
+2019-09-18
+[19:43:37.0000] <annevk>
+travisleithead: could you invite Sanket in here?
+
+[20:30:02.0000] <travisleithead>
+Will do
+
+[21:02:44.0000] <sanketj>
+👋
+
+[00:56:00.0000] <annevk>
+🎉
+
+
+2019-09-20
+[18:56:18.0000] <Domenic>
+Does anyone know how to get mistranscriptions corrected in generated W3C bot IRC notes? Who do we contact?
+
+[19:04:42.0000] <annevk>
+Domenic: you can use s/what was minuted/what was said/
+
+[19:04:58.0000] <Domenic>
+annevk: but if they're already published?
+
+[19:05:06.0000] <Domenic>
+or published as "draft"?
+
+[19:05:09.0000] <annevk>
+Domenic: if the minutes are already published this is harder and you might need the team contact to get corrections in
+
+[19:05:13.0000] <Domenic>
+OK
+
+[19:44:56.0000] <SimonSapin>
+annevk: https://url.spec.whatwg.org/#concept-host-parser used to have a blocklist of ascii characters, right? What happened to it? It looks like IDNA’s UseSTD3ASCIIRules could have the same effect, but URL seems not to use it (beStrict defaults to false)
+
+[19:46:14.0000] <annevk>
+SimonSapin: step 7
+
+[19:46:36.0000] <SimonSapin>
+duh
+
+[19:46:37.0000] <SimonSapin>
+thanks
+
+[19:46:44.0000] <annevk>
+SimonSapin: it was abstracted as there's another host parser now
+
+[19:47:46.0000] <SimonSapin>
+< and > are not in that list, but https://jsdom.github.io/whatwg-url/#url=aHR0cHM6Ly9leGFtPHBsZS5jb20v&base=YWJvdXQ6Ymxhbms= seems to be an error
+
+[19:48:11.0000] <SimonSapin>
+annevk: another host parser?
+
+[19:48:25.0000] <annevk>
+SimonSapin: https://url.spec.whatwg.org/#concept-opaque-host-parser
+
+[19:48:53.0000] <annevk>
+SimonSapin: </> are probably worth an issue
+
+[19:49:56.0000] <SimonSapin>
+alright
+
+[12:23:15.0000] <smaug____>
+Just curious, have we considered removing details element?
+
+[12:23:37.0000] <smaug____>
+er, not details
+
+[12:23:53.0000] <smaug____>
+dialog
+
+
+2019-09-21
+[17:02:08.0000] <annevk>
+smaug____: not sure to what extent, but it has a number of features everyone wants
+
+[17:04:30.0000] <annevk>
+littledan: how does importing Wasm work again?
+
+[18:29:14.0000] <smaug____>
+annevk: sure, but only one implementation. Perhaps the features should be exposed as lower level primitives.
+
+[18:29:33.0000] <smaug____>
+Just a random thought
+
+[20:57:01.0000] <annevk>
+Yeah, true
+
+[22:02:30.0000] <Domenic>
+I've advocated for removing it but Apple has supported keeping it for some time so we're at multi-implementer support... But that second support does not appear to be of the sort "we plan to implement this soon"... so I'm unsure.
+
+[23:35:46.0000] <littledan>
+annevk: It's based on the MIME type, just like JSON
+
+[00:07:56.0000] <annevk>
+littledan: I meant more in terms of capabilities. Does the Wasm just run or do you have to invoke something for it to run?
+
+[00:08:52.0000] <littledan>
+annevk: It just runs, like JavaScript. It invokes a "start function"
+
+[00:09:30.0000] <littledan>
+It can only import things from other modules, but those modules may give it access to globals
+
+[00:10:24.0000] <littledan>
+I was hoping that the get-originals proposal would give it access to everything, but I don't understand the landscape of who likes those kinds of proposals at the moment
+
+[00:11:18.0000] <annevk>
+If it can import a JS module the threat model seems equivalent
+
+[00:11:34.0000] <annevk>
+To JS modules
+
+[08:45:36.0000] <littledan>
+annevk: Someone might assume it's less powerful, if they hear about the Wasm sandbox and don't understand that module integration gives the power to import JS modules (unlike the JS API). I'm not sure if this makes it at all like JSON.
+
+[15:41:56.0000] <annevk>
+littledan: I don’t think it does. Going from data to code execution is bad as it’s not expected, but Wasm starts with code execution that’s equally capable
+
+[16:04:44.0000] <littledan>
+annevk: OK, seems reasonable to me, but I wonder what we will do to note module types explicitly. I don't remember when in TC39 we rejected adding syntax for this sort of thing. I am not sure we considered it. Maybe Domenic has more details. I would like to figure out how to enable JSON modules.
+
+[16:05:59.0000] <littledan>
+I just remember talking about things like SRI, but I think we can agree that this does not make as much sense  inline, because of tree cache invalidation.
+
+[16:20:46.0000] <annevk>
+littledan: agreed, though not having a solution for SRI at all is bad and arguably a step backward
+
+[16:21:15.0000] <annevk>
+littledan: might also lead to non-adoption depending on your threat model
+
+[16:23:57.0000] <littledan>
+Yeah, I think if we make a clear proposal to TC39 for this, it could work. I only remember a TC39 presentation encouraging us not to do this (IIRC for SRI) and some committee members agreed. We don't tend to resolve "we will never do this". So I think it's worth re-examining.
+
+[16:24:55.0000] <littledan>
+Annevk: Was there any concrete suggestion for the right way to include this data, either for SRI or JSON?
+
+[16:25:10.0000] <littledan>
+Do people want this to be inline in the JS?
+
+[16:29:50.0000] <littledan>
+I am not sure if there is some other proposal that would provide SRI that this would overlap with (signed exchange? It's been made clear that import maps would not have SRI information)
+
+[16:33:16.0000] <annevk>
+Import maps still seems like the most viable place
+
+[16:51:14.0000] <annevk>
+The downside is that you have to use import URLs for non-script resources, but that seems okayish
+
+[16:53:59.0000] <annevk>
+Or perhaps with some other opt-in we just route all URLs through this map
+
+
+2019-09-22
+[17:06:33.0000] <annevk>
+littledan: for JSON/CSS btw some kind of inline syntax seems preferable
+
+[17:07:28.0000] <annevk>
+littledan: you could maybe require CSP or some such but that’d be very web-specific
+
+[17:20:33.0000] <annevk>
+littledan: should there be an issue against ecma262?
+
+[23:13:32.0000] <littledan>
+annevk: There could be, explicitly for tracking, but the idea would be to graduate it into a proposal
+
+
+2019-09-23
+[02:11:05.0000] <yoav>
+annevk: hey! I've aligned TAO processing to what we previously talked about CORS does: https://github.com/w3c/resource-timing/pull/214
+
+[02:11:29.0000] <yoav>
+now got a question on that PR saying that it'd be great to point at what CORS does https://github.com/w3c/resource-timing/pull/214#pullrequestreview-289023889
+
+[02:13:10.0000] <yoav>
+but I'm having a hard time finding what to point at. Fetch seems to run the CORS check above redirects, and I'm not 100% sure how tainted origins fit into that
+
+[02:13:59.0000] <annevk>
+yoav: I'm not sure I understand the logic in the PR
+
+[02:14:24.0000] <yoav>
+(I'm painfully aware that the PR in question doesn't provide full Fetch integration, but didn't want to hold that observable difference between CORS and TAO until full integration happened)
+
+[02:14:39.0000] <annevk>
+yoav: when following redirects Fetch will change the requesting origin to an opaque origin when multiple origins are crossed
+
+[02:14:53.0000] <annevk>
+yoav: which means that only null can match it
+
+[02:14:58.0000] <annevk>
+yoav: but I don't see that in your text
+
+[02:15:20.0000] <annevk>
+(well, and * for non-credentialed requests)
+
+[02:16:11.0000] <annevk>
+yoav: ooh sorry, these days we set a tainted flag
+
+[02:16:51.0000] <annevk>
+yoav: see step 10 of https://fetch.spec.whatwg.org/#http-redirect-fetch for when it gets set
+
+[02:17:28.0000] <yoav>
+yeah, saw the flag set, but not sure where it's taken into account along with a CORS check
+
+[02:17:41.0000] <annevk>
+yoav: step 4 of https://fetch.spec.whatwg.org/#concept-cors-check
+
+[02:18:07.0000] <annevk>
+yoav: in particular the request's origin will serialize as null
+
+[02:18:16.0000] <yoav>
+oh, https://fetch.spec.whatwg.org/#serializing-a-request-origin
+
+[02:18:20.0000] <yoav>
+got it!
+
+[02:28:05.0000] <yoav>
+annevk: one more point, is the tainted flag setting influenced by any CORS checks? Didn't see any
+
+[02:30:04.0000] <annevk>
+yoav: what do you mean?
+
+[02:30:32.0000] <yoav>
+should the cross-origin redirects also opt-in to CORS? Or is it sufficient that the final response does?
+
+[02:31:00.0000] <annevk>
+yoav: redirects also need to carry CORS headers
+
+[02:32:17.0000] <yoav>
+can you point me to that part in the processing? saw CORS checks only in HTTP fetch and CORS-Preflight fetch
+
+[02:32:20.0000] <annevk>
+yoav: 4.4 of https://fetch.spec.whatwg.org/#http-fetch happens before the redirect is processed
+
+[02:32:31.0000] <annevk>
+yoav: and then if we hit another redirect, that'll go through 4.4 again
+
+[02:33:03.0000] <yoav>
+ok, cool
+
+[02:33:26.0000] <annevk>
+yoav: in particular note that before step 5 of HTTP fetch we haven't really done much with the status code (other than perhaps HTTP authentication)
+
+[02:33:43.0000] <annevk>
+(oh, and ranges and 304, they happen earlier)
+
+[04:03:32.0000] <annevk>
+Domenic: will you make the cancel() method throw if someone passes in a signal to a stream?
+
+[04:03:52.0000] <Domenic>
+annevk: I don't think so, it'd just be another mechanism for canceling the stream.
+
+[04:04:34.0000] <annevk>
+Domenic: JakeA's comment made me wonder if we should add abort() to fetch()'s theoretical FetchObserver, but it seemed to me whoever vends the signal might not like that being an option
+
+[04:05:07.0000] <Domenic>
+It depends on the programming model, yeah, I'm not sure.
+
+[04:05:13.0000] <annevk>
+Domenic: though I suppose that if you invoke fetch() yourself you can always not pass the signal anyway
+
+[04:05:45.0000] <annevk>
+Domenic: but if someone handed you the result of fetch() or a created stream it might be nice if you get to do things with it, but not decide to cancel it
+
+[04:07:03.0000] <Domenic>
+I think for streams at least the single-consumer model means you should get all the powers once you have the stream
+
+[04:07:22.0000] <Domenic>
+Like, reading is destructive, so allowing reads but not cancels isn't very useful.
+
+[04:07:35.0000] <annevk>
+Domenic: I had one other thought on import maps, rather than require import URLs, have a way to make all fetches go through it; that way you can use common names like jquery for images and CSS too
+
+[04:08:16.0000] <Domenic>
+annevk: yeah, I mean we could do that especially for URL-like specifiers. But bare specifiers, I'm not sure, <a href="jquery"> or <script src="jquery"> already have a meaning.
+
+[04:09:36.0000] <annevk>
+hmm yeah, I guess there's all the API mismatch
+
+[04:09:51.0000] <annevk>
+I have a feeling this is the second time I've had this realization
+
+[04:10:03.0000] <JakeA>
+Domenic: in the fetch abort discussions, folks seemed to want to keep observation and abort separate
+
+[04:10:47.0000] <Domenic>
+JakeA: doesn't make sense for streams at least
+
+[04:11:01.0000] <Domenic>
+JakeA: since read() is just as destructive as cancel()
+
+[04:17:30.0000] <JakeA>
+Agreed
+
+[04:22:07.0000] <Domenic>
+Anyone have a reference to the "async decisions only" policy that I've heard mentioned? Is it in some popular charters or something?
+
+[04:29:43.0000] <annevk>
+Domenic: what's the context? end-user UI?
+
+[04:29:59.0000] <Domenic>
+annevk: contrasting with TC39
+
+[04:30:32.0000] <annevk>
+Domenic: ooh WG decision making
+
+[04:31:23.0000] <annevk>
+Domenic: so I looked at https://whatwg.org/working-mode#changes and we don't mention that even though it's a somewhat critical part of our Working Mode
+
+[04:31:40.0000] <Domenic>
+We have a thing in FAQ about no F2F meetings
+
+[04:32:55.0000] <annevk>
+We might have to adjust that a bit too since there certainly are meetings affecting stuff we develop
+
+[04:34:15.0000] <annevk>
+I think the main thing is that all decisions are subject to appeal when done within a reasonable amount of time
+
+[04:35:02.0000] <annevk>
+And generally we don't make substantive changes without allowing at least a week for discussion
+
+[04:35:38.0000] <annevk>
+Maybe s/substantive/major/
+
+[05:05:43.0000] <annevk>
+Domenic: filed https://github.com/whatwg/sg/issues/98 and also created a PR for the FAQ
+
+[05:07:18.0000] <annevk>
+Ah you saw, doh
+
+[05:08:07.0000] <Domenic>
+Nice, I ask a small question and annevk improves all our docs, my work here is done ^_^
+
+[05:08:13.0000] <Domenic>
+Ramen time...
+
+[05:20:50.0000] <annevk>
+Jealous
+
+[06:46:55.0000] <domfarolino>
+oof just had some ramen myself
+
+[06:55:41.0000] <MikeSmith>
+I already miss the ramen in Fukuoka
+
+[07:43:42.0000] <annevk>
+TabAtkins: heya, when do you think we can make progress on https://github.com/tabatkins/bikeshed/issues/964?
+
+[07:44:50.0000] <annevk>
+TabAtkins: it spans about 4 repos so there's some fun dependency problems, but there's also the issue of not having a patch at all for Bikeshed and me really wishing you would write it
+
+[08:02:29.0000] <TabAtkins>
+^_^ I can go ahead and do it this week.
+
+[08:02:56.0000] <TabAtkins>
+Taking some recovery days from losing weekends to travel, but I'll be working on Wednesday
+
+[08:03:24.0000] <annevk>
+\o.
+
+[08:03:31.0000] <annevk>
+ /
+
+
+2019-09-24
+[21:54:01.0000] <Domenic>
+This is so cool. https://github.com/saschanaz/webidl-updater generates e.g. https://github.com/whatwg/url/pull/450
+
+[22:40:13.0000] <annevk>
+Oh wow
+
+[00:50:12.0000] <annevk>
+Domenic: so, Kagami signed the participation agreement, but the bot did not
+
+[01:04:30.0000] <Domenic>
+annevk: I think we should treat this as a person having two GitHub accounts. Ideally there'd be some framework to handle that more gracefully, but for now, just two participant agreements seems reasonable.
+
+[05:35:28.0000] <cihanmbebek>
+Hey all! I've been completely lost with a 307 redirect problem on Safari browsers and I'm not at all sure where to look for help atm. I hope its OK to ask questions here.
+
+[05:35:28.0000] <cihanmbebek>
+We have a server which returns 307 redirect and all other browsers, when receiving the 307 response, redirect the user to the given redirect URL with the method/body/headers that was sent to the server before it returned 307.
+
+[05:35:28.0000] <cihanmbebek>
+But for some reason, Safari doesn't keep the method/body/headers, and only redirects the user to the url. Any tips?
+
+[05:36:40.0000] <cihanmbebek>
+https://forums.developer.apple.com/thread/113892 I think this error might be the same one I'm facing, but I'm not sure.
+
+[05:52:28.0000] <annevk>
+cihanmbebek: I recommend filing a bug at https://bugs.webkit.org/enter_bug.cgi?product=WebKit
+
+[05:53:08.0000] <annevk>
+cihanmbebek: I can't reproduce locally btw, Safari TP is passing web-platform-tests tests that use 307 and check whether the method and body is preserved
+
+[05:57:19.0000] <cihanmbebek>
+Hmm ok, thats good to know. So I'm guessing its just something weird happening in our response which I don't understand, and which the other browsers dont care about :D
+
+[05:57:22.0000] <cihanmbebek>
+Thanks
+
+[06:00:58.0000] <annevk>
+cihanmbebek: if you find out what it is I'd still like to know since it means test coverage is inadequate
+
+[06:01:32.0000] <cihanmbebek>
+Will do!
+
+[07:34:19.0000] <annevk>
+littledan: does the check in https://github.com/whatwg/html/pull/4734 also need to exist for WebAssembly.Module?
+
+[07:37:21.0000] <annevk>
+I guess it doesn't, WebAssembly.Module just needs to be restricted to an agent cluster, but that's it
+
+[07:40:35.0000] <Ms2ger>
+annevk, like this? https://webassembly.github.io/spec/web-api/#serialization
+
+[07:42:02.0000] <annevk>
+Ms2ger: right, I was wondering if we had to patch that with additional checks due to COOP/COEP, but we don't I think; we might have to for https://github.com/whatwg/html/issues/4920 though
+
+[07:42:49.0000] <annevk>
+Ms2ger: I also wonder if that has adequate cross-site tests as Firefox does not currently implement the checks for SharedArrayBuffer correctly
+
+[07:42:59.0000] <Ms2ger>
+Probably not
+
+[07:44:02.0000] <Ms2ger>
+Though a Module can't contain SAB, I don't think
+
+[07:47:52.0000] <annevk>
+Ms2ger: not sure how that's relevant?
+
+[07:48:14.0000] <annevk>
+To be clear, I meant the agent cluster checks for SharedArrayBuffer
+
+[10:16:48.0000] <littledan>
+annevk: WebAssembly.Module is basically as powerful as a non-shared TypedArray; it just happens to be parsed as a WebAssembly program
+
+[10:16:53.0000] <littledan>
+annevk: So I'd expect not
+
+[16:27:08.0000] <marti1125>
+hi!
+
+[16:27:55.0000] <marti1125>
+can someone help me with this bug https://github.com/whatwg/html/issues/4911
+
+
+2019-09-25
+[19:24:18.0000] <NotWoods>
+marti1125: What issue are you having?
+
+[00:45:31.0000] <cihanmbebek>
+So I've been battling with this Safari 307 redirect error. I was able to get a 307 POST redirect working with another server with a bit different redirect request. The main difference seems to be that, with this other server, I get the headers ":authority:", ":method:", ":path:" and ":scheme:" into the redirect request, and they are not appearing in the one that isnt working.
+
+[00:45:31.0000] <cihanmbebek>
+I'm not at all sure how my browser is determining if to include them or not. I'm getting quite sure that this might be a bug in Safari.
+
+[00:46:45.0000] <cihanmbebek>
+So what I'm doing is I'm comparing the requests on chrome to determine whats the difference, since I can't really get Safari to output any info about my failed request (the Safari devtools are horrible)
+
+[00:47:12.0000] <cihanmbebek>
+If anyone knows anything about those headers or why my 307 redirect might work on all other browsers except Safari, I'd reaaally appreciate any help :D
+
+[01:22:33.0000] <annevk>
+cihanmbebek: perhaps it's broken on H/2 or some such?
+
+[01:33:54.0000] <annevk>
+FYI: https://www.w3.org/mid/CADnb78iV3HqozS+mL8=rHNb7yzc1u65se7c5O==K+wDjt41ixA⊙mgc
+
+[01:47:48.0000] <cihanmbebek>
+annevk I think it might actually be the other way around, that its broken on http1
+
+[01:47:57.0000] <cihanmbebek>
+coz the request without the http2 headers seems to work
+
+[01:48:37.0000] <cihanmbebek>
+but im unsure how my browser determines if the redirect should be done with or without the http2 headers, the request and response which returns the 307 look exactly alike as far as I can see
+
+[01:49:39.0000] <annevk>
+Well, web-platform-tests uses H/1 and it works there, so I guess I don't know then.
+
+[01:50:44.0000] <cihanmbebek>
+yeah, I'm completely lost as well :D but thanks for trying to help, I appreciate it :)
+
+[03:48:10.0000] <cihanmbebek>
+I think I have finally figured out what is missing from our requests! I think its related to CSP headers https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP
+
+[03:48:47.0000] <cihanmbebek>
+I guess other browsers just dont need to have the valid redirect urls listed in the CSP headers under 'form_action'
+
+[03:48:53.0000] <cihanmbebek>
+but safari requires it
+
+[03:49:16.0000] <cihanmbebek>
+im guessing! lets see if it works
+
+[03:54:05.0000] <cihanmbebek>
+https://github.com/w3c/webappsec-csp/issues/8 related to this if I understood correctly
+
+[04:40:30.0000] <annevk>
+Domenic: apologies for not reading OP in that ARIAMixin PR
+
+[04:41:47.0000] <annevk>
+Domenic: what's blocking it at the moment? Lack of response from rniwa?
+
+[04:45:35.0000] <Domenic>
+annevk: tests I believe
+
+[04:46:07.0000] <Domenic>
+Also I think your message on Mozilla standards positions was the second implementer interest.
+
+[04:46:39.0000] <Domenic>
+Hmm wait no this is untestable :(. So maybe it's good to go now I guess.
+
+[04:46:56.0000] <annevk>
+Domenic: yeah, still good to know if there are no objections; I have a hard time recalling whether we discussed ARIAMixin at all last week
+
+[04:47:08.0000] <annevk>
+Domenic: well, we can test that the attributes are exposed and can be changed
+
+[04:47:27.0000] <Domenic>
+Ah right true
+
+[04:47:29.0000] <annevk>
+Domenic: and can be set to arbitrary values
+
+[04:47:40.0000] <annevk>
+(as there doesn't seem to be validation anywhere)
+
+[04:47:45.0000] <Domenic>
+I knew there was something testable in there
+
+[04:48:43.0000] <Domenic>
+The tests might already exist since it's behind a flag in Chrome, but I'll check tomorrow.
+
+[05:23:17.0000] <marti1125>
+hi!
+
+[05:34:55.0000] <annevk>
+Hey marti1125
+
+[05:46:07.0000] <marti1125>
+could you help with https://github.com/whatwg/html/issues/4911
+
+[05:46:21.0000] <marti1125>
+how to find the bug... in the code
+
+[05:48:07.0000] <annevk>
+marti1125: sure
+
+[05:48:14.0000] <annevk>
+marti1125: in source, search for "andpixel"
+
+[05:52:43.0000] <annevk>
+marti1125: (I'm assuming you have the repository locally, I don't think GitHub supports editing files as large as source is)
+
+[06:16:55.0000] <marti1125>
+in source i don't find "andpixel" only "and pixel"
+
+[06:21:16.0000] <Domenic>
+marti1125: I see it on line 24843
+
+[06:24:07.0000] <marti1125>
+in which branch?
+
+[06:24:15.0000] <annevk>
+marti1125: perhaps run "git checkout master" and "git pull"
+
+[06:24:55.0000] <annevk>
+and maybe check that git log matches https://github.com/whatwg/html/commits
+
+[06:39:43.0000] <marti1125>
+oww my fork is too old.... =/
+
+[06:51:24.0000] <marti1125>
+I just send a pr https://github.com/whatwg/html/pull/4935
+
+[06:53:00.0000] <annevk>
+marti1125: thanks; couple things remain
+
+[06:53:03.0000] <annevk>
+marti1125: signing https://participate.whatwg.org/agreement
+
+[06:53:14.0000] <marti1125>
+okay
+
+[06:53:18.0000] <annevk>
+marti1125: ideally "pixel" moves to the next line as the line exceeds 100 columns now
+
+[06:53:43.0000] <marti1125>
+okay
+
+[06:53:46.0000] <annevk>
+marti1125: and you might want to add your name to the Acknowledgments section
+
+[06:53:51.0000] <annevk>
+(optional)
+
+[07:46:58.0000] <annevk>
+Domenic: is there a canonical place to discuss the lack of integrity for module scripts? (Note that SRI only covers style sheets and scripts (and fetch()) to date so background-image and such weren't really a concern although ideally they are also covered of course.) It might well be that some version of Import Maps can tackle this, but I guess there was
+
+[07:46:58.0000] <annevk>
+already discussion had there so maybe we should discuss requirements elsewhere first.
+
+[16:48:22.0000] <Domenic>
+annevk: whatwg/html seems like the right place
+
+
+2019-09-26
+[06:01:16.0000] <zcorpan>
+annevk: Domenic: MikeSmith: should we still do https://github.com/whatwg/html/issues/2335 ?
+
+[06:04:02.0000] <annevk>
+zcorpan: probably not
+
+[06:04:28.0000] <zcorpan>
+annevk: why not?
+
+[06:04:28.0000] <annevk>
+zcorpan: we should just decide what's best when doing something new
+
+[06:13:03.0000] <zcorpan>
+annevk: seems reasonable, but more likely to fall into the existing name/content pattern
+
+[06:14:40.0000] <zcorpan>
+e.g. https://github.com/w3c/csswg-drafts/issues/2750
+
+[06:16:23.0000] <annevk>
+zcorpan: do you think a warning in HTML would have prevented that?
+
+[06:16:51.0000] <zcorpan>
+annevk: he cited the spec for how to extend <meta>, so yes
+
+[06:17:12.0000] <zcorpan>
+well
+
+[06:17:24.0000] <annevk>
+zcorpan: don't think he works for Apple though
+
+[06:17:28.0000] <zcorpan>
+now that it redirects to whatwg :)
+
+[06:17:40.0000] <zcorpan>
+correct
+
+[06:18:13.0000] <zcorpan>
+ok, I see what you mean
+
+[06:19:29.0000] <zcorpan>
+I don't know if whoever implemented that thing read the spec before doing that, but probably not
+
+[06:21:10.0000] <zcorpan>
+but at least sometimes proposals are discussed before they ship, and then people are more likely to read the spec, and not so likely to find this open issue out of the 1000+ open issues
+
+
+2019-09-27
+[03:03:45.0000] <annevk>
+"Platform objects can be serializable objects if they implement only interfaces decorated with the [Serializable] IDL extended attribute." I'm I the only one to who the "only" bit in this sentence reads weird?
+
+[07:40:39.0000] <annevk>
+Domenic: it seems with GitHub Actions it wouldn't be that hard to create a tweet Action in JavaScript, but I guess we're waiting for it to go out of beta?
+
+
+2019-09-28
+[18:50:22.0000] <Domenic>
+annevk: we're mostly waiting on someone to make the time. GitHub actions seem less good than webhooks to me since they require checking in a file to the repo, but either would work.
+
+
+2019-09-29
+[14:13:42.0000] <foolip>
+Who in this room will be at View Source in Amsterdam? annevk?
+
+
+2019-09-30
+[21:00:40.0000] <annevk>
+There will be lots of Mozillians there I believe, but not me
+
+[00:07:54.0000] <annevk>
+I wish there was a there for something that's cross-origin and same-site
+
+[00:09:28.0000] <annevk>
+And same-scheme I suppose, gah
+
+[01:22:21.0000] <lilltiger>
+imo CORS/Certificates should have some "friend" function, so it would allow all stuff from origin marked with friend certificates
+
+[01:30:43.0000] <annevk>
+s/a there/a term/ doh
+
+[01:49:14.0000] <hsivonen>
+lilltiger: what would prevent ad tech from pressuring its customers to mark everything as friend?
+
+[01:59:47.0000] <annevk>
+Domenic: so I wonder if the service worker issue we're seeing is because HTML still loads some of these resources without CORS
+
+[02:00:12.0000] <annevk>
+Domenic: all of this will be resolved with the doubled-keyed HTTP cache so I guess we can just leave things as-is
+
+[02:08:03.0000] <lilltiger>
+hsivonen: hmm, true
+
+[02:16:54.0000] <Domenic>
+annevk: oh wow, maybe. I think we should fix it in HTML though.
+
+[02:22:37.0000] <annevk>
+"Started httpserver on port  8080" was this always part of building HTML?
+
+[02:26:40.0000] <annevk>
+Oh fun, building HTML has a Python dependency now
+
+[05:48:50.0000] <Domenic>
+It'll just not syntax highlight things if you're missing python
+
+[06:02:29.0000] <annevk>
+Maybe I was not running the latest html-build
+
+[08:58:21.0000] <wanderview>
+annevk: what is the "service worker issue we're seeing" you mention above?
+
+[13:13:07.0000] <annevk>
+wanderview: basically visual and console errors when viewing WHATWG standards that have SWs
+
+[13:13:17.0000] <TabAtkins>
+hsivonen: From what I've heard from my friends over on the security team, similar efforts in this space will boil down to "we monitor, and actively shut down attempts to create massive 'friend' networks"
+
+[13:13:30.0000] <TabAtkins>
+(aka "first party sets", etc)
+
+[13:13:46.0000] <annevk>
+TabAtkins: heya, ping on tracking markup in bs
+
+[13:14:01.0000] <TabAtkins>
+It'll be pretty dang obvious when that happens, and it's terrible for security, so we'll just not allow it to work.
+
+[13:14:18.0000] <TabAtkins>
+annevk: ponged, it's hovering at the top of my list.
+
+[13:15:47.0000] <annevk>
+🕺🏻
+
+[15:04:40.0000] <TimothyGu>
+Looks like https://www.w3c.org/TR/html now redirects, as well as /html5, but not /html51 or /html52... is there someone we can talk to to get that fixed?
+

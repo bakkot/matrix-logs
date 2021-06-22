@@ -1,0 +1,629 @@
+2021-01-06
+[13:05:38.0000] <shu>
+should we meet today?
+
+[13:06:04.0000] <shu>
+is everyone back from PTO and want to, given, you know, the coup
+
+[13:06:09.0000] <ljharb>
+we can, certainly
+
+[13:06:12.0000] <ljharb>
+not sure if we need to or not
+
+[13:08:22.0000] <shu>
+ok, i certainly haven't gotten much of anything done
+
+[13:08:24.0000] <shu>
+today is first day back for me
+
+[13:29:19.0000] <Bakkot>
+we were planning to, yeah
+
+[13:29:21.0000] <Bakkot>
+main thing I want to do is pester people to review stuff
+
+[13:43:57.0000] <shu>
+sure
+
+[14:09:05.0000] <shu>
+Bakkot: anything you'd like me to prioritize reviewing before the meeting?
+
+[14:10:34.0000] <shu>
+i'll start with 2258
+
+[14:11:37.0000] <Bakkot>
+you've stamped https://github.com/tc39/ecma262/pull/2045 but I would like to get it landed
+
+[14:11:49.0000] <Bakkot>
+i have started doing the SDO refactor
+
+[14:12:02.0000] <Bakkot>
+and want to get the big outstanding ones in first
+
+[14:15:43.0000] <shu>
+sounds good
+
+[14:15:59.0000] <shu>
+ah there was one missing detach check you pinged about a few days ago, let me look at tha
+
+[14:16:01.0000] <shu>
+t
+
+[14:32:22.0000] <Bakkot>
+editor call?
+
+[14:33:48.0000] <shu>
+i am waiting to be let in
+
+[14:33:54.0000] <shu>
+on https://meet.google.com/ewp-sntd-dhw
+
+[14:34:06.0000] <Bakkot>
+ditto
+
+[14:34:07.0000] <Bakkot>
+ljharb ping
+
+[14:34:33.0000] <ljharb>
+oh sorry
+
+[14:34:34.0000] <ljharb>
+on it
+
+
+2021-01-07
+[16:01:50.0000] <shu>
+Bakkot: ljharb: https://github.com/tc39/ecma262/pull/2116#pullrequestreview-563115638
+
+[16:02:13.0000] <shu>
+i don't think anything needs to be threaded through -- the prepending bit is declarative prose, but it's already there
+
+[16:04:20.0000] <Bakkot>
+ah, so it doesn't use `prefix` because it's part of the `_name_`?
+
+[16:04:54.0000] <Bakkot>
+works for me
+
+[16:10:24.0000] <ljharb>
+sgtm
+
+[16:36:37.0000] <shu>
+that's my understanding, yeah
+
+[17:03:21.0000] <shu>
+i must've fallen asleep during the discussion of #2216
+
+[17:03:26.0000] <shu>
+what was decided about toString()?
+
+[17:03:59.0000] <shu>
+we decided that was a worthy compat risk?
+
+[17:04:09.0000] <shu>
+actually i'll ask in #tc39
+
+[20:36:26.0000] <Bakkot>
+ljharb: rebased https://github.com/tc39/ecma262/pull/1234
+
+[20:36:43.0000] <Bakkot>
+we weren't going to bother getting formal approvals for it, sounded like
+
+[10:10:07.0000] <Bakkot>
+shu: https://github.com/tc39/ecma262/pull/2116#discussion_r553314854
+
+[10:10:25.0000] <Bakkot>
+the subtlety here is that the [[InitialName]] slot is used for F.p.toString
+
+[10:11:17.0000] <Bakkot>
+so e.g. 'Object.getOwnPropertyDescriptor(Uint8Array.prototype.__proto__, Symbol.toStringTag).get.toString()' should include 'get', if the '.name' does
+
+[10:11:30.0000] <Bakkot>
+and it does not in spidermonkey
+
+[10:13:26.0000] <Bakkot>
+that said I am inclined to say it's not worth worrying about
+
+[10:19:45.0000] <shu>
+Bakkot: i am not sure i understand
+
+[10:20:14.0000] <shu>
+Bakkot: that PR removes the call to the SetFunctionName AO so now it only talks about how the "name" property ought to be set
+
+[10:21:03.0000] <shu>
+what's the connection to [[InitialName]]? (i do agree that [[InitialName]] needs the latitude for toString, as you've said)
+
+[10:21:48.0000] <Bakkot>
+the PR does not remove the call to SetFunctionName, it just moves it into CreateBuiltinFunction
+
+[10:23:13.0000] <Bakkot>
+but I guess spidermonkey's current behavior - where `.name` and `.toString()` disagree about whether "get " is included - is not technically allowed by the current spec text
+
+[10:23:25.0000] <Bakkot>
+so this PR doesn't change anything
+
+[10:24:09.0000] <shu>
+oh i see, whereas the previous declarative prose didn't really say anything about how the call to SetFunctionName is made
+
+[10:24:17.0000] <Bakkot>
+yeah
+
+[10:24:21.0000] <shu>
+maybe you can handwave some auto-deconstruction-to-name-and-prefix
+
+[10:24:23.0000] <Bakkot>
+but it did specify the name you needed to end up with
+
+[10:24:30.0000] <shu>
+but now, if the full name is "get builtin"
+
+[10:24:44.0000] <shu>
+hmmm
+
+[10:24:58.0000] <Bakkot>
+then you don't get to take advantage of the "Optionally, set F.[[InitialName]] to name." step, yeah
+
+[10:26:01.0000] <shu>
+okay, in that case, to cover all our bases, i'll do the the thing i said to add a [ prefix ] to CreateBuiltinFunction
+
+[10:26:04.0000] <shu>
+shouldn't be too bad
+
+[10:29:34.0000] <shu>
+the signature's kinda gross but eh
+
+[12:34:34.0000] <Bakkot>
+works for me
+
+
+2021-01-08
+[18:24:28.0000] <Bakkot>
+michael and I are doing the SDO refactor, so we should hold off on landing anything which touches SDOs until that's in
+
+[18:24:38.0000] <Bakkot>
+gonna be a biiiiiiiiig PR
+
+[08:32:07.0000] <shu>
+how big
+
+[08:32:19.0000] <shu>
+break-GH's-review-UI big?
+
+[08:36:20.0000] <Bakkot>
+hopefully not
+
+[08:36:30.0000] <Bakkot>
+currently at 2k lines changed
+
+[08:36:48.0000] <Bakkot>
+probably closer to 6 by the time it's done
+
+[08:47:56.0000] <shu>
+looking forward, gonna be so nice
+
+
+2021-01-12
+[22:51:45.0000] <Bakkot>
+https://github.com/tc39/ecma262/pull/2271 is ready for reviiew
+
+[22:51:50.0000] <Bakkot>
++3,824 −4,927
+
+[22:51:52.0000] <Bakkot>
+good luck!
+
+[22:52:08.0000] <Bakkot>
+(it's almost entirely mechanical)
+
+[23:21:35.0000] <Bakkot>
+(I strongly recommend reviewing commit-wise rather than looking at the full diff)
+
+
+2021-01-13
+[13:38:21.0000] <shu>
+Bakkot: what does type="sdo" do in emu-clause?
+
+[13:39:31.0000] <Bakkot>
+currently nothing, but I have a PR to ecmarkup which will make it so that hovering over a production in one of the grammar definition sections will give you a popup which will let you open a panel listing all of the SDOs defined over that production
+
+[13:39:42.0000] <Bakkot>
+(like the references panel but for SDOs, and per-production)
+
+[13:39:51.0000] <shu>
+excellent
+
+[13:40:19.0000] <Bakkot>
+I should get that released, I guess
+
+[13:40:54.0000] <shu>
+the inability to correctly expand context lines of the individual commits in this PR in GH is really unfortunate
+
+[13:40:58.0000] <shu>
+guess i really do need to review this in the terminal
+
+[13:41:26.0000] <Bakkot>
+can't believe they haven't fixed that yet
+
+[13:57:49.0000] <shu>
+i think the only way i can review this is for me to assume that copy-pasted sections are correct
+
+[13:58:14.0000] <shu>
+and doing some structural and exhaustion reviewing, making sure all cases were in fact copied
+
+[14:12:21.0000] <Bakkot>
+copy-pasting was almost exclusively done by a script
+
+[14:12:34.0000] <Bakkot>
+you could review that if you want but it at least guarantees lack of typos
+
+[14:18:24.0000] <shu>
+one thing so far this has pointed out is that chain rule remains an annoyance for a reader
+
+[14:19:25.0000] <shu>
+e.g. in LabelledEvaluation, depending on the chain rule to realize that BreakableStatement and LabelledStatement fallthrough via chain rule requires diffing the production lists of Statement in the grammar and in the SDO
+
+[14:22:34.0000] <Bakkot>
+yeah
+
+[14:22:42.0000] <Bakkot>
+I don't have any bright ideas for fixing that
+
+[14:22:46.0000] <Bakkot>
+I don't think this makes it worse, at least
+
+[14:23:19.0000] <shu>
+yeah
+
+[15:47:38.0000] <ljharb>
+Bakkot: slap the RTM label on the SDO PR once you're ready (i assume you're waiting for shu) and i'll get to it tomorrow morning
+
+[15:48:06.0000] <Bakkot>
+will do
+
+[15:48:11.0000] <Bakkot>
+waiting for shu's review and for myself to do the ecmarkup bump
+
+
+2021-01-14
+[16:09:20.0000] <shu>
+Bakkot: for https://github.com/tc39/ecma262/pull/2271/commits/6342163d7444d23fe85cdd45df595623721118fa, it was intentional that even single-alternative productions are made multiline?
+
+[17:32:18.0000] <Bakkot>
+shu yeah I thought it looked better
+
+[17:33:56.0000] <Bakkot>
+it's subjective though
+
+[17:34:07.0000] <Bakkot>
+for e.g. the functions in https://ci.tc39.es/preview/tc39/ecma262/sha/2f4449bf9667a5b847e03db4f4e4cec553a7813f/#sec-static-semantics-isfunctiondefinition
+
+[17:34:17.0000] <Bakkot>
+having it multiline reads a lot better to me
+
+[17:35:02.0000] <Bakkot>
+happy to revert if you prefer though
+
+[17:39:16.0000] <shu>
+i don’t feel strongly
+
+[17:39:23.0000] <shu>
+do you think they always look better?
+
+[17:39:35.0000] <shu>
+i’d be happy to have am productions be multi line
+
+[17:39:36.0000] <Bakkot>
+no, the `block` one is definitely weird as two lines
+
+[17:39:43.0000] <shu>
+s/am/all
+
+[17:39:49.0000] <shu>
+okay
+
+[17:40:01.0000] <shu>
+ad hoc is fine by me too
+
+[17:46:58.0000] <Bakkot>
+for the LabelledStatement chain rule thing, I will add an emu-note
+
+[17:47:35.0000] <Bakkot>
+"The only two productions of |Statement| which have special semantics for LabelledEvaluation are |BreakableStatement| and |LabeledStatement|." sound good?
+
+[17:55:23.0000] <Bakkot>
+addressed comments I think
+
+[19:07:33.0000] <Bakkot>
+ljharb shu: a thing I forgot to mention is, this leaves a couple of clauses empty, specifically "The do-while Statement" and "The while Statement"
+
+[19:07:58.0000] <Bakkot>
+this is because there is no specific "while statement" production; they're all just grouped into IterationStatement
+
+[19:08:34.0000] <Bakkot>
+I think this is fine for now and I will submit a followup PR which splits IterationStatement into the different kinds, if you are on board with that
+
+[20:08:18.0000] <Bakkot>
+thoughts on https://github.com/tc39/ecma262/pull/2271#discussion_r556999580 ?
+
+[20:08:39.0000] <Bakkot>
+"Generally, when a clause defines an aoid, the id attribute is just "sec-" + lowercase(aoid)." - I included the "static-semantics-" part in the ids
+
+[20:08:50.0000] <Bakkot>
+I have no strong feelings
+
+[20:25:49.0000] <shu>
+i like having static-semantics
+
+[09:17:03.0000] <Bakkot>
+last call for feedback on https://github.com/tc39/ecma262/pull/2271
+
+
+2021-01-15
+[19:42:54.0000] <Bakkot>
+ljharb I rebased https://github.com/tc39/ecma262/pull/2271 and marked it ready to merge
+
+[19:43:18.0000] <Bakkot>
+decided I would do the ecmarkup bump in a different pr
+
+[20:36:54.0000] <ljharb>
+ok, sounds good
+
+[20:37:42.0000] <ljharb>
+Bakkot: should michael be a co-author on them?
+
+[20:38:24.0000] <Bakkot>
+don't think he's likely to care
+
+[20:47:14.0000] <ljharb>
+k
+
+
+2021-01-19
+[13:16:38.0000] <ljharb>
+it'd be nice if step xrefs linked "step 1" and not just the "1"
+
+[13:16:53.0000] <ljharb>
+just linking the number makes it harder to see and click on
+
+[13:20:56.0000] <Bakkot>
+probably doable, but figuring out the right capitalization is tricky
+
+[13:32:03.0000] <ljharb>
+hm, true
+
+
+2021-01-20
+[14:28:28.0000] <shu>
+Bakkot: ljharb: fyi i will be about 5 mins late
+
+[14:28:32.0000] <ljharb>
+kk
+
+
+2021-01-22
+[16:57:59.0000] <shu>
+Bakkot: did we miss arithmetic fixups for [[ArrayBufferByteLength]]?
+
+[16:58:24.0000] <shu>
+Bakkot: it does comparisons with unsubscripted numbers but we also store Numbers directly into it
+
+[17:28:09.0000] <Bakkot>
+oh, we should not be storing Numbers directly in it
+
+[17:28:11.0000] <Bakkot>
+where's that happen?
+
+[17:29:44.0000] <Bakkot>
+the only place I can see which sets `ArrayBufferByteLength` is in AllocateArrayBuffer, which deals only with reals
+
+[19:06:51.0000] <shu>
+Bakkot: ah, the main spec has no issues
+
+[19:07:12.0000] <shu>
+Bakkot: i was updating the resizable array buffer spec draft and had forgotten i had copied it from the pre-arithmetic fix times
+
+[19:07:58.0000] <Bakkot>
+ah, cool
+
+[19:09:01.0000] <shu>
+there's a bit of a weirdness with GrowableSharedArrayBuffers, however
+
+[19:09:25.0000] <shu>
+because GSABs' lengths are concurrently accessible, accessing them is an atomic operation
+
+[19:09:39.0000] <shu>
+and so they are in fact stored as Numbers in a shared data block, not as Reals
+
+[19:09:44.0000] <shu>
+i don't know if that has any issues
+
+[19:10:56.0000] <shu>
+i think no, because they are always itnegers
+
+[19:10:58.0000] <shu>
+integers
+
+
+2021-01-23
+[17:31:58.0000] <shu>
+Bakkot: ljharb: at() PR is up: https://github.com/tc39/ecma262/pull/2286
+
+[17:32:03.0000] <shu>
+sorry for being so late
+
+[17:32:11.0000] <shu>
+if you don't have time to review before plenary is over no worries
+
+[19:03:10.0000] <ljharb>
+no problem
+
+[19:03:20.0000] <ljharb>
+shu: any thoughts on the web compat thing?
+
+[19:03:46.0000] <shu>
+for editorial review? haven’t had a chance to think through yet
+
+[19:04:03.0000] <shu>
+wanted to do a full review and editorial at the same time, probably this weekend or the morning before committee
+
+[19:53:06.0000] <ljharb>
+oh, no, just in general. Off topic for this channel :-)
+
+[19:53:28.0000] <ljharb>
+like do you think we can still get stage 4 given that news
+
+
+2021-01-24
+[14:53:59.0000] <ljharb>
+Bakkot: is "making `Number::unaryMinus` autolink" on your list somewhere?
+
+[14:54:19.0000] <ljharb>
+also, shouldn't all of those have aoid's specified?
+
+[14:54:30.0000] <Bakkot>
+ljharb mmm nope, though it fits with other things we want to do
+
+[14:54:41.0000] <ljharb>
+for the former, cool, toss it on the pile
+
+[14:54:48.0000] <ljharb>
+for the latter, i can make a PR?
+
+[14:55:32.0000] <Bakkot>
+AOIDs are only really useful for things which are defined in only one place
+
+[14:55:44.0000] <ljharb>
+Number::unaryMinus is
+
+[14:55:56.0000] <ljharb>
+and its prose is "The abstract operation Number::unaryMinus takes argument" etc
+
+[14:55:58.0000] <Bakkot>
+ah, true, it's just not used that way mostly
+
+[14:56:07.0000] <Bakkot>
+the intent is that it's used like `T::unaryMinus`
+
+[14:56:13.0000] <ljharb>
+it is from `ApplyStringOrNumericBinaryOperator` :-)
+
+[14:56:16.0000] <Bakkot>
+when you don't know if a thing is a Number or BigInt
+
+[14:56:17.0000] <ljharb>
+but yeah true
+
+[14:56:38.0000] <ljharb>
+so should it have one, since it's an abstract op? or should it not, since you should only be calling it with the T form
+
+[14:56:54.0000] <Bakkot>
+also I'm not sure if AOIDs will work for things with `:` in
+
+[14:57:00.0000] <Bakkot>
+mm, so
+
+[14:57:01.0000] <ljharb>
+ah, true
+
+[14:57:08.0000] <Bakkot>
+I guess feel free to open the PR and we can see if it works
+
+[14:57:13.0000] <ljharb>
+ok cool
+
+[14:57:15.0000] <ljharb>
+will do
+
+[14:57:35.0000] <Bakkot>
+and I will make a note to try to improve the situation for `T::unaryMinus`
+
+[14:57:53.0000] <ljharb>
+sgtm
+
+
+2021-01-25
+[10:17:17.0000] <michaelficarra>
+I bet Istvan would love it if we added analytics to the draft spec
+
+[10:17:21.0000] <ljharb>
+should someone perhaps remind istvan that the quality of the spec downloads would be addressed by the PDF editing funding request the editors sent?
+
+[10:18:47.0000] <michaelficarra>
+Yulia is asking if we are ready to present next
+
+[10:18:54.0000] <michaelficarra>
+Bakkot you will be presenting, right?
+
+[10:19:00.0000] <Bakkot>
+y
+
+[10:19:04.0000] <Bakkot>
+am ready
+
+[10:19:17.0000] <michaelficarra>
+let her know in #tc39-delegates
+
+[10:22:33.0000] <shu>
+ljharb: +1
+
+[10:22:52.0000] <shu>
+michaelficarra: what about ads??
+
+[10:23:14.0000] <shu>
+thinking of all the targeting we can do for js pedantry-related products
+
+[10:31:39.0000] <michaelficarra>
+ecma doesn't need to be involved with the ads
+
+[10:35:42.0000] <shu>
+but is it against the bylaws if we should be so compensated
+
+[10:45:49.0000] <ljharb>
+Bakkot: also a "references" list?
+
+
+2021-01-26
+[12:15:41.0000] <ljharb>
+i've got code that uses cheerio to parse the rendered spec HTML. however, since it seems to contain `<emu-clause>` elements eg, cheerio can't handle it and does weird things like drop p tags and stuff. is there a better suggestion any of you have for handling custom elements?
+
+[12:16:52.0000] <Bakkot>
+jsdom is great as long as you don't care about performance
+
+[12:17:03.0000] <Bakkot>
+actually I think jsdom's parser is available as its own lib
+
+[12:17:18.0000] <ljharb>
+i do not care about performance here as long as the code i get to write is minimal
+
+[12:17:49.0000] <ljharb>
+i'll check it out, i usually avoid jsdom but "can't ever rely on it working in anything but latest node" doesn't matter for this use case
+
+[12:18:24.0000] <Bakkot>
+jsdom lets you get a simulacra of an actual DOM, which I find nice because I already know how to use the DOM tools
+
+[12:18:43.0000] <Bakkot>
+their parser appears to be https://www.npmjs.com/package/parse5
+
+[12:19:21.0000] <ljharb>
+ty, will try it out after sandwich
+
+[12:20:47.0000] <Bakkot>
+... can't tell if you mean "after I eat this sandwich" or "after I try this other npm library called sandwich"
+
+[12:20:53.0000] <Bakkot>
+don't enlighten me though
+
+[12:22:57.0000] <ljharb>
+i will not spoil the mystery
+
+[12:50:15.0000] <michaelficarra>
+shame on cheerio, custom elements are a first-class feature of HTML
+
+[12:50:51.0000] <ljharb>
+yeah i was a bit surprised. i'd expect it either to fail outright, to convert them to divs, or to work, and it did none of those three
+
+
+2021-01-28
+[11:57:59.0000] <michaelficarra>
+https://github.com/tc39/ecmarkup/issues/287
+

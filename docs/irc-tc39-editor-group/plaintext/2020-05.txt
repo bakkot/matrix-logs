@@ -1,0 +1,1488 @@
+2020-05-01
+[20:50:33.0000] <ljharb>
+bakkot: shu https://github.com/tc39/ecma262/pull/1314 is waiting on one of yalls review, fwiw
+
+[20:54:57.0000] <bakkot>
+bleh
+
+[20:55:03.0000] <bakkot>
+I feel like there has been a lot of churn lately
+
+[20:55:12.0000] <bakkot>
+and am not super sold on the utility of this churn vs other churn
+
+[20:55:26.0000] <bakkot>
+admittedly some of that is mine, but, well
+
+[20:55:29.0000] <bakkot>
+/shrug
+
+[21:16:27.0000] <ljharb>
+that's a totally fine opinion :-)
+
+[21:16:53.0000] <ljharb>
+i'd totally forgotten we had consensus for this in november, but i'd delayed on the PR because of the election nonsense
+
+
+2020-05-03
+[17:27:40.0000] <Bakkot>
+ljharb any interest in reviewing https://github.com/tc39/ecmarkdown/pull/66? Michael and I wrote it together so he can't really review
+
+[17:27:48.0000] <Bakkot>
+("no" is fine; I'll just land it.)
+
+[10:04:46.0000] <ljharb>
+Bakkot: sure, i can take a look; not sure how much i can add tho
+
+[10:05:05.0000] <ljharb>
+lol, clearly this project doesn't use the prefer-const eslint rule
+
+[10:05:43.0000] <ljharb>
+it seems really weird to me for Visitor to be a class, and then to have it used by `new Visitor(observer).genericallyVisit(ast);`
+
+[10:05:57.0000] <ljharb>
+eg `genericallyVisit` seems like it should be a function that takes observer and ast
+
+[10:06:11.0000] <ljharb>
+otherwise, PR seems fine
+
+[12:10:23.0000] <Bakkot>
+yeah, that's a fair point; we started writing it as a class with methods which could be overridden for each node type and then ended up with just the general one
+
+[12:10:39.0000] <Bakkot>
+and it should probably just be a function at this point, since there's not really anything left to overridie
+
+[12:10:48.0000] <Bakkot>
+thanks for the review!
+
+[13:11:12.0000] <ljharb>
+np!
+
+
+2020-05-05
+[17:20:16.0000] <shu>
+ah, [[IsHTMLDDA]], the pinnacle of mathematical beauty
+
+
+2020-05-06
+[14:52:52.0000] <ljharb>
+shu: `is ±0`
+
+
+2020-05-08
+[18:12:37.0000] <shu>
+philosophical question
+
+[18:13:01.0000] <shu>
+if you have a set of steps that become entirely unobservable based on some input
+
+[18:13:30.0000] <shu>
+would you consider that asserts inside those steps to have to hold?
+
+[18:14:20.0000] <shu>
+that is, if you have some steps that can be removed by an optimizer because their result aren't observable, does the spec still require you to satisfy their preconditions as captured by assertions?
+
+[18:14:26.0000] <shu>
+with my compiler engineer hat on, the answer is no
+
+[18:14:46.0000] <shu>
+but i can anticipate disagreement here
+
+[18:16:28.0000] <Bakkot>
+assertions are just comments, so I guess no, but I don't really understand the question
+
+[18:16:38.0000] <shu>
+i'll be concrete
+
+[18:16:55.0000] <shu>
+consider https://tc39.es/ecma262/#sec-newpromiseresolvethenablejob
+
+[18:17:11.0000] <Bakkot>
+is the observable behavior the same as if the engine had just executed the steps naively? yes? then it is all ok. no? then it is not ok.
+
+[18:17:44.0000] <shu>
+consider the case when _then_ is a revoked proxy
+
+[18:18:04.0000] <shu>
+(keep in mind: a revoked proxy throws in step 2 here: https://tc39.es/ecma262/#sec-proxy-object-internal-methods-and-internal-slots-call-thisargument-argumentslist)
+
+[18:18:21.0000] <shu>
+notably, step 2 happens before the argumentsList is ever observed
+
+[18:18:32.0000] <shu>
+going back to NewPromiseResolveThenableJob,
+
+[18:19:15.0000] <shu>
+the concrete question is: suppose, at the point of evaluation step 1.a, the execution context stack is empty and _then_ is a revoked Proxy
+
+[18:20:00.0000] <shu>
+since _then_ is a revoked Proxy, step 1.b will unconditionally throw without user code observing the resolving functions
+
+[18:20:29.0000] <shu>
+however, CreateResolvingFunctions calls CreateBuiltinFunction: https://tc39.es/ecma262/#sec-createbuiltinfunction
+
+[18:20:53.0000] <shu>
+step 2 of CreateBuiltinFunction looks at the execution context stack, and assumes it's non-empty
+
+[18:21:48.0000] <shu>
+in my hypothetical scenario, would you consider that Assert to require the exec ctx stack to be non-empty, even though the invocation itself can be eliminated because it's not observable
+
+[18:22:38.0000] <Bakkot>
+two answers:
+
+[18:23:42.0000] <Bakkot>
+1. I don't think it is observable to users whether the exec context stack is _in fact_ empty, so engines can choose to implement it such a way that it is empty (whatever that means, since "exec context stack" is not a real thing)
+
+[18:24:23.0000] <shu>
+it's a real thing in determining the current Realm, and in turn the Function.prototype to use for the created (but never observed) builtin function
+
+[18:24:55.0000] <shu>
+step 4 here: https://tc39.es/ecma262/#sec-createbuiltinfunction
+
+[18:25:31.0000] <shu>
+(though my opinion is, as you might expect, that that doesn't make it any more real, since none of these steps have "force" until user code actually observes anything"
+
+[18:25:33.0000] <Bakkot>
+2. assertions are comments for the benefits of readers of the specification. they have no normative implications. we should arrange that they be true by virtue of the way the spec is written. if they don't follow as logical consequences of the rest of the spec, we should either modify/eliminate them or add new constraints to other parts of the spec so that they do follow as logical consequences of the rest of the spec
+
+[18:26:06.0000] <shu>
+agreed on 2
+
+[18:26:46.0000] <Bakkot>
+"it's a real thing in determining the current Realm, and in turn the Function.prototype to use for the created (but never observed) builtin function" - I would not regard this as being observable to users
+
+[18:27:12.0000] <shu>
+if the builtin function escapes to user code, then it is, but in this case, it doesn't escape to user code
+
+[18:27:17.0000] <Bakkot>
+right
+
+[18:27:25.0000] <Bakkot>
+since it does not escape to user code, it is not observable
+
+[18:27:45.0000] <Bakkot>
+which means that the engine could have implemented the spec exactly as written, for all the user knows
+
+[18:28:06.0000] <Bakkot>
+it is not observable to the user that the engine does not just blindly implement the spec exactly as written = it is OK
+
+[18:30:54.0000] <Bakkot>
+(sidebar: the previous sentence leads to one of my favorite facts about the spec, which is that, since the spec does not actually specify any IO at all, a program which takes UTF16 in and then immediately hangs forever is a valid implementation of the spec)
+
+[18:36:30.0000] <shu>
+haha
+
+[18:36:32.0000] <shu>
+indeed
+
+[18:36:54.0000] <shu>
+okay, good, we are in agreement
+
+[18:43:36.0000] <shu>
+i'd appreciate https://github.com/tc39/ecma262/pull/1984 a read in context of this convo whenever you have time
+
+[18:44:00.0000] <shu>
+i find debating devsnek on it exasperating, so in case he's making valid points i'd like a reframing from other folks who are less exasperating
+
+[19:05:48.0000] <Bakkot>
+hm - given the foregoing, I don't understand your point about "the corner case that's made easier by giving hosts this latitude about Realms for scheduled jobs: revoked proxies"
+
+[19:06:28.0000] <Bakkot>
+since it sounds to me like we have just established that hosts are free to omit the realm from the context stack in the actual implementation, because it is not observable whether or not they do so
+
+[19:07:17.0000] <Bakkot>
+that is to say, I don't understand why hosts need latitude for that case
+
+[19:08:05.0000] <Bakkot>
+further latitude than they already get from the "as-if" nature of the specification, that is
+
+[19:13:13.0000] <shu>
+that's a good point, latitude here doesn't help the revoked proxy here given the "as-if" understanding
+
+[19:13:40.0000] <shu>
+the revoked proxy case*
+
+[19:14:41.0000] <shu>
+at least not strictly
+
+[19:15:26.0000] <shu>
+editorially, lack of latitude here would mean upstream specs need to understand the "as-if" cases
+
+[19:15:39.0000] <shu>
+and if not, they'd need to write extra spec text that might be nonsensical
+
+[19:15:47.0000] <shu>
+not sure how to balance
+
+[19:16:11.0000] <Bakkot>
+I think that's probably solvable with a NOTE
+
+[19:16:49.0000] <shu>
+hmm
+
+[19:16:52.0000] <Bakkot>
+I am more worried about the non-null case here: for cases where it is not null, do we want a normative requirement on which realm it is?
+
+[19:17:06.0000] <shu>
+no, i don't
+
+[19:17:48.0000] <shu>
+i guess it wasn't very clear before because it did say it required the same realm as at the time of queuing
+
+[19:18:01.0000] <shu>
+but it was also a part of the spec that was willfully violated and people didn't implement
+
+[19:18:03.0000] <shu>
+so... shrug
+
+[19:22:03.0000] <Bakkot>
+also there's two realms in question here, yes?
+
+[19:22:09.0000] <shu>
+yes
+
+[19:22:23.0000] <shu>
+there's the current Realm at the time of queuing, and there's the realm of the relevant handler callbacks
+
+[19:22:31.0000] <shu>
+the _realm_ passed to the host hook is the latter
+
+[19:23:23.0000] <Bakkot>
+the two I meant were "The Realm component of the topmost execution context on the execution context stack is a Realm Record." and the _realm_ passed to the host hook
+
+[19:23:33.0000] <Bakkot>
+there are currently no normative requirements on either, that I can see
+
+[19:23:51.0000] <Bakkot>
+the first is the realm at the time _the callback runs_, not the one at the time of queuing, I believee
+
+[19:24:13.0000] <shu>
+in our current draft there are no normative requirements
+
+[19:24:24.0000] <shu>
+there were (dubious) normative requirements before the promise layering PR landed
+
+[19:24:34.0000] <shu>
+with the whole jobs machinery that wasn't used
+
+[19:24:37.0000] <Bakkot>
+right, ok
+
+[19:24:50.0000] <Bakkot>
+and your position is, you don't want there to be any requirements on either of them?
+
+[19:25:04.0000] <shu>
+pretty much
+
+[19:29:19.0000] <Bakkot>
+if so, I would propose that we add a non-normative note to the HostEnqueuePromiseJob requirements  which says" bit which says "Note: typically this results in the execution context stack having as its topmost item an execution context whose Realm component was the Realm component of the topmost item on the execution stack when HostEnqueuePromiseJob was invoked, although this is not a normative requirement", and devsnek
+
+[19:29:19.0000] <Bakkot>
+ can argue a normative requirement through committee if he wants
+
+[19:29:37.0000] <shu>
+sgtm
+
+[19:29:55.0000] <Bakkot>
+though I am not super clear on why we would not want that to be a normative requirement, if the only benefit of leaving it unspecified is the revoked proxy thing
+
+[19:30:09.0000] <shu>
+he might be right about the error that gets created in resolvethenable jobs
+
+[19:31:04.0000] <Bakkot>
+and would therefore mildly prefer we make it normative and instead have a NOTE which says that it may not be observable what the realm is, e.g. if the _then_ is a revoked proxy, and reminds the reader of the as-if requirement
+
+[19:31:38.0000] <shu>
+we could make it a normative requirement, though it's slightly annoying on the upstream side
+
+[19:32:48.0000] <Bakkot>
+we could also just be explicit and say that the Realm requirement only applies if it is observable
+
+[19:33:03.0000] <Bakkot>
+this is always true but if that makes upstream integration I have no problem repeating it
+
+[19:33:33.0000] <shu>
+i am not sure if it should be the normative requirement because the host has always been allowed to push other execution contexts on top, and this incumbents nonsense maybe figures into it
+
+[19:33:52.0000] <Bakkot>
+ahh
+
+[19:34:10.0000] <Bakkot>
+ok, I will say the thing about the non-normative note then
+
+[19:34:13.0000] <shu>
+though i am not yet confident whether it does or does not
+
+[19:35:00.0000] <shu>
+like, should HTML enqueue a new promise job using the same hook from its own machinery, when there is no active script (you can imagine web apis doing this)
+
+[19:35:11.0000] <shu>
+what do our requirements here even mean then?
+
+[19:35:44.0000] <Bakkot>
+they explicitly do not apply in that case, no?
+
+[19:35:57.0000] <Bakkot>
+oh, no, I misread
+
+[19:36:07.0000] <shu>
+well i don't actually know if they apply or not
+
+[19:36:21.0000] <shu>
+if upstream specs implement our host hooks, it seems fair game to let it call those themselves
+
+[19:36:27.0000] <shu>
+and some kind of invariants should still hold
+
+[19:36:48.0000] <Bakkot>
+yes, that is an unrelated issue which should be fixed - if GetActiveScriptOrModule returns `null`, the "prepared to execute code" bit should not apply I think
+
+[19:37:00.0000] <shu>
+spec layering is a mess
+
+[19:37:04.0000] <shu>
+i need to think this through more carefully
+
+[19:37:06.0000] <Bakkot>
+trufax
+
+[19:44:43.0000] <Bakkot>
+> if upstream specs implement our host hooks, it seems fair game to let it call those themselves
+
+[19:45:19.0000] <Bakkot>
+having thought a little more about this, my position is, we are not required to arrange that these are written in a way which make sense for hosts to call at all times
+
+[19:45:45.0000] <Bakkot>
+hosts can in principle determine for themselves if they make sense as written
+
+[19:46:16.0000] <Bakkot>
+and if there's a particular reason to do the work to make them callable in the situation the host wants, we can do the work at that point, with the concrete use case in mind
+
+[19:47:26.0000] <Bakkot>
+I left my comment about the NOTE on the PR
+
+[20:36:43.0000] <shu>
+that position also seems fine to me
+
+[20:36:56.0000] <shu>
+and that concern probably doesn't generalize beyond promises
+
+[20:37:11.0000] <shu>
+promises is the only thing that might be widely used enough that rando web apis might want to call hooks to enqueue stuff
+
+[16:20:50.0000] <Bakkot>
+shu: i see your update, will review when I get a chance
+
+[16:21:04.0000] <Bakkot>
+gonna need to be at a point I can set aside a solid block of time for paging stuff in, I see
+
+[16:22:18.0000] <shu>
+it's not urgent
+
+[16:22:34.0000] <shu>
+hard deadline is like, before we merge weak refs
+
+[16:22:37.0000] <shu>
+no soft deadline really
+
+[16:22:47.0000] <shu>
+though the faster we review as a group the better chance i still remember my intentions :)
+
+[16:24:08.0000] <Bakkot>
+yeah, for big stuff like this it is nice to deal with it relatively synchronously
+
+[16:36:33.0000] <ljharb>
+we are definitely going to have to talk about this in the editor call, i'm so confused
+
+[16:46:13.0000] <shu>
+haha sure
+
+
+2020-05-09
+[19:47:34.0000] <Bakkot>
+https://github.com/tc39/ecmarkup/pull/199
+
+[13:27:50.0000] <Bakkot>
+ljharb: any idea why CI failed on the latest commit to ecma262 master?
+
+[14:57:45.0000] <ljharb>
+looking
+
+[14:57:58.0000] <ljharb>
+everything's green on https://travis-ci.org/github/tc39/ecma262/builds ?
+
+[15:09:55.0000] <Bakkot>
+https://github.com/tc39/ecma262/commits/master
+
+[15:14:42.0000] <ljharb>
+oh, that's because i merged it after the push one passed, but not after the PR one passed, so the git ref no longer existed https://travis-ci.org/github/tc39/ecma262/jobs/684794753
+
+[15:15:11.0000] <ljharb>
+which was my bad; i was the thing go green and hit enter, and forgot there was a second one, because the branch wasn't from a fork
+
+[15:15:22.0000] <ljharb>
+usually PRs come from forks, so there's no "push" run at all
+
+
+2020-05-10
+[22:41:17.0000] <Bakkot>
+ljharb: ping on https://github.com/tc39/ecma262/pull/1519
+
+[22:41:39.0000] <Bakkot>
+has stamps from michael and myself
+
+[07:42:49.0000] <ljharb>
+will take a look sometime today
+
+
+2020-05-11
+[09:41:16.0000] <Bakkot>
+shu: ping on https://github.com/tc39/ecma262/pull/1936; it should be pretty trivial
+
+[09:42:06.0000] <Bakkot>
+also https://github.com/tc39/ecma262/pull/1966
+
+[09:47:30.0000] <shu>
+roger, will look after call
+
+[16:30:24.0000] <shu>
+Bakkot: so marja on my team at v8 is writing a series of blog posts about reading ecma262 and she's doing a chapter on cover grammars
+
+[16:30:38.0000] <shu>
+in reviewing it i've had to try to justify why we use cover grammars
+
+[16:31:32.0000] <shu>
+and my understanding is that: given our LR(1) restriction, cover grammars arose as a more concise and understandable editorial machinery over threading single-token lookahead restrictions through all productions, which significantly bloats the grammar
+
+[16:31:49.0000] <shu>
+the confusing part is we *also* have both lookahead restrictions *and* grammar parameters
+
+[16:32:17.0000] <shu>
+would it be worth our time to try to provide editorial guidelines on when a grammar parameter is the right tool and when a cover is the right tool?
+
+[16:55:33.0000] <Bakkot>
+hmmm
+
+[16:55:42.0000] <Bakkot>
+it would certainly be worth trying to write down the constraints we intend to maintain
+
+[16:56:16.0000] <Bakkot>
+the way I have always thought of the lookahead restrictions vs cover grammar thing is, you should only have to look some fixed number of tokens ahead to know what you're parsing
+
+[16:56:56.0000] <Bakkot>
+which means you can't use lookahead restrictions for e.g. distinguishing arrows from groups, because those happen arbitrarily far away
+
+[16:57:17.0000] <Bakkot>
+(... which, now that I think about it, makes me a bit worried about the [lookahead ≠ else] we just merged...)
+
+
+2020-05-12
+[17:18:13.0000] <shu>
+Bakkot: you can mechanically convert an N-token lookahead to a 1-token lookahead by threading it through all intervening non-terminals
+
+[17:18:24.0000] <shu>
+which is a giant PITA
+
+[17:18:39.0000] <shu>
+but yes... what does it mean for the dangling else PR
+
+[17:20:11.0000] <shu>
+i think the if-else lookahead might be okay in that we don't need an oracle to determine if we parsed something that shouldn't have been accepted
+
+[17:21:00.0000] <shu>
+maybe i'm just wrong and you can't actually mechanically convert an N-token lookahead to a 1-token lookahead by threading it through all productions...
+
+[17:21:48.0000] <Bakkot>
+it has been too long since I thought about formal properties of grammars rather than just how humans would actually implement them
+
+[17:22:06.0000] <shu>
+i'm pretty sure you can though, say, once you see a `(`, you'd pass through some parameter that's basically like "you can't see a => after a )"
+
+[17:22:19.0000] <shu>
+the problem is that that blows up your grammar
+
+[17:22:36.0000] <shu>
+for the grouping case, you'd pass "you can't see a => after a )", the opposite for arrows
+
+[17:23:02.0000] <Bakkot>
+ok but how do you know which branch you're in when you start parsing?
+
+[17:23:22.0000] <shu>
+right, good question
+
+[17:23:47.0000] <shu>
+that's a question the actual parser has to answer, but from the formal grammar's point of view as describing all strings that can be accepted
+
+[17:23:52.0000] <shu>
+can't there just be an oracle?
+
+[17:24:17.0000] <shu>
+an actual parser would need to back track or do arbitrary lookahead or something
+
+[17:24:47.0000] <Bakkot>
+I think if there is an oracle you stop being LR(k)
+
+[17:24:55.0000] <shu>
+oh hmm
+
+[17:25:12.0000] <Bakkot>
+maybe not though
+
+[17:25:24.0000] <Bakkot>
+like I said, it's been too long since I thought about the theory
+
+[17:25:35.0000] <Bakkot>
+should go find some undergrads and ask them
+
+[17:25:41.0000] <shu>
+ah i think you're right, at least according to wikipedia
+
+[17:26:06.0000] <shu>
+LR(k) is literally left-to-right with k-token lookahead to disambiguate the non-terminals
+
+[17:28:06.0000] <Bakkot>
+so... yeah I think we might have broken that with the lookahead ≠ else PR
+
+[17:28:07.0000] <Bakkot>
+ugh
+
+[17:28:32.0000] <shu>
+so... covers actually have extra expressivity
+
+[17:37:46.0000] <shu>
+https://esdiscuss.org/topic/lr-1-grammar-parser-and-lookahead-restrictions is a pretty good read
+
+[17:37:57.0000] <shu>
+it had a very similar confusion to my own
+
+[17:39:09.0000] <Bakkot>
+I wish we could get Waldemar to share his automated tool he talks about here
+
+[17:40:24.0000] <shu>
+that or give up the LR(1) ghost
+
+[17:40:38.0000] <shu>
+hard to make us beholden to something we can't easily verify ourselves
+
+[17:42:57.0000] <shu>
+commented on https://github.com/tc39/ecma262/pull/1966
+
+[17:43:47.0000] <shu>
+Bakkot: as for "extra expressivity", i think my conclusion after reading all of that is that cover grammars don't give us extra expressivity in specifying what token streams would be accepted and what would not be
+
+[17:44:09.0000] <Bakkot>
+oh we didn't merge yet, phew
+
+[17:44:30.0000] <Bakkot>
+hmmm
+
+[17:44:42.0000] <shu>
+but it does affect how we write the rest of the spec and the static/evaluation semantics, since without reinterpretation of cover grammars, you'd end up with one production that the semantics would end up being responsible for disambiguating
+
+[17:44:47.0000] <shu>
+so the evaluator would need to keep some kind of state
+
+[17:44:49.0000] <shu>
+which is terrible
+
+[17:45:30.0000] <Bakkot>
+well, cover grammars absent early errors certainly do not give extra expressivity
+
+[17:45:38.0000] <shu>
+since the 1-1ness of a parse tree being interpreted a single way is really just a convention we hold
+
+[17:45:58.0000] <Bakkot>
+because the "this must cover" restrictions are enforced at early error time, not in the grammar itself
+
+[17:46:32.0000] <Bakkot>
+I don't know that it is possible to write an LR(k) grammar that has the same set of accepted token streams as the current grammar + the early error rules for "this must cover"
+
+[17:47:32.0000] <shu>
+i feel like it is but really verbose and impossible to understand
+
+[17:47:53.0000] <shu>
+e.g., for grouping vs arrow param list, something like (42) isn't a legal param list
+
+[17:48:16.0000] <shu>
+you can imagine that to start, '(' can have single-token lookahead restrictions for digits
+
+[17:48:58.0000] <Bakkot>
+the problem is that  it might be arbitrarily far away, yeah? `( a1, a2, ..., an, 42)`
+
+[17:49:25.0000] <shu>
+ah, right...
+
+[17:50:19.0000] <shu>
+but i think it'd be like, in the context of '(', you can have a bunch of parameters that do your branching
+
+[17:51:02.0000] <shu>
+accepting a 42 numeric literal means the following non-terminal doesn't accept a ') =>'
+
+[17:51:30.0000] <shu>
+accepting a x means both options are still open
+
+[17:52:16.0000] <Bakkot>
+how do you know which branch to take, after encountering `(`?
+
+[17:56:55.0000] <shu>
+you don't, you decide the branch the first time you see an illegal token in the other branch
+
+[17:57:04.0000] <shu>
+the first time you see 42, you decide you have to be a grouping
+
+[17:57:28.0000] <shu>
+if you don't see anything that would be an error in the other branch, you end up with a non-terminal that can be interpreted multiple ways depending on the parent non-terminal
+
+[17:57:33.0000] <Bakkot>
+that's how actual parsers are implemented, certainly
+
+[17:57:35.0000] <shu>
+(this might all be completely wrong, i haven't tried writing this out)
+
+[17:57:43.0000] <shu>
+you can also write the grammar that way
+
+[17:57:46.0000] <shu>
+no?
+
+[17:59:59.0000] <shu>
+anyways the formal property of covers isn't really worth either of our time
+
+[18:00:06.0000] <Bakkot>
+mmmmmaybe
+
+[18:00:47.0000] <Bakkot>
+yeah I would not want to try to make any definitive claims about this without writing things down
+
+[18:00:53.0000] <Bakkot>
+and ideally having tools to verify them
+
+[18:01:51.0000] <Bakkot>
+('grammar is unambiguous' is actually one of my TODOs in the 'things to lint for' issue, though I doubt I personally will get to that one)
+
+[18:02:03.0000] <Bakkot>
+btw https://github.com/tc39/ecmarkup/pull/199 exists if you haven't seen it
+
+
+2020-05-13
+[15:00:39.0000] <Bakkot>
+chrome crashed, proceed without me
+
+[15:00:42.0000] <Bakkot>
+I have some of the context
+
+[15:02:40.0000] <Bakkot>
+link me the meet? I switched computers
+
+[15:02:57.0000] <Bakkot>
+(chrome has _unrecoverably_ crashed on my work machine, which means I can't get to my work calendar)
+
+[15:02:59.0000] <Bakkot>
+shu ljharb ping^
+
+[15:03:24.0000] <shu>
+meet.google.com/knh-hwgb-kva
+
+
+2020-05-14
+[17:25:19.0000] <shu>
+ljharb: added a commit to https://github.com/tc39/ecma262/pull/1984 to narrowly specify the realm of the execution context that propagates the active script or module
+
+[17:27:20.0000] <shu>
+note that i'm still not constraining it to have to be the current Realm, and still leaving that up to the host for the reasons we discussed on the call. also, less hassle for layering ecma262 in the future to leave that up to the host than to prescribe it
+
+[08:19:57.0000] <shu>
+ljharb: ping on https://github.com/tc39/proposal-promise-any/pull/59
+
+[08:20:35.0000] <shu>
+ljharb: FYI otherwise i'd like to add a 5/10-min item to try to get consensus for that change
+
+[09:52:37.0000] <ljharb>
+i think we ran past our timebox when we talked about it last
+
+[09:52:50.0000] <ljharb>
+but yeah i think it's worth committee time
+
+
+2020-05-19
+[10:09:49.0000] <Bakkot>
+ljharb I don't get your objection in https://github.com/tc39/ecmarkup/pull/201#issuecomment-630939074
+
+[10:10:16.0000] <Bakkot>
+like, yes, these are formatters which expect a specific format of error which is only documented in the eslint project, agreed
+
+[10:10:17.0000] <Bakkot>
+so what?
+
+[10:10:29.0000] <Bakkot>
+what does that have to do with whether or not they are reasonable things to use in this project?
+
+[10:10:30.0000] <ljharb>
+so it feels hacky to use an "X formatter" outside of X
+
+[10:10:39.0000] <Bakkot>
+why?
+
+[10:10:41.0000] <ljharb>
+if we want to follow eslint conventions let's just use eslint
+
+[10:10:47.0000] <ljharb>
+because that's not what it's designed for
+
+[10:10:52.0000] <ljharb>
+eslint formatters are intended to consume eslint output
+
+[10:11:10.0000] <Bakkot>
+they are intended too consume a list of linting errors in a specific format
+
+[10:11:12.0000] <Bakkot>
+*to
+
+[10:11:18.0000] <Bakkot>
+we can produce such a list
+
+[10:11:39.0000] <Bakkot>
+nothing about that format is intrinsically tied to eslint
+
+[10:11:40.0000] <ljharb>
+sure, but why not use eslint to do it
+
+[10:11:46.0000] <Bakkot>
+why use eslint to do it?
+
+[10:11:50.0000] <ljharb>
+because it's an eslint formatter
+
+[10:11:53.0000] <Bakkot>
+so what?
+
+[10:11:55.0000] <Bakkot>
+who cares?
+
+[10:11:57.0000] <ljharb>
+i do
+
+[10:11:59.0000] <ljharb>
+it feels wrong to me
+
+[10:12:00.0000] <Bakkot>
+why?
+
+[10:12:11.0000] <ljharb>
+because using a thing in a way it's not intended is gross
+
+[10:12:26.0000] <Bakkot>
+it is intended to print a list of errors in a specific format
+
+[10:12:31.0000] <Bakkot>
+linting errors
+
+[10:12:31.0000] <ljharb>
+no, that's what it does
+
+[10:12:37.0000] <Bakkot>
+that is what it is _intended to do)
+
+[10:12:40.0000] <ljharb>
+it's intended to take *eslint output* and present it in a certain format
+
+[10:12:41.0000] <Bakkot>
+*_
+
+[10:12:52.0000] <ljharb>
+the way it does it is by consuming a list of errors in a specific format
+
+[10:13:02.0000] <ljharb>
+it is in no way intended to be used without eslint
+
+[10:13:07.0000] <Bakkot>
+sure it is
+
+[10:13:08.0000] <ljharb>
+it just happens to be usable without it
+
+[10:13:20.0000] <shu>
+lol what is this conversation
+
+[10:13:27.0000] <ljharb>
+it's re an ecmarkup PR
+
+[10:14:16.0000] <shu>
+yes i saw, but why such a strong opinion about not using eslint formatters
+
+[10:14:30.0000] <ljharb>
+because it's not in an eslint context
+
+[10:14:50.0000] <ljharb>
+it's important how things are done, not just that they are done
+
+[10:15:46.0000] <Bakkot>
+but what is wrong with doing it this way
+
+[10:15:51.0000] <shu>
+i also regret to inform you that is not how the world works
+
+[10:16:38.0000] <shu>
+let's talk about what your preferred alternative is
+
+[10:16:40.0000] <shu>
+write a custom formatter?
+
+[10:17:01.0000] <ljharb>
+it seems better to write an eslint plugin, and use eslint to lint the spec, and then we can use any eslint formatter
+
+[10:17:10.0000] <shu>
+what
+
+[10:17:13.0000] <Bakkot>
+That's a lot of work for literally no benefit
+
+[10:17:47.0000] <ljharb>
+the benefit is that it would plug into all eslint things. people's editors would show them ecmarkup linting errors inline, with no extra work. all the CI tools would work with it, like github's inline "checks" stuff.
+
+[10:18:10.0000] <ljharb>
+linting that's not using "the defacto linting tool for the ecosystem" is harder to use
+
+[10:18:12.0000] <Bakkot>
+github's inline checks are built on an eslint formatter: https://github.com/hipstersmoothie/eslint-formatter-github
+
+[10:18:34.0000] <ljharb>
+ok, it's nice that that one works the same either way
+
+[10:20:17.0000] <shu>
+using eslint formatters now does not preclude you or someone else from volunteering the extra time to work towards the world you want
+
+[10:20:27.0000] <ljharb>
+that is certainly true
+
+[10:20:36.0000] <Bakkot>
+(it makes it easier, even!)
+
+[10:20:52.0000] <shu>
+the person doing the work has expressed the time-investment doesn't pay off for what we want to accomplish
+
+[10:22:27.0000] <shu>
+it's kind of unreasonable to object on a personal conviction of "things should be done in such a way"
+
+[10:23:07.0000] <ljharb>
+i mean so far i haven't put a block on the pr or anything. i've just said that this feels confusing and not the right way to go about things
+
+[10:23:24.0000] <ljharb>
+i don't think it's ever unreasonable to talk out that sort of thing.
+
+[10:26:02.0000] <shu>
+i think you should be mindful of extra work the discussion generates for other people
+
+[10:27:55.0000] <ljharb>
+i am. it's still worth discussing to me.
+
+[10:29:50.0000] <ljharb>
+this approach involves dynamic requires, and coupling our tool to eslint in an implicit way, that requires it to be invoked outside of the standard eslint pipeline.
+
+[11:13:44.0000] <ljharb>
+at any rate i'm not going to block or anything, but i don't think it's a good idea, and i wanted to understand why yall disagreed
+
+[11:40:48.0000] <Bakkot>
+ljharb: re https://github.com/tc39/ecma262/pull/1995#discussion_r426126791 : that doesn't seem particularly useful to me, but I don't object to it. I don't really want to do the work, though. Do you want to push a commit to the branch which makes that change, or do you want to not worry about it for now?
+
+[11:43:26.0000] <ljharb>
+yeah sure, i can do that
+
+[11:44:56.0000] <ljharb>
+(within the next couple hours)
+
+
+2020-05-20
+[14:52:30.0000] <ljharb>
+shu: https://tc39.es/ecma262/#sec-left-shift-operator-runtime-semantics-evaluation
+
+[15:41:21.0000] <ljharb>
+shu: https://github.com/tc39/ecma262/pull/1998 could use your stamp (not required but i'd prefer it :-) )
+
+[15:41:54.0000] <shu>
+looking
+
+[15:42:08.0000] <ljharb>
+ty
+
+[15:45:09.0000] <Bakkot>
+couple of small PRs which need more reviews:
+
+[15:45:09.0000] <Bakkot>
+https://github.com/tc39/ecma262/pull/1938 needs more reviews, btw
+
+[15:45:24.0000] <Bakkot>
+https://github.com/tc39/ecma262/pull/1866
+
+[15:46:31.0000] <Bakkot>
+also the larger https://github.com/tc39/ecma262/pull/1994
+
+[15:51:26.0000] <ljharb>
+1866 seems like there's an unanswered question?
+
+[15:56:19.0000] <Bakkot>
+Does it? Which?
+
+[16:00:58.0000] <ljharb>
+michael's question and jmdyck's response on the bottom
+
+[16:01:07.0000] <Bakkot>
+that looks answered to me?
+
+[16:03:15.0000] <Bakkot>
+pinged michael for a response there
+
+[16:23:04.0000] <Bakkot>
+ok he's responded
+
+[16:44:40.0000] <shu>
+oh i forgot to link this during the call
+
+[16:44:43.0000] <shu>
+yulia sent me this earlier: https://usercontent.irccloud-cdn.com/file/u3fFtyOa/wdyt%3F%20arai%20made%20this
+
+[16:45:05.0000] <shu>
+arai is still working on it but seems pretty great
+
+
+2020-05-22
+[13:19:24.0000] <ljharb>
+Bakkot: can you ask michael what comment of mine he deleted here https://github.com/tc39/ecma262/pull/2007#event-3366014796 ?
+
+[13:20:15.0000] <Bakkot>
+he says he did not do that
+
+[13:20:33.0000] <Bakkot>
+(I see it too though)
+
+[13:22:00.0000] <Bakkot>
+now getting 500s from github
+
+[13:22:04.0000] <Bakkot>
+something is wrong clearly
+
+[13:25:15.0000] <ljharb>
+they've been having issues for an hour or so
+
+[13:26:31.0000] <ljharb>
+thanks for checking
+
+
+2020-05-25
+[16:30:59.0000] <Bakkot>
+ljharb: https://github.com/tc39/ecma262/pull/1866 should be good to go
+
+[16:33:16.0000] <Bakkot>
+ljharb: also what's the status of https://github.com/tc39/ecma262/pull/1517 ? do you plan to pursue it at some point?
+
+
+2020-05-26
+[17:11:05.0000] <Bakkot>
+ljharb also, updated https://github.com/tc39/ecma262/pull/1463
+
+[19:29:03.0000] <Bakkot>
+shu: https://github.com/tc39/ecma262/pull/2015
+
+[20:43:10.0000] <ljharb>
+Bakkot: thanks, 1886 is in
+
+[20:43:32.0000] <Bakkot>
+sweet
+
+[20:44:34.0000] <ljharb>
+re 1517, i found https://github.com/tc39/notes/blob/8e8bfcbddcb29c09a10b0845a55af2e0d31b6f49/meetings/2019-07/july-23.md#conclusionresolution-3, looks like i have to track some people down
+
+[20:45:27.0000] <ljharb>
+re 1463, i'll take a look
+
+[11:44:21.0000] <shu>
+Bakkot: thanks for the ping, i'm really swamped at the moment so might not get to it until during the next call itself...
+
+[11:49:53.0000] <Bakkot>
+shu: no rush
+
+
+2020-05-27
+[14:31:35.0000] <ljharb>
+are we doing this?
+
+[14:31:49.0000] <Bakkot>
+shu ping
+
+[14:32:01.0000] <ljharb>
+this "ask to join" thing is super annoying; i have a premium zoom account, is it worth using that?
+
+[14:32:07.0000] <Bakkot>
+hm, could be
+
+[14:32:08.0000] <shu>
+omw
+
+[14:32:10.0000] <Bakkot>
+I have one too
+
+[14:32:18.0000] <shu>
+though i cannot use zoom per corp policy
+
+[14:32:20.0000] <ljharb>
+oh
+
+[14:32:24.0000] <Bakkot>
+ah :(
+
+[14:32:25.0000] <ljharb>
+even for non-google-specific stuff?
+
+[14:32:31.0000] <ljharb>
+and on the web?
+
+[14:32:33.0000] <Bakkot>
+can't put it on google machines, I assume
+
+
+2020-05-28
+[18:39:13.0000] <shu>
+Bakkot: btw did you ever have ambition to build our own LR(k) checker
+
+[18:39:31.0000] <shu>
+or try to get jmdyck to give us his or something, instead of waiting on waldemar for another decade
+
+[18:40:08.0000] <Bakkot>
+I had ambition to get someone else to give us theirs
+
+[18:40:15.0000] <Bakkot>
+somewhat less ambition to build our own
+
+[18:40:42.0000] <shu>
+who's our best bet, jmdyck?
+
+[18:43:01.0000] <Bakkot>
+his is public actually
+
+[18:43:05.0000] <Bakkot>
+let me dig it up
+
+[18:43:10.0000] <Bakkot>
+(I think)
+
+[18:43:38.0000] <Bakkot>
+nvm can't find it
+
+[10:56:35.0000] <shu>
+i put up slides about the host-defined vs implementation-defined agenda item, if anyone cares to review
+
+[10:56:42.0000] <shu>
+https://docs.google.com/presentation/d/14NsIoRhr-z7HvRG0laq_F2c4iNPHF-Ld17-Yibshdo0/edit#slide=id.p
+
+[11:28:25.0000] <Bakkot>
+would be good if implementation-defined and host-defined had a different example, I guess
+
+[11:28:27.0000] <Bakkot>
+otherwise lgtm
+
+[11:32:31.0000] <shu>
+Bakkot: i am not sure if there actually are different example
+
+[11:32:32.0000] <shu>
+s
+
+[11:37:42.0000] <Bakkot>
+`debugger;` stands out as implementation-defined
+
+[11:38:24.0000] <Bakkot>
+also syntax extensions, in section 16
+
+[11:38:54.0000] <Bakkot>
+also the "message" property for errors
+
+[11:39:12.0000] <Bakkot>
+and TimeZoneString
+
+[11:39:28.0000] <Bakkot>
+and sort order
+
+[11:40:04.0000] <Bakkot>
+that's about it though
+
+[11:40:19.0000] <Bakkot>
+I don't think any implementation actually documents what it does for any of these, which is probably useful to note
+
+[13:06:18.0000] <Bakkot>
+ljharb: I think you messed up the order of the commits on the bump-ecmarkup proposal
+
+[13:06:32.0000] <Bakkot>
+at a guess, you only updated the timestamp for one or two of the commits
+
+[13:13:35.0000] <shu>
+Bakkot: ah indeed...
+
+[13:13:38.0000] <shu>
+added
+
+[13:51:41.0000] <Bakkot>
+ljharb: oh I see it's merged now... guess I should have commented on the issue.
+
+[13:51:46.0000] <Bakkot>
+whatever, doesn't much matter.
+
+[14:05:48.0000] <ljharb>
+yeah, i saw that prior to merging - i ran `git rebase -f master` tho so i'm not sure how to have "fixed" it
+
+[14:05:54.0000] <ljharb>
+i intentionally tried to make the meta one last tho
+
+[15:04:13.0000] <Bakkot>
+`git rebase -i`, reorder the commits in the order you want, and for each commit mark it as `e`, and then go through the rebase doing `git commit --amend --reset-author; git rebase --continue` until it finishes
+
+[15:04:15.0000] <Bakkot>
+is what I usually do
+
+[15:04:55.0000] <Bakkot>
+reordering does not affect the commit times, is the problem
+
+[15:06:46.0000] <ljharb>
+oh hm, ok
+
+[15:06:55.0000] <ljharb>
+i'll do that from now on then, i thought `-f` did that
+
+[15:18:44.0000] <Bakkot>
+nope, rebase -f creates a new commit but does not affect the timestamp (I believe)
+
+[15:19:11.0000] <ljharb>
+gotcha
+
+[15:21:14.0000] <Bakkot>
+note that this will also reset the author
+
+[15:21:18.0000] <Bakkot>
+there is presumably some way to avoid that
+
+[15:21:38.0000] <Bakkot>
+google suggests using `--date=now` might do the trick?
+
+[15:21:44.0000] <Bakkot>
+instead of `--reset-author`
+
+[15:30:57.0000] <ljharb>
+cool, that works
+
+[15:31:05.0000] <ljharb>
+(theoretically; i'll try it on the next PR)
+
+
+2020-05-29
+[18:46:07.0000] <Bakkot>
+ljharb: ping on https://github.com/tc39/ecma262/pull/1519
+
+[21:30:37.0000] <ljharb>
+i was kind of waiting for shu on that one
+
+[21:30:41.0000] <ljharb>
+that's grammar-ish
+
+[23:45:03.0000] <ljharb>
+k, 2020 candidate is updated, both in "releases" and the reflector, with a pdf
+
+[07:51:41.0000] <shu>
+i’ll take a look today
+
+[09:02:14.0000] <shu>
+Bakkot: let me check my understanding of 1519
+
+[09:02:17.0000] <shu>
+1) it is currently dead code
+
+[09:04:43.0000] <shu>
+2) i kinda like waldemar's suggestions. do you think they're needed?
+
+[09:12:00.0000] <shu>
+3) i don't quite grok the concern about the lexical-syntactic grammar boundary
+
+[09:13:21.0000] <Bakkot>
+yeah, it's dead (in the sense of, the "true" cases of those branches are never taken
+
+[09:13:49.0000] <Bakkot>
+the concern about the lexical-syntactic boundary is, for e.g. `LiteralPropertyName : IdentifierName` that's a _syntactic_ production, as evidenced by the single `:`
+
+[09:14:48.0000] <Bakkot>
+but if you took Waldear's suggestion, we would be defining Contains for `IdentifierName :: IdentifierStart` and `IdentifierName :: IdentifierName IdentifierPart`, which are _lexical_ productions
+
+[09:16:06.0000] <Bakkot>
+currently I don't think any of the SDOs descend into lexical productions, though I could be wrong
+
+[09:17:15.0000] <Bakkot>
+and, yeah, that would require rewording some stuff
+
+[09:17:19.0000] <Bakkot>
+I think
+
+[09:17:26.0000] <Bakkot>
+because "The syntactic grammar for ECMAScript is given in clauses 11, 12, 13, 14, and 15. This grammar has ECMAScript tokens defined by the lexical grammar as its terminal symbols"
+
+[09:18:07.0000] <Bakkot>
+that is, per this definition, IdentiferName is a _terminal_ symbol of the syntactic grammar
+
+[09:18:35.0000] <Bakkot>
+and Contains is defined to only recurse into _nonterminals_
+
+[09:21:33.0000] <shu>
+okay
+
+[09:21:36.0000] <shu>
+them simple removal lgtm
+
+[09:21:42.0000] <shu>
+as for #2019
+
+[09:21:43.0000] <shu>
+yikes
+
+[09:27:14.0000] <Bakkot>
+commented the above on #1519
+
+[09:27:18.0000] <Bakkot>
+and yeah #2019 is :(
+
+[09:27:25.0000] <Bakkot>
+I've actually encountered that before
+
+[09:27:33.0000] <Bakkot>
+didn't bring it up because I didn't want to think about it
+
+[09:30:14.0000] <shu>
+i'm trying to understand why we've all implemented this wrong
+
+[09:30:22.0000] <shu>
+arai _does_ seem correct
+
+[09:38:04.0000] <shu>
+okay, i see...
+
+[09:54:16.0000] <shu>
+Bakkot: i commented in #2019
+
+[09:54:20.0000] <shu>
+do you think this is worth fixing?
+
+[09:54:53.0000] <Bakkot>
+define "fixing"
+
+[09:55:05.0000] <Bakkot>
+changing the spec, or changing implementations?
+
+[09:55:09.0000] <shu>
+changing implementations
+
+[09:55:19.0000] <Bakkot>
+as long as I'm allocating other people's time, sure :P
+
+[09:55:25.0000] <Bakkot>
+realistically, not really
+
+[09:55:41.0000] <Bakkot>
+that is, I don't see this being the highest-priority thing to work on for the foreseeable future
+
+[09:55:49.0000] <Bakkot>
+could get an intern to do it I guess
+
+[09:55:57.0000] <Bakkot>
+(the joke is, I spent much of my internship at google fixing B.3.3 bugs)
+
+[09:56:12.0000] <shu>
+indeed
+
+[09:56:50.0000] <shu>
+cue vesti la giubba
+
+[10:02:55.0000] <shu>
+okay i think this is actually *hard* to fix in implementations
+
+[10:03:33.0000] <shu>
+async and defer scripts means parallel parser threads that need to reconcile their top-level binding tables
+
+[10:03:55.0000] <shu>
+so at parse time, you can't actually make the correct annex b.3.3 applicability decision
+
+[10:06:37.0000] <Bakkot>
+oof
+
+[10:06:42.0000] <Bakkot>
+but you want to resolve the bindings at parse time
+
+[10:07:17.0000] <Bakkot>
+I wish we had not made the top-level lexical contour shared across scripts
+
+[10:07:21.0000] <Bakkot>
+it is a weird decision
+
+[10:29:44.0000] <shu>
++1
+
+[10:33:07.0000] <shu>
+right, you *want* to resolve it at parse time so you can emit the assignment to the synthetic var if needed
+
+[10:34:02.0000] <shu>
+and... to also declare the synthetic var so it has effect on future "if replacing this function with a var statement would not result in an early error" clauses
+
+[10:34:12.0000] <shu>
+but if you _can't_... i don't really know how to think about this so far
+
+[11:02:40.0000] <ljharb>
+i still have no idea why this is a hard thing to fix, but you don't have to explain it to me :-p
+
+[11:07:56.0000] <shu>
+ljharb: it's basically like, when the parser sees `{ function f() {} }`, it wants to know, at that point, if we need to do the wacky annex b semantics
+
+[11:08:40.0000] <shu>
+ljharb: but! on the web there may be multiple parses in parallel because of async scripts, so when parser thread A seems `{ function f() {} }`, it doesn't actually know if annex b semantics applies
+
+[11:08:54.0000] <ljharb>
+hm
+
+[11:08:57.0000] <ljharb>
+why doesn't it know that?
+
+[11:09:02.0000] <shu>
+ljharb: maybe parser thread B has a top-level `let f`, but it hasn't finished parsing and "merging" back into the main thread state yet
+
+[11:09:14.0000] <ljharb>
+ahhh ok
+
+[11:09:29.0000] <ljharb>
+so it always technically applies but doesn't really do anything unless there's an overlap
+
+[11:09:38.0000] <ljharb>
+but because the parsing is parallelized, you can't know there's an overlap til the join?
+
+[11:09:42.0000] <shu>
+no, it doesn't always apply
+
+[11:09:54.0000] <shu>
+it only applies if "it wouldn't have caused an early error"
+
+[11:10:01.0000] <shu>
+but you don't even know if it would cause an early error until threads join, yep
+
+[11:10:02.0000] <ljharb>
+(i'm sure i don't grok the wacky annex b semantics either, fwiw)
+
+[11:10:04.0000] <ljharb>
+gotcha
+
+[11:10:09.0000] <ljharb>
+whatever the criteria is, i get the race condition
+
+[11:10:54.0000] <ljharb>
+is there a possible spec improvement that would obviate the need for implementations to fix anything?
+
+[11:11:11.0000] <shu>
+like Bakkot said, this is all because we decided the global lexical scope is shared among all scripts
+
+[11:11:22.0000] <shu>
+there is but that's also pretty gnarly for the spec
+
+[11:11:33.0000] <ljharb>
+and presumably we couldn't undecide that?
+
+[11:11:37.0000] <shu>
+i don't know how we should proceed yet
+
+[11:11:41.0000] <shu>
+undecide a possible spec fix?
+
+[11:11:57.0000] <ljharb>
+sorry i meant "the global lexical scope is shared among all scripts"
+
+[11:12:07.0000] <Bakkot>
+it would almost certainly not be web compat to change that, unfortunately
+
+[11:12:08.0000] <ljharb>
+i'm assuming that not sharing it would break other things
+
+[11:12:10.0000] <ljharb>
+right
+
+[11:13:16.0000] <shu>
+yeah
+
+[11:13:48.0000] <shu>
+it's certainly a funny definition of "lexical" that's for sure
+
+[11:15:23.0000] <ljharb>
+if that's lexical then we're all in the same room right now
+
+[11:16:05.0000] <shu>
+maybe it was done out of fear of the SM legacy let/const semantics, where they were actually vars?
+
+[11:16:11.0000] <shu>
+i don't have the history here
+
+[15:57:11.0000] <Bakkot>
+re https://github.com/tc39/ecma262/pull/2007#issuecomment-634985074: should we maybe prefer writing bigints as *0n*, rather than *0*<sub>Z</sub>?
+
+[15:58:39.0000] <ljharb>
+i am super on board with that. but, doesn't that then suggest that Numbers should be written as digits, forcing math values to have a marker?
+
+[15:59:16.0000] <Bakkot>
+I don't think it suggests numbers should be written as digits
+
+[15:59:20.0000] <Bakkot>
+*Numbers
+
+[15:59:33.0000] <ljharb>
+`0n` says to me "it's written like you'd write it in JS"
+
+[15:59:54.0000] <Bakkot>
+yeah, I mean, strings are too
+
+[16:00:04.0000] <Bakkot>
+but for Numbers that would be ambiguous, so we can't do it there
+
+[16:00:33.0000] <ljharb>
+right - ambiguous unless math values weren't used as digits
+
+[16:00:42.0000] <Bakkot>
+No, ambiguous anyway
+
+[16:00:59.0000] <Bakkot>
+Just because we can give something a definition doesn't mean all readers will have that definition in mind at all times
+
+[16:01:57.0000] <ljharb>
+hm
+
+[16:02:11.0000] <ljharb>
+i guess it'd confuse me if i saw multiple things in the spec written like it was in JS, but then found numbers weren't
+
+
+2020-05-31
+[22:25:44.0000] <Bakkot>
+ljharb: https://github.com/tc39/ecma262/pull/1781 is approved but you may not want to merge it without it getting re-approved, since I just force-pushed it and removed half of what it did
+
+[23:06:03.0000] <ljharb>
+Bakkot: lol you still have a block on the PR anyways
+
+[23:06:07.0000] <ljharb>
+i'll rerequest review on everyone
+
+[23:06:21.0000] <Bakkot>
+;p;
+
+[23:06:25.0000] <Bakkot>
+*lol
+
+[23:06:27.0000] <Bakkot>
+switched to approve
+
+[23:06:44.0000] <ljharb>
+lol, oops, i rerequested you at the same time
+
+[23:06:58.0000] <ljharb>
+race yay conditions
+
+[23:07:03.0000] <Bakkot>
+doesn't much matter
+
+[23:07:07.0000] <ljharb>
+kk
+

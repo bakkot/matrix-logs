@@ -1,0 +1,3957 @@
+2019-11-01
+[17:13:55.0000] <NilSet>
+bterlson: I am planning to attend the november TC39 meeting in december along with Chip, may I please get access to the reflector repo?
+
+[17:16:23.0000] <NilSet>
+bterlson: my github is also NilSet , the account is in the Evernote github org. let me know if you need any other kind of authentication
+
+[17:18:37.0000] <devsnek>
+we're gonna need your credit card number and your mother's maiden name
+
+[17:20:05.0000] <NilSet>
+at least i get to keep my dna to myself
+
+[17:20:41.0000] <devsnek>
+for now
+
+[17:20:49.0000] <devsnek>
+why do you think we have in-person meetings 👀
+
+[17:38:34.0000] <rkirsling>
+devsnek: collecting hair samples? 😱
+
+[17:39:09.0000] <devsnek>
+fingerprints
+
+[17:39:26.0000] <devsnek>
+the tc39 stickers harvest your dna as you apply them to your shiny laptop
+
+[17:45:43.0000] <bakkot>
+saved once more by never putting any decorations on anything
+
+[17:46:04.0000] <devsnek>
+except function declarations
+
+[20:06:24.0000] <devsnek>
+the pad functions remind me of ln -ls
+
+[20:06:31.0000] <devsnek>
+in that i can never remember the arguments of either
+
+[05:58:59.0000] <jorendorff>
+Iterator.from() as proposed seems weird to me
+
+[05:59:23.0000] <jorendorff>
+what is weird is that we already have GetIterator in the spec, and that's good enough for every place the spec needs to get an iterator from something
+
+[05:59:37.0000] <jorendorff>
+seems to me Iterator.from() is fine but it should just be steps 1-5 of GetIterator
+
+[05:59:45.0000] <jorendorff>
+(i mean it's fine for it to exist)
+
+[06:02:18.0000] <jorendorff>
+i'll file an issue
+
+[07:21:36.0000] <jorendorff>
+devsnek: What is the rationale for %WrapForValidIteratorPrototype%?
+
+[07:21:50.0000] <jorendorff>
+Looks like it was introduced in https://github.com/tc39/proposal-iterator-helpers/commit/49d13bd528e4488084f885a987153179d9452cf9 but the commit message doesn't say what feedback
+
+[07:45:57.0000] <jorendorff>
+filed https://github.com/tc39/proposal-iterator-helpers/issues/61
+
+[12:43:54.0000] <ryzokuken>
+ljharb: I suppose I'm not required to keep a `ToString` call after a typecheck, am I?
+
+[12:44:53.0000] <ryzokuken>
+or maybe I need to cast the string primitive to a `String`?
+
+[12:46:34.0000] <ryzokuken>
+Okay, wait, this is fun.
+
+[12:47:05.0000] <ryzokuken>
+In https://github.com/tc39/proposal-temporal/issues/230#issuecomment-548205490 we discussed adding typechecks, but what if the argument is a `String` object?
+
+[12:47:36.0000] <ryzokuken>
+Do we need to handle that? Should I let it go through and fail to be coerced and throw?
+
+[12:51:18.0000] <devsnek>
+ryzokuken: if you want a string, just use ToString
+
+[12:51:35.0000] <devsnek>
+or you can throw if it's not a string
+
+[12:51:40.0000] <ryzokuken>
+Yeeeah, I'm using `ToString` right now.
+
+[12:51:40.0000] <devsnek>
+but both is unnecessary
+
+[12:52:11.0000] <ryzokuken>
+The fun part is, we decided to merge `from` and `fromString`...
+
+[12:52:28.0000] <ryzokuken>
+and now I have this typecheck for `object`s and `string`s.
+
+[12:52:43.0000] <ryzokuken>
+But `String`s are `object`s, so it'll throw currently.
+
+[12:52:58.0000] <ryzokuken>
+idk if that's something people would be okay with?
+
+[12:55:28.0000] <devsnek>
+String as in normal string or String as in instance of %String%
+
+[12:55:57.0000] <ryzokuken>
+Yes, capital S String as in instance of `%String%`.
+
+[12:56:50.0000] <ryzokuken>
+it goes through typeof object check, but isn't a valid property bag like it's expected to be, so `from` will throw.
+
+[12:57:25.0000] <devsnek>
+that seems reasonable to me
+
+[12:57:54.0000] <ryzokuken>
+That's what I'm going with anyway, feel free to block the PR if anyone wants to discuss this behavior though.
+
+[13:43:15.0000] <ljharb>
+ryzokuken: tbh i don't think we have precedent here
+
+[13:43:25.0000] <ryzokuken>
+ljharb: :/
+
+[13:43:37.0000] <ryzokuken>
+What are your opinions?
+
+[13:43:42.0000] <ljharb>
+ryzokuken: iow i think you could make a case for "check for Type String, else Object", or, "is a string or a String object, else Object"
+
+[13:43:59.0000] <ljharb>
+i, of course, have a package you could use for the polyfill if you go with the latter
+
+[13:44:16.0000] <ryzokuken>
+Idk, throwing on `String` while accepting `string` feels weird.
+
+[13:44:21.0000] <ljharb>
+true
+
+[13:44:30.0000] <ryzokuken>
+Yeah, I'd personally prefer `String || string` too.
+
+[13:44:36.0000] <ljharb>
+but i think if you want it to be an Object or a string, a String is a big gray area
+
+[13:44:49.0000] <ryzokuken>
+lol exactly the problem.
+
+[13:45:07.0000] <ryzokuken>
+the biggest problem I'm having is not that it's a different behavior.
+
+[13:45:13.0000] <ryzokuken>
+It's that we're straight up throwing.
+
+[13:45:51.0000] <ryzokuken>
+I'd imagine a lot of people out there in the wild would pass `String`s. A lot. Unlike our test cases which are 100% literals.
+
+[13:46:15.0000] <ljharb>
+i don't imagine that
+
+[13:46:22.0000] <ljharb>
+it's nonzero but i'd guess it's an extreme rarity
+
+[13:47:14.0000] <ryzokuken>
+What? Are you sure? I think a lot of people will not have the string as a literal but rather get the value from a library or another thing that returns a `String`.
+
+[13:47:25.0000] <ryzokuken>
+Buuuuuut `Temporal.now()`
+
+[13:47:31.0000] <ljharb>
+i'm not aware of any library or thing that uses primitive objects
+
+[13:47:50.0000] <ljharb>
+it'd be super unergonomic to return a String because typeof would be misleading on it
+
+[13:47:51.0000] <ryzokuken>
+They use the `String` class, right?
+
+[13:47:53.0000] <ljharb>
+no
+
+[13:47:57.0000] <ryzokuken>
+Oh
+
+[13:48:10.0000] <ljharb>
+or rather, `Object('foo')` is instanceof String, yes
+
+[13:48:24.0000] <ljharb>
+but `typeof Object('foo') !== 'string'`, so it's generally considered super bad to produce boxed strings
+
+[13:48:32.0000] <ryzokuken>
+Wait, sorry, anyway, that shouldn't matter much either way though?
+
+[13:48:43.0000] <ljharb>
+you said "get the value from a library or another thing that returns a `String`."
+
+[13:48:48.0000] <ryzokuken>
+Yeah
+
+[13:48:52.0000] <ryzokuken>
+My bad.
+
+[13:48:53.0000] <ljharb>
+i'm saying that i think that virtually nothing in the entire ecosystem will produce a boxed string
+
+[13:50:20.0000] <ryzokuken>
+So... `typeof arg === 'string' || arg instanceof String` it is?
+
+[13:50:28.0000] <ljharb>
+no, `instanceof` is not reliable across realms
+
+[13:50:47.0000] <ryzokuken>
+you were talking about a shim of yours...
+
+[13:50:47.0000] <ljharb>
+ryzokuken: you'd have to use https://npmjs.com/is-string
+
+[13:51:20.0000] <ryzokuken>
+ljharb: question is, how would I express this in the spec text? Do we have an abstract op for this?
+
+[13:52:26.0000] <ljharb>
+ryzokuken: i think you can use "is a String exotic object", or [[StringData]] internal slot
+
+[13:52:35.0000] <ljharb>
+ryzokuken: but if you want to throw when it's not a string or String, then you can use `thisStringValue`
+
+[13:53:19.0000] <ryzokuken>
+I want two conditions: `string || String` and `non-String objects`.
+
+[13:53:28.0000] <ryzokuken>
+throw a `TypeError` otherwise.
+
+[13:53:51.0000] <ryzokuken>
+I think that'll be fairly simple in the polyfill given the module.
+
+[13:53:56.0000] <ljharb>
+agreed
+
+[13:54:26.0000] <ljharb>
+hmm - for the spec text, maybe make a "HasStringValue" abstract op, refactor `thisStringValue` to use it, and then use it in Temporal?
+
+[13:55:05.0000] <ryzokuken>
+ljharb: make "HasStringValue" in ECMA 262?
+
+[13:56:59.0000] <ljharb>
+ryzokuken: as part of temporal
+
+[13:57:14.0000] <ryzokuken>
+okay, I'll do that.
+
+[13:57:36.0000] <ryzokuken>
+will ping you if I hit any roadblocks (which I certainly will, I guess).
+
+[13:58:14.0000] <ljharb>
+sgtm
+
+[13:58:28.0000] <ryzokuken>
+great. have a nice weekend!
+
+[13:58:35.0000] <ljharb>
+you too
+
+[13:59:08.0000] <ryzokuken>
+I'd try to fix the whole `from` and `fromString` situation over the weekend so we have something nice to look at next week.
+
+[13:59:19.0000] <ryzokuken>
+hopefully a rather solid-looking public API.
+
+
+2019-11-03
+[13:39:45.0000] <bakkot>
+re: https://github.com/tc39/proposal-well-formed-stringify/issues/16, I am a little bit surprised how many languages have inconsistent handling of unpaired surrogates in JSON strings
+
+[13:39:51.0000] <bakkot>
+both rust and php, so far
+
+[13:39:55.0000] <bakkot>
+I guess I am not that surprised
+
+[14:06:30.0000] <devsnek>
+unicode is hard
+
+
+2019-11-04
+[08:37:21.0000] <bradleymeck>
+didn't someone vie for async constructors at one point?
+
+[10:15:15.0000] <devsnek>
+bradleymeck: it comes up on esdiscuss every once in a while
+
+[10:15:23.0000] <devsnek>
+and someone asked about it here a month ago or so
+
+[10:24:04.0000] <bakkot>
+it seems not totally unreasonable
+
+[10:24:23.0000] <bakkot>
+I have found myself writing `static async init()` pretty often
+
+[10:35:46.0000] <devsnek>
+bakkot: i'd argue that's what you should do though
+
+[10:36:12.0000] <bakkot>
+ehhhh
+
+[10:36:20.0000] <devsnek>
+`new` returns instance, static method for random async logic stuff
+
+[10:36:30.0000] <devsnek>
+i've used libraries where new returns promises
+
+[10:36:35.0000] <devsnek>
+its kind of annoying
+
+[10:36:51.0000] <ryzokuken>
+`static async init()` sounds A LOT like Java though.
+
+[10:37:06.0000] <devsnek>
+AsyncClassFactory
+
+[10:37:09.0000] <ryzokuken>
+`public static int main()`
+
+[10:37:10.0000] <bakkot>
+devsnek: the point is that I want it to be an invariant that a.) `new` returns an instance and b.) all instances are fully initialized
+
+[10:37:19.0000] <bakkot>
+but when full initialization requires async logic, I cannot do this
+
+[10:37:32.0000] <bakkot>
+so `new.await foo()` or whatever seems warranted
+
+[10:37:41.0000] <devsnek>
+you can just do `await new foo()`
+
+[10:37:55.0000] <bakkot>
+then `new` does not return an instance
+
+[10:37:57.0000] <devsnek>
+yeah
+
+[10:38:02.0000] <bakkot>
+(also interacts very poorly with inheritance)
+
+[10:38:07.0000] <devsnek>
+right
+
+[10:38:26.0000] <devsnek>
+i feel like we're agreeing
+
+[10:38:46.0000] <bakkot>
+... maybe?
+
+[10:38:59.0000] <bakkot>
+are you in favor of async constructors, or do you think `static async init()` is better?
+
+[10:39:14.0000] <devsnek>
+async constructors would return promises right?
+
+[10:39:34.0000] <bakkot>
+I mean, technically yes?
+
+[10:39:52.0000] <bakkot>
+but you would invoke them with `new.await`, rather than `await new`
+
+[10:40:01.0000] <devsnek>
+uh
+
+[10:40:03.0000] <devsnek>
+hmm
+
+[10:40:19.0000] <devsnek>
+i'd probably just go with `static async create()`
+
+[10:40:30.0000] <bakkot>
+(or `super.await()`, in an async constructor, I guess.)
+
+[10:40:48.0000] <bakkot>
+yeah I mean that works
+
+[10:40:53.0000] <bakkot>
+but still interacts poorly with inheritance
+
+[10:40:55.0000] <devsnek>
+this seems like the virality issue that tla has
+
+[10:40:58.0000] <devsnek>
+had*
+
+[10:41:20.0000] <bakkot>
+eh
+
+[10:41:22.0000] <devsnek>
+tla was lucky that the visible edges of graphs always happened to be async
+
+[10:41:23.0000] <bakkot>
+async things are async
+
+[10:41:37.0000] <devsnek>
+but 99.9% of constructors in js are not returning promises
+
+[10:41:53.0000] <bakkot>
+of course, because that's bad
+
+[10:41:59.0000] <bakkot>
+they are just returning not-fully-initialized instances
+
+[10:42:09.0000] <devsnek>
+yeah i'm just saying
+
+[10:42:18.0000] <devsnek>
+since constructors don't have asyncness already
+
+[10:42:21.0000] <devsnek>
+we can't add it in
+
+[10:42:22.0000] <bakkot>
+and relying on calling code to `await obj.init()`, or to never explicitly construct an object but instead do `await clazz.init()`
+
+[10:42:30.0000] <devsnek>
+without causing the viral async problem
+
+[10:42:35.0000] <bakkot>
+I don't think that is a problem?
+
+[10:42:41.0000] <bakkot>
+i guess I don't know what you mean by "problem"
+
+[10:42:43.0000] <devsnek>
+i mean `class X extends Y {}`
+
+[10:42:44.0000] <bakkot>
+async functions work fine
+
+[10:42:52.0000] <devsnek>
+you just `super()`
+
+[10:42:57.0000] <devsnek>
+doesn't matter what Y is
+
+[10:43:26.0000] <devsnek>
+async functions kind of have the same problem
+
+[10:43:42.0000] <devsnek>
+https://journal.stuffwithstuff.com/2015/02/01/what-color-is-your-function/
+
+[10:43:44.0000] <bakkot>
+are you talking about the "what color are your functions" thing?
+
+[10:43:45.0000] <bakkot>
+heh, yeah
+
+[10:43:51.0000] <devsnek>
+lol
+
+[10:44:02.0000] <bakkot>
+this is just... not really a problem, in my experience?
+
+[10:44:05.0000] <bakkot>
+async things are async
+
+[10:44:09.0000] <bakkot>
+and that's fine
+
+[10:44:10.0000] <devsnek>
+🤷🏻‍♂️
+
+[10:44:26.0000] <bakkot>
+yes, if you have an async thing deep in your stack, all calling code needs to also be async
+
+[10:44:28.0000] <bakkot>
+but, like
+
+[10:44:32.0000] <bakkot>
+it _does_ need to be async
+
+[10:44:40.0000] <bakkot>
+fundamentally, not just as a consequence of the syntax
+
+[10:44:51.0000] <devsnek>
+yeah, i'm just not sure adding syntax helps
+
+[10:45:11.0000] <bakkot>
+it helps because it allows inheritance to work for classes which require async code during initialization
+
+[10:45:26.0000] <bakkot>
+currently you basically cannot do that
+
+[10:45:43.0000] <bradleymeck>
+`return new Promise` works fine here
+
+[10:45:50.0000] <bradleymeck>
+but it is kind of hilarious
+
+[10:46:04.0000] <bakkot>
+bradleymeck: doesn't work at all with fields though
+
+[10:46:23.0000] <bakkot>
+I guess it kind of does
+
+[10:46:23.0000] <bradleymeck>
+i don't use fields currently so i guess i haven't been hit hard by that
+
+[10:46:41.0000] <devsnek>
+mfw fields
+
+[10:46:50.0000] <bakkot>
+`return new Promise(async resolve => { this.foo = await foo(); return this; })`
+
+[10:46:53.0000] <bakkot>
+not just fields though
+
+[10:47:03.0000] <bradleymeck>
+i know ive used sentinel values as guards for things when i want things only constructed my specific way (such as banning direct `new`)
+
+[10:47:44.0000] <devsnek>
+the argument to new Promise isn't async btw
+
+[10:47:47.0000] <bradleymeck>
+but these are all just goofy ways of trying to not allow people to construct things async, and people needing to do exactly that
+
+[10:48:04.0000] <bradleymeck>
+devsnek: its fine if you give it one for `await` to be usable
+
+[10:48:13.0000] <bakkot>
+devsnek: it does not matter
+
+[10:48:15.0000] <devsnek>
+i just mean, you end up with an unhandled rejection
+
+[10:48:18.0000] <devsnek>
+potentially
+
+[10:48:34.0000] <bakkot>
+yeah but whatever, handle your exceptions
+
+[10:48:40.0000] <bradleymeck>
+devsnek: how so? the return value is the promise
+
+[10:48:46.0000] <bradleymeck>
+so you still get a way to handle it
+
+[10:48:56.0000] <devsnek>
+bradleymeck: if the async function rejects nothing handles it
+
+[10:48:59.0000] <bradleymeck>
+oh, i see
+
+[10:49:14.0000] <bradleymeck>
+yea, `return Promise.resolve().then(async ...` then
+
+[10:49:27.0000] <bradleymeck>
+but this all just points to how terrible this is without helping the programmer
+
+[10:49:42.0000] <devsnek>
+yea
+
+[10:49:51.0000] <bradleymeck>
+why is there this restriction if you can do it anyway (poorly) when needed
+
+[10:49:58.0000] <bradleymeck>
+just add the `async`
+
+[10:54:28.0000] <devsnek>
+i like the restriction because it dissuades people from making async constructors
+
+[10:54:53.0000] <devsnek>
+have you ever used the mozilla source-map lib
+
+[10:59:04.0000] <bradleymeck>
+yes
+
+[10:59:45.0000] <bradleymeck>
+why dissuade though? what are you getting out of it?
+
+[10:59:49.0000] <bradleymeck>
+the class still is unusable sync
+
+[11:00:27.0000] <bradleymeck>
+i just don't understand how this benefits either side when a class does have async initialization
+
+[11:00:59.0000] <bakkot>
+yeah, curent patterns seem strictly worse
+
+[11:01:08.0000] <bakkot>
+returning a Promise rather than an instance is bad
+
+[11:01:15.0000] <bakkot>
+returning something which is not fully initialized is also bad
+
+[11:01:36.0000] <devsnek>
+i don't really think `new.await` is much better than `static async create() {}`
+
+[11:01:49.0000] <devsnek>
+that's just my opinion though :)
+
+[11:02:17.0000] <bradleymeck>
+why does it need a new keyword?
+
+[11:03:00.0000] <bakkot>
+bradleymeck: the main reason to want a new keyword is so that it can be used by subclasses invoking `super()`
+
+[11:03:14.0000] <bakkot>
+(though in that case it would be `super.await()`, not `new.await`)
+
+[11:03:36.0000] <devsnek>
+super.await is a super expression though
+
+[11:03:40.0000] <bradleymeck>
+if you have an async ctor would it ever not await super?
+
+[11:03:53.0000] <devsnek>
+syntax aside, I don't think this makes it any better
+
+[11:03:53.0000] <bakkot>
+devsnek: or whatever; ignore the particular syntax
+
+[11:03:59.0000] <devsnek>
+it's just an awkward situation
+
+[11:04:23.0000] <bakkot>
+devsnek: how is "the class can put all its initialization code in the constructor, so that the constructor never returns half-initialized instances" not better?
+
+[11:04:40.0000] <bakkot>
+I feel like "the constructor should not return instances which are not completely intialized" is a fairly bedrock principle
+
+[11:04:51.0000] <devsnek>
+you can make the constructor fail
+
+[11:05:03.0000] <devsnek>
+unless a certain symbol or something is passed
+
+[11:05:23.0000] <devsnek>
+"use X.create not new X"
+
+[11:05:45.0000] <bakkot>
+sure, yes; that seems... really a very awkward thing to be the officially blessed pattern for this common operation?
+
+[11:06:08.0000] <devsnek>
+hmm I haven't seen it that often
+
+[11:06:39.0000] <devsnek>
+of course there's also a third option
+
+[11:06:44.0000] <devsnek>
+sync constructor, async methods
+
+[11:06:45.0000] <bradleymeck>
+devsnek: how is requiring programmers to write more boilerplate helping?
+
+[11:07:06.0000] <bradleymeck>
+boilerplate has a cost of potentially being done wrong
+
+[11:07:16.0000] <bradleymeck>
+and these solutions do not seem simple
+
+[11:07:18.0000] <devsnek>
+bradleymeck: I don't think people should write them in the first place
+
+[11:07:33.0000] <bradleymeck>
+devsnek: think/should, people do and APIs are async
+
+[11:07:35.0000] <devsnek>
+sync constructor with async methods is actually really simple
+
+[11:07:56.0000] <bradleymeck>
+devsnek: how so, you have to track initialization manually?
+
+[11:08:23.0000] <devsnek>
+and then const resource = await this.#resource in methods
+
+[11:08:52.0000] <devsnek>
+hmm I think one of my messages didn't send
+
+[11:10:49.0000] <bradleymeck>
+that seems like more boilerplate arguments
+
+[11:11:07.0000] <bradleymeck>
+i don't see how forcing people to do that helps them
+
+[11:11:12.0000] <bradleymeck>
+you just don't want the alternative?
+
+[11:11:58.0000] <devsnek>
+i'm more concerned about who consumes the api
+
+[11:12:10.0000] <bradleymeck>
+what about them?
+
+[11:12:21.0000] <devsnek>
+i'd rather use something like `X.create()`
+
+[11:12:27.0000] <devsnek>
+actually i think the web does that too
+
+[11:12:47.0000] <bradleymeck>
+why
+
+[11:12:51.0000] <devsnek>
+like `navigator.getUserMedia()` instead of `new navigator.VideoFeed()`
+
+[11:12:57.0000] <bradleymeck>
+ok... but why
+
+[11:13:00.0000] <devsnek>
+wdym
+
+[11:13:09.0000] <bradleymeck>
+what invariant are you trying to prevent people from breaking
+
+[11:13:20.0000] <bradleymeck>
+what bugs are caused by using `new`
+
+[11:13:28.0000] <bradleymeck>
+i don't understand
+
+[11:13:41.0000] <devsnek>
+i just don't think its the appropriate operation
+
+[11:13:48.0000] <bradleymeck>
+how so?
+
+[11:13:54.0000] <bradleymeck>
+what is appropriate?
+
+[11:14:05.0000] <bradleymeck>
+cause new Promise certainly uses new
+
+[11:14:09.0000] <bradleymeck>
+as do subclasses of it
+
+[11:14:20.0000] <devsnek>
+and you get a promise out of it
+
+[11:14:33.0000] <bradleymeck>
+a promise to *something*
+
+[11:14:39.0000] <devsnek>
+right
+
+[11:14:45.0000] <bradleymeck>
+so how is that different?
+
+[11:14:46.0000] <devsnek>
+you could do `async constructor`
+
+[11:14:52.0000] <bakkot>
+devsnek: you don't think `new` is the appropriate operation for... getting a new instance of a class?
+
+[11:14:54.0000] <devsnek>
+and get the same pattern
+
+[11:14:57.0000] <bakkot>
+that seems like probably not the claim you meant
+
+[11:15:00.0000] <devsnek>
+i just dislike such a pattern
+
+[11:15:02.0000] <bakkot>
+but I don't know what claim you meant, if not that
+
+[11:15:04.0000] <devsnek>
+on a subjective level
+
+[11:15:21.0000] <bradleymeck>
+i just don't see what is dislikable
+
+[11:15:37.0000] <bradleymeck>
+you call a constructor, which totally doesn't guarantee you get an instance anyway
+
+[11:18:22.0000] <devsnek>
+i'm saying this the same way i would say my favourite colour is purple
+
+[11:18:30.0000] <devsnek>
+its just what i prefer
+
+[11:18:31.0000] <bradleymeck>
+and no once can like blue?
+
+[11:18:35.0000] <bradleymeck>
+no one*
+
+[11:18:42.0000] <devsnek>
+no go ahead and like blue
+
+[11:18:49.0000] <bradleymeck>
+but you dislike blue
+
+[11:18:55.0000] <bradleymeck>
+and so they shouldn't be using blue
+
+[11:18:57.0000] <devsnek>
+i'm not objecting to you liking blue
+
+[11:19:06.0000] <bradleymeck>
+you are objecting to me using blue because you want purple
+
+[11:19:10.0000] <devsnek>
+i was just saying my opinion
+
+[11:19:36.0000] <bradleymeck>
+and your opinion differs from wanting to prevent people from using blue?
+
+[11:20:40.0000] <devsnek>
+i was saying the web pattern seems okay to me
+
+[11:20:54.0000] <devsnek>
+and i wasn't sure there was a huge motivation to need something else
+
+[11:21:15.0000] <bradleymeck>
+it was more than saying that one pattern seems ok
+
+[11:21:24.0000] <bradleymeck>
+it was stating that another was not ok
+
+[11:21:37.0000] <bradleymeck>
+or at least dislikable
+
+[11:22:17.0000] <bradleymeck>
+even if one pattern is ok, that shouldn't preclude other patterns from being usable
+
+[11:22:18.0000] <devsnek>
+i was just saying i was surprised people want more of that pattern
+
+[11:24:21.0000] <devsnek>
+like that esdiscuss topic about giving js significant whitespace instead of braces
+
+[11:25:18.0000] <devsnek>
+subjectively not a fan, and if enough people are subjectively not fans of it, it won't happen
+
+[11:34:03.0000] <bradleymeck>
+not really true, i am not a fan of a variety of things that does not mean i attempt to block them
+
+[11:34:47.0000] <devsnek>
+i'm not trying to block anything lol
+
+[11:35:28.0000] <bradleymeck>
+i'm stating that all but 1 could not be fans of something but if that 1 champion pushes it even with that it would still go through unless someone does block it
+
+[11:35:49.0000] <devsnek>
+i'm just trying to suggest alternatives that don't require modifying the language, which is usually where stuff starts out
+
+[11:35:50.0000] <bradleymeck>
+not liking some proposal doesn't prevent things from landing
+
+[11:36:29.0000] <bradleymeck>
+we have the alternatives already though and they are troublesome, the reasons by which we are being told to pursue those troubles is unclear
+
+[11:36:45.0000] <bradleymeck>
+modifying the language is what tc39 is discussing all the time
+
+[12:01:26.0000] <bakkot>
+devsnek: I still don't understand what exactly it is that you dislike
+
+[12:01:55.0000] <devsnek>
+i just don't get the pattern
+
+[12:02:10.0000] <devsnek>
+like in node we create a handle synchronously and emit an error event
+
+[12:02:17.0000] <devsnek>
+the web has functions that return promises
+
+[12:02:30.0000] <bakkot>
+you don't get having async initialization code?
+
+[12:02:36.0000] <bakkot>
+or... some other pattern?
+
+[12:02:42.0000] <devsnek>
+i don't understand why async constructors are better than doing those things
+
+[12:03:36.0000] <devsnek>
+i get that performing work asynchronously is needed obviously
+
+[12:03:39.0000] <bakkot>
+I don't know what the first things refers to; you generally can't do things synchronously
+
+[12:03:44.0000] <bakkot>
+the functions-returning-promises thing isn't really used with classes, afaict
+
+[12:04:32.0000] <bakkot>
+it works fine if you are just not using classes at all, of course
+
+[12:04:46.0000] <devsnek>
+i don't write that many libraries, but node and the web do this thing where they have some X class with a constructor that always throws, then a `createX` function that creates an instance
+
+[12:05:24.0000] <bakkot>
+but to make it work with a class, you have to do awkward things like forbidding `new`, which is boilerplate you really do not want to require everyone to add, and also a.) does not work with inheritance and b.) requires splitting your initialization code across the constructor and some other async function
+
+[12:06:06.0000] <bakkot>
+is your position that everyone who wants to use classes and has async code should just have that boilerplate to forbid `new`, not use inheritance, and split their intialization code across the constructor and some other async function?
+
+[12:06:25.0000] <devsnek>
+the constructor doesn't generally do anything
+
+[12:06:40.0000] <devsnek>
+but what i mean is people don't usually want to subclass them anyway
+
+[12:06:46.0000] <devsnek>
+because dealing with that in an async way sucks
+
+[12:06:57.0000] <bakkot>
+... right, the proposal would be to make it not suck
+
+[12:07:05.0000] <devsnek>
+i think it would still suck
+
+[12:07:07.0000] <devsnek>
+just in a different way
+
+[12:07:30.0000] <bakkot>
+though I think people mainly do not subclass because node classes and web classes aren't really intended to be subclassed, with some rare exceptions
+
+[12:08:07.0000] <bakkot>
+in what way would it still suck?
+
+[12:08:20.0000] <devsnek>
+like if i wanted to create my own class that provided the functionality
+
+[12:08:20.0000] <bakkot>
+just that you have to make any class which extends an async class also async?
+
+[12:08:23.0000] <bakkot>
+that does not seem so bad.
+
+[12:08:29.0000] <devsnek>
+i'd probably wrap it so that it was a sync constructor with async methods
+
+[12:08:35.0000] <devsnek>
+since that's a nicer api to use
+
+[12:08:40.0000] <devsnek>
+i wouldn't subclass it
+
+[12:09:00.0000] <bakkot>
+I don't think that's actually a nicer API, if the methods are sync once initialization has completed?
+
+[12:09:09.0000] <bakkot>
+like, let's say my class is a wrapper for values returned by some API
+
+[12:09:10.0000] <devsnek>
+they aren't
+
+[12:09:15.0000] <bakkot>
+... why not
+
+[12:09:25.0000] <bakkot>
+wait, what do you mean by "why not"
+
+[12:09:29.0000] <bakkot>
+er
+
+[12:09:33.0000] <bakkot>
+what do you mean by "they aren't"
+
+[12:09:45.0000] <devsnek>
+`async doThing() { const x = await this.#x; }`
+
+[12:09:54.0000] <devsnek>
+it doesn't become sync once `this.#x` fulfills
+
+[12:09:57.0000] <bakkot>
+right, of course you can write that
+
+[12:10:17.0000] <bakkot>
+my point is, you can also have a situation where there is one async operation in the lifetime of the class, which occurs during initialization
+
+[12:10:24.0000] <bakkot>
+and every method invocation after that point can be synchronous
+
+[12:10:42.0000] <bakkot>
+making them have to be async at that point seems like a strictly worse API to use
+
+[12:11:08.0000] <devsnek>
+just having worked with both patterns
+
+[12:11:16.0000] <devsnek>
+i prefer the async method one
+
+[12:11:27.0000] <devsnek>
+source-map uses the async constructor pattern if you want to try it out
+
+[12:11:34.0000] <bakkot>
+I think you are literally the only person I have ever heard express that preference
+
+[12:11:54.0000] <bakkot>
+every one else I have ever talked to prefers things to be sync when they can be sync
+
+[12:12:16.0000] <devsnek>
+"when they can be sync" is pretty abstract
+
+[12:12:28.0000] <devsnek>
+if they aren't exposed synchronously you'd never know
+
+[12:12:52.0000] <bakkot>
+of course sometimes you do not know when an API is more awkward than it needs to be because you do not know about the library interals
+
+[12:13:10.0000] <bakkot>
+but it still seems like, as the library author, given the choice of making your API less awkward, you should do so
+
+[12:13:18.0000] <bakkot>
+sync methods are generally less awkward than async methods
+
+[12:13:23.0000] <devsnek>
+i rewrote the source-map library to not use async constructors
+
+[12:13:33.0000] <devsnek>
+which in my mind was making the api less awkward
+
+[12:13:39.0000] <devsnek>
+i guess to you that makes it more awkward
+
+[12:14:05.0000] <bakkot>
+I agree that the current patterns for async constructors themselves are not great, but again, the point of this would be to make those better
+
+[12:14:22.0000] <bakkot>
+after that point - once the class has been constructed - you agree that sync methods are easier to use, yes?
+
+[12:14:32.0000] <devsnek>
+sure
+
+[12:14:33.0000] <devsnek>
+well
+
+[12:14:36.0000] <devsnek>
+maybe
+
+[12:14:40.0000] <devsnek>
+i don't mind writing `.then` and `await`
+
+[12:14:53.0000] <bakkot>
+sure, but it easier all around if you don't have to
+
+[12:14:58.0000] <devsnek>
+i'm just saying, as a consumer, there isn't a huge difference between `await new x` and `new.await x`
+
+[12:15:07.0000] <devsnek>
+i understand not using new Promise in your constructor is nice
+
+[12:15:19.0000] <bakkot>
+there is a huge difference when inheritance is involved
+
+[12:15:50.0000] <bakkot>
+sometimes the way a class is consumed is by subclassing it
+
+[12:15:50.0000] <devsnek>
+actually, do you have examples of things where this would help with inheritence?
+
+[12:15:53.0000] <devsnek>
+i'm curious
+
+[12:16:40.0000] <bakkot>
+specifically, the case is that your superclass needs to do some async initialization, and your constructor code needs to wait for the superclass instance to be fully initialized before it can do its thing
+
+[12:16:50.0000] <devsnek>
+yeah i get the idea
+
+[12:16:57.0000] <devsnek>
+i've just never really encountered this problem
+
+[12:17:09.0000] <devsnek>
+like normally things acquired asynchronously represent data, not functionality, so people don't tend to subclass them, they tend to wrap them
+
+[12:17:15.0000] <devsnek>
+at least in my experience
+
+[12:17:48.0000] <bakkot>
+classes marry data and functionality; that's kind of the point
+
+[12:17:48.0000] <devsnek>
+or the subclass is separate from the async part
+
+[12:18:06.0000] <devsnek>
+like in discord.js, the thing that creates a message instance is not `new Message`
+
+[12:18:22.0000] <devsnek>
+its receiving a message over a channel of data, so subclassing the message instance doesn't break anything
+
+[12:18:28.0000] <devsnek>
+it still gets created synchronously
+
+[12:18:57.0000] <devsnek>
+subclassing the message class*
+
+[12:20:37.0000] <devsnek>
+bakkot: i'm saying, classes aren't usually responsible for acquiring the data
+
+[12:21:07.0000] <bakkot>
+classes are often responsible for transforming the data into a suitable internal representation, though, and that is sometimes not a sync operation
+
+[12:21:18.0000] <zenparsing>
+coming up with a way to do inheritance for an abstraction where initialization is async takes a bit of finesse and creativity perhaps, but I think an "async constructor" cure would be worse than the disease - it will tend to muddy the waters between memory allocation/initialization and event-loop programming.
+
+[12:22:20.0000] <bakkot>
+zenparsing: yeah, I don't know that `async constructor` is necessarily the right solution; haven't thought about it much. mostly just gesturing at the existence of the problem.
+
+[12:22:28.0000] <bakkot>
+though, say more about "muddy the waters between memory allocation/initialization and event-loop programming"?
+
+[12:23:37.0000] <bakkot>
+specifically, it is not obvious how async constructors do that any more than any other class would; possibly I do not know what you are referring to
+
+[12:23:56.0000] <devsnek>
+node file handles as an example, could use this in theory
+
+[12:24:02.0000] <devsnek>
+but I'm not sure there would be a point
+
+[12:24:11.0000] <devsnek>
+consumers wrap them, they wouldn't want to subclass them
+
+[12:24:45.0000] <devsnek>
+I've just never had a time I wanted to do this, so I'm curious about specific examples
+
+[12:25:57.0000] <devsnek>
+source-map should arguably return a promise to the complete library with sync constructors with sync methods on them
+
+[12:26:36.0000] <devsnek>
+its only async because of loading wasm
+
+[12:28:04.0000] <bakkot>
+devsnek: riffing off that, one could imagine a class which, internally, dynamically generates and loads some wasm, and exposes a sync interface to the underlying wasm
+
+[12:28:27.0000] <bakkot>
+consumers would not need to know wasm was involved at all
+
+[12:29:05.0000] <bakkot>
+and subclasses could build new methods on top of the existing ones, or overload them to provide more checks than the base class does, or whatever
+
+[12:29:08.0000] <devsnek>
+i mean thats kind of what it does now
+
+[12:29:17.0000] <devsnek>
+it returns a promise from the constructor
+
+[12:30:23.0000] <devsnek>
+it's also the only lib I know of that does that
+
+[12:35:44.0000] <devsnek>
+I guess you can subclass it by doing `return super().then(...)`
+
+[12:43:17.0000] <bakkot>
+yeah
+
+[12:43:59.0000] <bakkot>
+not really natural though
+
+[12:48:56.0000] <devsnek>
+bakkot: but you're suggesting kind of the same pattern, just with await, right?
+
+[12:49:16.0000] <devsnek>
+like a sync function using .then vs an async function using await
+
+[12:50:39.0000] <bakkot>
+yeah
+
+[12:50:45.0000] <bakkot>
+with roughly the same advantages and disadvantages
+
+
+2019-11-05
+[21:11:15.0000] <devsnek>
+does anyone know anyone who is really good with babel transforms
+
+[21:11:22.0000] <devsnek>
+or is anyone really good with babel transforms
+
+[21:12:00.0000] <devsnek>
+i need to recursively expand call arguments to separate variables
+
+[09:07:35.0000] <bradleymeck>
+devsnek: can you expand on that
+
+[09:08:03.0000] <bradleymeck>
+you mean move call arguments ala `foo(x,y)` to `let _0 = x, _1 = y; foo(_0, _1);` ?
+
+[09:08:16.0000] <devsnek>
+nice pun
+
+[09:08:22.0000] <devsnek>
+and yeah
+
+[09:08:25.0000] <devsnek>
+i figured it out though
+
+[09:08:39.0000] <devsnek>
+https://github.com/engine262/engine262/blob/master/transform.js#L124
+
+
+2019-11-06
+[19:58:08.0000] <jmdyck>
+devsnek: does engine262 do Annex B?
+
+[19:58:14.0000] <devsnek>
+jmdyck: no
+
+[19:58:22.0000] <devsnek>
+well it uses acorn so it does annex b syntax
+
+[19:58:32.0000] <devsnek>
+but i haven't implemented any annex b runtime semantics
+
+[19:59:34.0000] <jmdyck>
+ok, that fits then. I found a mistake in one of my eliminate-lex-env commits, but it's in one of the Annex B insertions
+
+[19:59:41.0000] <devsnek>
+heh
+
+[19:59:53.0000] <devsnek>
+i'm planning to implement annex b stuff when it gets "merged"
+
+
+2019-11-07
+[20:33:44.0000] <devsnek>
+is anyone planning on extending Math methods for bigint
+
+[21:53:11.0000] <ljharb>
+devsnek: i haven’t had time to make a proposal but yes, I’m super on board for championing that
+
+[07:07:54.0000] <chicoxyzzy>
+l gf z xx
+
+[07:08:47.0000] <chicoxyzzy>
+oops sorry 😅
+
+[08:29:50.0000] <devsnek>
+how old were you when you realized that class declarations are mutable
+
+[08:41:47.0000] <rkirsling>
+I mean JS being JS, it's as expected, I would say
+
+[08:43:25.0000] <rkirsling>
+"it's not mutable unless I say so" is one of the best parts of Rust, but you kind of need to have a language be like that from the get-go
+
+[08:43:44.0000] <devsnek>
+i thought engine262 had a bug when class X{} X = 1 reassigned X
+
+[08:48:28.0000] <rkirsling>
+tbf I would've assumed that `class X {}` and `let X = class X {};` had some sort of edge-case difference that I hadn't thought about
+
+[08:49:31.0000] <rkirsling>
+but you can always make that `const` whereas the reverse wouldn't've been true
+
+[08:49:45.0000] <devsnek>
+i always thought it was `const`
+
+[08:57:25.0000] <rkirsling>
+it makes sense if you consider the pre-ES6 code it was aiming to streamline though
+
+[09:00:36.0000] <devsnek>
+yeah
+
+[10:31:31.0000] <bakkot>
+devsnek: the flatMap functions in the iterator helpers proposal still don't get errors right
+
+[10:31:49.0000] <bakkot>
+for some reason https://github.com/tc39/proposal-iterator-helpers/issues/54 is locked so I can't comment there
+
+[10:32:07.0000] <bakkot>
+(I neglected to review them for correctness when I was touching them for #55, sorry)
+
+[10:52:56.0000] <devsnek>
+bakkot: oh yeah that issue was more just a reminder for me, you can open a separate one
+
+[10:53:04.0000] <bakkot>
+√
+
+[10:57:55.0000] <devsnek>
+littledan: thats a lotta issues
+
+[10:58:18.0000] <littledan>
+devsnek: I dunno, those are the substantial issues I want to discuss
+
+[10:58:25.0000] <devsnek>
+no they're good
+
+[10:58:29.0000] <devsnek>
+it was just kinda funny
+
+[10:58:43.0000] <littledan>
+no need to answer all the questions right up front! We'll have to bring in a lot of stakeholders here to find thorough answers
+
+[10:58:54.0000] <devsnek>
+indeed
+
+[10:59:11.0000] <littledan>
+yeah I have been drafting this for some time. I wanted to get it posted last week, but, you know how it is...
+
+[11:12:20.0000] <devsnek>
+littledan: i'm just not sure of this syntax because its kind of unclear what systems that don't support the metadata are supposed to do
+
+[11:12:29.0000] <devsnek>
+ignore it? error on unknown fields?
+
+[11:12:50.0000] <littledan>
+what systems would not support metadata?
+
+[11:13:04.0000] <devsnek>
+like my postgresql js implementation supports field x
+
+[11:13:08.0000] <devsnek>
+node doesn't support field x
+
+[11:13:15.0000] <devsnek>
+does node throw, ignore, something else?
+
+[11:13:29.0000] <devsnek>
+in either case you could end up with unexpected behaviour
+
+[11:34:06.0000] <devsnek>
+ljharb: arguments that are "not present" are undefined?
+
+[11:34:16.0000] <ljharb>
+devsnek: yes
+
+[11:34:25.0000] <ljharb>
+devsnek: i believe there’s somewhere in the spec that says that
+
+[11:34:41.0000] <devsnek>
+i understood that to only be times when the phrase "not present" isn't in play
+
+[11:34:44.0000] <devsnek>
+perhaps i misread it
+
+[11:34:56.0000] <ljharb>
+the phrase “present” is the only way to distinguish
+
+[11:35:07.0000] <ljharb>
+so you *can* distinguish, but you needn't
+
+[11:35:22.0000] <ljharb>
+and places where it’s observably distinguished to user code are considered legscy
+
+[11:35:23.0000] <ljharb>
+*legacy
+
+[11:36:01.0000] <devsnek>
+i guess in that case, that pr to iterator helpers is good as is
+
+[11:36:20.0000] <devsnek>
+what a weird problem
+
+[12:33:20.0000] <devsnek>
+bakkot: shouldn't we only call IteratorClose for errors that don't happen because of iterator protocol stuff
+
+[12:33:56.0000] <bakkot>
+devsnek: I realized when I was making this PR that you might have interpreted my previous statement about this to mean that
+
+[12:34:10.0000] <bakkot>
+understandably, since it was ambiguous
+
+[12:34:13.0000] <devsnek>
+oh no
+
+[12:34:40.0000] <bakkot>
+but I think the correct thing is, we do not call IteratorClose on an _iterator which is broken_, in the sense of failing to conform to the iterator prototocol
+
+[12:34:55.0000] <bakkot>
+but if some _other_ iterator is broken, that's not the fault of the first iterator, so it still needs to get closed gracefully
+
+[12:34:55.0000] <devsnek>
+oh i see
+
+[12:34:59.0000] <devsnek>
+this closes the outer iterator
+
+[12:35:02.0000] <bakkot>
+yeah exactly
+
+[12:35:17.0000] <devsnek>
+got it got it
+
+[12:35:56.0000] <devsnek>
+also seems i need to figure out the order of arguments for IfAbruptCloseIterator
+
+
+2019-11-08
+[19:04:28.0000] <jmdyck>
+I don't think the spec says that not-present *operation* args are undefined
+
+[19:05:27.0000] <jmdyck>
+so you have to distinguish between operations and built-in functios
+
+[20:38:45.0000] <ljharb>
+jmdyck: i guess that’s true, it doesn’t say anything about it either way - but since they’re conceptually the same as normal function calls, and use the same notation, that seems like more a gap in https://tc39.es/ecma262/#sec-algorithm-conventions-abstract-operations than anything else
+
+[20:41:38.0000] <jmdyck>
+i don'
+
+[20:41:51.0000] <jmdyck>
+I don't know -- it might be intentional.
+
+[20:43:07.0000] <jmdyck>
+i.e., there's no need to define a "default" value for missing op args because op algorithms will/should always check for the presence of optional args.
+
+[20:44:41.0000] <ljharb>
+that’s true
+
+[20:45:03.0000] <ljharb>
+it’s certainly cleaner for an abstract op to pivot on presence
+
+[20:47:57.0000] <devsnek>
+https://github.com/tc39/proposal-iterator-helpers/issues/63
+
+[20:48:58.0000] <jmdyck>
+It looks like there are a few cases where an alg should be checking for presence but isn't.
+
+[20:50:00.0000] <devsnek>
+are you talking about 63 or something else
+
+[20:52:46.0000] <jmdyck>
+not talking about 63.
+
+[20:52:53.0000] <devsnek>
+bakkot: the next value propagation is kind of weird tbh, it doesn't work at all for stuff like filtering and flat mapping
+
+[20:53:17.0000] <devsnek>
+s/doesn't work/doesn't map cleanly/
+
+[20:53:32.0000] <bakkot>
+devsnek: yeah agreed
+
+[20:53:51.0000] <jmdyck>
+ljharb: correction: not "a few cases", just one case (that I know of): OrdinaryCreateFromConstructor
+
+[20:53:55.0000] <devsnek>
+actually i think filter might need changes in that case
+
+[20:54:12.0000] <devsnek>
+next(v) will call next(v) on the inner iterator multiple times i think
+
+[20:55:23.0000] <jmdyck>
+OrdinaryCreateFromConstructor has a sentence in the protocol that gives a 'default value' for the optional param, but the alg itself doesn't accomplish that.
+
+[21:08:29.0000] <ljharb>
+jmdyck: that’s done with steps tho all over the place, that one’s just in prose
+
+[21:08:45.0000] <ljharb>
+using default arg syntax would probably clean up a lot of abstract ops :-)
+
+[21:11:10.0000] <devsnek>
+what if built-in generators enqueue NormalCompletion(~empty~) instead of NormalCompletion(undefined) when next is called with no args
+
+[21:17:09.0000] <jmdyck>
+ljharb: that's what i'm saying: it's just in the prose, not in the alg.
+
+[21:17:33.0000] <devsnek>
+ljharb: we use default arg syntax in engine262
+
+[21:18:10.0000] <devsnek>
+maybe horrifying https://github.com/engine262/engine262/blob/master/src/intrinsics/DataView.mjs#L17
+
+[21:44:39.0000] <ljharb>
+devsnek: would `.next()` and `.next(undefined)` be observably different?
+
+[21:45:07.0000] <devsnek>
+next() calls the wrapped iterator next()
+
+[21:45:15.0000] <devsnek>
+next(undefined) calls the wrapped iterator next(undefined)
+
+[21:45:18.0000] <ljharb>
+i meant for builtin generators
+
+[21:45:28.0000] <devsnek>
+yeah that's how they'd be different
+
+[21:45:51.0000] <devsnek>
+https://github.com/tc39/proposal-iterator-helpers/issues/63
+
+[21:47:27.0000] <ljharb>
+i guess i’m confused about the overarching issue
+
+[21:47:47.0000] <devsnek>
+basically you call next() on a built-in generator
+
+[21:47:54.0000] <devsnek>
+which results in `Yield()` returning `undefined`
+
+[21:48:01.0000] <devsnek>
+and then it does `IteratorNext(iterated, undefined)`
+
+[21:48:09.0000] <devsnek>
+instead of `IteratorNext(iterated)`
+
+[21:48:14.0000] <ljharb>
+ok so absent your proposal, how would this come up
+
+[21:48:45.0000] <devsnek>
+wdym
+
+[21:49:12.0000] <devsnek>
+if we miss the "is present" check at any point
+
+[21:49:25.0000] <devsnek>
+we might accidentally call with [undefined]
+
+[21:49:29.0000] <devsnek>
+regardless of my proposal
+
+[21:57:22.0000] <ljharb>
+i mean, with the current spec, where would i be observing “the thing that issue 33 would change"
+
+[21:57:48.0000] <devsnek>
+i don't think you would
+
+[21:57:59.0000] <devsnek>
+none of our iterators forward next args at the moment
+
+[22:01:38.0000] <ljharb>
+where would `arguments.length === 0` be observable
+
+[22:02:58.0000] <devsnek>
+like `x.map().next()`
+
+[22:03:03.0000] <devsnek>
+would call `x.next(undefined)`
+
+[22:03:08.0000] <devsnek>
+vs `x.next()`
+
+[22:04:44.0000] <ljharb>
+it seems better to avoid that, if possible
+
+[22:05:04.0000] <ljharb>
+ie i think language things shouldn’t be passing `undefined` if it can omit the arg instead
+
+[22:05:28.0000] <devsnek>
+yeah thats why i brought this up lol
+
+[22:05:47.0000] <devsnek>
+wanted some opinions from folks on it (https://github.com/tc39/proposal-iterator-helpers/issues/63)
+
+[22:08:32.0000] <ljharb>
+in your diff, i don’t like "is a built-in generator"
+
+[22:08:44.0000] <ljharb>
+why is that part needed?
+
+[22:09:16.0000] <devsnek>
+because we can't pass ~empty~ to jsland
+
+[22:09:34.0000] <ljharb>
+right, but you can omit an argument
+
+[22:09:40.0000] <devsnek>
+?
+
+[22:09:44.0000] <devsnek>
+it goes to Yield
+
+[22:09:51.0000] <devsnek>
+Yield just returns something
+
+[22:10:01.0000] <ljharb>
+ftr i don’t have a complete understanding here of how generators work in the spec
+
+[22:10:01.0000] <devsnek>
+a completion
+
+[22:10:08.0000] <devsnek>
+oh ok
+
+[22:10:23.0000] <devsnek>
+basically yield suspends the context
+
+[22:10:24.0000] <ljharb>
+so `Yield()` returns something; it could be undefined
+
+[22:10:38.0000] <devsnek>
+later, the context is resumed with a completion
+
+[22:10:43.0000] <ljharb>
+so can’t Yield return `NormalCompletion(~empty~)` for *any* next call with zero args?
+
+[22:10:50.0000] <devsnek>
+and the Yield that suspended the context returns that completion
+
+[22:11:13.0000] <devsnek>
+no
+
+[22:11:29.0000] <devsnek>
+because then in js code, `yield` would return ~empty`
+
+[22:11:32.0000] <devsnek>
+~empty~*
+
+[22:13:42.0000] <ljharb>
+sure but the syntactic yield could convert empty to undefined
+
+[22:13:48.0000] <ljharb>
+the abstract op doesn’t have to do that
+
+[22:14:03.0000] <devsnek>
+hmm
+
+[22:14:28.0000] <devsnek>
+perhaps
+
+[14:56:18.0000] <devsnek>
+why does the spec have lists of errors for parsing
+
+[14:56:23.0000] <devsnek>
+does anything actually have that ability
+
+[15:04:25.0000] <rkirsling>
+lists?
+
+[15:04:59.0000] <devsnek>
+"Otherwise, let body be a List of one or more SyntaxError objects representing the parsing errors and/or early errors."
+
+[15:05:27.0000] <devsnek>
+if you hit an error, how can you even continue on to find more errors
+
+[15:05:43.0000] <rkirsling>
+oh
+
+[15:06:23.0000] <devsnek>
+i'd imagine there's a reason this is here
+
+[15:06:26.0000] <devsnek>
+just
+
+[15:06:32.0000] <devsnek>
+i'm really not sure what it is
+
+[15:06:34.0000] <rkirsling>
+I mean I think it makes sense from a spec perspective
+
+[15:07:07.0000] <rkirsling>
+https://www.irccloud.com/pastebin/iKorTR7Z/
+
+[15:07:10.0000] <rkirsling>
+dammit
+
+[15:07:18.0000] <rkirsling>
+did not mean to make a snippet
+
+[15:07:24.0000] <rkirsling>
+if there are a bunch that apply the spec can concat as many as it likes but ultimately
+
+[15:07:24.0000] <rkirsling>
+> If more than one parsing error or early error is present, the number and ordering of error objects in the list is implementation-dependent, but at least one must be present.
+
+[15:07:37.0000] <rkirsling>
+(I wish "send as messages" were the default option...)
+
+[15:07:49.0000] <devsnek>
+i guess you could find multiple early errors
+
+[15:08:02.0000] <devsnek>
+i don't think multiple syntax errors is possible with the grammar though
+
+[15:08:27.0000] <devsnek>
+jmdyck: is this right?
+
+
+2019-11-09
+[21:32:09.0000] <jmdyck>
+devsnek: multiple early errors is certainly possible.
+
+[21:32:22.0000] <jmdyck>
+as for multiple parsing errors,
+
+[21:34:28.0000] <jmdyck>
+you can have a parser that, after an error, continues, attempts to get back on track, and maybe discovers subsequent errors.
+
+[21:38:30.0000] <jmdyck>
+I don't actually know if anyone writes that kind of parser any more.
+
+[11:01:19.0000] <bakkot>
+babel does that now!
+
+[11:01:24.0000] <bakkot>
+and is working on doing it better
+
+[11:21:20.0000] <devsnek>
+jmdyck: bakkot: multiple parser errors?
+
+[11:21:43.0000] <devsnek>
+I asked about parsers that could continue here a while ago and was told that wasn't really possible
+
+[11:21:50.0000] <bakkot>
+yeah
+
+[11:22:09.0000] <bakkot>
+you can't do it 100%, obviously, but you can do it a little bit sometimes
+
+[11:22:23.0000] <bakkot>
+also you can do it for most early errors quite well, since they're kind of after-the-fact
+
+[11:22:49.0000] <devsnek>
+yeah early errors for sure
+
+[11:23:30.0000] <bakkot>
+(except for errors like the one forbidding await expressions in async arrow heads, since that affects tokenization and no one wants to re-tokenize)
+
+[11:23:44.0000] <bakkot>
+anyway https://babeljs.io/blog/2019/11/05/7.7.0#parser-error-recovery-10363-https-githubcom-babel-babel-pull-10363
+
+[11:24:33.0000] <bakkot>
+anyway error recovery is a whole thing
+
+
+2019-11-10
+[21:57:31.0000] <Jessidhia>
+hmm... what is the fate of decorators? I haven't seen many public signs of activity for like a month 🤔
+
+[11:14:16.0000] <devsnek>
+should test262 attempt to test the full conformance of JSON.parse
+
+[11:40:26.0000] <ljharb>
+yes
+
+[11:40:36.0000] <ljharb>
+does it not?
+
+[11:44:57.0000] <devsnek>
+I found a few number parsing cases that aren't caught
+
+
+2019-11-11
+[18:09:50.0000] <devsnek>
+AggregateError.proottype.toString is just Error.prototype.toString with a single string name change, is this intentional?
+
+[18:11:12.0000] <bakkot>
+devsnek: https://github.com/tc39/proposal-promise-any/pull/37#discussion_r329601782
+
+[18:11:19.0000] <bakkot>
+see also https://github.com/tc39/proposal-promise-any/issues/36
+
+[18:11:27.0000] <devsnek>
+i'm looking at 36 rn
+
+[18:11:28.0000] <devsnek>
+not much in it
+
+[18:11:56.0000] <bakkot>
+the specific comment in 37 which I linked is I think the last anyone actually thought about the question
+
+[18:12:00.0000] <bakkot>
+(cc mathiasbynens)
+
+[18:12:17.0000] <devsnek>
+i'm looking at https://tc39.es/proposal-promise-any/#sec-aggregate-error.prototype.toString
+
+[18:12:31.0000] <devsnek>
+it seems like this could be an internal slot that changes the default string value
+
+[18:12:42.0000] <devsnek>
+so you don't get inconsistent formatting
+
+[18:12:50.0000] <devsnek>
+for example Error.prototype.toString.call is fairly common
+
+[18:13:09.0000] <devsnek>
+well "fairly common" is relative
+
+[18:13:16.0000] <devsnek>
+but debug tooling does it a lot
+
+[18:15:16.0000] <devsnek>
+might as well just comment this on 36
+
+[18:16:43.0000] <bakkot>
+oh, is your question why is this not omittied entirely, so that it would inherit from error.prototype?
+
+[18:16:48.0000] <bakkot>
+that seems reasonable to me
+
+[18:17:10.0000] <bakkot>
+given that there are no other behavior changes
+
+[18:17:14.0000] <devsnek>
+yeah
+
+[18:17:55.0000] <bakkot>
+having the name come from `this.name` and fall back to `Error` seems totally reasonable; no one is likely to be deleting `AggregateError.prototype.name` anyway
+
+[18:18:55.0000] <devsnek>
+i don't think the default even needs overriding
+
+[18:19:02.0000] <devsnek>
+just removing the method from AggregateError should be enough
+
+[18:19:07.0000] <bakkot>
+yeah, that's what I meant
+
+[18:19:12.0000] <devsnek>
+👍🏻
+
+[18:21:37.0000] <ljharb>
+it doesn't really make sense to me tho to have it not look at the errors slot
+
+[18:21:58.0000] <devsnek>
+huh
+
+[18:21:59.0000] <ljharb>
+altho the `Error.prototype.toString.call` argument is decent
+
+[18:22:12.0000] <bakkot>
+ljharb: 'message' can refer to the errors, yeah?
+
+[18:22:19.0000] <bakkot>
+and that gets added to the tostring
+
+[18:22:24.0000] <ljharb>
+i suppose that's true
+
+[18:22:37.0000] <devsnek>
+as its currently specified its an exact clone of Error.prototype.toString
+
+[18:22:47.0000] <ljharb>
+but what i mean is, i'd prefer to find a way that isn't just "gee willikers, i sure hope impls make this useful"
+
+[18:23:02.0000] <devsnek>
+i suppose if it was different in some way i wouldn't have brought it up
+
+[18:23:03.0000] <ljharb>
+devsnek: yeah i know, an explicit step about the errors was removed
+
+[18:23:12.0000] <ljharb>
+prior to you bringing it up (and it's valid to bring up now)
+
+[18:23:19.0000] <bakkot>
+ljharb: fwiw that is my usual approach to error messages
+
+[18:23:23.0000] <bakkot>
+in the spec
+
+[18:23:58.0000] <bakkot>
+clarity of error messages is something impls have historically competed and iterated on, at least a little, and spec'ing them hinders that
+
+[18:24:11.0000] <ljharb>
+yeah true, i'm torn
+
+[18:24:14.0000] <bakkot>
+(I know that many of those messages are now depended upon by code, but still)
+
+[18:24:17.0000] <devsnek>
+did y'all see what v8 did with JSON.stringify circular errors
+
+[18:24:23.0000] <bakkot>
+did not
+
+[18:24:33.0000] <devsnek>
+https://gc.gy/40986295.png
+
+[18:24:39.0000] <bakkot>
+hah, nice
+
+[18:27:09.0000] <devsnek>
+has anything implemented AggregateError yet
+
+[18:27:26.0000] <devsnek>
+besides core-js
+
+[19:48:03.0000] <devsnek>
+leobalter: just noticed, a lot of files you create in test262 are missing a newline on the last line, so they aren't technically valid text files according to posix
+
+[19:48:23.0000] <devsnek>
+might wanna check your editor
+
+[20:06:52.0000] <ljharb>
+devsnek: https://www.npmjs.com/package/es-aggregate-error
+
+[20:07:15.0000] <devsnek>
+all i could find was core-js
+
+[20:07:21.0000] <devsnek>
+seems fine
+
+[20:08:40.0000] <ljharb>
+devsnek: i use that package in https://www.npmjs.com/package/string-replace-all
+
+[20:09:13.0000] <devsnek>
+you use aggregate errors in replaceAll?
+
+[20:09:44.0000] <ljharb>
+oh sorry wrong one
+
+[20:10:02.0000] <ljharb>
+devsnek: https://www.npmjs.com/package/promise.any
+
+[20:10:21.0000] <devsnek>
+makes more sense
+
+[05:51:32.0000] <chicoxyzzy>
+leobalter: may I start working on tests for Promise.any if you or someone else didn't start yet? :) I see https://github.com/tc39/test262/pull/2406 is merged so it's time to add them. I also want to implement Promise.any in JSC so tests will help me
+
+[06:00:08.0000] <chicoxyzzy>
+I also can fix AggregateError tests (see https://github.com/tc39/proposal-promise-any/pull/49#issuecomment-552400869) in either in the same PR or separately
+
+[08:14:13.0000] <bradleymeck>
+reentrancy is funky in JS data types
+
+
+2019-11-12
+[08:19:15.0000] <bradleymeck>
+re-reading and trying to understand why `extends null` is still broken
+
+[08:20:40.0000] <devsnek>
+bradleymeck: why it doesn't work or why it hasn't been fixed yet
+
+[08:20:57.0000] <bradleymeck>
+SuperCall seeing `null` seems to be the gist of it
+
+[08:21:07.0000] <bradleymeck>
+i'm more curious as to why we haven't fixed it
+
+[08:21:07.0000] <devsnek>
+https://github.com/tc39/ecma262/pull/1321
+
+[08:21:26.0000] <devsnek>
+seems i missed the birthday of my pr
+
+[08:23:27.0000] <bradleymeck>
+aklein: i know you tried to fix `extends null` a while back as well. didn't see you on ^ . do you have any opinions?
+
+[08:51:40.0000] <ljharb>
+i don’t understand why we wouldn’t just make super() largely a noop when the superclass is null
+
+[08:52:23.0000] <ljharb>
+it shouldn’t be possible to have a derived class access the receiver without also having an explicit super; it shouldn’t be possible for a base class to have super; and since extends is an expression it isn’t possible to statically know if it’s extending null, so I’m not sure what other options exist
+
+[08:54:35.0000] <bakkot>
+ljharb: do you mean when the superclass is _currently_ null?
+
+[08:54:51.0000] <ljharb>
+yes
+
+[08:55:01.0000] <bakkot>
+and also the class had an extends clause, presumably
+
+[08:55:05.0000] <ljharb>
+yes
+
+[08:56:08.0000] <bakkot>
+that seems like a reasonable enough option; you should prepare a PR :P
+
+[08:57:17.0000] <bradleymeck>
+i added that pr to the agenda, can we keep it all in there for tracking
+
+[08:57:20.0000] <bakkot>
+(as to "what other options exist", see https://github.com/tc39/ecma262/pull/1321 )
+
+[08:57:35.0000] <ljharb>
+i guess i assumed there was a reason that approach wasn’t used. No?
+
+[08:57:51.0000] <bakkot>
+not that I'm aware of
+
+[08:58:03.0000] <bakkot>
+could ask devsnek
+
+[08:58:31.0000] <devsnek>
+hmm
+
+[08:58:52.0000] <ljharb>
+devsnek: how does my approach differ from your PR?
+
+[08:59:13.0000] <ljharb>
+(i have no context built up on this part of the spec)
+
+[08:59:16.0000] <devsnek>
+i'm not sure what you're saying
+
+[08:59:41.0000] <bakkot>
+ljharb: the semantics of that PR are summarized in https://github.com/tc39/ecma262/pull/1321#issuecomment-439249010, particularly case 3
+
+[09:00:34.0000] <bakkot>
+the differences are that a.) your approach switches on the runtime value of the superclass rather than its class at the time it is declared and b.) your approach requires invokation of super in classes which extend null, rather than merely allowing it
+
+[09:01:05.0000] <bakkot>
+*rather than its value at the time it is declared
+
+[09:01:15.0000] <devsnek>
+is "your" me or ljhrab
+
+[09:01:22.0000] <bakkot>
+devsnek: ljharb
+
+[09:01:27.0000] <devsnek>
+cuz those two properties sound good to me
+
+[09:01:50.0000] <ljharb>
+gotcha
+
+[09:01:57.0000] <ljharb>
+i think it should be required for access to this
+
+[09:02:22.0000] <ljharb>
+whether it switches on the runtime value or not i don’t actually have strong opinions on; it’d be whatever super does when the proto is changed
+
+[09:02:37.0000] <ljharb>
+if super follows the change, then it’d have to switch on the runtime value too
+
+[09:02:45.0000] <devsnek>
+i'm fine with whatever as long as its not the current behaviour
+
+[09:03:08.0000] <bakkot>
+super switches on runtime value when the proto is changed
+
+[09:03:28.0000] <ljharb>
+then it should also be able to “call” null, by doing nothing except setting up the this
+
+[09:03:36.0000] <ljharb>
+imo
+
+[09:03:46.0000] <devsnek>
+that could be written up
+
+[09:03:57.0000] <bakkot>
+wait
+
+[09:03:59.0000] <bakkot>
+maybe that was false
+
+[09:04:19.0000] <devsnek>
+i know there's HomeObject or something
+
+[09:04:19.0000] <ljharb>
+if super doesn’t switch, then super always “calls” the original one, whether it’s null or not
+
+[09:04:54.0000] <bakkot>
+no I was right the first time OK
+
+[09:04:57.0000] <bakkot>
+just had the wrong test
+
+[09:05:02.0000] <devsnek>
+GetSuperConstructor does activeFunction.[[GetPrototypeOf]]()
+
+[09:05:20.0000] <ljharb>
+so basically the place where it calls that constructor should be an optional call :-p
+
+[09:05:25.0000] <ljharb>
+and everything else would stay the same?
+
+[09:05:37.0000] <devsnek>
+maybe?
+
+[09:05:41.0000] <devsnek>
+i can test this in engine262
+
+[09:05:58.0000] <bakkot>
+`class A { constructor(){ console.log('A'); } }; class B { constructor(){ console.log('B'); } }; class C extends A {}; Object.setPrototypeOf(C, B); new C;`
+
+[09:06:04.0000] <ljharb>
+please; I never really figured out why this was a hard thing to solve but i had other stuff to focus on
+
+[09:06:19.0000] <bakkot>
+ljharb: not _exactly_ since it would still need to evaluate the arguments list, which optional call doesn't do
+
+[09:06:27.0000] <bakkot>
+(and set `this`)
+
+[09:06:29.0000] <devsnek>
+that's actually not a problem
+
+[09:06:35.0000] <devsnek>
+thanks to how SuperCall evaluation works
+
+[09:06:39.0000] <bakkot>
+but yeah I think that is the relevant change
+
+[09:07:00.0000] <bakkot>
+devsnek: but it should be: https://github.com/tc39/ecma262/issues/1351
+
+[09:07:20.0000] <ljharb>
+bakkot: ok fair, pretty close tho
+
+[09:07:26.0000] <devsnek>
+bakkot: i mean not a problem for this change
+
+[09:08:00.0000] <bakkot>
+devsnek: yeah
+
+[09:08:03.0000] <ljharb>
+seems like we just need to go back to the committee with both of those changes and we could fix super :-p
+
+[09:08:03.0000] <bakkot>
+just being pedantic
+
+[09:12:59.0000] <bradleymeck>
+to fix the ordering it just looks like a single operation ordering swap?
+
+[09:14:46.0000] <devsnek>
+`class X extends null` currently gets the prototype %Function.prototype%
+
+[09:15:10.0000] <devsnek>
+not null
+
+[09:15:13.0000] <bradleymeck>
+that seems fine since it isn't the instance
+
+[09:15:24.0000] <devsnek>
+but that means we can't detect it
+
+[09:15:25.0000] <bradleymeck>
+the instance protos are null
+
+[09:15:38.0000] <bakkot>
+bradleymeck: the prototype of the class is used to determine what `super()` calls
+
+[09:15:47.0000] <devsnek>
+ljharb: bakkot: this is probably why the pr is the way it is
+
+[09:16:02.0000] <devsnek>
+the info that the heritage was null is lost
+
+[09:16:12.0000] <devsnek>
+instead we have Function.prototype
+
+[09:16:23.0000] <devsnek>
+which is not constructable
+
+[09:16:58.0000] <ljharb>
+devsnek: it could be stored in another slot tho, no?
+
+[09:17:20.0000] <devsnek>
+slots don't update as the prototype changes though
+
+[09:17:28.0000] <ljharb>
+like it’s the original [[Prototype]] of the .prototype
+
+[09:17:38.0000] <ljharb>
+oh right, so it’s the latest [[Prototype]] of the .prototype then?
+
+[09:17:49.0000] <devsnek>
+huh
+
+[09:18:32.0000] <devsnek>
+the problem is that we can't tell the difference from
+
+[09:18:41.0000] <devsnek>
+function Y() {} Y.prototype = null; class X extends Y {}
+
+[09:18:47.0000] <devsnek>
+vs class X extends null
+
+[09:19:17.0000] <devsnek>
+except that the latter gets %Function.prototype%
+
+[09:19:20.0000] <devsnek>
+which isn't constructable
+
+[09:19:22.0000] <bakkot>
+could we just make it get the prototype `null`? does anyone actually need classes themselves to inherit from Function.prototype?
+
+[09:19:34.0000] <devsnek>
+i'd be fine with changing it
+
+[09:19:41.0000] <devsnek>
+but it would be visible
+
+[09:19:56.0000] <devsnek>
+actually wait that prototype is important
+
+[09:20:13.0000] <bradleymeck>
+threw up a PR to fix eval ordering
+
+[09:20:16.0000] <devsnek>
+cuz Function.prototype has methods on it
+
+[09:20:27.0000] <ljharb>
+classes themselves can’t change there i think
+
+[09:20:43.0000] <devsnek>
+what should `(class extends null).toString` be
+
+[09:20:43.0000] <ljharb>
+but the classes .prototype is null, no?
+
+[09:21:01.0000] <devsnek>
+the classes .prototype is an object with a null prototype
+
+[09:22:12.0000] <devsnek>
+honestly i'd be fine with changing the behaviour if the prototype is Function.prototype
+
+[09:23:12.0000] <ljharb>
+ok so you can get the null off the classes prototype
+
+[09:23:49.0000] <bakkot>
+devsnek: yeah, works for me
+
+[09:24:24.0000] <ljharb>
+i don’t think class extends Function or Function.prototype should break because of this change
+
+[09:24:53.0000] <bakkot>
+the change would be, it would make `class extends Function.prototype` work
+
+[09:24:54.0000] <bakkot>
+... I think
+
+[09:25:00.0000] <bakkot>
+(currently it does not)
+
+[09:25:16.0000] <devsnek>
+yeah that's what it is
+
+[09:25:26.0000] <devsnek>
+and setting the prototype of a class to null would throw
+
+[09:25:46.0000] <bakkot>
+devsnek: wait, _setting_ it would throw, or would make the class non-constructible?
+
+[09:25:57.0000] <devsnek>
+it would make the class impossible to construct
+
+[09:26:48.0000] <bakkot>
+that's the case currently, no?
+
+[09:27:26.0000] <devsnek>
+should be
+
+[09:27:34.0000] <devsnek>
+https://gc.gy/41284653.png
+
+[09:28:23.0000] <devsnek>
+and the diff is just https://gc.gy/41284695.png
+
+[09:29:25.0000] <bakkot>
+hm, you would really want to allow Function.prototype from any realm
+
+[09:29:27.0000] <bakkot>
+but otherwise yeah
+
+[09:29:51.0000] <devsnek>
+looking forward to Function.isFunctionPrototype
+
+[09:29:51.0000] <bakkot>
+(or at least the realm the class was defined in, I guess)
+
+[09:30:18.0000] <devsnek>
+yeah i can change that when i write it up i think
+
+[09:30:19.0000] <ljharb>
+I’m confused, why would we want to conflate Function.prototype with a null .prototype.[[Prototype]]
+
+[09:30:40.0000] <devsnek>
+i think you're the one conflating it
+
+[09:30:44.0000] <ljharb>
+lol maybe
+
+[09:30:52.0000] <devsnek>
+right now you could do
+
+[09:30:58.0000] <ljharb>
+but you said the null gets lost; isn’t it always on .prototypr.[[Prototype]]?
+
+[09:31:06.0000] <devsnek>
+function X() {} X.prototype = null; class Y extends X {}
+
+[09:31:16.0000] <devsnek>
+Object.getPrototypeOf(Y.prototype) is null
+
+[09:31:32.0000] <ljharb>
+right, so once that’s found, it hits the special behavior
+
+[09:31:41.0000] <ljharb>
+you can get that directly from X
+
+[09:31:43.0000] <devsnek>
+but we aren't extending null
+
+[09:31:48.0000] <devsnek>
+we're extending X
+
+[09:31:59.0000] <devsnek>
+X is a proper normal constructor
+
+[09:33:16.0000] <ljharb>
+right so when Y calls super, it calls X, which works, and doesn’t have a super call so it’s fine
+
+[09:33:33.0000] <ljharb>
+the only issue is a class that extends null and calls super, i thought
+
+[09:33:45.0000] <ljharb>
+(and that class being constructed, or extended and constructed)
+
+[09:33:53.0000] <devsnek>
+the problem is weird in general
+
+[09:34:13.0000] <devsnek>
+i'm not sure what you're suggesting
+
+[09:34:38.0000] <devsnek>
+activeFunction.prototype.[[Prototype]] doesn't correlate to whether or not its safe for super() to be an actual call
+
+[09:38:01.0000] <bakkot>
+ljharb: https://gist.github.com/bakkot/77ead596161e1e499af9b9758cf04379
+
+[09:38:39.0000] <bakkot>
+devsnek: though, another option here is to just make Function.prototype constructible
+
+[09:38:46.0000] <bakkot>
+I guess that might well actually break someone :(
+
+[09:39:10.0000] <devsnek>
+that's probably going too far yeah
+
+[09:39:26.0000] <bakkot>
+it isn't totally unreasonable
+
+[09:39:33.0000] <devsnek>
+what if we just disallowed `extends null`
+
+[09:39:39.0000] <bakkot>
+it's callable after all
+
+[09:39:41.0000] <devsnek>
+and made people do `Object.setPrototypeOf(this, null)` in their constructors
+
+[09:39:59.0000] <bakkot>
+:|
+
+[09:40:12.0000] <devsnek>
+or Object.setPrototypeOf(C.prototype, null)
+
+[09:40:19.0000] <devsnek>
+i guess people already do the latter
+
+[09:40:43.0000] <bradleymeck>
+i do the latter for sure
+
+[09:40:53.0000] <bradleymeck>
+it is inconvenient but 🤷
+
+[09:41:55.0000] <devsnek>
+bakkot: actually, making Function.prototype constructable wouldn't work i don't think
+
+[09:42:07.0000] <bakkot>
+:(
+
+[09:42:09.0000] <bakkot>
+why not?
+
+[09:42:17.0000] <devsnek>
+it wouldn't return ObjectCreate(null)
+
+[09:42:41.0000] <devsnek>
+i mean we could specify it to return a null object
+
+[09:42:44.0000] <devsnek>
+but that would be weird
+
+[09:42:53.0000] <bakkot>
+you make it depend on new.target, like classes do
+
+[09:43:10.0000] <devsnek>
+i don't mean weird in spec text
+
+[09:43:21.0000] <bradleymeck>
+if new.target extends null XD
+
+[09:43:50.0000] <devsnek>
+well
+
+[09:43:57.0000] <devsnek>
+i guess all these options can be presented to committee
+
+[09:46:20.0000] <ljharb>
+bakkot: ah, i see what you mean
+
+[09:46:41.0000] <ljharb>
+bakkot: and `class X extends Function.prototype {}` should throw, and not noop
+
+[09:47:06.0000] <bakkot>
+ljharb: I don't care about that one
+
+[09:47:29.0000] <bakkot>
+if making that work makes other things which should work do so, I'm fine with it
+
+[09:48:24.0000] <bakkot>
+devsnek: you wouldn't make it return `Object.create(null)`; you would make it return `Object.create(new.target.prototype)`
+
+[09:48:39.0000] <bakkot>
+which seems not totally unreasonable to me?
+
+[09:49:31.0000] <devsnek>
+I see
+
+[09:53:26.0000] <rkirsling>
+so does this have a test262 test then? https://bugs.webkit.org/show_bug.cgi?id=203957
+
+[09:55:16.0000] <rkirsling>
+"Does this seem like something you’d want to change?" is a surprising question since it sounds like something you'd only ask about unspec'ed behavior, but I don't think that's the case, right?
+
+[11:41:33.0000] <bradleymeck>
+something about tc39 PRs seems to make suggestion commits not want to merge
+
+[11:46:40.0000] <ljharb>
+bradleymeck: it's when the suggester has write access; it's a known github bug
+
+[11:46:53.0000] <bradleymeck>
+thats kind of hilarious
+
+[11:47:00.0000] <ljharb>
+yeah
+
+[11:47:10.0000] <ljharb>
+or rather when both the suggester and PR author do, i think
+
+[11:47:24.0000] <devsnek>
+lol
+
+
+2019-11-14
+[07:10:55.0000] <jorendorff>
+littledan: do you think the committee would go for an assignment operator `??=`?
+
+[07:14:18.0000] <littledan>
+jorendorff: Heh, I don't know if I like that, personally... but that sounds a lot like what Justin Ridgewell proposed
+
+[07:14:32.0000] <littledan>
+https://github.com/tc39/proposal-logical-assignment
+
+[07:14:49.0000] <littledan>
+the committee was a bit meh on his proposal; probably the grounds for hesitation would apply to ??= as well
+
+[07:16:21.0000] <jorendorff>
+Right, the big difference to my mind is that `??=` seems, like, really useful...
+
+[07:16:42.0000] <Jessidhia>
+perl has it with //=, where // is their equivalent of ??
+
+[07:16:56.0000] <Jessidhia>
+(defined-or)
+
+[07:17:12.0000] <jorendorff>
+ruby has them
+
+[07:17:35.0000] <jorendorff>
+I can certainly understand being kind of ehhhhhh on `&&=` and `||=`, we've gone all this time without them
+
+[07:18:19.0000] <littledan>
+hmm, interesting
+
+[07:18:28.0000] <littledan>
+well, yeah, we could discuss it
+
+[07:18:29.0000] <Jessidhia>
+the main use case I can think of for &&= and ||= are better covered by ??= anyway
+
+[07:18:31.0000] <jorendorff>
+littledan: I assume the reason for the mehness is 2. lack of obvious need 1. short-circuiting makes the behavior a bit surprising
+
+[07:18:36.0000] <jorendorff>
+is there something else?
+
+[07:18:48.0000] <littledan>
+yeah, those were the two arguments
+
+[07:18:56.0000] <jorendorff>
+yeah, i am totally sympathetic to both of those
+
+[07:18:59.0000] <littledan>
+I guess 3. vaguely, there's too many punctuation characters there
+
+[07:19:19.0000] <jorendorff>
+oh, interesting. haha
+
+[07:19:33.0000] <littledan>
+we're falling off the complexity cliff if we add more punctuation! JS will be the next C++
+
+[07:23:51.0000] <Jessidhia>
+we still have design space for making unary versions of binary operators like %, * or & ;)
+
+[07:24:05.0000] <Jessidhia>
+wait, unary % is taken by intrinsics
+
+[07:25:46.0000] <jorendorff>
+suddenly occurs to me, if JS ever gets a `???` operator i'll have to change my habits -- i use it to mean TODO
+
+[07:26:02.0000] <jorendorff>
+`???` - unsigned bitwise wtf
+
+[07:54:17.0000] <bradleymeck>
+Jessidhia: unary from binary gets ASI hazards
+
+[07:55:00.0000] <Jessidhia>
+/o\
+
+[07:55:08.0000] <Jessidhia>
+I prefer Go's ASI :(
+
+[08:05:39.0000] <devsnek>
+'use no asi' when
+
+[08:20:48.0000] <bradleymeck>
+when low semicolon style goes out of favor? even if we do hard sell on introducing yet another mode for syntax to deal w/
+
+[08:43:14.0000] <devsnek>
+should occurances of %AsyncGenerator% be replaced with %AsyncGeneratorFunction.prototype%
+
+[08:48:16.0000] <rkirsling>
+wait, go has ASI?
+
+[08:49:09.0000] <devsnek>
+rkirsling: it doesn't require them
+
+[08:49:23.0000] <devsnek>
+in any location
+
+[08:50:07.0000] <devsnek>
+why someone would make that decision knowing js exists is beyond me
+
+[08:50:08.0000] <devsnek>
+but they did
+
+[08:50:22.0000] <rkirsling>
+but like, a lot of languages use semicolon exclusively as a "write two lines without a newline" operator
+
+[08:50:41.0000] <rkirsling>
+so we're saying it's more than that right?
+
+[08:50:58.0000] <devsnek>
+its basically the same as js's
+
+[08:51:27.0000] <rkirsling>
+who would copy such a thing 😣
+
+[08:51:54.0000] <devsnek>
+shrug
+
+[08:52:16.0000] <devsnek>
+i am honestly not very impressed with go as a whole
+
+[08:52:18.0000] <devsnek>
+except for goroutines
+
+[08:52:19.0000] <rkirsling>
+/me goes to stare into the void, dejected by this newfound knowledge
+
+[08:52:33.0000] <rkirsling>
+yeah that's probably a fair assessment lol
+
+[08:52:47.0000] <devsnek>
+gorountines are pretty cool
+
+[08:52:53.0000] <devsnek>
+~~we should add them to js~~
+
+[08:53:07.0000] <Jessidhia>
+IIRC Go will always insert a semicolon at end of line unless it would cause a syntax error
+
+[08:53:25.0000] <devsnek>
+that is what i'm reading
+
+[08:53:32.0000] <Jessidhia>
+I think the rules might have been more elaborate than that but it's way less hazardous than JS
+
+[08:53:51.0000] <devsnek>
+its less hazardous because of the definitions of the statements within
+
+[08:54:04.0000] <devsnek>
+like you can't accidentally do `return\n5;` like you can in js
+
+[08:54:18.0000] <devsnek>
+you you can accidentally do `a\n()`
+
+[08:54:22.0000] <rkirsling>
+hmm alright. it's still super surprising seeing as my understanding was that everybody uses gofmt anyway?
+
+[08:54:58.0000] <Jessidhia>
+yep, and gofmt yeets all semicolons
+
+[08:55:15.0000] <devsnek>
+i dunno about it
+
+[08:55:25.0000] <devsnek>
+i'm all for explicitness if the difference is semicolons
+
+[08:55:44.0000] <devsnek>
+i think double quoted strings are an order of magnitude louder than semicolons
+
+[08:56:40.0000] <rkirsling>
+"""what about this"""
+
+[08:57:33.0000] <devsnek>
+now that's just silly
+
+[08:57:55.0000] <Jessidhia>
+Python is silly 😜
+
+[09:21:10.0000] <ljharb>
+devsnek: yeah probably there's no need for %AsyncGenerator% anymore - do other specs use it directly?
+
+[09:21:16.0000] <devsnek>
+🤷🏻
+
+[10:38:03.0000] <bakkot>
+go has gofmt which makes style debates way less of a thing
+
+[11:10:35.0000] <ljharb>
+which is a brilliant language design decision
+
+[12:15:07.0000] <shu>
+are your proposing format262
+
+[12:15:18.0000] <shu>
+there will be 262 distinct styles
+
+[14:04:40.0000] <rkirsling>
+shu: "with this many, you're sure to find at least one that makes you wildly angry"
+
+[15:20:58.0000] <akirose>
+-_-
+
+
+2019-11-15
+[22:03:18.0000] <devsnek>
+if we can call the formatter "standard js" i'm 100% on board
+
+[22:06:36.0000] <rkirsling>
+how about "standards js"
+
+[22:06:52.0000] <rkirsling>
+😈
+
+[22:09:26.0000] <devsnek>
+when jetbrains was building webstorm they got confused and shipped standardjs as the default formatter for js
+
+[22:16:14.0000] <rkirsling>
+oh dearie
+
+[22:44:39.0000] <Jessidhia>
+as long as it has single quotes and no semicolons 😉
+
+[22:46:05.0000] <rkirsling>
+yay for single quotes anyway :p
+
+[04:49:47.0000] <ryzokuken>
+people have opinions™️
+
+[09:56:53.0000] <devsnek>
+littledan: have yall found a solution for the "operator overloading slows down everything" problem?
+
+[11:05:15.0000] <bakkot>
+devsnek: people in prettier's bug tracker make that same mistake occasionally
+
+[11:05:27.0000] <bakkot>
+or otherwise assume that "standard" is, like, popular
+
+[11:05:44.0000] <devsnek>
+i don't understand why they had to do that
+
+[11:05:47.0000] <devsnek>
+it just seems deceitful
+
+[11:13:38.0000] <rkirsling>
+very
+
+
+2019-11-16
+[18:52:55.0000] <jwalden>
+maybe a mildly dumb question, but if I have an ECMAScript spec (specifically the 402 spec) and separately a proposal to modify it, I can build that proposal for HTML rendering with |npm install; npm run build;| -- but how do I merge that proposal backward into the original spec?  manually?  (this seems very unlikely)
+
+[18:59:57.0000] <rkirsling>
+my understanding is that it actually is manual 😓
+
+[19:14:34.0000] <jwalden>
+oh that is such garbage :-)
+
+[19:14:47.0000] <jwalden>
+"someone should make better tooling for this"
+
+[19:28:24.0000] <devsnek>
+jwalden: i've been formulating a rewrite of ecmarkup for a while
+
+[19:29:01.0000] <devsnek>
+multiple files is the big thing
+
+[19:29:19.0000] <devsnek>
+hopefully then people would just put the changes in an actual fork of the spec
+
+[19:35:34.0000] <jmdyck>
+devsnek: you think the spec being single-file prevents people from putting the changes in a fork?
+
+[19:40:38.0000] <devsnek>
+jmdyck: well two separate problems
+
+[19:41:02.0000] <devsnek>
+#1 is that keeping track of your changes in a 40k line file is difficult
+
+[19:41:12.0000] <devsnek>
+#2 is that they want to group changes together
+
+[19:41:40.0000] <devsnek>
+good static understanding of the spec source and using separate files can provide both of those
+
+[19:43:22.0000] <jmdyck>
+re #1, it seems to me that keeping track of your changes in a bunch of files totalling 40k lines isn't going to be any easier
+
+[19:43:56.0000] <jmdyck>
+(might be worse)
+
+[19:44:37.0000] <devsnek>
+people do alright with 100k line codebases
+
+[19:44:44.0000] <devsnek>
+not in one file
+
+[19:45:06.0000] <Sirisian>
+devsnek, I tried removing like 4K lines, but the maintainers waited 10 months merge it. :\
+
+[19:45:27.0000] <rkirsling>
+I mean if you remove lines there will just be more later though
+
+[19:45:34.0000] <Sirisian>
+Honestly you could just use custom elements to shrink most of it more, but they're against that.
+
+[19:45:38.0000] <rkirsling>
+not being able to git blame from the GH UI is horrible
+
+[19:45:53.0000] <devsnek>
+i'd like to just make a custom format
+
+[19:46:31.0000] <Sirisian>
+That would be nice.
+
+[19:49:13.0000] <bakkot>
+Sirisian: editors were backlogged for a while but it should be better now / soon
+
+[19:51:20.0000] <jmdyck>
+custom elements could shrink it some, but I suspect not much.
+
+[19:52:16.0000] <jmdyck>
+Most of the spec is headers, paragraphs, and algorithms, and I don't think custom elements will make those smaller.
+
+[19:52:57.0000] <rkirsling>
+Sirisian: yeah, what bakkot said. I had an editorial patch stalled for a year too
+
+[19:53:13.0000] <devsnek>
+our editorial process is kind of weird
+
+[19:56:43.0000] <jmdyck>
+a custom format is an interesting idea, but it'd presumably be a big jump. (massive merge conflicts for every open PR)
+
+[19:56:55.0000] <Sirisian>
+bakkot, Curious. You post a bit in the class fields proposal. If the proposal didn't care about supporting private variables that could be the same name as public ones would that change anything?
+
+[19:59:36.0000] <jmdyck>
+devsnek: otoh, if you provided a script that could 'upgrade' any version of the spec to the new format, that would quell some of the revolt
+
+[20:00:00.0000] <rkirsling>
+indeed
+
+[20:00:27.0000] <devsnek>
+honestly i'd be most concerned about commit history
+
+[20:01:15.0000] <jmdyck>
+how so?
+
+[20:03:36.0000] <Sirisian>
+Clearly just use the conversion script to convert every version retroactively in the GIT history. That's possible right?
+
+[20:05:01.0000] <rkirsling>
+lol
+
+[20:05:41.0000] <rkirsling>
+I mean yeah the blame would temporarily be blotted out by the "touch everything" commit but
+
+[20:06:14.0000] <rkirsling>
+any solution that would make it possible to have git blame work via GH UI would require that
+
+[20:08:33.0000] <jmdyck>
+I don't understand: having git blame work via GH UI is within 'our' power?
+
+[20:09:08.0000] <rkirsling>
+oh it doesn't work because the file is too big so it refuses to display the whole thing
+
+[20:09:19.0000] <jmdyck>
+ah, i see.
+
+[20:09:41.0000] <jmdyck>
+what's the biggest it will display?
+
+[20:09:52.0000] <rkirsling>
+hmm good question
+
+[20:10:19.0000] <devsnek>
+it also just randomly breaks
+
+[20:10:30.0000] <devsnek>
+like when you try to expand a section
+
+[20:10:34.0000] <devsnek>
+it will just be missing lines
+
+[20:11:43.0000] <jmdyck>
+i just always run git blame locally.
+
+[20:16:47.0000] <jmdyck>
+Apparently it's possible to split a file and have git blame 'see through' the split: https://devblogs.microsoft.com/oldnewthing/20190916-00/?p=102892
+
+[20:19:26.0000] <jmdyck>
+devsnek: but I imagine a custom format would need to have some pretty compelling features to outweigh the bother.
+
+[20:20:53.0000] <devsnek>
+jmdyck: lots of static analysis, no html entities, etc
+
+[20:21:25.0000] <devsnek>
+basically i'd want to just reify everything we do manually in html
+
+[20:21:37.0000] <jmdyck>
+"no html entities" = easier to edit, you mean?
+
+[20:21:43.0000] <devsnek>
+yeah
+
+[20:21:50.0000] <devsnek>
+but i just especially hate &gt; and stuff
+
+[20:22:51.0000] <jmdyck>
+explain more about "reify..." ?
+
+[20:23:04.0000] <devsnek>
+stuff like emu-xref
+
+[20:23:13.0000] <devsnek>
+or giving tables ids
+
+[20:24:58.0000] <jmdyck>
+so what might it look like to 'reify' emu-xref?
+
+[20:25:12.0000] <devsnek>
+i dunno
+
+[20:25:19.0000] <devsnek>
+i haven't really started on the design
+
+[20:25:21.0000] <devsnek>
+i just have a lot of goals
+
+[20:27:30.0000] <jmdyck>
+what sorts of static analysis?
+
+[20:28:57.0000] <devsnek>
+stuff like type checking
+
+[20:30:34.0000] <jmdyck>
+so, not just expressing the current content in a new format, but adding more info as well.
+
+[20:37:31.0000] <jmdyck>
+My PR #545 isn't getting much enthusiasm, and it doesn't discard any HTML-isms. A proposal that banished pointy brackets as well might sit on the shelf for a while too.
+
+[20:40:20.0000] <jmdyck>
+(possibly indefinitely)
+
+[20:46:31.0000] <devsnek>
+jmdyck: interestingly, getting more into the html version short-term would make it easier to export to a new format
+
+[20:47:04.0000] <jmdyck>
+yup
+
+[20:47:22.0000] <devsnek>
+🤷🏻
+
+[20:47:51.0000] <devsnek>
+if igalia takes me on for a code experience project maybe i can ask to work on rewriting ecma262
+
+[20:47:54.0000] <jmdyck>
+(i can't discern what that emoji is)
+
+[20:48:15.0000] <devsnek>
+shrugging
+
+[20:51:14.0000] <rkirsling>
+that'd be sweet
+
+[20:59:35.0000] <jmdyck>
+https://www.igalia.com/coding-experience/ ?
+
+[20:59:55.0000] <devsnek>
+ya
+
+[21:00:15.0000] <jmdyck>
+cool
+
+[21:00:40.0000] <devsnek>
+i've heard it takes them a long time to respond
+
+[21:01:52.0000] <rkirsling>
+did you enter for the November round?
+
+[21:02:28.0000] <devsnek>
+i just filled out the form
+
+[21:02:43.0000] <devsnek>
+a few weeks ago
+
+[21:02:50.0000] <rkirsling>
+cool
+
+[21:02:54.0000] <rkirsling>
+🤞
+
+[21:03:08.0000] <devsnek>
+i filled it out for the compiler team though
+
+[21:03:21.0000] <rkirsling>
+I mean you're quite a known quantity so I feel like your chances are pretty darn good
+
+[21:22:45.0000] <ljharb>
+rkirsling: fwiw i've reported to github in their maintainer feedback group specifically about ecma262 and how it should be reviewable on the web, so hopefully they'll fix it at some point
+
+[21:34:53.0000] <devsnek>
+ljharb: i think its kind of a lost cause
+
+[21:35:15.0000] <devsnek>
+eventually you have too many elements and it gets laggy
+
+[21:42:45.0000] <ljharb>
+devsnek: for everything and find-in-page, perhaps, but it could still be made somewhat functional
+
+[21:43:33.0000] <devsnek>
+one nice thing would be if they put a command to clone the pr locally in the "this is too big" ui
+
+[22:05:32.0000] <rkirsling>
+ljharb: anything would be great
+
+[22:06:12.0000] <ljharb>
+alternatively if github supported following renames, we could split up the file
+
+[22:07:40.0000] <devsnek>
+what i want to do is build up a blame of each section of the spec
+
+[22:07:49.0000] <devsnek>
+like blame of all changes to Promise.any
+
+[22:08:11.0000] <devsnek>
+then we could modify the commit history of the new files to contain those commits as history
+
+[22:08:16.0000] <devsnek>
+with the final commit being the rewrite
+
+[00:03:24.0000] <bakkot>
+Sirisian: probably yes, but also if it didn't have that it probably wouldn't be worth having
+
+[00:31:42.0000] <Sirisian>
+I gather discussing this might be tiring by now. One of my friends pointed out it's at stage 3 which piqued my interest. Would it allow for just doing private x; syntax with this.x being valid, still using the WeakMap concept? class A { private x; ... f(a) { this.x = a.x; }); const a1 = new A(); const a2 = new A(); a1.f(a2); My thinking is this.x would first check private(this).x and if it's undefined then fallback to public properties. Could probably be
+
+[00:31:42.0000] <Sirisian>
+optimized since "this.x" must(?) refer to the private property. let foo = this; foo.x; would complicate that though maybe.
+
+[00:33:25.0000] <Sirisian>
+Was scrolling through all the slides on the proposal the other day trying to convince myself the proposal is the best/only way forward for JS.
+
+
+2019-11-17
+[01:04:41.0000] <devsnek>
+Sirisian: personally i'm a fan of private symbols
+
+[01:05:14.0000] <devsnek>
+they let you define your own scope instead of being forced to the class
+
+[01:05:52.0000] <devsnek>
+and they don't force you to surround your accesses with a try/catch
+
+
+2019-11-18
+[13:07:21.0000] <bradleymeck>
+i feel like i use destructuring soo much just to do a pluck
+
+[13:08:29.0000] <TabAtkins>
+the ol' `let {x,y} = foo; foo = {x,y};` dance?
+
+[13:09:19.0000] <bradleymeck>
+yea
+
+[13:09:31.0000] <bradleymeck>
+especially on DOM stuff
+
+[13:12:30.0000] <rkirsling>
+litherum: are you coming over to the language side now? :p
+
+[13:41:18.0000] <litherum>
+rkirsling: oh hey ross!
+
+[13:42:24.0000] <litherum>
+rkirsling: I've been participating in some of the 402 discussions, and some of those discussions are being moved to 262, so i'm here now
+
+[13:42:40.0000] <rkirsling>
+sweet! welcome
+
+
+2019-11-19
+[17:40:55.0000] <shu>
+bakkot: you might get a kick out of this: https://bugs.chromium.org/p/v8/issues/detail?id=9982#c3
+
+[18:30:24.0000] <bakkot>
+`Vec3.prototype = new Float32Array(3);`
+
+[18:30:29.0000] <bakkot>
+shu: oh god
+
+[18:30:55.0000] <shu>
+"composition"
+
+[18:31:16.0000] <devsnek>
+the web is a lovely place
+
+[18:33:31.0000] <devsnek>
+shu: I appreciate the drake memes
+
+[18:33:38.0000] <shu>
+tyty
+
+[18:35:10.0000] <bakkot>
+shu: btw you are gonna champion https://github.com/domenic/proposal-arraybuffer-transfer/, yeah?
+
+[18:35:19.0000] <shu>
+bakkot: yeah, that's the plan
+
+[18:35:33.0000] <bakkot>
+I am hoping that one is easy, especially if it does not not include realloc
+
+[18:36:14.0000] <shu>
+good reminder, i haven't found time to page it back in yet but should add it to the agenda now...
+
+[18:36:59.0000] <devsnek>
+bakkot: funny I especially want realloc :D
+
+[18:37:42.0000] <shu>
+what js really needs is alloca
+
+[18:37:42.0000] <bakkot>
+devsnek: yeah, it just has more moving parts, is all
+
+[18:40:43.0000] <devsnek>
+shu: +1
+
+[22:19:09.0000] <devsnek>
+shu: sltg sounds pretty neat
+
+[11:36:42.0000] <shu>
+devsnek: thanks! hope it's well received
+
+
+2019-11-20
+[09:40:41.0000] <devsnek>
+what if there was some sort of syntax like `{ frozen x() {} } `
+
+[09:42:12.0000] <devsnek>
+bradleymeck: littledan: this might interest y'all
+
+[09:42:42.0000] <bradleymeck>
+this has been suggested a while ago at least on the object  itself rather than per prop
+
+[09:42:56.0000] <bradleymeck>
+decorators seem fine to me here honestly
+
+[09:43:39.0000] <devsnek>
+we have get/set, and I think (hope?) decorators are kind if unlikely to happen with the current design
+
+[09:44:23.0000] <bradleymeck>
+why?
+
+[09:44:37.0000] <devsnek>
+why do I not like the current decorator proposal?
+
+[09:44:48.0000] <bradleymeck>
+not liking != unlikely to happen
+
+[09:44:55.0000] <devsnek>
+way too much of a dsl
+
+[09:45:19.0000] <devsnek>
+I guess others might not care about it but I'm hoping they do
+
+[09:45:53.0000] <devsnek>
+but in any case, too much weird scoping and syntax imo
+
+[10:00:43.0000] <devsnek>
+bradleymeck: in any case,I wasn't proposing that in replacement of decorators
+
+[10:00:46.0000] <devsnek>
+both could exist
+
+[10:10:55.0000] <ljharb>
+bradleymeck: unless they can figure out how to be a first-class value, i can't see them advancing
+
+[10:30:07.0000] <rkirsling>
+I finally looked up what a sticky regex is
+
+[10:31:29.0000] <rkirsling>
+sigh.
+
+[10:32:45.0000] <rkirsling>
+`y` is for yikes, I guess.
+
+[10:36:19.0000] <ljharb>
+rkirsling: i *think*/suspect it only exists so that the behavior of String.prototype.search could be self-hosted
+
+[10:41:33.0000] <rkirsling>
+huh.
+
+[10:44:55.0000] <rkirsling>
+like, at least it would feel internally consistent if it simply ignored the substring prior to `lastIndex`
+
+[10:46:18.0000] <rkirsling>
+but the fact that it only matches exactly *at* `lastIndex` is making me unable to even right now
+
+[12:04:19.0000] <gibson042>
+https://github.com/tc39/proposal-string-replaceall/issues/17#issuecomment-537455698
+
+[12:04:19.0000] <gibson042>
+> So the final effect is that while non-sticky global expressions replace every matching substring, sticky global expressions only replace every consecutive match *from the beginning*—and if the beginning doesn't match, then they don't replace anything at all.
+
+[12:04:19.0000] <gibson042>
+> Concretely, we get this potentially surprising behavior:
+
+[12:04:19.0000] <gibson042>
+> ```js
+
+[12:04:19.0000] <gibson042>
+> "No Uppercase!".replaceAll(/[A-Z]/g, "");	// "o ppercase!"
+
+[12:04:19.0000] <gibson042>
+> "No Uppercase?".replaceAll(/[A-Z]/gy, "");	// "o Uppercase?"
+
+[12:04:19.0000] <gibson042>
+> "NO UPPERCASE!".replaceAll(/[A-Z]/gy, "");	// " UPPERCASE!"
+
+[12:04:20.0000] <gibson042>
+> ```
+
+[13:09:28.0000] <rkirsling>
+oof
+
+[13:15:36.0000] <rkirsling>
+I mean I guess that's how it has to be
+
+[13:16:04.0000] <rkirsling>
+but yuck.
+
+[14:09:43.0000] <leobalter>
+gibson042 rkirsling the examples with replaceAll are a bit annoying for me
+
+[14:10:06.0000] <leobalter>
+the problem is: this is not a behavior specific for replaceAll, but RegExp.prototype[Symbol.replace]
+
+[14:10:19.0000] <leobalter>
+that's already a thing
+
+[14:10:38.0000] <leobalter>
+so it's not a surprising behavior for replaceAll
+
+[14:11:01.0000] <leobalter>
+unless we want to disconnect replaceAll from the RegExp method, it's not any surprise
+
+[14:13:09.0000] <rkirsling>
+oh yeah I'm not concerned with replaceAll here
+
+[14:13:35.0000] <rkirsling>
+I just literally didn't know what `y` did until today and am experiencing five stages of grief about it
+
+[14:14:15.0000] <leobalter>
+ahahh I've been much exposed to RegExp, I'm beyond grief for flags at this point
+
+[14:14:52.0000] <rkirsling>
+:p
+
+[14:17:02.0000] <leobalter>
+the examples from gibson042 are good as: "replaceAll returns the same values as RegExp#@@replace, when searchValue is a RegExp", and replaceAll do it as String#replace does. So I believe this is a huge +1 for consistency
+
+[14:19:16.0000] <rkirsling>
+agree.
+
+[14:19:31.0000] <leobalter>
+the best alternative would always cast toString on the searchValue, but that would smell hard
+
+[14:20:18.0000] <leobalter>
+like: `'foo/bar/baz'.replaceAll(/bar/, '='); // 'foo=baz'
+
+[14:20:43.0000] <leobalter>
+mostly because it would cast any object to string
+
+[14:21:08.0000] <leobalter>
+and tbh, it's alright having the behavior closer to .replace
+
+
+2019-11-21
+[18:08:20.0000] <Jessidhia>
+jquery got converted to ES modules :o
+
+[18:13:27.0000] <Jessidhia>
+rkirsling: wait, `y` fails to match if it doesn't match *at* `lastIndex`?
+
+[18:14:02.0000] <Jessidhia>
+oh, right, I think we both were confusing `y`'s behavior with `g`'s
+
+[18:21:59.0000] <rkirsling>
+yeah. I really didn't know. being "sticky" I figured it had something to do with exec-style behavior / mutable state, but the reality was still surprising
+
+
+2019-11-22
+[08:58:37.0000] <rkirsling>
+leobalter: could I get your opinion on https://bugs.webkit.org/show_bug.cgi?id=204493 ?
+
+[08:59:21.0000] <rkirsling>
+Perl makes me want to cry
+
+
+2019-11-23
+[22:58:03.0000] <rkirsling>
+hey folks, the table in https://tc39.es/ecma262/#sec-getsubstitution sounds like it's suggesting something different from web reality
+
+[22:59:18.0000] <rkirsling>
+in all engines, `string.replace(search, '$10')` replaces with the first capture and the character `0` when there are 1 <= n < 10 captures
+
+[22:59:59.0000] <rkirsling>
+but this:
+
+[22:59:59.0000] <rkirsling>
+> $n where n is one of 1 2 3 4 5 6 7 8 9 and $n is not followed by a decimal digit
+
+[23:00:24.0000] <rkirsling>
+sounds like we wouldn't be able to use $n if $nn applies?
+
+[23:00:48.0000] <rkirsling>
+am I misreading it or is this a spec bug?
+
+[23:07:03.0000] <ljharb>
+rkirsling: your reading seems correct to me
+
+[23:07:57.0000] <rkirsling>
+I guess the intent is that we try to apply both cases and if $10 is valid we'll do the replacement, and if it's not we won't, at which point we need to reconsider `$10` as being composed of `$1` and `0`, but
+
+[23:08:05.0000] <rkirsling>
+it does not seem to spell that out
+
+[23:08:14.0000] <ljharb>
+it does not seem to, i agree
+
+[23:10:30.0000] <rkirsling>
+ljharb: thanks, I'll open up an issue then
+
+[23:18:01.0000] <rkirsling>
+oh awesome
+
+[23:18:06.0000] <rkirsling>
+gibson042 is already on the case: https://github.com/tc39/ecma262/pull/1732
+
+[23:20:32.0000] <ljharb>
+ah right, yay, just needs tests
+
+
+2019-11-24
+[14:59:32.0000] <devsnek>
+" In particular, a conforming implementation of ECMAScript may provide properties not described in this specification, and values for those properties, for objects that are described in this specification."
+
+[14:59:54.0000] <devsnek>
+is it intentional that this doesn't bar shadowing properties like Error.prototype.toString
+
+[15:00:04.0000] <devsnek>
+say, adding an EvalError.prototype.toString
+
+[15:41:38.0000] <ljharb>
+i think that in practice that loophole is way too wide
+
+[15:42:07.0000] <ljharb>
+it’s meant, i think, to allow nonstandard properties and globals, not to allow shadowing in that way
+
+
+2019-11-25
+[05:57:52.0000] <Jessidhia>
+https://github.com/tc39/proposal-optional-chaining/issues/115#issuecomment-55787484 unflagged on two engines 👀
+
+[08:06:21.0000] <rkirsling>
+Jessidhia: 🥳
+
+
+2019-11-26
+[14:20:10.0000] <jwalden>
+/me wishes the formatting style for in-spec lists were more glaring
+
+[14:20:43.0000] <jwalden>
+the angle double-brackets in, e.g. GetOption(options, "fallback", "string", « "code", "none" », "code") do not especially stick out visually
+
+
+2019-11-27
+[18:53:45.0000] <shu>
+jwalden: hm, is there a font where that'd stick out more?
+
+[18:54:34.0000] <jwalden>
+probably there is *some* font somewhere in existence where the answer is yes; but as far as what I know, ¯\_(ツ)_/¯
+
+[18:55:39.0000] <jwalden>
+I think the issue I have is that the angle-brackets don't extend vertically the full height of the line (or some approximation to it), so they blend in roughly as much as an "o" would as a lowercase letter that is just part of some argument or so
+
+[18:56:22.0000] <jwalden>
+JS-style '[]' doesn't have that problem, but also it probably is being avoided to not confuse with optional arguments or something
+
+[18:56:39.0000] <jwalden>
+and because it would imply heavyweight-er semantics than invoking the spec-internal idea of List
+
+[18:59:01.0000] <rkirsling>
+could switch to《》
+
+[18:59:16.0000] <rkirsling>
+or even 【】 :p
+
+[18:59:48.0000] <jwalden>
+U+2329 LEFT-POINTING ANGLE BRACKET 〈 U+232A RIGHT-POINTING ANGLE BRACKET 〉 would remedy the vertical-spanning consideration at least in the default font for the GNOME character-map tool
+
+[19:00:06.0000] <jwalden>
+(just trawling through hits for "bracket" in that)
+
+[19:00:40.0000] <rkirsling>
+yeah the one I gave is the doubled version
+
+[19:01:04.0000] <jwalden>
+U+276C MEDIUM LEFT-POINTING ANGLE BRACKET ORNAMENT ❬appears heavy bold in same tool, and boldness would help with stick-outness
+
+[19:01:25.0000] <rkirsling>
+(300A / 300B)
+
+[19:01:50.0000] <jwalden>
+or U+276E HEAVY LEFT-POINTING ANGLE QUOTATION MARK ORNAMENT ❮ for something that is actually semantically guaranteed to be heavy
+
+[19:04:54.0000] <jwalden>
+anyway -- planted the seed of idea enough so people are aware of the concern and may or may not be inclined to agree, and if other people tended to agree we could think about doing something, and that's all I intended to do saying something here for now :-)
+
+[19:07:15.0000] <shu>
+rkirsling:【】reminds me of japanese filenames
+
+[19:07:31.0000] <rkirsling>
+Japanese lots of things hehe
+
+[19:07:46.0000] <shu>
+【】 is the most visually bold
+
+[19:09:08.0000] <rkirsling>
+only drawback is that it has a ton of built-in space on the sides
+
+
+2019-11-28
+[16:59:48.0000] <bakkot>
+btw, I am planning on fixing completion records: https://github.com/tc39/ecma262/issues/1796
+
+[16:59:54.0000] <bakkot>
+(in the spec)
+
+[16:59:59.0000] <bakkot>
+would welcome input on this plan
+
+[20:49:49.0000] <devsnek>
+bakkot: any chance of removing normal completions? :P
+
+[21:35:47.0000] <bakkot>
+devsnek: no
+
+[21:36:00.0000] <bakkot>
+tagged unions are clearer than untagged unions, as a rule
+
+[21:36:43.0000] <devsnek>
+🤷🏻
+
+[21:36:53.0000] <devsnek>
+from my perspective normal completions make everything more complex
+
+[21:37:39.0000] <jmdyck>
+there's no reason you can't consider language values to be a tagged union.
+
+[21:37:57.0000] <bakkot>
+jmdyck: sure there is; there's no tag
+
+[21:38:48.0000] <jmdyck>
+How does an algorithm evaluate a condition like "If x is an Object" then?
+
+[21:40:18.0000] <jmdyck>
+you could just as easily say that there's no "tag" that allows algorithms to distinguish language values of different types. And yet they certainly do.
+
+[21:42:02.0000] <bakkot>
+you can discriminate on types, and obviously you could do that for completion records if we decided to mix abrupt completions with other values. but here they are different kinds of things in a way that a string vs an object is not.
+
+[21:42:40.0000] <bakkot>
+and explicitly tagging which is which makes it easier to avoid a confusion of types.
+
+[21:43:58.0000] <devsnek>
+jmdyck: is Type(completion record) valid?
+
+[21:45:41.0000] <bakkot>
+devsnek: strictly speaking yes, but in practice we just say "is an abrupt completion" or "is a normal completion", and we could still say "is an abrupt completion" even if we decided to do mix abrupt completions with values other than completion records
+
+[21:46:11.0000] <jmdyck>
+"they are different kinds of things in a way that a string vs an object is not". Sure, but a string vs an object are different kinds of things in a way that an array vs a proxy are not. It's just different branches of a type hierarchy.
+
+[21:46:22.0000] <devsnek>
+if that weren't valid i would understand
+
+[21:46:26.0000] <devsnek>
+but since it is...
+
+[21:47:14.0000] <bakkot>
+devsnek: I don't know what comes after your ellipses
+
+[21:48:08.0000] <bakkot>
+jmdyck: technically true, yes, but I think the overwhelming majority of branches in the spec are on abrupt vs normal completion
+
+[21:48:19.0000] <devsnek>
+if it can be discriminated by Type() it seems like a valid method of discrimination to me
+
+[21:48:29.0000] <bakkot>
+devsnek: yes, the two choices are semantically equivalent
+
+[21:48:48.0000] <devsnek>
+the spec is usually if x is abrupt do y else set x to x.Value
+
+[21:49:00.0000] <devsnek>
+basically you'd just remove a bunch of set x to x.Value
+
+[21:49:46.0000] <jmdyck>
+"the overwhelming majority of branches in the spec are on abrupt vs normal completion": do you mean branching on conditions in algorithms?
+
+[21:49:59.0000] <devsnek>
+i guess we have stuff like "Assert: completion is a normal completion and completion.[[Value]] is undefined."
+
+[21:50:12.0000] <devsnek>
+probably refactor to "assert: result is undefined"
+
+[21:50:45.0000] <bakkot>
+jmdyck: I mean that most "if"s in the spec are of the form "If argument is an abrupt completion, return argument"
+
+[21:51:00.0000] <bakkot>
+(albeit somewhat obscured behind a macro)
+
+[21:51:06.0000] <devsnek>
+else set argument to argument.Value
+
+[21:51:16.0000] <bakkot>
+devsnek: yes, I know what the other branch is
+
+[21:51:27.0000] <devsnek>
+my point is that it's redundant
+
+[21:51:45.0000] <bakkot>
+devsnek: we are not optimizing for the shortest possible specification
+
+[21:52:01.0000] <devsnek>
+less stuff is usually more understandable
+
+[21:52:27.0000] <bakkot>
+not when it involves mixing exceptions with values without explicit tagging
+
+[21:52:27.0000] <devsnek>
+barring stuff like code golf
+
+[21:53:39.0000] <devsnek>
+maybe to put it another way
+
+[21:53:49.0000] <devsnek>
+i can point to parts of the specification where normal completions are confusing
+
+[21:53:58.0000] <devsnek>
+usually around evaluation boundaries
+
+[21:54:20.0000] <devsnek>
+i can't imagine confusion from the lack of normal completions
+
+[21:54:30.0000] <devsnek>
+maybe if you had an example of a part of the spec that became less understandable
+
+[21:54:43.0000] <bakkot>
+devsnek: if there's any cases you expect will still be confusing after https://github.com/tc39/ecma262/issues/1796, I would be interested to know which and why
+
+[21:55:04.0000] <bakkot>
+devsnek: literally any places that an algorithm returns sometimes-an-abrupt-completion, sometimes-a-js-value
+
+[21:55:11.0000] <bakkot>
+I would find to be less undertandable
+
+[21:55:48.0000] <bakkot>
+because I would be confused by what type the algorithm returns
+
+[21:55:54.0000] <bakkot>
+does it return a JS value? sometimes?
+
+[21:56:00.0000] <bakkot>
+how is "sometimes" an acceptable type signature?
+
+[21:56:22.0000] <bakkot>
+"completion record" is a natural type
+
+[21:56:39.0000] <bakkot>
+"untagged union of completion records and js values" is not a natural type
+
+[21:56:51.0000] <bakkot>
+I will literally never expect that to be the return type of an algorithm
+
+[21:57:12.0000] <bakkot>
+and it will be less clear to readers and authors which abstract operations can return abruptly and which cannot
+
+[21:57:27.0000] <devsnek>
+is natural type a defined term
+
+[21:57:38.0000] <devsnek>
+i'm confused
+
+[21:57:59.0000] <bakkot>
+no, not especially
+
+[21:58:02.0000] <devsnek>
+like `Value | Error<Value>` would be a valid signature
+
+[21:58:09.0000] <jmdyck>
+re: ``I mean that most "if"s in the spec are of the form "If argument is an abrupt completion, return argument"``: I make it about 45%. But either way, I'm not sure how it's relevant.
+
+[21:58:56.0000] <devsnek>
+i don't really understand why tagged unions are inherently simpler
+
+[21:58:59.0000] <bakkot>
+jmdyck: it means that understanding which values are normal and which are abrupt is a much more important operation to understanding the specification than understanding whch JS values are Objects and which are Strings
+
+[22:00:18.0000] <bakkot>
+devsnek: clearer, not simpler. and they are clearer because, among other reasons, it means that if an algorithm can possibly throw, you cannot fail to handle the throwing behavior without having the types be obviously wrong
+
+[22:01:02.0000] <bakkot>
+whereas if "can possibly throw" is represented by "returns either a JS value or a completion record", and the caller treats the return value as a JS value, that is not obviously wrong - maybe it just doesn't throw in their particular circumstances
+
+[22:01:09.0000] <devsnek>
+in good static languages you can't coalesce a T|U to a T
+
+[22:01:19.0000] <bakkot>
+this is a specification
+
+[22:01:27.0000] <devsnek>
+yeah but you're talking about static types
+
+[22:01:32.0000] <bakkot>
+it does not currently have a type checker
+
+[22:01:36.0000] <devsnek>
+right
+
+[22:01:42.0000] <devsnek>
+which is why i asked what tagged unions has to do with it
+
+[22:02:09.0000] <devsnek>
+if we expect random rules of tagged unions to apply why cant we expect other rules to apply as well
+
+[22:02:18.0000] <devsnek>
+like rules of how things can be coalesced
+
+[22:02:24.0000] <jmdyck>
+[understanding abrupt vs normal is more important than understanding object vs string]: possibly, but I'm not convinced that "understanding which values are normal and which are abrupt" is aided by the existence or normal completions.
+
+[22:02:46.0000] <devsnek>
+^
+
+[22:03:34.0000] <bakkot>
+devsnek: it is much more obvious that you have failed to consider a case when your usage of a value cannot ever be right, rather than when it is only wrong some of the time
+
+[22:03:59.0000] <devsnek>
+i'm not entirely sure what that means
+
+[22:04:28.0000] <devsnek>
+when can you handle T|U wrong more than you can handle enum { T, U } wrong
+
+[22:04:54.0000] <bakkot>
+devsnek: if I write an something which treats the return value of Foo as being never-abrupt, and it turns out that Foo could sometimes be aburpt, it will not be obvious just from looking at Foo and the algorithm I'm writing
+
+[22:05:35.0000] <bakkot>
+whereas if I write something which treats the return value of Foo as a JS value, and Foo can only return completion records, it is obvious from looking at Foo and the algorithm I'm writing that I have done that wrong
+
+[22:06:19.0000] <devsnek>
+if foo only returns completion records you can still accidentally assume that it only returns normal ones
+
+[22:06:28.0000] <bakkot>
+but you have to do so explicitly
+
+[22:06:52.0000] <devsnek>
+i don't understand how that's any more or less explicit than deciding that, given a signature of T|U, only T will ever exist
+
+[22:06:59.0000] <bakkot>
+(and algorithms which can never throw won't return completion records anymore, so that assumption will be much less warranted)
+
+[22:07:11.0000] <bakkot>
+devsnek: by "explicitly" I mean you have to explicitly unwrap the completion record
+
+[22:07:18.0000] <bakkot>
+in prose
+
+[22:07:22.0000] <devsnek>
+same with T|U
+
+[22:07:30.0000] <devsnek>
+if it's U do x
+
+[22:07:34.0000] <devsnek>
+otherwise it must be T
+
+[22:08:12.0000] <devsnek>
+you can take completion.Value without checking whether its normal or not
+
+[22:08:15.0000] <devsnek>
+without violating any rules
+
+[22:08:28.0000] <bakkot>
+devsnek: you can, but it is obvious that you are doing something weird in that case
+
+[22:08:31.0000] <bakkot>
+it is explicit
+
+[22:08:40.0000] <bakkot>
+treating a T|U as a T is not explicit
+
+[22:08:40.0000] <devsnek>
+i don't understand how it's any more obvious
+
+[22:09:17.0000] <shu>
+what is going on
+
+[22:09:21.0000] <bakkot>
+if I say "If SameValue(Foo(bar), 0)...", but Foo can throw, it is not obvious that I have done something wrong
+
+[22:09:30.0000] <bakkot>
+if Foo does not return completion records
+
+[22:09:32.0000] <bakkot>
+it is if it does
+
+[22:09:35.0000] <devsnek>
+shu: discussion about whether removing normal completions is good or not
+
+[22:09:47.0000] <devsnek>
+bakkot: why not?
+
+[22:09:50.0000] <shu>
+we're not removing normal completions, we're removing implicit coercions to normal completions?
+
+[22:10:15.0000] <bakkot>
+devsnek: at this point I am going to have to appeal to personal experience
+
+[22:10:30.0000] <bakkot>
+replace my previous "it is not obvious" with "it is not obvious to me, bakkot"
+
+[22:10:36.0000] <devsnek>
+i mean in the two languages i've used with an Option<T> type
+
+[22:10:42.0000] <devsnek>
+people do unsafe unwrapping all the time
+
+[22:11:06.0000] <devsnek>
+i don't understand how this is any different
+
+[22:11:16.0000] <jmdyck>
+(shu: one way to eliminate implicit coercions to/from normal completions is for them not to exist.)
+
+[22:11:41.0000] <shu>
+so that whenever you return a JS value, it is to be interpreted as "lifted into normal Completion of value"?
+
+[22:12:01.0000] <devsnek>
+at the moment, yes
+
+[22:12:05.0000] <bakkot>
+shu: no, so that you don't have normal completions at all, and we just have things which return "either a JS value or a completion record"
+
+[22:12:15.0000] <shu>
+oh what, no
+
+[22:12:18.0000] <shu>
+that is not a good idea
+
+[22:12:23.0000] <bakkot>
+yeah that is my reaction
+
+[22:12:36.0000] <devsnek>
+maybe shu has a different perspective
+
+[22:12:44.0000] <jmdyck>
+shu: why not?
+
+[22:13:34.0000] <bakkot>
+devsnek: the unsafe unwrapping is explicit, not implicit
+
+[22:13:40.0000] <bakkot>
+that is the point
+
+[22:13:47.0000] <shu>
+jmdyck: because Completion records as a structure that encodes the pair of "how to continue evaluation" and "the payload needed to continue evaluation in that way" is explicit and desirable
+
+[22:13:49.0000] <bakkot>
+you have to write down that you are doing it
+
+[22:13:51.0000] <devsnek>
+bakkot: it's the same as doing completion.Value without checking the type of the completion
+
+[22:14:17.0000] <bakkot>
+devsnek: explicitly doing an unsafe unwrap is the same as explicitly doing completion.value without checking the type of the completion, yes
+
+[22:14:21.0000] <bakkot>
+in that both are explicit
+
+[22:14:22.0000] <shu>
+jmdyck: there will be AOs which *should not* have a say in "how to continue evaluation", but might return JS values
+
+[22:14:46.0000] <bakkot>
+by contrast to the _implicit_ unwrapping which happens if I say "If SameValue(Foo(bar), 0)...", but Foo can throw
+
+[22:14:50.0000] <shu>
+right
+
+[22:15:23.0000] <devsnek>
+bakkot: in my mind that isn't valid spec text
+
+[22:15:26.0000] <devsnek>
+there's no unwrapping there
+
+[22:15:34.0000] <shu>
+it is detrimental to how i understand language evaluation to have to think through, in an ad hoc way, whether an AO returns a JS value to mean "continue evaluating, with this JS value", or "here's a spec-internal thing i checked, and here is a JS value"
+
+[22:15:34.0000] <bakkot>
+devsnek: but people will write it anyway
+
+[22:16:35.0000] <shu>
+i mean this isn't about reduction to some form that is equally expressive
+
+[22:16:37.0000] <shu>
+this is about editorial clarity
+
+[22:16:45.0000] <shu>
+in a spec that is full of prose
+
+[22:16:49.0000] <devsnek>
+indeed
+
+[22:16:56.0000] <devsnek>
+which was my point up above
+
+[22:17:07.0000] <devsnek>
+i'm not as concerned about the strict typing of all our algorithms
+
+[22:17:22.0000] <shu>
+sorry, what was your point because i think we're on different sides of the question here
+
+[22:17:40.0000] <devsnek>
+my point was that i've gotten confused dealing with normal completions before
+
+[22:18:14.0000] <shu>
+in... what way?
+
+[22:18:18.0000] <devsnek>
+(while working on engine262, v8 doesn't have completions)
+
+[22:18:24.0000] <shu>
+because the implicit coercions?
+
+[22:18:31.0000] <devsnek>
+yeah
+
+[22:18:40.0000] <shu>
+i'm missing some intermediate steps
+
+[22:18:43.0000] <devsnek>
+and there was something else too
+
+[22:18:48.0000] <bakkot>
+great, we are all on board, we will get rid of implicit coercions
+
+[22:18:49.0000] <devsnek>
+i think it was in ScriptEvaluation
+
+[22:18:51.0000] <shu>
+why does confusion arising from implicit coercions imply we should remove normal completions...
+
+[22:18:53.0000] <devsnek>
+i'd ahave to double check
+
+[22:19:16.0000] <devsnek>
+shu: that wasn't the only thing, just the main one
+
+[22:19:23.0000] <devsnek>
+as bakkot said, i think we all agree about removing the implicit stuff
+
+[22:19:40.0000] <shu>
+correct, and bakkot and i have both said we find value in keeping normal completions, but explicit
+
+[22:19:50.0000] <shu>
+vs return of bare JS values
+
+[22:20:04.0000] <shu>
+so i'd like to understand what the lack of clarity is for having explicit normal completions
+
+[22:21:05.0000] <devsnek>
+in terms of clarity, normal completion to me is a weird duplicate identity of just a plain js value
+
+[22:21:43.0000] <devsnek>
+like the same way jmdyck has that pr to get rid of lexical environment records or whatever
+
+[22:21:45.0000] <devsnek>
+it's very explicit
+
+[22:21:52.0000] <devsnek>
+but seemingly unneeded
+
+[22:22:33.0000] <devsnek>
+same amount of clarity either way, but one way has less stuff
+
+[22:22:54.0000] <shu>
+so, for me, i think it's very important to distinguish AOs that are meant to be used as part of observable evaluation, and AOs that are spec-internal, like predicates
+
+[22:23:05.0000] <shu>
+for the former, it makes sense to return a completion value, whether normal or abrupt
+
+[22:23:23.0000] <shu>
+for the latter, it make sense to return bare JS values
+
+[22:23:26.0000] <devsnek>
+using completions even where it can never be non-normal?
+
+[22:23:35.0000] <shu>
+what?
+
+[22:23:56.0000] <devsnek>
+AOs that are part of observable evaluation don't inherently have the ability to return abrupt completions
+
+[22:24:16.0000] <devsnek>
+to me there would be no reason to use a completion if there's no possibility of it being anything except normal
+
+[22:25:39.0000] <shu>
+i think that kind of mental model minimizes for the wrong thing, i don't think it should be about minimizing what can't be abrupt right now
+
+[22:26:23.0000] <jmdyck>
+devsnek: if you're talking about evaluating ES code, then (except for literals, say) wouldn't there always be the possibility of an abrupt completion?
+
+[22:26:49.0000] <devsnek>
+jmdyck: i dunno, maybe shu and i have different definitions of "part of observable evaluation"
+
+[22:27:16.0000] <devsnek>
+anything that evaluates js could throw
+
+[22:27:16.0000] <bakkot>
+devsnek: I don't find them equally clear; see above re: not finding it obvious that "If SameValue(Foo(bar), 0)..." is wrong
+
+[22:27:33.0000] <shu>
+in all formal PL semantics i've worked on, "semantics" are captured two ways
+
+[22:27:57.0000] <shu>
+1) something operational, like a step-by-step thing that describes what an evaluation machine does
+
+[22:28:10.0000] <shu>
+2) something mathematical that declares a property
+
+[22:28:21.0000] <shu>
+it so happens that in ecma262, we conflate both with operational step-by-step algorithms
+
+[22:28:40.0000] <shu>
+but, some AOs are intended for the first category and some are intended for the second
+
+[22:28:50.0000] <shu>
+for the first category, those are the AOs that return completion values
+
+[22:28:57.0000] <devsnek>
+i guess you mean the difference between AOs and runtime semantics?
+
+[22:29:11.0000] <shu>
+no, i wish that was the line of distinction but it isn't
+
+[22:29:20.0000] <shu>
+we refactor runtime semantics into AOs all the time and then call them
+
+[22:29:22.0000] <devsnek>
+i mean we don't have any distinction between them atm
+
+[22:29:29.0000] <devsnek>
+if we did though
+
+[22:29:30.0000] <shu>
+right, it is confusing at the moment
+
+[22:29:41.0000] <shu>
+and this completion value realignment thing *is* the split
+
+[22:29:58.0000] <devsnek>
+so you meant if we recategorized our runtime semantics and AOs
+
+[22:30:00.0000] <devsnek>
+that makes sense
+
+[22:30:11.0000] <devsnek>
+i took what you said to mean our current definitions
+
+[22:30:16.0000] <shu>
+what we call runtime semantics is just the purely syntax direct part
+
+[22:30:25.0000] <shu>
+but that isn't even true because we pass parse nodes to AOs too
+
+[22:30:35.0000] <shu>
+directed*
+
+[22:31:16.0000] <devsnek>
+i would be a fan of fixing what we call AO and what we call RS
+
+[22:31:34.0000] <jmdyck>
+ there are lots of SDOs labelled "Static Semantics"
+
+[22:32:12.0000] <shu>
+i don't think the labels of our metafunctions here matter as much as their signatures
+
+[22:32:25.0000] <shu>
+we can relabel after we got the signatures sussed out better
+
+[22:32:35.0000] <devsnek>
+yeah, i was just confused about what you meant
+
+[22:33:15.0000] <jmdyck>
+i'll agree that "Runtime" vs "Static" is not very important.
+
+[22:33:37.0000] <devsnek>
+i though you were suggesting something like OrdinaryOwnPropertyKeys would need to return a completion
+
+[22:34:00.0000] <jmdyck>
+I think if we deleted all mention of "Runtime Semantics" and "Static Semantics", it wouldn't make a bit of difference normatively.
+
+[22:34:28.0000] <shu>
+devsnek: that AO reads to me as squarely in 2) from my categorization
+
+[22:34:40.0000] <devsnek>
+ya
+
+[22:35:06.0000] <shu>
+it's declaratively describing a strict order
+
+[22:35:17.0000] <jmdyck>
+shu: are you saying that the 1 vs 2 distinction can be made on the basis of signatures?
+
+[22:35:19.0000] <shu>
+but is describing it with the algorithmic language because it's the only thing we have
+
+[22:35:23.0000] <shu>
+jmdyck: that is my hope, yes
+
+[22:35:34.0000] <shu>
+signatures of returning completions or not
+
+[22:35:53.0000] <shu>
+i imagine there are snags, but that is my rough mental model
+
+[22:35:57.0000] <devsnek>
+whether they take productions, runtime values, etc, as arguments, what they return, etc
+
+[22:37:05.0000] <devsnek>
+or rather what they do with those arguments :P
+
+[22:37:07.0000] <shu>
+anyway happy thanksgiving!
+
+[22:37:18.0000] <devsnek>
+🦃
+

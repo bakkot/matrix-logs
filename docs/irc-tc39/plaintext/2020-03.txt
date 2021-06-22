@@ -1,0 +1,4556 @@
+2020-03-01
+[16:34:43.0000] <Bakkot>
+devsnek: there is an important difference in how they're created, which is that module namespaces are created with internal methods which invoke OrdinaryGet, and proxies are not
+
+[16:39:31.0000] <devsnek>
+i guess?
+
+[16:39:52.0000] <devsnek>
+something about that doesn't sit with me
+
+[16:40:34.0000] <Bakkot>
+it helps if you don't think about the spec as being a program so much
+
+[16:40:38.0000] <devsnek>
+you still need to explicitly say a proxy has [[ProxyTarget]]
+
+[16:40:44.0000] <devsnek>
+and a namespace has [[Exports]]
+
+[16:40:52.0000] <devsnek>
+so why don't you need to say an object has ordinary properties
+
+[16:41:03.0000] <Bakkot>
+oh, you do: https://tc39.es/ecma262/#sec-object-type
+
+[16:41:07.0000] <Bakkot>
+"All objects are logically collections of properties"
+
+[16:41:26.0000] <devsnek>
+*ordinary* properties
+
+[16:41:40.0000] <Bakkot>
+what is a non-ordinary property?
+
+[16:42:43.0000] <devsnek>
+Bakkot: where you say "create an own data property" or "create an own accessor property"
+
+[16:43:20.0000] <Bakkot>
+those are the kinds of properties which are meant when it says all objects are logically collections of properties
+
+[16:43:29.0000] <devsnek>
+then
+
+[16:43:35.0000] <devsnek>
+OrdinaryGet on a proxy would be valid?
+
+[16:43:43.0000] <devsnek>
+since proxy is a part of that definition
+
+[16:43:49.0000] <Bakkot>
+I don't really know what that means?
+
+[16:44:15.0000] <Bakkot>
+is your question "are any of the steps in OrdinaryGet nonsensical when applied to a proxy"?
+
+[16:44:34.0000] <devsnek>
+i guess i mean OrdinaryGetOwnProperty
+
+[16:44:35.0000] <devsnek>
+but yes
+
+[16:44:58.0000] <devsnek>
+OrdinaryDefineOwnProperty and OrdinaryGetOwnProperty when used on things like proxies
+
+[16:45:01.0000] <Bakkot>
+I believe the answer is no
+
+[16:45:13.0000] <Bakkot>
+see, it's the "when used on things like proxies" which is tripping me up
+
+[16:45:21.0000] <Bakkot>
+they _aren't_ used on things like proxies
+
+[16:45:26.0000] <Bakkot>
+so the "when" is confusing
+
+[16:46:28.0000] <devsnek>
+i'm trying to figure out if all objects have "own" properties
+
+[16:47:09.0000] <devsnek>
+an implementation of the spec could theoretically perform that call
+
+[16:47:46.0000] <Bakkot>
+Since the spec does not perform that call, it would no longer be an implementation of the spec
+
+[16:48:14.0000] <Bakkot>
+but anyway yes all objects of "own" properties, per the section I linked above
+
+[16:48:56.0000] <Bakkot>
+"An Object is logically a collection of properties. Each property is either a data property, or an accessor property. [...] The properties accessible via get and set access includes both own properties that are a direct part of an object and inherited properties which are provided by another associated object via a property inheritance relationship. [...] All objects are logically collections of properties, but there are multiple forms of
+
+[16:48:57.0000] <Bakkot>
+objects that differ in their semantics for accessing and manipulating their properties."
+
+[16:49:11.0000] <Bakkot>
+left unsaid in that last part is that Proxies do not provide any way of accessing and manipulating their properties
+
+[16:50:05.0000] <devsnek>
+why is using ordinary ops on a proxy out of range if using them on module namespaces isn't
+
+[16:50:18.0000] <devsnek>
+they both provide their own implementation of [[GetOwnProperty]]
+
+[16:51:38.0000] <jmdyck>
+When are you thinking an implementation would invoke OGOP on a proxy?
+
+[16:52:29.0000] <devsnek>
+🤷🏻
+
+[16:52:49.0000] <devsnek>
+i'm able to do such a thing in engine262 at least
+
+[16:53:08.0000] <jmdyck>
+ok, so when does engine262 do it?
+
+[16:53:21.0000] <devsnek>
+never
+
+[16:53:23.0000] <devsnek>
+but it's possible
+
+[16:53:32.0000] <devsnek>
+so i want to make sure engine262 does the right thing if someone did that
+
+[16:54:48.0000] <jmdyck>
+so you're asking what the OGOP algorithm means when _O_ is a proxy?
+
+[16:55:18.0000] <devsnek>
+i guess
+
+[16:55:40.0000] <devsnek>
+like if you did OrdinaryDefineOwnProperty and then OrdinaryGetOwnProperty
+
+[16:55:45.0000] <devsnek>
+do you get your property back out
+
+[16:55:48.0000] <devsnek>
+does nothing happen
+
+[16:55:51.0000] <devsnek>
+is the whole thing in valid
+
+[16:55:53.0000] <devsnek>
+invalid*
+
+[16:57:30.0000] <devsnek>
+i think it would create an own property on the proxy
+
+[16:57:38.0000] <devsnek>
+based on what bakkot said about the object definition
+
+[16:57:45.0000] <devsnek>
+but then bakkot also said it isn't valid
+
+[16:58:35.0000] <jmdyck>
+I wouldn't say it's *invalid* per se, but the spec never performs such an invocation, so it has no need to define its semantics.
+
+[16:59:25.0000] <devsnek>
+i'd be fine if it was invalid
+
+[16:59:30.0000] <devsnek>
+i just want to figure out some answer
+
+[16:59:45.0000] <devsnek>
+hopefully we can project out of the spec whether or not a certain behaviour is correct or not
+
+[17:10:44.0000] <jmdyck>
+Presumably, when OGOP refers to an own property of _O_, that's not a veiled reference to a MOP method, else you'd get infinite recursion.
+
+[17:13:49.0000] <devsnek>
+yeah no that's the actual hook into the implementation's method of storing properties
+
+[17:20:45.0000] <jmdyck>
+I guess I'd say that if your implementation calls OrdinaryDefineOwnProperty on a proxy, then OrdinaryGetOwnProperty will 'see' that property.
+
+[17:22:40.0000] <jmdyck>
+But again, that's not spec semantics, that's just a possible approach to non-spec semantics.
+
+[17:25:58.0000] <jmdyck>
+Another approach would be for the Ordinary* ops to assert that _O_ isn't a proxy.
+
+[17:27:05.0000] <devsnek>
+O is ordinary or a module namespace object
+
+[17:27:18.0000] <devsnek>
+i prefer the less locked down approach
+
+[17:27:26.0000] <devsnek>
+where it just works
+
+[17:28:26.0000] <jmdyck>
+Ordinary* ops have to work for more than just ordinary and module namespace objects
+
+[17:28:40.0000] <devsnek>
+hmm
+
+[17:28:41.0000] <devsnek>
+what else
+
+[17:30:28.0000] <jmdyck>
+e.g., array's [[DefOwnProp]] has a call to OGOP
+
+[17:30:41.0000] <devsnek>
+oh and arrays
+
+[17:30:44.0000] <jmdyck>
+on the array object
+
+[17:30:48.0000] <devsnek>
+i think it makes more sense to just
+
+[17:30:54.0000] <devsnek>
+approach it as working
+
+[17:31:02.0000] <devsnek>
+it seems like that's the approach we take
+
+[17:31:08.0000] <devsnek>
+we can override but always fall back to the ordinary ops
+
+[17:31:26.0000] <jmdyck>
+String object's [[GetOwnProperty]] calls OGOP on the String object
+
+[17:32:23.0000] <jmdyck>
+and other examples
+
+[19:43:56.0000] <Bakkot>
+devsnek: I don't think it is important that the algorithms in the spec be meaningful when used in ways which the spec does not use them in
+
+[19:44:25.0000] <Bakkot>
+it is not a library in the programming sense; it is a specification
+
+[19:46:37.0000] <Bakkot>
+that is to say, I don't think it is important that one be able to answer questions like "what happens when this algorithm is invoked on this kind of object, which it is never invoked on"
+
+[19:48:02.0000] <Bakkot>
+all that said, in this case I do think it happens to work out such that all of the steps in OrdinaryGetOwnProperty would make sense when applied to a proxy, and would manipulate its collection of properties, which it happens to have because the spec says all objects have properties
+
+[19:49:10.0000] <Bakkot>
+but the fact that there is an answer to this question, under the current specification, is pretty much coincidence; if we had happened to have an "Assert: O is not a proxy" in OGOP, or in the definition of objects had excluded proxies, there would not be an answer, and that would be OK because it is not the purpose of the spec to answer questions like that
+
+[20:06:59.0000] <devsnek>
+Bakkot: if there was an assert I wouldn't ask
+
+[20:14:37.0000] <Bakkot>
+devsnek: in principle there could be an assert for every statement which happens to be true after every algorithm step
+
+[20:15:07.0000] <Bakkot>
+they are basically comments
+
+[20:16:24.0000] <devsnek>
+we use them all the time to restrict what abstract ops run on
+
+[20:16:43.0000] <Bakkot>
+we use them to clarify why the steps in the abstract operation are sensible
+
+[20:16:51.0000] <Bakkot>
+they do not restrict what they run on
+
+[20:17:05.0000] <Bakkot>
+the thing which restricts what they run on is, we don't run them on the things we don't want to run them on
+
+[20:26:13.0000] <devsnek>
+ug my messages didn't send
+
+[20:55:58.0000] <ljharb>
+devsnek: i'd say it's not ok to use the ordinary ops directly on a module namespace object either
+
+[20:56:05.0000] <ljharb>
+devsnek: only via their internal methods
+
+[20:56:13.0000] <devsnek>
+eh
+
+[20:56:19.0000] <devsnek>
+that makes no sense to me
+
+[20:56:28.0000] <ljharb>
+abstract ops aren't general purpose functions
+
+[20:56:36.0000] <devsnek>
+that's literally what they are
+
+[20:56:41.0000] <ljharb>
+any usage outside of their explicitly referenced usage is invalid
+
+[20:56:44.0000] <ljharb>
+no, they're not
+
+[20:56:47.0000] <devsnek>
+general logic abstracted out to be used in other places
+
+[20:56:56.0000] <ljharb>
+they're functions that are used for "the exact purpose they're specified for, and nothing more"
+
+[20:57:03.0000] <ljharb>
+not arbitrary places
+
+[20:57:08.0000] <ljharb>
+explicitly enumerated ones
+
+[20:58:18.0000] <ljharb>
+the main question is, why *would* you ever use an OrdinaryGet operation on an exotic objcet
+
+[20:58:26.0000] <devsnek>
+idk
+
+[20:58:45.0000] <devsnek>
+someone can do `AbstractOps.OrdinaryGet(AbstractOps.ProxyCreate())`
+
+[20:58:46.0000] <ljharb>
+ok so, if there's no reason to do it, why is it important that the spec doesn't explicitly forbid it?
+
+[20:58:51.0000] <ljharb>
+well sure
+
+[20:58:51.0000] <devsnek>
+so i wondered what should happen
+
+[20:59:02.0000] <ljharb>
+an incompetent or malicious implementation can do all sorts of things
+
+[20:59:26.0000] <ljharb>
+in this case, does the proxy even have any properties?
+
+[20:59:37.0000] <ljharb>
+its prototype would be via the proxy trap
+
+[21:00:03.0000] <devsnek>
+it does by the definition of objects
+
+[21:00:09.0000] <devsnek>
+people at least agree on that
+
+[21:00:23.0000] <devsnek>
+still up in the air if OrdinaryXyz can be used to access them
+
+[21:01:16.0000] <ljharb>
+it's *capable* of having them, syure
+
+[21:01:21.0000] <ljharb>
+but the only way it could get them is OrdinarySet
+
+[21:01:28.0000] <ljharb>
+and since nothing invokes that on a proxy, how could it get any?
+
+[21:01:49.0000] <ljharb>
+an impl could certainly store things on it, and get them, but no observable JS could, so why is it a question worth thinking about?
+
+[21:04:22.0000] <devsnek>
+ljharb: observable js can't call the ops either so
+
+[21:04:26.0000] <devsnek>
+🤷🏻
+
+[21:04:28.0000] <ljharb>
+right
+
+[21:04:43.0000] <ljharb>
+so you're asking a question about a thing that basically can't ever happen :-)
+
+[21:04:48.0000] <devsnek>
+well actually i do have $262.callAbstract
+
+[21:04:53.0000] <devsnek>
+but besides that
+
+[21:04:54.0000] <ljharb>
+sure, within your enginr
+
+[21:04:55.0000] <ljharb>
+*engine
+
+[21:05:16.0000] <ljharb>
+we could certainly add an assertion about what kind of object the ordinary methods are called on
+
+[21:05:27.0000] <ljharb>
+i'm just not sure who it'd be to help
+
+[21:05:33.0000] <devsnek>
+probably no one
+
+[21:05:52.0000] <devsnek>
+all it would do is make engine262 a bit slower cuz i actually check assertions lol
+
+[21:06:51.0000] <devsnek>
+assert is called 1,508,260,158 times during a test262 run
+
+[21:07:19.0000] <jmdyck>
+do all the asserts succeed?
+
+[21:08:47.0000] <devsnek>
+yep
+
+[21:09:07.0000] <devsnek>
+there were a few cases where they didn't last year
+
+[21:09:18.0000] <devsnek>
+but i fixed the spec
+
+[21:10:27.0000] <devsnek>
+i think most of the calls are probably from expanding `!`
+
+
+2020-03-02
+[10:32:54.0000] <rkirsling>
+anybody know about https://github.com/tc39/ecma402/pull/302#issuecomment-589999054 ? trying to confirm whether part of the change in https://github.com/tc39/test262/pull/1995 was invalid, which I believe it was, even though SM went along with it...
+
+[15:54:05.0000] <devsnek>
+why does for-of body abrupt completion call iterator.return instead of iterator.throw
+
+[15:54:28.0000] <devsnek>
+s/abrupt/abrupt throw/
+
+
+2020-03-03
+[16:02:25.0000] <Bakkot>
+devsnek: presumably because the _consumer_ of the iterator hitting an error condition is not the iterator's problem
+
+[16:03:16.0000] <Bakkot>
+`.throw` only really makes sense for iterators which do something with the argument to `.next`, so, not the iterators you would use with for-of
+
+[16:03:55.0000] <devsnek>
+i guess there are arguments both ways
+
+[16:04:14.0000] <Bakkot>
+what is the argument for calling `.throw`?
+
+[16:05:21.0000] <devsnek>
+something about wrapping streams with async iterators
+
+[16:06:07.0000] <devsnek>
+https://github.com/nodejs/node/pull/32051
+
+[16:07:45.0000] <devsnek>
+in a push stream model i guess you'd expect the stream itself to own errors that happen while consuming
+
+[16:13:01.0000] <Bakkot>
+for a push stream I would expect the stream to be responsible for handling errors which happen while producing values to be pushed, but not for errors which happen while consuming
+
+[16:13:16.0000] <Bakkot>
+generally speaking the consumer of some data having an error is not the responsibility of the producer of the data
+
+[16:13:23.0000] <devsnek>
+i mean in the nodejs model it works how i described
+
+[16:13:34.0000] <devsnek>
+because it uses event emitters
+
+[16:13:52.0000] <devsnek>
+`emit('data')` would throw if handlers of the data event throw
+
+[16:14:12.0000] <devsnek>
+or pass an error event or whatever it does
+
+[16:14:16.0000] <Bakkot>
+that's pretty unintuitive to me, but ok
+
+[16:14:38.0000] <Bakkot>
+in the web platform `dispatchEvent` does not throw even if listeners added by `addEventListener` do
+
+[16:14:40.0000] <devsnek>
+yeah i mean in general i agree with the design in the spec
+
+[16:15:38.0000] <devsnek>
+yeah it just throws
+
+[16:16:04.0000] <Bakkot>
+what just throws?
+
+[16:16:28.0000] <devsnek>
+`emit('data')`
+
+[16:16:42.0000] <devsnek>
+i couldn't remember if it threw or made the emitter emit an 'error' event
+
+[16:17:14.0000] <Bakkot>
+ah, yeah
+
+
+2020-03-04
+[19:44:44.0000] <devsnek>
+java beat us to switch expressions
+
+[20:10:36.0000] <rkirsling>
+for real?
+
+[20:10:46.0000] <rkirsling>
+that's embarrassing, I won't lie
+
+[20:10:56.0000] <devsnek>
+we need to just
+
+[20:10:59.0000] <devsnek>
+make everything expressions
+
+[20:22:11.0000] <ljharb>
+our switch is gross
+
+[20:22:15.0000] <ljharb>
+we need pattern matching
+
+[21:29:24.0000] <Bakkot>
+java has a huge advantage over us in adding switch expressions, namely, a type system
+
+[21:29:34.0000] <Bakkot>
+switch expressions are a natural fit for java
+
+[21:30:57.0000] <Bakkot>
+also I see they're using `yield` for producing the value from the expression
+
+[21:31:02.0000] <Bakkot>
+which is neat
+
+[21:33:09.0000] <Bakkot>
+actually I guess their switch expressions aren't the thing I was thinking of and aren't really something they're in any better of a position to add
+
+[21:33:22.0000] <Bakkot>
+looks like they're adding them mostly because they want to use them with type guards, though
+
+[21:33:37.0000] <Bakkot>
+if I am reading the JEP right
+
+[21:34:07.0000] <Bakkot>
+I recall they were discussing adding a proper match expression at some point
+
+[23:52:11.0000] <devsnek>
+i'd guess matching is actually pretty easy in modern js engines with all the hidden shape classes
+
+[23:52:23.0000] <devsnek>
+sucks if you don't have that optimization though
+
+[07:16:21.0000] <bradleymeck>
+devsnek: it gets complicated by transitions not being uniform always. shape x getting a y property added then a z property, might not be the same shape as x getting a z property then a y property
+
+[11:46:36.0000] <shu>
+yes whatever did happen to the pattern matching proposal
+
+[11:50:51.0000] <ljharb>
+its champion doesn't seem to be doing much JS stuff anymore
+
+[13:14:47.0000] <devsnek>
+bradleymeck: i just meant its faster than doing complete object comparison with checking individual properties and such
+
+[13:57:20.0000] <shu>
+you'll still have to do that for many cases
+
+[13:57:28.0000] <shu>
+which is what bradley's saying
+
+[13:57:48.0000] <devsnek>
+hopefully not tooooo often
+
+[13:58:12.0000] <devsnek>
+maybe with libraries like acorn where everything is changing shape all the time
+
+[13:58:33.0000] <shu>
+depends on your objects, right
+
+[13:59:00.0000] <shu>
+dictionary mode objects aren't that rare
+
+[13:59:15.0000] <devsnek>
+mfw strict mode didn't get rid of delete
+
+[13:59:20.0000] <devsnek>
+i don't even know the last time i used delete
+
+[14:13:29.0000] <TabAtkins>
+I used it a few days ago, but I can't recall why.
+
+[14:14:16.0000] <TabAtkins>
+Oh yeah, I wanted to remove a key from an object, duh: https://github.com/tabatkins/railroad-diagrams/blob/gh-pages/railroad.js#L303
+
+[14:14:39.0000] <TabAtkins>
+(I iterate the object to set attributes later, so I can't just set it to null or something.)
+
+[14:15:52.0000] <Bakkot>
+yeah, strict mode should not have gotten rid of delete; the thing it does is a reasonable thing to want to do
+
+
+2020-03-05
+[16:20:51.0000] <rkirsling>
+was that even on the table? 👀
+
+
+2020-03-06
+[11:09:15.0000] <Bakkot>
+you know how there are some built-in functions whose length is not the obvious thing you would infer from their signature? like the Object constructor has `.length === 1` despite having only an optional parameter. is there a reason we can't just change their signatures to match their lengths?
+
+[11:10:03.0000] <ljharb>
+changing the signature would be making the parameter required, and `Object()` would stop working
+
+[11:10:39.0000] <Bakkot>
+where does it say that failing to pass a required parameter to a built-in function throws a type error?
+
+[11:11:24.0000] <Bakkot>
+in fact I am pretty sure that is not the case, because e.g. Map.prototype.set requires both arguments, but `(new Map).set()` does not throw
+
+[11:12:16.0000] <rickbutton>
+Object.keys ?
+
+[11:12:26.0000] <ljharb>
+i guess that's fair, "required" is a conceptual thing
+
+[11:12:41.0000] <ljharb>
+Bakkot: for Object it might make sense, but it wouldn't make any sense for Date
+
+[11:12:55.0000] <ljharb>
+1 required parameter doesn't feel "wrong" to me for Object, but 7 feels wrong for Date
+
+[11:12:55.0000] <Bakkot>
+rickbutton Object.keys explicitly calls ToObject on its argument, which throws if provided undefined
+
+[11:13:01.0000] <rickbutton>
+ah tru
+
+[11:13:54.0000] <Bakkot>
+ljharb: sure but what is the benefit of leaving them notationally non-required?
+
+[11:14:09.0000] <Bakkot>
+as far as I can tell it is literally just added complexity in the spec
+
+[11:14:15.0000] <ljharb>
+it makes sense?
+
+[11:14:18.0000] <Bakkot>
+since it requires explicitly specifying the length
+
+[11:14:29.0000] <ljharb>
+i find that to be far less complex than making the signature conceptually nonsensical
+
+[11:14:52.0000] <Bakkot>
+what
+
+[11:14:54.0000] <Bakkot>
+ok
+
+[11:15:01.0000] <Bakkot>
+... what
+
+[11:15:14.0000] <Bakkot>
+I, uh, do not share that intuition
+
+[11:16:24.0000] <ljharb>
+why is an explicit sentence overriding the length on a few legacy functions "complexity"?
+
+[11:17:30.0000] <Bakkot>
+Because now there is another moving part of the spec to understand
+
+[11:17:56.0000] <Bakkot>
+It is not "You can infer the .length of a builtin from its signature", it's that "except..."
+
+[11:18:56.0000] <ljharb>
+ok, fair. but your suggestion trades getting rid of that "except" for "now the concept of optional or required is meaningless, because you can't rely on it everywhere"
+
+[11:19:15.0000] <ljharb>
+(because as you noted, "required" doesn't consistently mean "throws when omitted" or anything else)
+
+[11:19:37.0000] <Bakkot>
+Is it currently the case that you can rely on it?
+
+[11:20:11.0000] <ljharb>
+afaik. the notation matches what's conceptually required
+
+[11:20:22.0000] <Bakkot>
+I guess I don't know what "conceptually required" means
+
+[11:20:25.0000] <ljharb>
+(there's a few DataView/TypedArray cases where it might not)
+
+[11:20:36.0000] <ljharb>
+like, the method needs it to meaningfully work
+
+[11:20:53.0000] <ljharb>
+you can call `.set()` on a map but that wouldn't make any sense, even though it doesn't throw
+
+[11:21:07.0000] <Bakkot>
+`.set(foo)` does make sense, it sets to `void 0`
+
+[11:21:22.0000] <ljharb>
+i also don't think that makes sense conceptually (altho i understand what it does)
+
+[11:21:37.0000] <ljharb>
+that's just shorthand for `.set(foo, undefined)`, trading convenience for clarity
+
+[11:22:09.0000] <Bakkot>
+omitting an argument is (almost) always shorthand for explicitly passing undefined as that argument
+
+[11:22:23.0000] <Bakkot>
+whether it is "conceptually required" or not
+
+[11:22:36.0000] <ljharb>
+that's not universally true, in userland or in the language
+
+[11:22:48.0000] <ljharb>
+lots of things check arguments.length, altho in the spec we've tried to minimize that
+
+[11:23:04.0000] <Bakkot>
+yes, hence the "almost"
+
+[11:23:09.0000] <ljharb>
+`Number(undefined)` is NaN, `Number(0)` is 0
+
+[11:23:20.0000] <ljharb>
+right, but "not always" means that it's not a reliable shorthand
+
+[11:23:40.0000] <Bakkot>
+yes but my point is that its reliability has nothing to do with whether an argument is "concdeptually required" or not
+
+[11:23:42.0000] <ljharb>
+and the way you can know it's reliable for Map set, is that the value is required, so omitting it will either assume undefined or throw
+
+[11:24:23.0000] <Bakkot>
+that's not what reliable means?
+
+[11:25:28.0000] <ljharb>
+to me it gives a guarantee
+
+[11:25:38.0000] <Bakkot>
+"it is either the same, or different", yes
+
+[11:25:44.0000] <Bakkot>
+not the world's best guarantee
+
+[11:25:44.0000] <ljharb>
+things that check arguments.length ime only do so around optional arguments
+
+[11:26:06.0000] <ljharb>
+if an argument is optional, omitting it is potentially not the same as passing undefined
+
+[11:26:11.0000] <ljharb>
+thus, the shorthand is ill-advised there
+
+[11:26:21.0000] <Bakkot>
+also if the argument is required
+
+[11:26:51.0000] <ljharb>
+i would be very surprised if omitting a required argument was different from passing undefined for it. do you have any examples?
+
+[11:27:01.0000] <ljharb>
+(in the spec, or in reasonably-used userland libs)
+
+[11:27:59.0000] <Bakkot>
+`String`
+
+[11:28:38.0000] <ljharb>
+noted
+
+[11:29:03.0000] <ljharb>
+(seems like String.length should be 0 then, in my mental model)
+
+[11:29:13.0000] <ljharb>
+any others?
+
+[11:29:47.0000] <Bakkot>
+Not off the top of my head
+
+[11:31:02.0000] <Bakkot>
+Oh, looking, `Number` too
+
+[11:31:50.0000] <Bakkot>
+but I think that's it among builtins
+
+[11:32:03.0000] <Bakkot>
+we're usually pretty good about not surfacing the distinction
+
+[11:33:04.0000] <ljharb>
+ah right, my own example lol
+
+[11:43:38.0000] <devsnek>
+function lengths in js are meaningless to me and I ignore them
+
+[12:04:33.0000] <jmdyck>
+ljharb: I think the distinction between optional and required (for built-in fns) is behaviorally meaningless. I.e., indicating that a parameter is optional or required has zero effect on the behavior of the function. The only effect it has is on the default value of the 'length' property.
+
+[12:11:20.0000] <ljharb>
+i agree, it's a conceptual thing
+
+
+2020-03-08
+[12:04:30.0000] <devsnek>
+proposal: reflect.iscallable and isconstructable (and maybe clean up stuff like symbol which has no business being constructable)
+
+[12:23:11.0000] <Bakkot>
+devsnek: michael ficarra ws interested in this the other day, if you haven't talked to him about this yet
+
+[12:28:32.0000] <devsnek>
+actually now that i've woken up and thought about this more i'm not sure how useful it would be
+
+[12:28:52.0000] <devsnek>
+i was just annoyed at this https://cdn.discordapp.com/attachments/222079895583457280/686284194338439248/Screenshot_20200308-114817.jpg
+
+[12:35:13.0000] <Bakkot>
+the only reasons I can think to care about it are 1) so you can give better error messages and 2) so you can be more polymorphic; 1 is of slightly dubious value (why is your "is not a constructor" message going to be better than the engine's?) and 2 I am opposed to on principle
+
+[12:35:19.0000] <Bakkot>
+but maybe there are other reasons to want it?
+
+[12:35:27.0000] <Bakkot>
+I think if you have a good use case the committee would not be opposed
+
+[14:34:02.0000] <ljharb>
+i'm interested in this
+
+[14:34:38.0000] <ljharb>
+in particular it's just nonsense to me to have the concept of `[[Construct]]`, but then also make some things nonconstructible via a throwing [[Construct]] slot
+
+
+2020-03-10
+[22:17:35.0000] <devsnek>
+i think typed arrays might be the most complex thing in the step
+
+[22:17:36.0000] <devsnek>
+spec
+
+[22:20:33.0000] <devsnek>
+> IsSharedArrayBuffer tests whether an object is an ArrayBuffer, a SharedArrayBuffer, or a subtype of either.
+
+
+2020-03-11
+[02:47:52.0000] <devsnek>
+wow my impl of GetActiveScriptOrModule was totally broken
+
+[02:48:15.0000] <devsnek>
+and i never noticed because the spec only calls GetActiveScriptOrModule when the top execution context happens to have a non-null ScriptOrModule
+
+
+2020-03-12
+[23:33:08.0000] <rkirsling>
+wow I never actually stopped to notice that you could pin sections while reading the spec
+
+[23:33:15.0000] <rkirsling>
+this changes everything
+
+[23:44:25.0000] <devsnek>
+every once in a while i accidentally click it while trying to copy a permalink
+
+[23:44:35.0000] <devsnek>
+that is the entirety of my relationship with pins
+
+[23:45:29.0000] <ljharb>
+ha yeah i never knew about it either
+
+[06:53:17.0000] <jackworks>
+https://es.discourse.group/t/get-iterator-result-in-for-of-syntax/ 🤔
+
+[07:06:09.0000] <bradleymeck>
+might be interesting to have an expression form but `for` is soo overloaded already
+
+[07:06:54.0000] <bradleymeck>
+the completion value differing if it is used as expression vs statement does have precedent with `function`s though
+
+[07:40:26.0000] <ljharb>
+do expressions could be used to get you the return value
+
+[07:42:30.0000] <bradleymeck>
+ljharb: for ... of doesn't have the right completion value to do that
+
+[07:43:09.0000] <ljharb>
+ah, what’s it’s completion value now, the last thing in the last iteration?
+
+[07:44:08.0000] <bradleymeck>
+the last completion value of the loop body (if it ran)
+
+[07:44:40.0000] <bradleymeck>
+ruh roh, is it always undefined if it never ran???
+
+[07:44:53.0000] <bradleymeck>
+is it supposed to be undefined or empty....
+
+[07:45:15.0000] <bradleymeck>
+> 0; for (let _ of (function* () {yield 1; return 2;})()) { 3; }
+
+[07:45:26.0000] <bradleymeck>
+if you don't yield I see undefined instead of 0?
+
+[07:48:07.0000] <bradleymeck>
+ff => 0, v8 => undefined, jsc => undefined
+
+[07:48:15.0000] <bradleymeck>
+a consistency bug, ripe for the picking
+
+[07:50:29.0000] <bradleymeck>
+https://tc39.es/ecma262/#sec-runtime-semantics-forin-div-ofbodyevaluation-lhs-stmt-iterator-lhskind-labelset , looks like it is supposed to be fundefined
+
+[07:51:13.0000] <bradleymeck>
+interesting to know that I cannot propagate completion values through it
+
+[08:07:19.0000] <jackworks>
+👀
+
+[08:08:05.0000] <bradleymeck>
+if someone has IE / non-chrome Edge lying around i'd be curious to know what it is there
+
+[09:34:39.0000] <Bakkot>
+I think this is one of the things changed in ES2015
+
+[09:51:31.0000] <rkirsling>
+one of these days I really need to buckle down and figure out Annex B.3.3, but in the meantime, does somebody have a clearer explanation for why this test is valid? https://github.com/tc39/test262/blob/master/test/language/statements/try/early-catch-function.js
+
+[09:51:40.0000] <rkirsling>
+namely:
+
+[09:52:06.0000] <rkirsling>
+• everyone agrees that `try { JSON.parse() } catch (x) { var x; }` is fine (per Annex B.3.5)
+
+[09:53:20.0000] <rkirsling>
+• everyone evidently agrees that  `try { JSON.parse() } catch { function x() {} } print(x);` prints `function x() {}` and not `undefined` in sloppy mode
+
+[09:53:43.0000] <ljharb>
+sure, there's no shadowing with that one
+
+[09:54:03.0000] <ljharb>
+`var` being allowed makes sense because `var x` is a noop in that case, and `x = y` is already allowed
+
+[09:54:15.0000] <rkirsling>
+• yet somehow `try { JSON.parse() } catch (x) { function x() {} }` does not get the B.3.5 exemption
+
+[09:54:19.0000] <ljharb>
+i can see an argument to allow `function x() {}` in there, but what's the use case
+
+[09:55:02.0000] <rkirsling>
+no I just want to make sure I get how the spec is saying that this is so
+
+[09:55:28.0000] <ljharb>
+lol i'm not going to pretend i can understand grammar + annex b + hoisting, hopefully someone can help :-)
+
+[09:55:33.0000] <rkirsling>
+because it seems like if it's visible after the catch block, then it's not lexical; yet it doesn't get the var redecl exemption
+
+[09:55:48.0000] <rkirsling>
+yeah I was hoping for Bakkot's rescue here 😂
+
+[09:58:02.0000] <Bakkot>
+rkirsling: the reason it's an error is because B.3.3 function declarations act as _both_ a lexical and a var declaration, and `try { } catch (e) { let e; }` is an error
+
+[09:58:27.0000] <Bakkot>
+it is in fact
+
+[09:58:31.0000] <Bakkot>
+sorry, mistype
+
+[09:58:37.0000] <Bakkot>
+"if it's visible after the catch block, then it's not lexical" is false; it is in fact both
+
+[09:59:05.0000] <rkirsling>
+I see
+
+[09:59:23.0000] <rkirsling>
+I didn't realize "both" was an option due to lack of depth of Annex B.3.3 understanding
+
+[09:59:35.0000] <rkirsling>
+apparently this is the "clopen" of the ES spec? :P
+
+[09:59:51.0000] <Bakkot>
+it's pretty terrible, yeah
+
+[10:00:04.0000] <Bakkot>
+I guess it would be more precise to say that it creates two bindings
+
+[10:00:07.0000] <Bakkot>
+not that it is both
+
+[10:00:12.0000] <Bakkot>
+but rather that it is one of each
+
+[10:02:54.0000] <Bakkot>
+rkirsling: here, just stare at this gist until it makes sense (read: your brain gives up): https://gist.github.com/bakkot/d3bcc42b7938fe2aeebf37eea1ff462d
+
+[10:05:27.0000] <Bakkot>
+(editted with a perhaps clearer example0
+
+[10:05:37.0000] <Bakkot>
+)
+
+[10:35:17.0000] <rkirsling>
+(whoops got called away there) wow, this is a doozy
+
+[10:35:18.0000] <rkirsling>
+thanks
+
+[10:35:59.0000] <shu>
+welcome to adventure
+
+[10:54:32.0000] <rkirsling>
+and all that just due to a function redecl
+
+[11:40:26.0000] <rkirsling>
+my brain is seriously melting
+
+[11:49:32.0000] <rkirsling>
+ohhhh wait
+
+[11:54:49.0000] <rkirsling>
+so like, the function decl ends up creating an IIFE-scope var binding for `a` but doesn't initialize it...  but it's position is still relevant for the `a` binding earlier in the block... ugh, I'm still not there yet
+
+[11:54:56.0000] <rkirsling>
+also *its
+
+[12:00:57.0000] <Bakkot>
+rkirsling: updated the gist again with some more probes
+
+[12:01:26.0000] <rkirsling>
+<3
+
+[12:01:41.0000] <Bakkot>
+but to summarize:
+
+[12:02:20.0000] <Bakkot>
+when B.3.3 is allowed to apply to a function declaration named f, it has the following effects:
+
+[12:02:20.0000] <Bakkot>
+- the function gets a `var f;` at the top of it
+
+[12:02:20.0000] <Bakkot>
+- the block containing the declaration gets a `let f = function (){}` at the top of it (with the parameters and body of the original declaration, but no name because function expression names are not the same as function declaration names)
+
+[12:02:20.0000] <Bakkot>
+- when the declaration itself is reached, it reads from the `let f` (whatever is currently there) and writes to the `var f`
+
+[12:02:51.0000] <Bakkot>
+sorry, that first line should be "the function (or script) containing the function-declaration-in-a-block [...]"
+
+[12:04:18.0000] <shu>
+another person inducted to b.3.3 understanding?
+
+[12:04:21.0000] <shu>
+one of us one of us
+
+[12:05:12.0000] <shu>
+i tried to get the last bullet of Bakkot changed a while back because the first time i implemented i felt so personally affronted by the semantics
+
+[12:06:08.0000] <shu>
+but i have since then matured as a person
+
+[12:06:26.0000] <Bakkot>
+also B.3.3 doesn't actually capture what browsers do yet; see https://github.com/tc39/ecma262/issues/913
+
+[12:07:31.0000] <shu>
+oh man i wrote that?
+
+[12:07:37.0000] <shu>
+no recollection
+
+[12:08:04.0000] <shu>
+counterfactuals in semantics: not a good time
+
+[12:10:41.0000] <shu>
+rkirsling: you'd appreciate the difficulty. the way i learned how to model counterfactuals is possible worlds a la kripke. is it time for modal logic in ecma262?
+
+[12:17:31.0000] <rkirsling>
+=D
+
+[12:18:51.0000] <rkirsling>
+hell yeah
+
+[12:20:53.0000] <rkirsling>
+create a successor world and then jettison it after
+
+[12:21:47.0000] <rkirsling>
+(admittedly that's a very imperative way to put it but alas)
+
+[12:23:23.0000] <rkirsling>
+Bakkot: thanks for all that; I'll be sure to store this in writing somewhere for myself
+
+[12:23:56.0000] <Bakkot>
+someday I should write it up and publish it somewhere so I can link it instead of reproducing it from memory every time
+
+[12:24:07.0000] <rkirsling>
+actually there ought to be a tales-from-the-ES-crypt blog post about this yeah
+
+[12:24:28.0000] <rkirsling>
+lol, "ecma's crypt"
+
+[12:24:38.0000] <rkirsling>
+this needs to be a blog
+
+[12:24:55.0000] <shu>
+a "wat" talk only 5 people can appreciate
+
+[12:25:03.0000] <rkirsling>
+😅
+
+[12:25:20.0000] <akirose>
+I APPRECIATE
+
+[12:25:20.0000] <akirose>
+OMG
+
+[12:25:26.0000] <akirose>
+ECMA'S CRYPT YES
+
+[12:25:43.0000] <Bakkot>
+my favorite right now is `typeof new Proxy(document.all, {})`
+
+[12:25:50.0000] <Bakkot>
+(it's "function", because of course it is)
+
+[12:25:52.0000] <devsnek>
+stop that's illegal
+
+[12:25:53.0000] <akirose>
+http://images4.wikia.nocookie.net/__cb20100602135929/uncyclopedia/images/thumb/c/c4/CryptKeeper.gif/450px-CryptKeeper.gif
+
+[12:26:00.0000] <devsnek>
+how is that function
+
+[12:26:06.0000] <Bakkot>
+document.all is callable
+
+[12:26:06.0000] <devsnek>
+document.all doesn't have a call slot
+
+[12:26:08.0000] <devsnek>
+what
+
+[12:26:10.0000] <Bakkot>
+sure does
+
+[12:26:22.0000] <devsnek>
+oh and it returns null
+
+[12:26:23.0000] <devsnek>
+classic
+
+[12:26:36.0000] <Bakkot>
+when called with no arguments
+
+[12:26:50.0000] <Bakkot>
+https://html.spec.whatwg.org/multipage/common-dom-interfaces.html#HTMLAllCollection-call
+
+[12:27:58.0000] <devsnek>
+like i understand why they did the whole falsish thing
+
+[12:28:07.0000] <devsnek>
+but why is it a function too
+
+[12:29:17.0000] <shu>
+Bakkot: make it revocable bro
+
+[12:29:23.0000] <rkirsling>
+it's called `all` for a reason
+
+[12:29:32.0000] <Bakkot>
+devsnek it was already a function in IE
+
+[12:30:09.0000] <rkirsling>
+the answer to the question "what type is document.all?" is of course "yes"
+
+[12:30:47.0000] <rkirsling>
+(I guess it's unequivocally not a number though lol)
+
+[12:33:06.0000] <shu>
+could some recommend a CLI js pretty printer?
+
+[12:33:40.0000] <shu>
+what is the clang format of js, prettier?
+
+[12:34:00.0000] <ljharb>
+there's no one answer. prettier's probably the fastest out of the box for you
+
+[12:34:20.0000] <Bakkot>
+prettier
+
+[12:34:32.0000] <ljharb>
+the most common is eslint with airbnb's config, but "standard" and "prettier" are both pretty frequently used too
+
+[12:34:49.0000] <Bakkot>
+prettier is the most common as a CLI tool by far
+
+[12:34:56.0000] <ljharb>
+as a standalone one, true
+
+[12:36:02.0000] <Bakkot>
+shu: you can `npx prettier file.js` to pretty-print any JS file without even installing prettier, as long as you have modern node on your computer
+
+[12:36:05.0000] <devsnek>
+we could make an official tc39 one and destroy the community forever
+
+[12:36:17.0000] <Bakkot>
+though probably you want to install it
+
+[12:36:39.0000] <Bakkot>
+devsnek nah, no one listens to us
+
+[12:37:33.0000] <devsnek>
+fun trivia
+
+[12:37:38.0000] <devsnek>
+when jetbrains was making webstorm
+
+[12:37:43.0000] <rkirsling>
+...except when we try to take away their precious ASI
+
+[12:37:48.0000] <devsnek>
+they made standardjs the default formatter for js
+
+[12:37:53.0000] <devsnek>
+because they thought it was an actual standard
+
+[12:38:26.0000] <Bakkot>
+yeah I am still mad about feross's decision to name it that
+
+[12:38:50.0000] <shu>
+cool thanks
+
+[12:40:28.0000] <rkirsling>
+still not too late to make StandardsJS
+
+[12:40:34.0000] <rkirsling>
+just sayin'
+
+[12:41:25.0000] <devsnek>
+StandardizedES
+
+[12:43:45.0000] <Bakkot>
+ljharb: also it looks like prettier gets 3x the number of weekly downloads as eslint-config-airbnb; is there a different number somewhere you're looking at?
+
+[12:44:18.0000] <Bakkot>
+oh, I guess more like 2x for eslint-config-airbnb-base
+
+[12:44:23.0000] <ljharb>
+Bakkot: ah, i haven't checked in awhile
+
+[12:44:37.0000] <ljharb>
+tho prettier's also used on "not just javascript"
+
+[12:44:51.0000] <Bakkot>
+i wish it weren't :(
+
+[12:44:54.0000] <Bakkot>
+but yes
+
+[12:44:58.0000] <ljharb>
+agreed
+
+[12:45:06.0000] <devsnek>
+ya but just look at that logo
+
+[12:45:12.0000] <devsnek>
+it will make my code as aesthetic as that logo
+
+[12:46:06.0000] <ljharb>
+nothing like picking a name that directly says that all other options make your code ugly :-p
+
+[12:46:09.0000] <rkirsling>
+I believe it's spelled a e s t h e t i c
+
+[13:32:25.0000] <rkirsling>
+so stepping back, even if that function-in-block is "both" var and let, what is the original rationale for the let part being hoisted to the top of the block?
+
+[13:32:35.0000] <rkirsling>
+I feel like that might be the weirdest part of it
+
+[13:34:47.0000] <ljharb>
+let/const is always hoisted to the top of every block
+
+[13:34:51.0000] <ljharb>
+that's how the TDZ works
+
+[13:36:12.0000] <rkirsling>
+oh
+
+[13:36:24.0000] <rkirsling>
+right
+
+[13:36:40.0000] <ljharb>
+(that's my understanding anyways)
+
+[13:37:23.0000] <devsnek>
+I found my voice
+
+[13:37:54.0000] <shu>
+rkirsling: the original motivation is that all bindings hoist in that way
+
+[13:38:13.0000] <shu>
+the original original motivation was probably implementation
+
+[13:40:47.0000] <rkirsling>
+I still feel like this is shocking in the sense that `let a = function () {};` is inserted at the top of the block, so like, it has an accessible value and everything
+
+[13:41:01.0000] <rkirsling>
+not just an uninitialized binding
+
+[13:42:08.0000] <ljharb>
+rkirsling: you mean how function declarations work?
+
+[13:43:55.0000] <rkirsling>
+evidently I just never thought about hoisting _in_ a block (vs. _through_ a block)
+
+[13:44:24.0000] <rkirsling>
+{ var x; } is easy to understand; it just "can't see the braces"
+
+[13:44:53.0000] <ljharb>
+it sees the function's braces tho
+
+[13:45:01.0000] <rkirsling>
+yeah true
+
+[13:47:39.0000] <rkirsling>
+hrmm yeah I guess I take that back then
+
+[13:47:44.0000] <shu>
+rkirsling: wait `let a = function () {};` isn't inserted at the top of the block
+
+[13:47:51.0000] <shu>
+the binding is hoisted, the initializer isn't
+
+[13:47:54.0000] <Bakkot>
+shu yes it is
+
+[13:47:59.0000] <shu>
+wait what
+
+[13:48:02.0000] <shu>
+the initializer is hoisted?
+
+[13:48:12.0000] <Bakkot>
+yes
+
+[13:48:13.0000] <Bakkot>
+see https://gist.github.com/bakkot/d3bcc42b7938fe2aeebf37eea1ff462d
+
+[13:48:15.0000] <rkirsling>
+this was the surprise to me, yeah
+
+[13:48:18.0000] <rkirsling>
+but then tbf
+
+[13:48:19.0000] <shu>
+oh for annex B?
+
+[13:48:27.0000] <shu>
+i am so confused what are we talking about
+
+[13:48:43.0000] <rkirsling>
+`'use strict'; { a(); function a() { print(3); } } print(a);` is not surprising, in printing 3 and then hitting a ref error
+
+[13:48:50.0000] <Bakkot>
+either way
+
+[13:48:54.0000] <shu>
+if you actually wrote out `let a = ...` the ... isn't hoisted
+
+[13:49:07.0000] <shu>
+the semantics of annex b are not representable via source text JS
+
+[13:49:11.0000] <rkirsling>
+yes, that much is crystal clear
+
+[13:49:12.0000] <rkirsling>
+yeah
+
+[13:50:32.0000] <shu>
+right, annex b hoists the entire function because function statements are generally hoisted in toto
+
+[13:51:07.0000] <shu>
+the thing that gets left in place of the original statement is like "var_env.a = env.a"
+
+[13:51:19.0000] <shu>
+which is unutterable
+
+[13:52:12.0000] <Bakkot>
+shu: https://freenode.logbot.info/tc39/20200312#c3395561-c3395570
+
+[13:52:52.0000] <shu>
+exactly, yes
+
+[13:54:23.0000] <rkirsling>
+I think I just got momentarily confused about what exactly I was confused about
+
+[13:54:30.0000] <rkirsling>
+sloppy mode is tears
+
+
+2020-03-13
+[19:51:37.0000] <devsnek>
+does anyone know if the es4 ml interpreter is available somewhere
+
+[20:02:10.0000] <bradleymeck>
+awbjs would be the best person to ask likely
+
+[20:26:49.0000] <bradleymeck>
+devsnek: https://github.com/dherman/es4 is that not it?
+
+[20:27:06.0000] <devsnek>
+oh that might be it
+
+[20:27:10.0000] <devsnek>
+nice find
+
+[20:33:51.0000] <bradleymeck>
+/me looking at how Promise.all actually works
+
+[20:33:59.0000] <bradleymeck>
+/me is visibly concerned
+
+[20:42:23.0000] <devsnek>
+what's wrong with promise.all
+
+[22:48:13.0000] <ljharb>
++1, what's wrong with it
+
+[14:45:57.0000] <devsnek>
+how did it come to be that primitive + string doesn't call Primitive.prototype.toString
+
+[14:47:12.0000] <devsnek>
+i guess that's js 1.0 behaviour
+
+[14:47:19.0000] <ljharb>
+there's no Primitive.prototype
+
+[14:47:37.0000] <ljharb>
+if there were, and all the primitive types didn't inherit from Object.prototype, things would make a lot more sense
+
+[14:47:45.0000] <devsnek>
+ljharb: ok i meant like
+
+[14:47:52.0000] <devsnek>
+number + string doesn't call Number.prototype.toString
+
+[14:49:29.0000] <ljharb>
+ah, right
+
+[14:49:38.0000] <ljharb>
+yeah i assume just legacy reasons
+
+[14:50:37.0000] <Bakkot>
+I'm sure glad it doesn't though
+
+[14:51:55.0000] <devsnek>
+whys that
+
+[14:52:39.0000] <ljharb>
+it'd make some of the few robust parts of the language brittle
+
+[15:12:47.0000] <Bakkot>
+I don't want interpolating numbers into strings to be slow
+
+[15:14:18.0000] <shu>
+you know what i want
+
+[15:14:52.0000] <shu>
+actually i take it back not gonna troll today
+
+[16:24:53.0000] <devsnek>
+Bakkot: i mean engines already optimize based on prototypes not being modified
+
+[16:25:31.0000] <Bakkot>
+eventually, yes
+
+[16:29:47.0000] <shu>
+less perf cliffs please
+
+
+2020-03-14
+[18:04:49.0000] <devsnek>
+https://tc39.es/ecma262/#sec-module-environment-records-getbindingvalue-n-s is step 4.c actually possible?
+
+[22:08:52.0000] <ljharb>
+devsnek: perhaps during a cycle?
+
+[22:09:42.0000] <devsnek>
+maybe?
+
+[22:09:50.0000] <devsnek>
+I haven't found anything that can trigger that error
+
+[09:28:33.0000] <bradleymeck>
+devsnek: i had an example of this long ago, I think guy did as well
+
+[09:28:57.0000] <bradleymeck>
+it came up when talking about export * being visibly changed for the dynamic modules proposal
+
+[15:38:49.0000] <devsnek>
+bradleymeck: if you come up with something let me know, its currently missing coverage in test262
+
+
+2020-03-15
+[11:19:24.0000] <ryzokuken>
+Bakkot: I made a starter PR for `Temporal.parse`: https://github.com/tc39/proposal-temporal/pull/433
+
+[11:20:08.0000] <ryzokuken>
+for now, I'm throwing if the string doesn't have both components (DateTime and TimeZone) which is atleast halfway what you want, but I might have to change it if the champions ask me to.
+
+[11:20:53.0000] <ryzokuken>
+also, it's parsing recursively so `DateTime.from` would still take in a `DateTime` without a `Time` (or `Date`) but I'd have to recheck.
+
+
+2020-03-16
+[17:26:43.0000] <bradleymeck>
+devsnek: it seems it is currently only possible with cycles in cyclic module record where an error comes from tying to initialize the env of the cyclic submodule https://tc39.es/ecma262/#cyclic-module-record
+
+[17:27:08.0000] <bradleymeck>
+so i dont think you can do it purely off JS
+
+[17:28:17.0000] <devsnek>
+interesting...
+
+[17:31:38.0000] <devsnek>
+bradleymeck: that's only if an impl explicitly tried to get the binding at that point though so
+
+[17:31:50.0000] <devsnek>
+seems unlikely
+
+[17:32:51.0000] <bradleymeck>
+it seems possible if 2 modules formed a export cycle
+
+[17:34:03.0000] <bradleymeck>
+a exports a, a exports * from b; b exports b, b exports * from a
+
+[17:34:28.0000] <bradleymeck>
+so i'd imagine an impl generating a binding for 1 of them before the 2nd one blows up
+
+[17:38:45.0000] <devsnek>
+bradleymeck: but the exception is thrown at evaluation, after the environments exist
+
+[17:39:09.0000] <bradleymeck>
+yea, but the environment stays null
+
+[17:39:12.0000] <bradleymeck>
+undefined*
+
+[17:39:20.0000] <devsnek>
+oh I see what you mean
+
+[17:39:26.0000] <devsnek>
+makes sense
+
+[07:20:04.0000] <ljharb>
+bradleymeck: devsnek should that then perhaps be an assert instead of a runtime exception, since it's something a host is expected to not do?
+
+[07:21:07.0000] <bradleymeck>
+unclear, host may never have an environment record for that module idk what the host would do then
+
+[07:21:37.0000] <bradleymeck>
+like if a module requires evaluation to form itself (wasm has a concept of eval during initialization)
+
+[07:22:34.0000] <bradleymeck>
+i think it is fine as is
+
+[07:22:56.0000] <ljharb>
+ok
+
+[08:34:12.0000] <bradleymeck>
+node's primordials namespace and snapshot stuff is a trove of edge cases in APIs
+
+
+2020-03-17
+[17:41:28.0000] <devsnek>
+should we validate that the first argument is an object? https://gc.gy/52110662.png
+
+[18:37:01.0000] <bradleymeck>
+devsnek: https://tc39.es/ecma262/#sec-requireobjectcoercible ?
+
+[18:37:31.0000] <devsnek>
+bradleymeck: i mean like
+
+[18:37:37.0000] <devsnek>
+'hello' would throw a type error
+
+[18:37:40.0000] <devsnek>
+Object('hello') wouldn't
+
+[18:37:49.0000] <devsnek>
+it doesn't matter that much
+
+[18:37:52.0000] <bradleymeck>
+that doesn't seem to match other stuff
+
+[11:14:41.0000] <rkirsling>
+oh interesting, wish I'd've known about https://github.com/tc39/proposal-class-fields/pull/301 earlier
+
+[11:14:48.0000] <rkirsling>
+(not that it matters, just FOMO :P)
+
+[11:15:56.0000] <devsnek>
+isn't it 🆒 how every usage of object member has to be manually updated for private fields
+
+[11:16:01.0000] <devsnek>
+:(
+
+[11:16:12.0000] <devsnek>
+i don't know why that's an emoji
+
+[11:17:11.0000] <rkirsling>
+(lol I've always wondered why it's an emoji too...)
+
+[11:17:26.0000] <devsnek>
+i mean, i didn't intend for "cool" to be an emoji
+
+[11:17:35.0000] <devsnek>
+gboard ftw
+
+[11:22:57.0000] <bradleymeck>
+one day we will get a spec macro language
+
+[11:23:13.0000] <bradleymeck>
+i do like 402's extensions to the spec language
+
+[11:23:35.0000] <devsnek>
+we already have macros
+
+[11:26:36.0000] <bradleymeck>
+we have flags / abstract ops, but we don't have things like PER_ISOLATE_STRING_PROPERTIES(V) in Node that expands as a preprocessor sort of thing
+
+[11:26:53.0000] <devsnek>
+we have %NativeErrors% or whatever it is
+
+[11:27:12.0000] <devsnek>
+we have a list of the names and then the spec expands a template definition into intrinsics
+
+[11:27:38.0000] <devsnek>
+https://tc39.es/ecma262/#sec-nativeerror-constructors
+
+[11:30:40.0000] <bradleymeck>
+I am unclear how we could re-use that for something like %MemberOperations% :thinking:
+
+[11:32:00.0000] <devsnek>
+extract out Identifier and #PrivateIdentifier and use green text for the parts i guess?
+
+[11:52:29.0000] <theskillwithin>
+optional chaining ftw
+
+
+2020-03-18
+[07:21:27.0000] <jackworks>
+https://github.com/caridy/secure-javascript-environment/issues/76
+
+[07:21:27.0000] <jackworks>
+magic behavior of `document.all` is poising sandboxes 🤣
+
+[13:49:56.0000] <devsnek>
+did people generally agree that normal completions should be a thing
+
+[13:54:28.0000] <Bakkot>
+... as opposed to?
+
+[13:55:01.0000] <Bakkot>
+mixing abrupt completions with values of non-completion types?
+
+[13:55:07.0000] <devsnek>
+yeah
+
+[13:55:25.0000] <Bakkot>
+I dunno about people generally but that is definitely the opinion of a majority of the current editor group
+
+[13:55:38.0000] <devsnek>
+that normal completion should be a thing you mean
+
+[13:55:46.0000] <Bakkot>
+yeah
+
+[13:56:32.0000] <ljharb>
+yes
+
+[13:56:34.0000] <devsnek>
+also, you had an issue open saying you were going to tidy up completions
+
+[13:56:39.0000] <Bakkot>
+yup, still planning to
+
+[13:56:41.0000] <devsnek>
+ok
+
+[13:56:55.0000] <devsnek>
+i was trying to refactor completions in engine262 and everything exploded
+
+[13:57:10.0000] <ljharb>
+completion values will at some point be appropriately socially distanced from regular values
+
+[13:57:31.0000] <devsnek>
+apparently at some point in the last two years i added an escape hatch where Completion(language value) returns that language value
+
+[15:37:55.0000] <rkirsling>
+so https://github.com/michaelficarra/proposal-first-class-protocols/issues/3 explains why we would avoid using `interface` for  a first-class version of what the spec calls a "protocol", but
+
+[15:38:23.0000] <rkirsling>
+how did it come to be that it's, e.g., the "iterator protocol" and not the "iterator interface"?
+
+[15:39:45.0000] <rkirsling>
+(I'm guessing it's because there was already this "MOP" notion?)
+
+
+2020-03-19
+[07:46:35.0000] <bradleymeck>
+rkirsling: wikipedia for interface in OOP redirects to protocol , seems like it was just a pref in naming at a glance
+
+[07:46:44.0000] <bradleymeck>
+MOP likely the same
+
+[15:55:31.0000] <devsnek>
+the more I think about module attributes the more I'm convinced they're not a good thing
+
+[15:57:39.0000] <devsnek>
+I'm pretty sure all of the motivating examples are better served by application or package level configuration
+
+
+2020-03-20
+[17:23:33.0000] <bradleymeck>
+devsnek: I think they do not currently inhibit the ability for a host to do application/package level configuration so I have no objections
+
+[17:24:09.0000] <bradleymeck>
+I think we should be careful about what we consider problematic and allow things even if only a specific subset of hosts would use them realistically
+
+[17:26:11.0000] <bradleymeck>
+I do think there will be synchronization / verbosity problems if we don't limit them to some central coordination system; but, for me just a simple registry like the MIME registry would be more than enough
+
+[17:26:36.0000] <devsnek>
+bradleymeck: they seem like a massive footgun
+
+[17:26:43.0000] <devsnek>
+and nothing else
+
+[17:27:09.0000] <devsnek>
+all the examples are specifying details about the module
+
+[17:27:11.0000] <devsnek>
+not the import
+
+[17:33:58.0000] <bradleymeck>
+devsnek: in the readme yea, but i don't see how that prevents other mechanisms like you described or conflicts with them
+
+[17:34:17.0000] <bradleymeck>
+to me the real conflicts come from things like customized revivers, which might need to be categorized differently
+
+[17:39:18.0000] <devsnek>
+this seems useful for whatever query parameters are used for
+
+[17:39:24.0000] <devsnek>
+and nothing else
+
+[17:40:32.0000] <devsnek>
+honestly that's not a bad test
+
+[17:40:56.0000] <bradleymeck>
+?
+
+[17:41:08.0000] <bradleymeck>
+how do you assert the MIME via query params?
+
+[17:41:17.0000] <bradleymeck>
+thats controlled via the server not the client
+
+[17:41:26.0000] <bradleymeck>
+this lets the client add an assert
+
+[17:41:36.0000] <devsnek>
+exactly
+
+[17:41:42.0000] <bradleymeck>
+?
+
+[17:41:48.0000] <devsnek>
+if you wouldn't put it in a query parameter
+
+[17:41:54.0000] <devsnek>
+you shouldn't put it in an attribute
+
+[17:42:16.0000] <bradleymeck>
+i don't understand, attributes are client local / not synced with the server
+
+[17:42:27.0000] <bradleymeck>
+the whole point is they aren't the same
+
+[17:43:38.0000] <bradleymeck>
+its adding an integration point that doesn't exist currently for source on the client to apply some kind of data to be used locally only
+
+[17:43:54.0000] <bradleymeck>
+query params are for integrating with the fetch/remote
+
+[17:44:15.0000] <bradleymeck>
+/me grumbles about this not being technically true in node
+
+[17:50:44.0000] <devsnek>
+bradleymeck: basically nothing specific to a module should be in an attribute
+
+[17:51:05.0000] <bradleymeck>
+I just don't see an answer to why thats the case
+
+[17:51:09.0000] <devsnek>
+type is project wide
+
+[17:51:17.0000] <devsnek>
+hash is project wide
+
+[17:51:24.0000] <devsnek>
+mocking is project wide
+
+[17:51:45.0000] <devsnek>
+I honestly have no idea what you would put in an attribute
+
+[17:51:52.0000] <bradleymeck>
+mocking is definitely project wide and gets replaced multiple times in test suites
+
+[17:52:26.0000] <bradleymeck>
+type can be defined project wide, but isn't necessarily only able to be defined there
+
+[17:52:36.0000] <bradleymeck>
+hash is the same, except for cycles
+
+[17:52:39.0000] <devsnek>
+yeah but anywhere else is a footgun
+
+[17:52:45.0000] <bradleymeck>
+devsnek: why?
+
+[17:52:50.0000] <devsnek>
+don't specify type somewhere and your code doesn't run
+
+[17:52:57.0000] <devsnek>
+very good experience
+
+[17:53:17.0000] <devsnek>
+forget to specify hash somewhere and maybe you have a security problem
+
+[17:54:06.0000] <bradleymeck>
+devsnek: those are host level concerns though
+
+[17:54:21.0000] <bradleymeck>
+i doubt node would enforce the need for a type attribute / I wouldn't want them to
+
+[17:54:34.0000] <bradleymeck>
+but if one is supplied, it does the check
+
+[17:55:04.0000] <devsnek>
+if the best that can be said is "people won't use it anyway"
+
+[17:55:07.0000] <devsnek>
+why bother adding it
+
+[17:55:09.0000] <bradleymeck>
+i don't see how thats a net negative, its just another layer of ways to verify things
+
+[17:55:40.0000] <bradleymeck>
+people will use it / linters may add it, but it being *Required* is up to the host
+
+[17:56:05.0000] <devsnek>
+it seems to be completely net negative to me
+
+[17:56:27.0000] <bradleymeck>
+how so? it adds a way for people to opt-in to a form of verification they cannot currently do
+
+[17:56:49.0000] <bradleymeck>
+that doesn't seem to take away anything
+
+[17:58:29.0000] <devsnek>
+I mean people can't call numbers either
+
+[17:58:40.0000] <devsnek>
+that doesn't mean we need to add it
+
+[17:59:42.0000] <devsnek>
+any time you would want to use this it seems like the actual correct thing would be a project wide config
+
+[17:59:59.0000] <devsnek>
+maybe if your app is a single file this makes sense
+
+[18:00:01.0000] <devsnek>
+but like...
+
+[18:00:14.0000] <devsnek>
+idk even then
+
+[18:00:29.0000] <bradleymeck>
+[[Call]] on numbers doesn't verify things / idk how that relates
+
+[18:01:15.0000] <bradleymeck>
+this actively does something that might be appealing. the ability to make assertions about what type is being evaluated when loading a module
+
+[18:01:51.0000] <devsnek>
+bradleymeck: I think it's inherently incorrect for that assertion to occur at the import site
+
+[18:02:04.0000] <bradleymeck>
+honestly node's policy mechanism might be aided by a similar constraint so that you could state a app can load arbitrary files, but only JSON
+
+[18:02:28.0000] <devsnek>
+that assertion should be specified somewhere that blankets all import sites
+
+[18:02:34.0000] <bradleymeck>
+devsnek: I think there isn't a real reason that having it at the import site is shown to be problematic so far
+
+[18:02:50.0000] <bradleymeck>
+i don't disagree, but i don't see how at import site is harmful
+
+[18:04:17.0000] <bradleymeck>
+just because there are multiple ways of doing something doesn't mean we can/should define 1 way as the only way. I don't see a direct conflict of these assertions, if you have conflicts of import site and app config it just means it 100% will fail to load
+
+[18:04:29.0000] <bradleymeck>
+which seems correct
+
+[18:05:58.0000] <bradleymeck>
+it would be good to see how having it at an import site does cause problems. omission is the current state and most people agree that having no mechanism for these asserts isn't a great path forward
+
+[18:07:06.0000] <bradleymeck>
+having an out of band mechanism doesn't seem to have any clear problems co-existing with an in band mechanism so far
+
+[18:08:43.0000] <devsnek>
+why are we making something where you can do it incorrectly
+
+[18:08:49.0000] <devsnek>
+is my question
+
+[18:09:48.0000] <devsnek>
+obviously type fails loudly but not everything does
+
+[18:10:55.0000] <devsnek>
+for example missing a hash at an import
+
+[18:11:32.0000] <bradleymeck>
+because convenience and UX. even with app configuration you could do it wrong there
+
+[18:11:35.0000] <devsnek>
+it's just weird to me that people want to specify things inherently bound to the module in the completely wrong place
+
+[18:12:31.0000] <devsnek>
+idk I think it's better UX to not let people make these mistakes
+
+[18:12:32.0000] <bradleymeck>
+to be fair, doing it all in 1 place like node policies does slow down boot time
+
+[18:12:39.0000] <devsnek>
+the entire premise is that not having this info is bad
+
+[18:12:42.0000] <bradleymeck>
+it isn't like thats a wonderful solution either
+
+[18:12:50.0000] <devsnek>
+so let's reduce the places where you can be missing this info
+
+[18:13:36.0000] <devsnek>
+you mean loading the policy file takes time right?
+
+[18:15:36.0000] <bradleymeck>
+devsnek: loading it and the unused entries being loaded in particular
+
+[18:15:48.0000] <bradleymeck>
+medium CLI is 100-200ms added boot time in Node
+
+[18:16:05.0000] <devsnek>
+that seems reasonable to me tbh
+
+[18:16:07.0000] <bradleymeck>
+cause you load all the possible values
+
+[18:16:16.0000] <bradleymeck>
+100-200ms is totally insane for web
+
+[18:16:19.0000] <bradleymeck>
+and iot
+
+[18:16:27.0000] <devsnek>
+well they don't use a separate file
+
+[18:16:37.0000] <bradleymeck>
+?
+
+[18:16:54.0000] <bradleymeck>
+they want it in-band yea... via module attributes.
+
+[18:16:58.0000] <devsnek>
+they're not bound to node's way of loading that data
+
+[18:17:29.0000] <devsnek>
+yeah module attributes would be fine if humans couldn't interact with them lol
+
+[18:17:32.0000] <devsnek>
+but they can
+
+[18:17:38.0000] <bradleymeck>
+devsnek: i've actively tried to think of ways we could load it faster
+
+[18:17:45.0000] <devsnek>
+they aren't just build output
+
+[18:17:48.0000] <bradleymeck>
+devsnek: there really isn't too much that can be done
+
+[18:18:02.0000] <bradleymeck>
+if you do the verification at runtime, you gotta pay the cost
+
+[18:18:10.0000] <devsnek>
+yes
+
+[18:18:12.0000] <bradleymeck>
+unused stuff is most of the cost
+
+[18:18:31.0000] <devsnek>
+the web has an entire thing for remapping imports
+
+[18:18:54.0000] <bradleymeck>
+yup
+
+[18:19:02.0000] <devsnek>
+for them it would be adding additional props to json
+
+[18:19:06.0000] <devsnek>
+which isn't slow
+
+[18:19:22.0000] <devsnek>
+at least compared to having the json in the first place
+
+[18:19:23.0000] <bradleymeck>
+if you list each json file that could be loaded?
+
+[18:19:30.0000] <bradleymeck>
+thats slow cause you have to list them all
+
+[18:19:33.0000] <devsnek>
+you do that already
+
+[18:19:40.0000] <bradleymeck>
+you don't in import maps
+
+[18:19:42.0000] <devsnek>
+the thing maps imports
+
+[18:20:05.0000] <devsnek>
+are you saying you think there will be more attributes than mapped imports?
+
+[18:20:07.0000] <bradleymeck>
+it does namespaced mapping, it doesn't have 1 entry per resource
+
+[18:20:20.0000] <bradleymeck>
+yes, since a mapping covers multiple resources
+
+[18:20:23.0000] <bradleymeck>
+can*
+
+[18:20:42.0000] <devsnek>
+ugh this is annoying
+
+[18:21:06.0000] <bradleymeck>
+https://wicg.github.io/import-maps/#import-map-scopes
+
+[18:21:07.0000] <devsnek>
+i think it makes perfect sense that you'd take a perf hit for this
+
+[18:21:16.0000] <devsnek>
+yeah I know how import maps work
+
+[18:22:37.0000] <bradleymeck>
+the perf hit can be done as needed with in-band
+
+[18:22:55.0000] <bradleymeck>
+rather than all at once, which saves a lot of time if you have unused stuff
+
+[18:23:00.0000] <devsnek>
+it shouldn't matter where the data is
+
+[18:23:05.0000] <bradleymeck>
+it does though
+
+[18:23:38.0000] <bradleymeck>
+even with my making things increasingly lazy and only parsing SRI on access to a resource in node, you still have to resolve the resource paths at startup
+
+[18:23:41.0000] <devsnek>
+i can see how it would if you have a dynamic import somewhere breaking the graph into pieces
+
+[18:24:18.0000] <devsnek>
+yeah i think that's kind of inherent to this problem though
+
+[18:24:30.0000] <devsnek>
+my point is that you need to map these attributes to every import location
+
+[18:24:44.0000] <bradleymeck>
+with in-band you don't have to resolve the paths since it is just w/e the import site is
+
+[18:24:55.0000] <devsnek>
+but you don't guarantee the data exists at every import site
+
+[18:25:04.0000] <devsnek>
+in terms of security that seems like a net loss to me
+
+[18:25:23.0000] <bradleymeck>
+sure, same with lots of things. use CSP or w/e to enforce that all sites must have the security attributes
+
+[18:25:24.0000] <devsnek>
+like yay its faster but we don't have the feature we set out to have
+
+[18:25:35.0000] <bradleymeck>
+you can just set a config that you must use the feature
+
+[18:25:43.0000] <bradleymeck>
+then while in dev it is optional
+
+[18:25:52.0000] <devsnek>
+you shouldn't need eslint to write correct code
+
+[18:25:55.0000] <devsnek>
+good code maybe
+
+[18:25:56.0000] <bradleymeck>
+linters/bundlers/formatters/etc. can add them
+
+[18:25:57.0000] <devsnek>
+but not correct code
+
+[18:26:06.0000] <bradleymeck>
+it would be correct without the attribute
+
+[18:26:14.0000] <devsnek>
+it wouldn't
+
+[18:26:20.0000] <bradleymeck>
+how so?
+
+[18:26:32.0000] <bradleymeck>
+you set a flag to enforce the attribute being used
+
+[18:26:34.0000] <devsnek>
+with missing `type`, the graph is invalid
+
+[18:26:46.0000] <devsnek>
+with missing `hash`, the graph is unsafe, and should be invalid because of that
+
+[18:26:54.0000] <bradleymeck>
+in a certain host that wants to ensure it is used, that seems reasonable
+
+[18:27:18.0000] <devsnek>
+we're not talking about hosts that don't want to use it though
+
+[18:27:20.0000] <bradleymeck>
+these are all things that you are treating as necessary rather than opt-in
+
+[18:27:26.0000] <devsnek>
+we should design the feature for people who will use it
+
+[18:27:52.0000] <bradleymeck>
+are you saying we should standardize an app config?
+
+[18:28:05.0000] <devsnek>
+maybe
+
+[18:28:18.0000] <devsnek>
+moreover i'm saying the current direction seems net negative
+
+[18:28:39.0000] <devsnek>
+i'd love to get more people thinking about alternatives but as soon as you say "not in band" they stop listening
+
+[18:28:45.0000] <bradleymeck>
+i dont saee anything you stated as removing value
+
+[18:28:58.0000] <bradleymeck>
+i'm in the not-in-band camp
+
+[18:29:07.0000] <bradleymeck>
+but i don't see anything concrete to find problems with
+
+[18:29:38.0000] <devsnek>
+i think its inherently bad that you can end up with out of sync config while actively trying to use it
+
+[18:29:42.0000] <bradleymeck>
+i see problems with not-in-band, the champions of attributes want different compromises than I do
+
+[18:29:44.0000] <bradleymeck>
+thats fine
+
+[18:29:53.0000] <devsnek>
+like to me that seems to invalidate the point
+
+[18:30:11.0000] <bradleymeck>
+you aren't configuring the type of the target with type=
+
+[18:30:17.0000] <devsnek>
+the point of this is to enforce a behaviour but you just kick the can down the road
+
+[18:30:21.0000] <bradleymeck>
+you are performing an assertion
+
+[18:30:33.0000] <devsnek>
+now you need assertions that you're performing assertions
+
+[18:30:36.0000] <devsnek>
+via eslint or whatever
+
+[18:30:40.0000] <devsnek>
+you literally just move the problem
+
+[18:30:42.0000] <bradleymeck>
+no, out of band is not a solution for these performance problems
+
+[18:31:05.0000] <bradleymeck>
+i am heavily in the oob solution camp
+
+[18:31:17.0000] <bradleymeck>
+but I see serious problems with it being the only way
+
+[18:31:58.0000] <devsnek>
+i don't understand how it fulfills the requirements
+
+[18:32:05.0000] <bradleymeck>
+i would still encourage all my teams to use oob, but it does not work as a solution for all situations
+
+[18:32:08.0000] <bradleymeck>
+which requirements?
+
+[18:32:26.0000] <devsnek>
+the reason this exists is to add verification where verification is missing
+
+[18:32:30.0000] <devsnek>
+right?
+
+[18:32:53.0000] <bradleymeck>
+in a way that is reasonable given platform constraints
+
+[18:32:54.0000] <bradleymeck>
+yes
+
+[18:33:04.0000] <bradleymeck>
+web has a perf constraint
+
+[18:33:08.0000] <devsnek>
+but then you have a problem
+
+[18:33:20.0000] <devsnek>
+you have an ability to add verification to the attributes
+
+[18:33:25.0000] <devsnek>
+but now you have to verify those exist
+
+[18:33:33.0000] <devsnek>
+you move the problem without solving it
+
+[18:33:50.0000] <devsnek>
+i guess you can say you make eslint solve it
+
+[18:34:00.0000] <bradleymeck>
+you solved the problem, but you have to do ahead of time verification still
+
+[18:34:24.0000] <bradleymeck>
+instead of verifying the type= of resources
+
+[18:34:33.0000] <bradleymeck>
+you now verify that all imports have type=
+
+[18:34:36.0000] <bradleymeck>
+different
+
+[18:34:37.0000] <devsnek>
+if somehow attributes were invisible to humans
+
+[18:34:41.0000] <devsnek>
+it would be fine
+
+[18:35:10.0000] <bradleymeck>
+idk how that would work
+
+[18:35:13.0000] <devsnek>
+exactly
+
+[18:35:21.0000] <bradleymeck>
+so, visible is fine
+
+[18:35:25.0000] <devsnek>
+so basically we're saying
+
+[18:35:27.0000] <devsnek>
+here's a feature
+
+[18:35:32.0000] <devsnek>
+don't ever actually use it
+
+[18:35:37.0000] <devsnek>
+leave it to babel output
+
+[18:35:39.0000] <bradleymeck>
+you should use it, when you want it
+
+[18:35:48.0000] <devsnek>
+no you as a human should not use it
+
+[18:35:56.0000] <devsnek>
+your tooling should emit it
+
+[18:36:05.0000] <bradleymeck>
+i don't agree with that statement
+
+[18:36:16.0000] <bradleymeck>
+you don't have to use it, but use it if you need it
+
+[18:36:24.0000] <devsnek>
+actually humans manually putting it in assisted by eslint seems usable
+
+[18:36:27.0000] <bradleymeck>
+import(x, {type:json}) is still useful
+
+[18:36:30.0000] <devsnek>
+i mean i wouldn't agree with that workflow
+
+[18:37:03.0000] <devsnek>
+dynamic imports seem fine
+
+[18:37:40.0000] <devsnek>
+but in a certain context
+
+[18:37:51.0000] <devsnek>
+you're importing x and you have no idea what it is but you know it should be json
+
+[18:38:53.0000] <devsnek>
+honestly that still has the multiple import location problem
+
+[18:40:00.0000] <bradleymeck>
+It asserts whatever loads won't mutate crap
+
+[18:40:50.0000] <devsnek>
+yeah it seems useful in very specific contexts
+
+[18:41:10.0000] <devsnek>
+where dynamic import is not being used to split the graph for lazy loading but to load something given to your application that you don't know
+
+[18:41:34.0000] <devsnek>
+like i said it technically still has the multiple import location problem but its unlikely you'd hit it
+
+[18:41:45.0000] <bradleymeck>
+If 2 callsites differ you might also be able to assert at least one will fail
+
+[18:42:20.0000] <devsnek>
+if js had standard resolve behaviour it could assert that attributes were consistent
+
+[18:43:00.0000] <bradleymeck>
+Hell even for static urls you are just asking the host to not let it mutate crap
+
+[18:43:11.0000] <bradleymeck>
+Sites get pwned
+
+[18:43:17.0000] <bradleymeck>
+It happens
+
+[18:44:15.0000] <devsnek>
+with static urls you can specify it once in a project config
+
+[18:44:22.0000] <devsnek>
+and sleep safe knowing you didn't forget one
+
+[18:44:52.0000] <bradleymeck>
+Perf cost
+
+[18:45:03.0000] <devsnek>
+how long does it take to verify a hash though
+
+[18:46:22.0000] <bradleymeck>
+Hash, no significant time . Loading all the paths... 10k entries is 300ms even  super lazy
+
+[18:47:39.0000] <bradleymeck>
+And that's the total path count for a small CLI in node thanks to dynamic specifiers if you limit it to app root
+
+[18:47:56.0000] <devsnek>
+10k entries lol
+
+[18:47:59.0000] <bradleymeck>
+Like 280 get used
+
+[18:48:00.0000] <devsnek>
+is that just npm being npm
+
+[18:48:12.0000] <bradleymeck>
+Yes and no
+
+[18:48:40.0000] <devsnek>
+well at least with imports you know exactly what is and isn't being loaded
+
+[18:48:50.0000] <bradleymeck>
+Total traversables statically is around 1-2k
+
+[18:49:01.0000] <devsnek>
+assuming you're not randomly `import()`ing absolute urls
+
+[18:49:31.0000] <bradleymeck>
+People do import non-static values
+
+[18:49:49.0000] <devsnek>
+right but usually they're just globbed
+
+[18:50:02.0000] <bradleymeck>
+Globbed?
+
+[18:50:19.0000] <devsnek>
+webpack will expand all possible importable things based on a static root in the import
+
+[18:50:28.0000] <devsnek>
+like `import('./assets/' + x)`
+
+[18:50:37.0000] <devsnek>
+will make webpack check everything in `./assets`
+
+[18:51:24.0000] <bradleymeck>
+Yup, both need tooling to aid this
+
+[18:51:29.0000] <devsnek>
+i should do a study of what % of sites have those webpack dynamic import maps
+
+[18:51:31.0000] <devsnek>
+i see them a lot
+
+[18:57:35.0000] <rkirsling>
+hmmmm
+
+[18:58:08.0000] <rkirsling>
+apparently `temporal dead zone` doesn't actually appear in the spec but the abbreviation `TDZ` is used without explanation in this algorithm alone: https://tc39.es/ecma262/#sec-runtime-semantics-forin-div-ofheadevaluation-tdznames-expr-iterationkind
+
+[18:59:04.0000] <bradleymeck>
+Yup
+
+[18:59:48.0000] <bradleymeck>
+We don't really have a non normative terms area
+
+[18:59:49.0000] <rkirsling>
+seems like it's been that way since ES2015 too, which is kind of shocking
+
+[19:00:21.0000] <bradleymeck>
+We have few notes and virtually no examples
+
+[19:01:30.0000] <bradleymeck>
+People have been reluctant to add non-normative text / had push back
+
+[19:03:27.0000] <rkirsling>
+I'm shocked that I can't find an issue either
+
+[19:03:39.0000] <rkirsling>
+I don't care how we resolve that but it's not a good look :-/
+
+[09:07:15.0000] <rwaldron>
+Is anyone around that can wants to chat about import.meta real quick? devsnek MylesBorins or anyone with familiarity enough to discuss a specific step in the algorithm? https://tc39.es/proposal-import-meta/#sec-meta-properties-runtime-semantics-evaluation Step 4: If importMeta is undefined.
+
+[09:08:31.0000] <rwaldron>
+For the purpose of testing, is there a way to contrive that state?
+
+[09:17:00.0000] <devsnek>
+rwaldron: no
+
+[09:17:18.0000] <devsnek>
+at least not from js
+
+[09:28:02.0000] <devsnek>
+when host hooks are available via realms or whatever it should be possible though
+
+[09:33:54.0000] <bradleymeck>
+does the spec need to be updated? [[Meta]] vs [[ImportMeta]]
+
+[09:35:08.0000] <devsnek>
+bradleymeck: fixed in stage 4 pr
+
+[12:19:03.0000] <devsnek>
+bradleymeck: are realms not going to allow a custom global proxy? wouldn't that be needed for mocking browser environment.
+
+[12:19:20.0000] <devsnek>
+realms/compartments
+
+[12:19:43.0000] <devsnek>
+whatever the overall api is called
+
+[12:20:50.0000] <bradleymeck>
+they do but its complicated
+
+[12:21:04.0000] <bradleymeck>
+realms ~= new set of intrinsics / global
+
+[12:21:29.0000] <bradleymeck>
+compartments ~= host hooks / potentially global proxy / definitely global lexical scope
+
+[12:21:47.0000] <bradleymeck>
+so one is really just making a fresh env w/o host customization
+
+[12:21:55.0000] <bradleymeck>
+the other is all the host customization you might need
+
+[12:22:12.0000] <bradleymeck>
+and then some people want to define Agents eventually
+
+[12:22:19.0000] <bradleymeck>
+those are separate address spaces
+
+[12:22:49.0000] <devsnek>
+yeah I just meant like
+
+[12:23:00.0000] <devsnek>
+overall the realm+compartment api
+
+[12:23:17.0000] <devsnek>
+seems like global proxy would be needed for stuff like jsdom
+
+[12:25:49.0000] <devsnek>
+I wonder if we will ever have an agent api
+
+[12:26:40.0000] <devsnek>
+I guess that would conflict with web workers and worker_threads
+
+[12:42:33.0000] <bradleymeck>
+conflict? duplicate, sure
+
+[12:44:53.0000] <devsnek>
+it would be cool though
+
+[13:06:24.0000] <theskillwithin>
+is this correct? https://github.com/colorjs/javascript-yellow
+
+[13:08:18.0000] <devsnek>
+probably
+
+[13:17:47.0000] <shu>
+theskillwithin: the JS logo is a community thing, unaffiliated with TC39
+
+[13:18:17.0000] <shu>
+theskillwithin: https://github.com/voodootikigod/logo.js/ is the repo
+
+[13:18:43.0000] <shu>
+perhaps you could contribute your package to that larger collection
+
+[13:20:27.0000] <theskillwithin>
+not my package just found it on google
+
+[13:21:02.0000] <shu>
+ah, i'm not sure what you mean by "correct" then
+
+[13:23:10.0000] <theskillwithin>
+i just want to use the javascript color associated with javascript to theme https://d4dnjdsd285hx.cloudfront.net/
+
+[13:25:33.0000] <devsnek>
+"javascript" itself isn't even official
+
+[13:25:56.0000] <devsnek>
+we make ECMAScript here
+
+[13:28:08.0000] <bradleymeck>
+"javascript" is trademarked to oracle
+
+[13:29:55.0000] <bradleymeck>
+always call it JS if you can avoid the long name
+
+[13:38:11.0000] <theskillwithin>
+wow did not know that
+
+[13:38:33.0000] <theskillwithin>
+i thought u lost ur tademark very easily if it was common lingo
+
+[13:40:54.0000] <bradleymeck>
+IANAL but i believe as long as it is defended it won't be lost
+
+[13:41:10.0000] <bradleymeck>
+2018 it was
+
+[13:41:33.0000] <bradleymeck>
+also law varies per area of the world
+
+[13:56:32.0000] <devsnek>
+oracle is known for issuing takedowns on the mac app store for things with "javascript" in the name
+
+[13:57:17.0000] <devsnek>
+well, known to issue
+
+
+2020-03-21
+[17:37:07.0000] <rkirsling>
+kind of unfortunate that a non-global, non-sticky regex still has to call the lastIndex getter when exec-ing 🤔
+
+[15:08:53.0000] <rkirsling>
+everyone's so vocally unenthusiastic about my editorial PR 😂
+
+[15:11:42.0000] <jmdyck>
+but hey, it got merged.
+
+[15:30:09.0000] <rkirsling>
+indeed :D
+
+
+2020-03-22
+[17:26:39.0000] <ljharb>
+:-p
+
+[21:46:20.0000] <theskillwithin>
+=]
+
+
+2020-03-23
+[13:38:41.0000] <devsnek>
+why do tagged templates not use an array for the expressions
+
+[13:46:00.0000] <Bakkot>
+presumably because a given template has only a fixed number of expressions
+
+[13:46:13.0000] <Bakkot>
+which makes it more like a function call
+
+[13:46:35.0000] <Bakkot>
+easy enough to do `tag(strings, ...exps)` to get the array if you want it
+
+[13:48:33.0000] <devsnek>
+yeah i know you can spread
+
+[13:48:51.0000] <devsnek>
+i don't think the design is bad or anything
+
+[13:48:56.0000] <devsnek>
+just a curiosity
+
+[14:01:20.0000] <Bakkot>
+yeah, that's my guess
+
+[14:02:19.0000] <Bakkot>
+it's for cases like "console.log(employee`${name} is a level ${level} employee`)" or whatever
+
+[14:02:33.0000] <Bakkot>
+*optimized for
+
+[14:26:55.0000] <TabAtkins>
+Bakkot: I don't understand what optimization you're indicating there.
+
+[14:27:08.0000] <Bakkot>
+TabAtkins not like a performance optimization
+
+[14:27:55.0000] <Bakkot>
+I mean if the case you care most about is the case where the tag is expected to be used with a fixed number of expressions, then you would have each expression be its own argument to the function (as is in fact the case)
+
+[14:28:46.0000] <Bakkot>
+as opposed to the case where the tag is expected to be used with an arbitrary number of expressions, in which case you would have all the expressions wrapped up in an array
+
+[14:29:26.0000] <ljharb>
+this api design does preclude any future additional arguments to the tag function, tho.
+
+[14:30:56.0000] <Bakkot>
+you can just hang the new arguments as properties of the array which is the first argument :P
+
+[14:31:05.0000] <Bakkot>
+(this is ugly but it's also what we actually do, for `raw`)
+
+[14:31:39.0000] <ljharb>
+ugh, i forgot we repeated the match object mistake there too
+
+[15:23:38.0000] <Bakkot>
+jmdyck: where does LR_Parser come from in https://github.com/jmdyck/ecmaspeak-py/blob/0d82b85e4dd433def0ca9ec3384d380762bcabf2/Pseudocode_Parser.py#L10 ?
+
+[15:23:47.0000] <Bakkot>
+that does not appear to be the name of a package pip knows about
+
+[15:46:15.0000] <devsnek>
+ljharb: is there anything else that https://github.com/tc39/ecma262/pull/1669 needs?
+
+[16:06:18.0000] <ljharb>
+devsnek: nope, not as of today, thanks for the ping
+
+[16:14:45.0000] <jmdyck>
+Bakkot: LR_Parser is another thing I wrote.
+
+[16:15:29.0000] <Bakkot>
+jmdyck: that's what I figured; does it exist somewhere? I'm trying to run ecmaspeak-py, and it doesn't work without it.
+
+[16:16:19.0000] <jmdyck>
+guess i'll have to publish it then
+
+[16:22:38.0000] <Bakkot>
+jmdyck thanks!
+
+[16:23:03.0000] <Bakkot>
+if you're planning doing so soon, let me know when it's up?
+
+[16:23:13.0000] <jmdyck>
+k
+
+
+2020-03-24
+[17:58:25.0000] <jmdyck>
+Bakkot: https://github.com/jmdyck/LR_Parser
+
+[18:07:27.0000] <Bakkot>
+jmdyck: thank you!
+
+[18:09:46.0000] <Bakkot>
+jmdyck: https://github.com/jmdyck/compare_and_replace.py/blob/master/compare_and_replace.py depends on a module named misc, which also appears to not exist
+
+[18:09:59.0000] <jmdyck>
+hmm
+
+[18:10:02.0000] <Bakkot>
+though it doesn't use it for anything, so maybe that line can just be remoed?
+
+[18:10:57.0000] <Bakkot>
+yeah, seems to work fine without that line
+
+[18:18:06.0000] <jmdyck>
+I've updated the repo.
+
+
+2020-03-26
+[18:23:55.0000] <TimothyGu>
+Is https://github.com/tc39/proposal-javascript-standard-library/ still being actively developed?
+
+[18:58:02.0000] <devsnek>
+TimothyGu: i believe that turned into https://github.com/syg/standard-library-task-group
+
+[19:00:07.0000] <shu>
+devsnek: no, SLTG is not directly related to the standard library proposal. in fact SLTG turned more into the "incubator calls"
+
+[19:00:36.0000] <devsnek>
+hmm ok
+
+[19:01:07.0000] <shu>
+TimothyGu: the standard library proposal turned into builtin modules, since that's required for how michael saboff and co at JSC want to do the standard library
+
+[19:01:52.0000] <shu>
+TimothyGu: it's still being worked on by them (and me to a much smaller extent). there are thorny technical issues with polyfilling and making the available to non-module code that aren't solved yet
+
+[19:02:01.0000] <shu>
+making them*
+
+[19:02:24.0000] <devsnek>
+I'm not a fan of modules for standard library
+
+[19:02:35.0000] <TimothyGu>
+ah
+
+[19:03:20.0000] <shu>
+yeah, i'm also of the opinion, as domenic pointed out, if new standard library features were only builtin modules and builtin modules aren't available to script, that arbitrary bifurcates the ecosystem
+
+[19:03:52.0000] <shu>
+so it's pretty important that there be a way for builtin modules to be available to script
+
+[19:04:06.0000] <devsnek>
+has that been figured out yey
+
+[19:04:09.0000] <devsnek>
+yet
+
+[19:04:12.0000] <shu>
+nope, it's pretty hard
+
+[19:04:43.0000] <devsnek>
+yeah I'm of the opinion it's better to just keep making globals
+
+[19:04:47.0000] <shu>
+the availability-to-script thing is also the crux of it for ljharb's position that they must be polyfillable as well
+
+[19:05:40.0000] <shu>
+/me off for the night
+
+[19:05:48.0000] <devsnek>
+👋
+
+[19:09:58.0000] <TimothyGu>
+what's wrong about `import()`
+
+[19:14:02.0000] <devsnek>
+TimothyGu: not sync
+
+[19:14:12.0000] <TimothyGu>
+ah that
+
+[19:19:29.0000] <devsnek>
+i'm so excited for tla
+
+[09:17:22.0000] <rwaldron>
+@shu https://github.com/tc39/proposal-atomics-wait-async/issues/28
+
+[09:17:55.0000] <shu>
+rwaldron: thanks for ping, in mtgs until 11am PT, will look in afternoon
+
+[09:18:35.0000] <rwaldron>
+Thank you!
+
+[09:20:22.0000] <rwaldron>
+also, cc @ljharb
+
+[09:23:39.0000] <ljharb>
+commented
+
+[10:49:44.0000] <rwaldron>
+ljharb thank you!
+
+
+2020-03-27
+[08:13:57.0000] <jmdyck>
+Has the TC39 meeting next week been cancelled, or is it going to be all-remote?
+
+[10:14:26.0000] <TabAtkins>
+It's all remote, on zoom
+
+[10:15:40.0000] <TabAtkins>
+Hmm, I'm looking at ToInteger <https://tc39.es/ecma262/#sec-tointeger>, and step 4 says to convert it to a value with the same sign, but magnitude equal to floor(abs(value)).
+
+[10:15:58.0000] <TabAtkins>
+That's just trunctation, right? Why not refer to that? Is trunc() just not defined over abstract numbers?
+
+[10:16:51.0000] <devsnek>
+TabAtkins: yeah we haven't defined it
+
+[10:16:58.0000] <TabAtkins>
+Ok.
+
+[10:17:50.0000] <devsnek>
+https://tc39.es/ecma262/#sec-mathematical-operations
+
+[10:19:09.0000] <TabAtkins>
+Yeah, I just tried to reproduce the algo in code and thought it was weird. Turns out you can reduce the whole thing to a one-liner if you're working in JS rather than spec-ese: `Math.trunc(n) || 0;`
+
+[10:19:49.0000] <TabAtkins>
+That preserves Infinities, rounds toward 0, and converts NaN and -0 to +0, which is the entire algo.
+
+
+2020-03-28
+[13:41:52.0000] <rkirsling>
+wow. so before ES3, not only did FunctionExpression not exist, but also the body of a FunctionDeclaration was a Block, so you couldn't declare a function within a function
+
+[13:41:54.0000] <rkirsling>
+wild
+
+
+2020-03-30
+[11:42:07.0000] <devsnek>
+rickbutton: is there any info on RefCollection outside of that presentation
+
+[11:42:16.0000] <devsnek>
+because i have many many objections i'd like to write down
+
+[11:55:51.0000] <rickbutton>
+devsnek: yeah, there is a proposal repo, but it is currently private, msg-ing rricard to open it up
+
+[11:56:18.0000] <devsnek>
+removing ownership of refs from where they are contained seems like it automatically disqualifies the design tbh
+
+[11:56:34.0000] <devsnek>
+individual ref cells at each position would be better
+
+[11:56:43.0000] <devsnek>
+and better yet would be removing the restriction on objects in records
+
+[11:57:30.0000] <rickbutton>
+not sure what you mean by individual ref cells
+
+[11:57:41.0000] <devsnek>
+like instead of one thing owning a bunch of cells
+
+[11:57:47.0000] <devsnek>
+each instance is its own thing
+
+[11:57:54.0000] <rickbutton>
+oh i see
+
+[11:57:58.0000] <rricard>
+yea I can see that work as well
+
+[11:58:04.0000] <devsnek>
+but like i said
+
+[11:58:10.0000] <devsnek>
+better would be just allowing objects in records
+
+[11:58:24.0000] <rickbutton>
+what would it mean for a primitive to contain an object?
+
+[11:58:37.0000] <rricard>
+it's an early idea, I'm gonna try to get the RefCollection up asap
+
+[11:58:37.0000] <devsnek>
+it would mean there was a pointer to the object
+
+[11:58:44.0000] <devsnek>
+like how there will be pointers to the doubles
+
+[11:58:50.0000] <devsnek>
+because engines put doubles in the heap
+
+[11:58:57.0000] <rickbutton>
+well sure
+
+[11:59:06.0000] <devsnek>
+i don't understand your question then
+
+[11:59:20.0000] <devsnek>
+the record holds some keys and values
+
+[11:59:30.0000] <devsnek>
+why is there a limitation on the type of the value
+
+[11:59:33.0000] <rricard>
+Ergonomically there is a point in having to make the extra dereferencing hoo[
+
+[11:59:40.0000] <rricard>
+hoop*
+
+[11:59:52.0000] <devsnek>
+yeah the extra reference is kind of awful too
+
+[11:59:57.0000] <devsnek>
+even if you move to a per-instance cell
+
+[12:00:00.0000] <rricard>
+we can improve it
+
+[12:00:13.0000] <rricard>
+I agree it's annoying
+
+[12:00:17.0000] <devsnek>
+you could make the cell implicit in the record
+
+[12:00:29.0000] <devsnek>
+so you just do `#{ a: {} }`
+
+[12:00:36.0000] <devsnek>
+and then `whatever.a === that object`
+
+[12:00:53.0000] <rickbutton>
+one of the major arguments against objects in records is also an ergonomic one
+
+[12:01:09.0000] <devsnek>
+yeah people want to guarantee the objects are frozen all the way down
+
+[12:01:10.0000] <rricard>
+the ergonomic goal here is to typeerror
+
+[12:01:28.0000] <rricard>
+if you bail out, you have to explicitely do it
+
+[12:01:38.0000] <rickbutton>
+exactly, from our research most bugs introduced while using immutable libraries like Immutable.js and immer are at the boundaries
+
+[12:01:41.0000] <rricard>
+`#{ a: r({}) }
+
+[12:01:47.0000] <devsnek>
+from my perspective not allowing objects is unergonomic to the point of being a blocking point
+
+[12:01:58.0000] <rricard>
+whatever.a.deref() === that object
+
+[12:02:08.0000] <rricard>
+I don' t know but in this area
+
+[12:02:24.0000] <devsnek>
+so when two things collide i generally feel its better to go for the one that allows both
+
+[12:02:37.0000] <devsnek>
+allowing objects doesn't mean you can't have things that are immutable all the way down
+
+[12:02:50.0000] <rricard>
+I need to go for a quick while
+
+[12:03:02.0000] <devsnek>
+wasn't there a suggestion to have `##{}` or something which enforces immutable in its children
+
+[12:03:15.0000] <devsnek>
+or maybe ## was the one that allows mutable children
+
+[12:03:20.0000] <devsnek>
+i don't remember which was which
+
+[12:03:33.0000] <rickbutton>
+^ that question is why I'm not in favor of that syntax
+
+[12:03:39.0000] <devsnek>
+in either case
+
+[12:03:49.0000] <devsnek>
+not having objects directly seems like a huge pain point
+
+[12:03:49.0000] <rickbutton>
+allowing objects means that given a record you can't know if it is actually immutable
+
+[12:04:06.0000] <devsnek>
+like i'm imagining how i'd use these in node core
+
+[12:04:09.0000] <devsnek>
+and this would just be a huge pain
+
+[12:04:17.0000] <devsnek>
+to the point of not using them
+
+[12:05:28.0000] <rickbutton>
+do you have any specific examples? vv interested in them
+
+[12:05:29.0000] <devsnek>
+for example datagram packets
+
+[12:05:50.0000] <devsnek>
+to reply to a datagram message you need the host+port
+
+[12:06:10.0000] <devsnek>
+moving to `#{ host, port, socket }` would be cool
+
+[12:06:18.0000] <devsnek>
+except making socket a ref of some sort is a terrible api
+
+[12:06:22.0000] <devsnek>
+so i wouldn't bother
+
+[12:06:47.0000] <devsnek>
+or maybe `#{ host, port, socket, reply() }`
+
+[12:06:56.0000] <devsnek>
+except again you can't put the reply function in directly
+
+[12:07:36.0000] <devsnek>
+its like there's this cool feature but its so annoying to use its better to just not use it
+
+[12:08:23.0000] <devsnek>
+another example would be, if we supported evaluation results from TLA modules, they have to be packed up like { result: value }
+
+[12:08:29.0000] <devsnek>
+which seems like a good case for a record
+
+[12:08:38.0000] <devsnek>
+since mutating that would just cause confusion
+
+[12:08:47.0000] <devsnek>
+but if value happens to be an object that breaks
+
+[12:11:31.0000] <rickbutton>
+yes, allowing objects in records simplifies that use case, but on the other end, I think that allowing #[{}] !== #[{}] causes a significant amount of sharp edges in real world code, we find a majority of bugs in immutables happen because the user of the library didn't expect an object or doesn't understand object identity, so I worry that introducing a primitive that can deeply compare but won't if you aren't careful
+
+[12:11:31.0000] <rickbutton>
+is a super sharp edge
+
+[12:12:08.0000] <devsnek>
+do actual humans think of things in js as primitives and objects
+
+[12:12:17.0000] <devsnek>
+because i find that distinction pretty much meaningless
+
+[12:12:54.0000] <rickbutton>
+maybe not using the nouns "primitive" and "object" but certainly "things i can compare with ===" and "things i need to write a deep compare function for"
+
+[12:13:01.0000] <rickbutton>
+in the context of equality, at least
+
+[12:13:28.0000] <devsnek>
+so the problem is identity
+
+[12:13:31.0000] <devsnek>
+not the categorization
+
+[12:14:12.0000] <rickbutton>
+yeah exactly, the meat of the sharp edge is the fact that putting an object in a record implicitly gives the record identity
+
+[12:14:37.0000] <devsnek>
+i mean if they're defined to recursively have the identity of their parts (how most languages do it) then its not really a problem
+
+[12:14:58.0000] <devsnek>
+i guess you're saying people would be surprised that it stopped at the object boundary
+
+[12:15:19.0000] <rickbutton>
+yep, there is no spec reason it isn't possible, it's surprising for humans imo
+
+[12:15:32.0000] <devsnek>
+weird cuz i find it surprising the other way around
+
+[12:15:48.0000] <rricard>
+the main motivation we got on why it's like this is actually interviewing some developers using Immutable.js that ended up not trusting immutable equality because they started mixing object
+
+[12:15:58.0000] <Bakkot>
+my intuition exactly matches rickbutton's fwiw
+
+[12:16:25.0000] <rricard>
+that's a footgun we want to avoid
+
+[12:17:12.0000] <devsnek>
+if it was added without that behaviour i wouldn't find much use in it probably
+
+[12:17:14.0000] <rricard>
+making the ref hoop explicit is a way to at least bring awareness on that footgun
+
+[12:17:18.0000] <devsnek>
+so its hard to comment much on it at that point
+
+[12:17:27.0000] <Bakkot>
+devsnek: that seems fine; not every feature needs to be useful for everyone
+
+[12:17:36.0000] <devsnek>
+eh
+
+[12:17:47.0000] <devsnek>
+i mean if we're adding new primitives
+
+[12:17:58.0000] <devsnek>
+seems like a pretty high bar
+
+[12:17:58.0000] <rickbutton>
+(there is a balance, of course)
+
+[12:18:08.0000] <Bakkot>
+I would not find it useful if it allowed non-primitive objects, because of that sharp edge, so one of us is going to be out of luck
+
+[12:18:24.0000] <Bakkot>
+devsnek: oh, there is no way this would get through the committee if it was primitive and also allowed objects inside of it
+
+[12:18:31.0000] <devsnek>
+like private fields, i've probably used them like once ever because they're so limited
+
+[12:18:32.0000] <Bakkot>
+if it has objects inside of it, it is not primitive
+
+[12:18:35.0000] <devsnek>
+i don't want the same to happen to records
+
+[12:18:40.0000] <devsnek>
+because i think they're cool
+
+[12:19:04.0000] <rickbutton>
+if you don't want them to be primitives, what do you expect the behavior of === to be?
+
+[12:19:16.0000] <rricard>
+we're just starting on this, I'm sure we can find ways to make them useful
+
+[12:19:22.0000] <rricard>
+for you*
+
+[12:19:31.0000] <devsnek>
+on the subject of identity https://github.com/tc39/proposal-record-tuple/issues/65#issuecomment-606178554
+
+[12:19:44.0000] <rricard>
+refcollection is just a very basic way to do it so far
+
+[12:19:59.0000] <devsnek>
+i think the solution here is going to end up being some sort of new ref primitive
+
+[12:20:06.0000] <devsnek>
+and i'm just never going to use them
+
+[12:20:18.0000] <Bakkot>
+there is no way any sort of ref primitive is going to get through committee either
+
+[12:20:29.0000] <rricard>
+that's why symbol was a nice way to tie things up
+
+[12:20:36.0000] <devsnek>
+wait so then what is refcollection
+
+[12:20:38.0000] <rricard>
+but it has ergonomic issues
+
+[12:20:39.0000] <devsnek>
+oh it returns a symbol?
+
+[12:20:42.0000] <rricard>
+yes
+
+[12:20:48.0000] <devsnek>
+ah jeez
+
+[12:20:57.0000] <Bakkot>
+that's kind of cute
+
+[12:20:58.0000] <rricard>
+yes reakized my slides suck
+
+[12:21:02.0000] <devsnek>
+that seems like a huge footgun too
+
+[12:21:10.0000] <devsnek>
+nothing implies its a ref to another object in that case
+
+[12:21:36.0000] <devsnek>
+you have to implicitly know
+
+[12:21:38.0000] <rricard>
+the refcollection is there to make you manage it
+
+[12:21:47.0000] <devsnek>
+no like
+
+[12:21:50.0000] <devsnek>
+if i hand you a record
+
+[12:21:52.0000] <devsnek>
+you have to know
+
+[12:21:58.0000] <devsnek>
+exactly where all those symbols are
+
+[12:22:00.0000] <rricard>
+I agree it's not perfect
+
+[12:22:01.0000] <devsnek>
+and that they need to be unwrapped
+
+[12:22:12.0000] <devsnek>
+and you have to be given the refcollection somehow
+
+[12:22:15.0000] <devsnek>
+out of band
+
+[12:22:15.0000] <rickbutton>
+if you hand me a record, you also need to hand me a refcollection
+
+[12:22:23.0000] <devsnek>
+why not just hand you an object then
+
+[12:22:58.0000] <devsnek>
+like if Object.freeze is easier
+
+[12:23:03.0000] <devsnek>
+i end up never using this
+
+[12:23:05.0000] <rricard>
+the most primitive form of that is I hand you an object with the record and the symbol mapping
+
+[12:23:31.0000] <rickbutton>
+with Object.freeze you lose deep equality checks
+
+[12:24:04.0000] <devsnek>
+there are deep equality libraries 🤷🏻
+
+[12:25:24.0000] <Bakkot>
+devsnek: stepping back a bit, why do you want to have these records-with-mutable-contents?
+
+[12:25:34.0000] <devsnek>
+i gave some examples above
+
+[12:25:51.0000] <Bakkot>
+you said you wanted to write `#{ host, port, socket }`, but I don't know why you want to write that
+
+[12:25:53.0000] <devsnek>
+i think there are more use cases for records than diffing react trees
+
+[12:26:04.0000] <devsnek>
+right because those shouldn't be mutable
+
+[12:26:12.0000] <rricard>
+we also discussed with jridsgewell about template-records and tuples
+
+[12:26:20.0000] <devsnek>
+and that also means you can compare the two message origins
+
+[12:26:22.0000] <devsnek>
+with ===
+
+[12:26:22.0000] <rricard>
+jridgewell*
+
+[12:26:33.0000] <devsnek>
+instead of doing a.host === b.host && a.port === b.port && a.socket === b.socket
+
+[12:26:45.0000] <devsnek>
+yeah template records make zero sense to me
+
+[12:26:49.0000] <devsnek>
+template tuples maybe
+
+[12:27:08.0000] <Bakkot>
+devsnek: what's the advantage of them not being mutable? are you handing the same object off to multiple parties somewhere?
+
+[12:27:16.0000] <devsnek>
+Bakkot: they're part of the public node api
+
+[12:27:29.0000] <devsnek>
+if you mutated them all you're doing is creating confusion
+
+[12:27:53.0000] <Bakkot>
+devsnek right my question is, does the API return the same object to multiple different callers, or does it make a fresh object for each caller?
+
+[12:28:02.0000] <Bakkot>
+because if it's fresh, I don't see much advantage in immutability
+
+[12:28:19.0000] <devsnek>
+i mean if you just don't think this is a valid use case then whatever
+
+[12:28:29.0000] <Bakkot>
+no I am just trying to understand why you want this
+
+[12:28:55.0000] <Bakkot>
+for context, to me the advantage of immutability is mostly when you have one object you're handing to multiple parties, so that one party cannot mutate it and thereby mess up the other party
+
+[12:29:21.0000] <devsnek>
+immutability is whatever
+
+[12:29:34.0000] <devsnek>
+the main reason in this case is equality and being able to use it as a map key or something
+
+[12:29:40.0000] <Bakkot>
+ahh
+
+[12:30:26.0000] <devsnek>
+i really hope tuples can replace Symbol.compositeKey
+
+[12:30:51.0000] <devsnek>
+but you just end up with huge leaks if you use ref cells
+
+[12:31:01.0000] <devsnek>
+well refcollection cells
+
+[12:31:11.0000] <Bakkot>
+the map key thing I tend to just solve in userland, but it does get a bit awkward
+
+[12:31:18.0000] <Bakkot>
+I should clean up the library I wrote for that and publish it maybe
+
+[12:31:19.0000] <rickbutton>
+how do you end up with leaks?
+
+[12:31:25.0000] <Bakkot>
+ends up being pretty clean for users, just messy internally
+
+[12:31:38.0000] <devsnek>
+RefCollection has to strongly reference the object
+
+[12:31:48.0000] <devsnek>
+as long as the symbol could possibly be alive
+
+[12:31:58.0000] <devsnek>
+and since userland can't iterate over the heap
+
+[12:32:02.0000] <devsnek>
+we just have to call that forever
+
+[12:32:30.0000] <rricard>
+the refcollection polyfill will leak until it's released
+
+[12:32:35.0000] <devsnek>
+yeah so
+
+[12:32:40.0000] <devsnek>
+not good for maps
+
+[12:33:02.0000] <rricard>
+but you can see an implementation in engine where it automatically releases
+
+[12:33:06.0000] <devsnek>
+the map implementation can't tell if the object is still being used from the symbol it has
+
+[12:33:20.0000] <devsnek>
+you can clean the entire map
+
+[12:33:22.0000] <devsnek>
+but not individual keys
+
+[12:33:42.0000] <devsnek>
+individual entries
+
+[12:33:57.0000] <rricard>
+yes I agree in the case of the polyfill
+
+[12:34:05.0000] <rickbutton>
+well, you can use a FinalizationRegistry
+
+[12:34:17.0000] <devsnek>
+i guess you could
+
+[12:34:21.0000] <rickbutton>
+but an in-engine impl can handle that of course
+
+[12:34:28.0000] <devsnek>
+that seems incredibly complex for the simple case of compound keys
+
+[12:34:56.0000] <rickbutton>
+I don't see where RefCollection comes into play for compound keys
+
+[12:35:05.0000] <devsnek>
+because the keys could be objects
+
+[12:35:05.0000] <rricard>
+ultimately if this works for a unique refcollection we can think of a more global mechanism
+
+[12:35:11.0000] <devsnek>
+maps can use objects as keys
+
+[12:36:11.0000] <rickbutton>
+oh I see, you are saying if records allowed objects via RefCollection then records-as-keys-in-Map gets more weird if the records include objects
+
+[12:36:42.0000] <devsnek>
+i just want there to be more use to this than react vdoms
+
+[12:37:07.0000] <devsnek>
+without super contrived apis
+
+[12:38:08.0000] <devsnek>
+if the object thing can't be worked out, perhaps the equality can be split into a separate syntax
+
+[12:38:25.0000] <devsnek>
+#@{} for immutable+deeply equal or something
+
+[12:38:45.0000] <devsnek>
+though immutability with implicit object refs is nice :(
+
+[12:43:05.0000] <rickbutton>
+to be fair none of our internal research involves using record&tuple for vdoms, they just provide a consise and well-understood example (they would obviously be beneficial though)
+
+[12:43:32.0000] <devsnek>
+i'm just thinking of all the things i do with PartialEq in rust
+
+[12:43:46.0000] <Bakkot>
+yeah, I confess have also (almost) never used react vdoms
+
+[12:44:05.0000] <devsnek>
+all the examples i've seen so far involve vdoms
+
+[12:44:09.0000] <devsnek>
+not inherently react i guess
+
+[12:44:15.0000] <Bakkot>
+or any other vdoms
+
+[12:44:27.0000] <ljharb>
+tbh i'm still not clear on why having first class refs in the language would not be a terrible thing
+
+[12:45:42.0000] <devsnek>
+yeah i'd probably block if symbols in global caches was the solution
+
+[12:45:44.0000] <ljharb>
+like, i've seen a couple use cases for them, but nothing compelling to me
+
+[12:45:56.0000] <devsnek>
+(not block as in tc39 block)
+
+[12:45:58.0000] <ljharb>
+and i've always considered it a wonderful thing that JS doesn't have refs/pointers
+
+[12:46:35.0000] <devsnek>
+symbols seem strictly worse imo
+
+[12:46:42.0000] <devsnek>
+in this use case
+
+[12:54:27.0000] <bradleymeck>
+well i missed some talking
+
+[12:55:10.0000] <devsnek>
+lol
+
+[12:55:14.0000] <rickbutton>
+hahaha
+
+[12:55:41.0000] <rickbutton>
+I'm on day 22 of isolation if I don't argue semantics then I can't tell if I'm alive
+
+[12:56:03.0000] <devsnek>
+its mostly just me having private symbol deja vu with records
+
+[13:00:30.0000] <jmdyck>
+I argue therefore I am.
+
+[13:01:36.0000] <ljharb>
+nuh uh
+
+[13:02:48.0000] <bradleymeck>
+i doubt compositeKey could be replaced as long as things strongly hold onto refs
+
+[13:03:24.0000] <devsnek>
+that's my fear
+
+[13:04:10.0000] <bradleymeck>
+why does it have to replace compositeKey?
+
+[13:04:26.0000] <devsnek>
+it doesn't have to
+
+[13:04:37.0000] <devsnek>
+but it is kind of an easy step to take
+
+[13:04:49.0000] <bradleymeck>
+i don't see how it is easy? since these are strong refs
+
+[13:04:51.0000] <devsnek>
+since they have the identity of their children
+
+[13:05:08.0000] <devsnek>
+no I mean if they didn't require all the ref stuff
+
+[13:05:12.0000] <bradleymeck>
+kind of?
+
+[13:05:37.0000] <bradleymeck>
+compositeKey allows partial GC idk how this would
+
+[13:05:48.0000] <devsnek>
+it does what
+
+[13:06:11.0000] <bradleymeck>
+compositeKey(a, b, c) lets b GC regardless of if the key lives
+
+[13:06:51.0000] <devsnek>
+weird
+
+[13:06:54.0000] <bradleymeck>
+a, b, and c do not have their lifetimes interwoven nor tied to the key
+
+[13:07:00.0000] <devsnek>
+I mean that makes sense in some ways
+
+[13:07:12.0000] <devsnek>
+I think this is just the problem of having a weird symbol wrapper
+
+[13:07:18.0000] <bradleymeck>
+you just won't be able to reproduce the key from them (since b is gone)
+
+[13:07:20.0000] <devsnek>
+it's a contrived solution
+
+[13:07:28.0000] <bradleymeck>
+how so?
+
+[13:07:48.0000] <devsnek>
+you're making a weird function that does magic with objects to create some symbol
+
+[13:07:59.0000] <bradleymeck>
+its not magic, just some weakmaps
+
+[13:08:01.0000] <devsnek>
+Vs just using the inherent identity rules of the language
+
+[13:09:13.0000] <devsnek>
+yeah I know how it works internally, I mean it's not obvious or natural
+
+[13:09:17.0000] <bradleymeck>
+rickbutton: rricard it might be interesting to compare the RC to compositeKey in general. compositeKey explicitly doesn't have a way to reflect on component parts
+
+[13:09:29.0000] <devsnek>
+in languages with tuples like rust and python you just naturally use them as map keys
+
+[13:09:36.0000] <devsnek>
+bevause it makes sense
+
+[13:09:44.0000] <bradleymeck>
+devsnek: it seems fine for me coming from the perspective of DBs with composite keys
+
+[13:10:03.0000] <bradleymeck>
+you could use things as a map key in those languages but they stay strongly held
+
+[13:10:16.0000] <bradleymeck>
+which is part of the point of not doing that in the compositeKey proposal
+
+[13:10:54.0000] <devsnek>
+yeah I mean it's not crazy
+
+[13:10:58.0000] <devsnek>
+I'm fine with composite key
+
+[13:11:07.0000] <devsnek>
+but given we might have tuples
+
+[13:11:21.0000] <devsnek>
+those would be way more natural
+
+[13:12:00.0000] <devsnek>
+if you needed the weakmap semantics you'd usually do that yourself
+
+[13:12:13.0000] <devsnek>
+also various things about whether you want it to drop from the map or not
+
+[13:12:15.0000] <bradleymeck>
+you could have both but you would want to lean towards compositeKey for anything with differing lifetimes if memory is a premium, also you can't weakmap tuples so that makes things hard to deal with in a weak way
+
+[13:12:28.0000] <devsnek>
+there are a lot of options there that the language can't infer for you
+
+[13:12:50.0000] <bradleymeck>
+i'd agree but i wouldn't say tuples replace arrays or weak keys
+
+[13:12:52.0000] <Bakkot>
+map can't have it drop; it would have to be weakmap
+
+[13:13:07.0000] <Bakkot>
+and a weakmap could drop it iff the key itself was dropped and all its values were
+
+[13:13:11.0000] <Bakkot>
+that one I think the language can infer
+
+[13:13:55.0000] <bradleymeck>
+Bakkot: but that requires the key to drop before its components can gc is my point
+
+[13:14:06.0000] <bradleymeck>
+so you have interwoven the lifetimes
+
+[13:14:18.0000] <Bakkot>
+bradleymeck wait, why does it?
+
+[13:14:24.0000] <devsnek>
+you'd use finalization registry to make it drop
+
+[13:14:36.0000] <Bakkot>
+I am not suggesting you can use the composite to get its components
+
+[13:14:41.0000] <bradleymeck>
+Bakkot: if you can get the key you can access the components
+
+[13:15:11.0000] <devsnek>
+even if the objects are dead, because you hold that unique symbol
+
+[13:15:14.0000] <Bakkot>
+in your proposal? that is not required to be true for the thing I said
+
+[13:16:08.0000] <bradleymeck>
+Bakkot: in my proposal that isn't true, but i thought your antecedent was about tuples
+
+[13:16:13.0000] <Bakkot>
+ah
+
+[13:16:18.0000] <Bakkot>
+no, was speaking of composite keys, sorry
+
+[13:17:04.0000] <devsnek>
+my overarching point was that weird behaviour like interactions with object lifetimes should be explicit because you're probably doing something that is a special case
+
+[13:17:18.0000] <Bakkot>
+for composite keys, map cannot drop the key ever because maps cannot drop anything, and for weakmaps the key can be dropped if the key itself and at least one of its components has been dropped
+
+[13:18:42.0000] <devsnek>
+you can't use a composite key in a weakmap
+
+[13:18:46.0000] <devsnek>
+it's just a symbol
+
+[13:18:49.0000] <bradleymeck>
+you can in the object form
+
+[13:18:58.0000] <devsnek>
+there's an object form?
+
+[13:19:04.0000] <bradleymeck>
+it has object and symbol, symbol was only added because people wanted it
+
+[13:19:22.0000] <devsnek>
+interesting
+
+[13:19:32.0000] <devsnek>
+I wish weakmaps could hold symbols
+
+[13:19:44.0000] <bradleymeck>
+you can recreate compositeSymbol easily enough and people wanted it so 🤷
+
+[13:19:49.0000] <ljharb>
+they can hold boxed symbols
+
+[13:20:04.0000] <devsnek>
+ljharb: not that helpful though
+
+[14:45:18.0000] <ljharb>
+does anyone know where to report that w3 has uncool URLs? https://www.w3.org/TR/wai-aria/roles no longer works
+
+[14:45:39.0000] <ljharb>
+(and a bunch of others)
+
+[14:51:53.0000] <devsnek>
+what is /roles supposed to be
+
+[14:53:48.0000] <ljharb>
+specifically, https://www.w3.org/TR/wai-aria/roles#composite_header 404s and the content now lives at https://www.w3.org/TR/wai-aria/#composite
+
+[14:53:57.0000] <ljharb>
+also https://www.w3.org/TR/wai-aria/states_and_properties → https://www.w3.org/TR/wai-aria/#states_and_properties
+
+[14:54:03.0000] <ljharb>
+and a few others
+
+[14:54:14.0000] <ljharb>
+basically it looks like they regressed their site back to hashbang URLs, like it's 2006
+
+[14:54:32.0000] <ljharb>
+the main thing is that they need to add redirects, but i'm not sure where to report that
+
+[15:15:36.0000] <jridgewell>
+Late to the R&T discussion, but
+
+[15:15:39.0000] <jridgewell>
+>  my intuition exactly matches rickbutton's fwiw
+
+[15:15:45.0000] <jridgewell>
+Same here. I really like this new design.
+
+[15:15:54.0000] <devsnek>
+😢
+
+[15:23:40.0000] <jridgewell>
+And I also don't understand how tuples could have replaced CompositeKeys
+
+[15:23:43.0000] <jridgewell>
+Even the old design
+
+[15:24:14.0000] <jridgewell>
+Would have caused a permanent memory leak, ala the tagged template literal redesign
+
+[15:24:45.0000] <jridgewell>
+As soon as you stick the old Tuple into a WeakMap, it becomes a permanent value
+
+[15:25:08.0000] <devsnek>
+if you have the tuple you have the key
+
+[15:25:20.0000] <devsnek>
+if you don't you don't
+
+[15:25:34.0000] <devsnek>
+i agree the semantics on how to release them is iffy
+
+[15:27:01.0000] <jridgewell>
+The problem is that I could create the key at any future point
+
+[15:27:09.0000] <jridgewell>
+So that key can never be released
+
+[15:27:20.0000] <devsnek>
+right as long as the objects exist
+
+[15:27:34.0000] <devsnek>
+that isn't surprising to me
+
+[15:28:38.0000] <jridgewell>
+Consider it without the objects, purely immutable primitive types
+
+[15:28:50.0000] <devsnek>
+you can't put that in a weakmap
+
+[15:28:58.0000] <jridgewell>
+If I did `weakMap.set([1, 2, 3], {})`
+
+[15:29:18.0000] <devsnek>
+you can't use numbers as weakmap keys though
+
+[15:29:21.0000] <jridgewell>
+Sorry, meant `weakMap.set(#[1, 2, 3], {})`
+
+[15:29:31.0000] <devsnek>
+you still can't use numbers as weakmap keys
+
+[15:29:40.0000] <jridgewell>
+It's a tuple, though
+
+[15:29:47.0000] <jridgewell>
+Which is just an immutable array
+
+[15:29:53.0000] <devsnek>
+tuple of numbers
+
+[15:30:04.0000] <jridgewell>
+Tuple of _anything_ is my point
+
+[15:30:06.0000] <devsnek>
+there has to be a lifetime somewhere for it to be valid as a weakmap key
+
+[15:30:29.0000] <devsnek>
+(i probably wouldn't use tuples in weakmaps in either case)
+
+[15:30:36.0000] <jridgewell>
+I don't think that's going to fly with end users
+
+[15:30:49.0000] <jridgewell>
+"Why is this tuple allowed and not that one?"
+
+[15:30:57.0000] <devsnek>
+#[1, 2, 3] as a weakmap key is nonsensical
+
+[15:31:10.0000] <devsnek>
+the same way 5 as a weakmap key is nonsensitcal
+
+[15:31:13.0000] <devsnek>
+nonsensical
+
+[15:31:17.0000] <jridgewell>
+The difficulty is explaining this to anyone
+
+[15:31:32.0000] <jridgewell>
+I can say the same about `Symbol('foo')` and `Symbol.for('foo')`
+
+[15:31:40.0000] <jridgewell>
+Why would one be allowed and the other now?
+
+[15:31:43.0000] <jridgewell>
+Why would one be allowed and the other not**?
+
+[15:31:46.0000] <devsnek>
+neither are allowed atm
+
+[15:32:04.0000] <jridgewell>
+Wasn't that just discussed above?
+
+[15:32:16.0000] <devsnek>
+i don't think its worth trying to argue about the behaviour of values based on weakmap keys
+
+[15:32:30.0000] <devsnek>
+because everything is very weird
+
+[15:33:31.0000] <jridgewell>
+But this is a discussion on replacing CompositeKey with R&T, which has to work for maps and weakmaps.
+
+[15:33:48.0000] <jridgewell>
+I don't think there's we can discuss one without the other.
+
+[15:34:14.0000] <devsnek>
+i wasn't really thinking about weakmaps
+
+[15:34:36.0000] <jridgewell>
+Only maps?
+
+[15:35:00.0000] <devsnek>
+yes, i don't think its bad that you have to build your own keying system for weakmaps
+
+[15:35:19.0000] <devsnek>
+the lifetimes there are tricky to get right and if any of it is done implicitly you might accidentally leak something
+
+[15:35:24.0000] <devsnek>
+or end something too early
+
+[15:36:07.0000] <jridgewell>
+For maps only, I think either R&T design would work?
+
+[15:36:26.0000] <devsnek>
+what is r&t
+
+[15:36:31.0000] <jridgewell>
+Records & Tuples
+
+[15:36:48.0000] <devsnek>
+by either design do you mean with or without objects allowed?
+
+[15:37:15.0000] <jridgewell>
+Yah, if I've skimmed the above discussion correctly
+
+[15:37:23.0000] <jridgewell>
+One with `Ref`, and one with direct mutable objectcs
+
+[15:37:31.0000] <devsnek>
+i think it would be pretty useless without objects allowed
+
+[15:38:01.0000] <devsnek>
+you have to set up really a bunch of lifetime management with the ref stuff
+
+[15:38:06.0000] <devsnek>
+even though you don't care about lifetimes at all
+
+[15:38:41.0000] <devsnek>
+and ref has a lot of other problems
+
+[15:38:49.0000] <jridgewell>
+I guess it couldn't be just a second tuple to let it handle for you.
+
+[15:39:06.0000] <devsnek>
+i'd be fine with two kinds of tuples
+
+[15:39:39.0000] <jridgewell>
+Eg, `Map.set(#[ immutable, refs ])`, where you get the immutable and refs from the first R&T.
+
+[15:39:58.0000] <jridgewell>
+Because the `refs` reference wouldn't be allowed.
+
+[15:40:10.0000] <devsnek>
+i don't understand what this means
+
+[15:40:17.0000] <jridgewell>
+Bradley's `CompositeKey` might work
+
+[15:40:38.0000] <jridgewell>
+It's an attempt to store both the tuple and it's mutable refs in a single Map key.
+
+[15:40:57.0000] <devsnek>
+that doesn't seem possible
+
+[15:40:59.0000] <jridgewell>
+So you don't manually manage the lifetime of the refs, it's done for you
+
+[15:41:30.0000] <devsnek>
+given just the objects that make up the key
+
+[15:41:35.0000] <devsnek>
+where do you derive the refs from
+
+[15:41:41.0000] <devsnek>
+for a get() operation
+
+[15:42:24.0000] <devsnek>
+on a larger level this is the problem, if you just allow objects you don't have to solve all these problems because the semantics just naturally work together
+
+[15:43:16.0000] <devsnek>
+but apparently that's also a footgun
+
+[15:43:51.0000] <devsnek>
+(i never encountered that being a problem in python though)
+
+[15:46:48.0000] <jridgewell>
+Is `refs` not a map itself?
+
+[15:46:57.0000] <jridgewell>
+So it holds onto the mutable objects?
+
+[15:47:20.0000] <devsnek>
+you're the one who brought refs into this
+
+[15:48:10.0000] <devsnek>
+in order to get an item out of the map you need to have the identity with it, so you'd need a reference to `refs`
+
+[15:48:14.0000] <devsnek>
+i'm not sure what `refs` is though
+
+[15:48:19.0000] <devsnek>
+is it the RefCollection?
+
+[15:48:51.0000] <jridgewell>
+Yah
+
+[15:49:00.0000] <jridgewell>
+`const refs = new RefCollection();`
+
+[15:49:22.0000] <devsnek>
+well you can't store that in a tuple
+
+[15:49:24.0000] <devsnek>
+since its an object
+
+[15:49:25.0000] <jridgewell>
+I see it uses `deref`
+
+[15:49:56.0000] <jridgewell>
+Instead of `get`
+
+[15:49:59.0000] <devsnek>
+RefCollection.prototype.ref apparently returns a symbol
+
+[15:50:19.0000] <jridgewell>
+Yah
+
+[15:50:21.0000] <devsnek>
+so you just have to know that some symbols in records and tuples need to be derefed in some random refcollection somewhere
+
+[15:50:27.0000] <devsnek>
+which refcollection? who knows!
+
+[15:50:43.0000] <jridgewell>
+This is the same as with Tagged Template Literals
+
+[15:50:50.0000] <devsnek>
+in what way
+
+[15:51:01.0000] <jridgewell>
+Mutable data is stored out-of-band (in the invocations arguments)
+
+[15:51:17.0000] <jridgewell>
+And immutable data is stored as a frozen `TemplateStringsArray`
+
+[15:51:37.0000] <jridgewell>
+You reference the mutable data based on the index
+
+[15:51:37.0000] <devsnek>
+is it frozen?
+
+[15:51:50.0000] <jridgewell>
+Is what frozen?
+
+[15:51:53.0000] <devsnek>
+the array
+
+[15:51:55.0000] <devsnek>
+i know its cached
+
+[15:52:06.0000] <jridgewell>
+The `TemplateStringsArray` is frozen
+
+[15:52:17.0000] <jridgewell>
+The arguments aren't frozen, you have to generate your own array
+
+[15:52:36.0000] <devsnek>
+yeah
+
+[15:52:46.0000] <devsnek>
+i'm not seeing how this relates to map keys though
+
+[15:53:25.0000] <devsnek>
+are you saying you want to have a key that is the template string array and the values together
+
+[15:53:32.0000] <devsnek>
+for caching the rendered result or something
+
+[15:57:09.0000] <jridgewell>
+No, I was talking about using a Tuple for CompositeKey still
+
+[15:57:22.0000] <jridgewell>
+But it doesn't work it still doesn't work.
+
+[15:57:29.0000] <jridgewell>
+CompositeKey would, though
+
+[15:57:56.0000] <jridgewell>
+You'd just stick your immutable R&T and the mutable Refs into a CompositeKey, and let the `===` take care of the equality
+
+[15:58:11.0000] <devsnek>
+where do you get refs from
+
+[15:58:14.0000] <devsnek>
+for get()
+
+[16:00:07.0000] <jridgewell>
+https://button.dev/talks/record-and-tuple-tc39-march-2020.pdf https://www.irccloud.com/pastebin/CWoXdvIl/RefCollection.js
+
+[16:00:38.0000] <jridgewell>
+`rc` is a brand instance you make with every tuple
+
+[16:00:49.0000] <jridgewell>
+(`rc` being what I was calling `refs`)
+
+[16:01:03.0000] <devsnek>
+yeah i've seen the slides
+
+[16:07:58.0000] <jridgewell>
+With the Tagged form of R&T, you'll could get them automatically as a parameter
+
+[16:08:16.0000] <jridgewell>
+We'd just have to settle on a syntax for Tagged form and inclusions.
+
+[16:08:48.0000] <devsnek>
+jridgewell: i'm still not convinced that tagged records and tuples make any amount of sense
+
+[16:09:16.0000] <devsnek>
+its like saying tagged object literal or tagged array literal
+
+[16:10:07.0000] <jridgewell>
+You had a very real complaint about the burden of creating a `RefCollection`
+
+[16:10:13.0000] <jridgewell>
+It just solves that for you
+
+[16:11:31.0000] <devsnek>
+i don't understand how it does anything
+
+[16:11:34.0000] <devsnek>
+it doesn't make sense to me
+
+[16:14:16.0000] <jridgewell>
+`tag#{ foo: object }` would invoke `foo` with an already built record and refs
+
+[16:14:43.0000] <devsnek>
+`tag#{}` doesn't make sense to me
+
+[16:14:47.0000] <jridgewell>
+So you wouldn't have to create and do the `rc.ref(...)` manually
+
+[16:14:50.0000] <devsnek>
+regardless of what {} contains
+
+[16:14:55.0000] <devsnek>
+and that doesn't solve the ref problem
+
+[16:15:03.0000] <jridgewell>
+Did ``` tag`x` ``` make sense at first?
+
+[16:15:07.0000] <devsnek>
+yes
+
+[16:15:21.0000] <jridgewell>
+Why?
+
+[16:15:22.0000] <devsnek>
+but i literally cannot figure out what semantics `tag#{}` has
+
+[16:15:35.0000] <devsnek>
+it feels like you're saying tagged number
+
+[16:15:51.0000] <devsnek>
+actually i can think of things that tagged numbers would do
+
+[16:16:19.0000] <devsnek>
+the best i can come up with is something analogous to the JSON.stringify callback for a "tagged record"
+
+[16:16:30.0000] <devsnek>
+but that seems like a reach
+
+[16:19:00.0000] <ljharb>
+it does look kind of weird, `tag#`
+
+[16:19:03.0000] <jridgewell>
+https://www.irccloud.com/pastebin/Ub13FBLx/
+
+[16:19:21.0000] <ljharb>
+like at least `obj.#x` has the `.` in it
+
+[16:19:36.0000] <devsnek>
+oh you're saying `tag#{}` is shorthand for proper records that allow all values in them
+
+[16:19:43.0000] <jridgewell>
+Yes
+
+[16:19:50.0000] <devsnek>
+there are a lot of problems with that
+
+[16:19:53.0000] <devsnek>
+for example
+
+[16:19:56.0000] <jridgewell>
+Because the values will be put into the refs automatically
+
+[16:20:08.0000] <devsnek>
+`tag1#{ x: tag2#{ y: {} } }`
+
+[16:20:33.0000] <jridgewell>
+What's wrong with that?
+
+[16:20:35.0000] <devsnek>
+having separate refs just don't work
+
+[16:20:43.0000] <jridgewell>
+We do the same with tagged templates
+
+[16:20:43.0000] <devsnek>
+you lose the refs in x
+
+[16:20:53.0000] <jridgewell>
+You have to return a result from the tag
+
+[16:20:58.0000] <jridgewell>
+If you want to use a result
+
+[16:21:05.0000] <devsnek>
+what could the possible return value be
+
+[16:21:06.0000] <devsnek>
+to be useful
+
+[16:21:25.0000] <jridgewell>
+https://github.com/polymer/lit-html/
+
+[16:21:28.0000] <devsnek>
+like if i just want records that can hold objects
+
+[16:21:39.0000] <jridgewell>
+The entire design of Tagged Template Literals is about the return value
+
+[16:21:53.0000] <jridgewell>
+Lit uses `TemplateResult` values
+
+[16:21:57.0000] <jridgewell>
+Which allow you to render
+
+[16:21:58.0000] <devsnek>
+yes but we're not trying to compose the values of a record
+
+[16:22:01.0000] <devsnek>
+they're already composed
+
+[16:22:07.0000] <devsnek>
+into key: value
+
+[16:22:17.0000] <jridgewell>
+But they're not, because you can't hold mutable values.
+
+[16:22:22.0000] <devsnek>
+right
+
+[16:22:23.0000] <devsnek>
+so you end up
+
+[16:22:27.0000] <devsnek>
+with this useless function
+
+[16:22:34.0000] <jridgewell>
+You need a tag that actually does something
+
+[16:22:42.0000] <devsnek>
+what is "something"
+
+[16:22:48.0000] <devsnek>
+what possible use is there
+
+[16:23:35.0000] <jridgewell>
+https://github.com/Polymer/lit-html/blob/master/src/lit-html.ts#L67-L68
+
+[16:23:42.0000] <jridgewell>
+https://github.com/Polymer/lit-html/blob/7c7442278281a6923eb1dfbb77600b8b64522a50/src/lit-html.ts#L67-L68
+
+[16:23:53.0000] <jridgewell>
+You return a value that composes the immutable and mutable parts
+
+[16:23:59.0000] <devsnek>
+they're already composed
+
+[16:24:01.0000] <jridgewell>
+And do something with that value in your library
+
+[16:24:09.0000] <devsnek>
+into keys and values
+
+[16:24:12.0000] <jridgewell>
+They are not by definition.
+
+[16:24:17.0000] <devsnek>
+if you don't want that
+
+[16:24:20.0000] <devsnek>
+why are you using a key value thing
+
+[16:24:24.0000] <jridgewell>
+You cannot hold mutable data in an immutable record
+
+[16:24:36.0000] <devsnek>
+this doesn't solve the problem
+
+[16:24:37.0000] <jridgewell>
+So, no, they are not composed.
+
+[16:25:07.0000] <devsnek>
+i started with mutable and immutable components that can't be composed
+
+[16:25:15.0000] <devsnek>
+and ended with mutable and immutable components that can't be composed
+
+[16:26:05.0000] <devsnek>
+because they're still stuck in a record and a floaty "refs" object
+
+[16:26:13.0000] <devsnek>
+the refs can't be associated with the record in any way
+
+[16:26:21.0000] <devsnek>
+and if you want nested structures
+
+[16:26:27.0000] <devsnek>
+you can't put refs anywhere
+
+[16:26:43.0000] <devsnek>
+because again its an object
+
+[16:27:56.0000] <devsnek>
+and refs really fall apart as soon as you start combining records and tuples from different places
+
+[16:28:33.0000] <devsnek>
+have like five different ref collections each holding a different bit of this tuple i'm trying to get values out of
+
+[16:28:45.0000] <devsnek>
+does accessing a value become O(n) to the number of ref collections since you have to check each one
+
+[16:29:14.0000] <devsnek>
+where do you even put all these ref collections
+
+[16:29:50.0000] <jridgewell>
+https://www.irccloud.com/pastebin/84lzR9OW/deep-tagged-record.js
+
+[16:30:23.0000] <jridgewell>
+This is entirely up to the tag library
+
+[16:30:45.0000] <jridgewell>
+And it's the _same_ super powers we give to Tagged Template Literals
+
+[16:30:58.0000] <devsnek>
+so in this case
+
+[16:31:01.0000] <devsnek>
+you nest the refs deeply
+
+[16:31:09.0000] <devsnek>
+refs.get(refs).refs.get(refs)
+
+[16:31:31.0000] <jridgewell>
+As example code, yes.
+
+[16:31:39.0000] <jridgewell>
+Again, the tag library can do anything.
+
+[16:31:50.0000] <devsnek>
+can it solve this problem in a reasonable way?
+
+[16:32:35.0000] <devsnek>
+refs.get(refs).refs.get(refs) doesn't seem to pass the bar for in-the-language design
+
+[16:35:46.0000] <jridgewell>
+https://www.irccloud.com/pastebin/WqdrIhyA/deep-tagged-template-literals.js
+
+[16:35:58.0000] <devsnek>
+obviously yes
+
+[16:36:03.0000] <jridgewell>
+Is this any different than^
+
+[16:36:04.0000] <devsnek>
+tagged templates flatten into one value
+
+[16:36:09.0000] <devsnek>
+records flatten into two values
+
+[16:36:21.0000] <jridgewell>
+How?
+
+[16:36:43.0000] <devsnek>
+because tagged templates are allowed to return objects that reference objects
+
+[16:36:48.0000] <jridgewell>
+Because if you flatten it all into a single object, you lose the positions of the interpolations
+
+[16:37:15.0000] <jridgewell>
+Which means it was no better than constructing the object in the first place.
+
+[16:37:36.0000] <devsnek>
+i'm just really not sure what problem tagged records solve
+
+[16:37:44.0000] <devsnek>
+i guess it makes making vdoms easier
+
+[16:37:50.0000] <devsnek>
+it doesn't solve my problem though
+
+[16:38:28.0000] <jridgewell>
+I don't think your problem can be solved while giving interpolation positions.
+
+[16:38:51.0000] <devsnek>
+i don't think my problem can be solved by tagged records
+
+[16:38:55.0000] <devsnek>
+period end of story
+
+[16:38:57.0000] <jridgewell>
+Which would limit the use of records in any tree structure
+
+[16:39:04.0000] <jridgewell>
+vdom just being one use case.
+
+[16:39:15.0000] <devsnek>
+as far as i can tell i would not have any use cases for records and tuples
+
+[16:39:18.0000] <devsnek>
+with the current design
+
+[16:39:32.0000] <devsnek>
+they just wouldn't be usable
+
+[16:40:00.0000] <devsnek>
+and its giving me private fields vibes (i have no uses for those either because they're so limited)
+
+[16:40:20.0000] <jridgewell>
+As a counter, I don't think mixing mutable and immutable in the same structure solve any real problem.
+
+[16:40:31.0000] <jridgewell>
+It's just a mutable structure then.
+
+[16:40:45.0000] <devsnek>
+immutable isn't the only thing that records and tuples have
+
+[16:40:57.0000] <devsnek>
+their identity is the identity of their children
+
+[16:41:14.0000] <devsnek>
+which is useful in lots of cases
+
+[16:41:18.0000] <devsnek>
+even if the structure is mutable
+
+[16:41:22.0000] <jridgewell>
+Which would be broken with any mutable reference
+
+[16:41:34.0000] <devsnek>
+i'm not diffing vdoms
+
+[16:42:04.0000] <devsnek>
+i gave an example above of a udp datagram origin object
+
+[16:42:54.0000] <jridgewell>
+How would you generate a second UDP packet that's equal?
+
+[16:43:08.0000] <devsnek>
+its not the packet data
+
+[16:43:13.0000] <devsnek>
+its the origin of the packet
+
+[16:43:14.0000] <devsnek>
+the ip and port
+
+[16:43:21.0000] <jridgewell>
+s/packet/datagram/
+
+[16:43:25.0000] <devsnek>
+you need both to reply
+
+[16:43:46.0000] <devsnek>
+but you also don't want to combine them into a string or something because then you have to parse it apart
+
+[16:44:14.0000] <jridgewell>
+There are no problems with 2 primitives in a tuple, though.
+
+[16:44:21.0000] <devsnek>
+(notice that composite keys also don't work here because they don't ref the items that they're made of)
+
+[16:44:30.0000] <devsnek>
+yes but then maybe you want to add the socket reference
+
+[16:45:08.0000] <devsnek>
+anyway if this comes down to my use cases not being valid there's not much point in arguing
+
+[16:46:17.0000] <jridgewell>
+What socket reference?
+
+[16:46:51.0000] <devsnek>
+on a high level, node has a datagram socket instance
+
+[16:48:47.0000] <devsnek>
+you could also do a reply function right on the origin record
+
+[16:49:00.0000] <devsnek>
+though the semantics of the identity of that would be iffy
+
+[16:53:52.0000] <jridgewell>
+What if we had operator overloading?
+
+[16:54:14.0000] <jridgewell>
+Eg, my deep equality tag returns some instance that will do equality for you.
+
+[16:54:30.0000] <devsnek>
+i don't need deep equality of normal objects
+
+[16:54:41.0000] <jridgewell>
+Or, just a `Datagram` class that had equality without even involving R&t.
+
+[16:54:49.0000] <devsnek>
+oh i see what you mean
+
+[16:55:04.0000] <devsnek>
+on a very theoretical level that would work
+
+[16:55:15.0000] <devsnek>
+but i don't think operator overloading is a good idea in js
+
+[16:56:01.0000] <devsnek>
+afaik it has yet to be shown that you can do it in an ergonomic way without slowing down all occurrences of the overloaded operator
+
+[16:56:30.0000] <jridgewell>
+Even the static import design?
+
+[16:56:34.0000] <jridgewell>
+I thought that solved the issue.
+
+[16:56:39.0000] <devsnek>
+the `with operators` thing?
+
+[16:56:44.0000] <jridgewell>
+Yah
+
+[16:56:45.0000] <devsnek>
+i don't consider that ergonomic
+
+[16:57:17.0000] <devsnek>
+honestly i think its more of a footgun
+
+[16:57:23.0000] <devsnek>
+since you can just forget to have it
+
+[16:57:33.0000] <devsnek>
+especially the more you scope it
+
+[16:57:35.0000] <devsnek>
+the more you need it
+
+[16:57:38.0000] <devsnek>
+the more places you can forget it
+
+[16:57:43.0000] <ljharb>
+that's the first design that i don't instantly and violently abhor
+
+[16:57:50.0000] <ljharb>
+but i'm not convinced either
+
+[16:57:59.0000] <devsnek>
+it's not as bad as others
+
+[16:58:05.0000] <devsnek>
+but i don't think it's good enough
+
+[16:58:22.0000] <devsnek>
+i also have issues with how static it is
+
+
+2020-03-31
+[17:02:10.0000] <jridgewell>
+Side topic, devsnek: any chance you could make engine262 print its AST tree?
+
+[17:02:23.0000] <devsnek>
+its just acorn
+
+[17:02:30.0000] <jridgewell>
+I was curious how you implemented Optional Chaining
+
+[17:02:33.0000] <devsnek>
+oh
+
+[17:02:38.0000] <devsnek>
+i guess that part isn't acorn
+
+[17:02:40.0000] <jridgewell>
+Because ESTree is taking soooo long.
+
+[17:02:54.0000] <jridgewell>
+I was attempting to rewrite Babel parsing so we could get some progress.
+
+[17:02:56.0000] <devsnek>
+it's just BinaryExpression with operator: '??=' and whatnot
+
+[17:03:14.0000] <jridgewell>
+Huh?
+
+[17:03:26.0000] <jridgewell>
+`foo?.bar.baz?.qux`?
+
+[17:03:31.0000] <devsnek>
+oh optional chaining
+
+[17:03:44.0000] <devsnek>
+dunno how i goofed that
+
+[17:03:54.0000] <devsnek>
+https://github.com/engine262/engine262/blob/master/src/parse.mjs#L176-L211
+
+[17:04:05.0000] <devsnek>
+those are some ASTs
+
+[17:04:16.0000] <devsnek>
+they're missing the property names i guess
+
+[17:04:41.0000] <jridgewell>
+Yah, so I was curious if we could implement an option to `JSON.stringify` your AST tree
+
+[17:05:03.0000] <devsnek>
+in the web ui you mean?
+
+[17:05:10.0000] <jridgewell>
+Yah
+
+[17:05:22.0000] <jridgewell>
+Or even to console, just with the option in the UI.
+
+[17:06:30.0000] <devsnek>
+i'm not sure when i might get around to it but the repo is here https://github.com/engine262/engine262.github.io
+
+[17:07:43.0000] <rkirsling>
+this is how JSC does it, if it helps: https://usercontent.irccloud-cdn.com/file/zk2ohYYP/jsc-optional-chaining.png
+
+[17:08:10.0000] <devsnek>
+that's how v8 does it
+
+[17:08:24.0000] <devsnek>
+its nothing like how engine262 or the spec does it
+
+[17:08:27.0000] <devsnek>
+because they can't jump
+
+[17:08:33.0000] <rkirsling>
+(a slide from a presentation I hope to give sometime this year 😅)
+
+[17:08:37.0000] <devsnek>
+they have to know before entering the node whether or not to skip it
+
+[17:09:34.0000] <jmdyck>
+ljharb: https://www.w3.org/Help/Webmaster#sitecomments
+
+[17:12:07.0000] <ljharb>
+ah thanks
+
+[14:48:18.0000] <rkirsling>
+caiolima: I think you opened this on the wrong repo? https://github.com/tc39/proposal-decimal/issues/55
+
+[14:49:12.0000] <jridgewell>
+Lol
+
+[14:49:52.0000] <ljharb>
+caiolima: rkirsling: someone who has admin on both repos can transfer it
+
+[15:00:49.0000] <caiolima>
+🙀
+
+[15:00:58.0000] <caiolima>
+I think I got it right now,
+
+[15:07:12.0000] <caiolima>
+ljharb: I just closed this issue and created a new one into test262 https://github.com/tc39/test262/issues/2563
+
+[15:07:34.0000] <ljharb>
+ok
+

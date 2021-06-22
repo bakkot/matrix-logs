@@ -1,0 +1,824 @@
+2021-03-01
+[13:02:15.0000] <bakkot>
+ljharb: do you know what
+
+[13:02:24.0000] <bakkot>
+*what's up with the `build-spec` package.json command?
+
+[13:09:51.0000] <ljharb>
+it's used by build-travis, so it's the one that gets deployed to the website
+
+[13:10:17.0000] <ljharb>
+i'll have to refactor it when i get around to fully dropping travis
+
+[13:11:13.0000] <bakkot>
+ah, ok
+
+[13:11:26.0000] <bakkot>
+I'm adding the --multipage flag and want to make sure I put it in the right places
+
+[13:21:32.0000] <bakkot>
+oh jeeze, they're already out of sync
+
+[13:21:38.0000] <bakkot>
+with observable consequences
+
+[13:22:12.0000] <bakkot>
+https://github.com/tc39/ecma262/issues/1257 is not fixed on https://tc39.es/ecma262/2020/
+
+[13:22:40.0000] <ljharb>
+oof
+
+[13:23:05.0000] <ljharb>
+i can fix that
+
+[13:24:42.0000] <ljharb>
+oh actually it's just the `--no-ecma-262-biblio` that's missing, right?
+
+[13:24:52.0000] <ljharb>
+i'll rework it so there's a single source of truth for the `ecmarkup` command
+
+[13:30:36.0000] <bakkot>
+yeah, just that
+
+[13:30:47.0000] <bakkot>
+that said, why does the 2020 branch get updated?
+
+[13:30:53.0000] <bakkot>
+I thought 2020 was the one which we cut a while ago?
+
+[13:30:55.0000] <bakkot>
+or am I confused
+
+[13:32:11.0000] <ljharb>
+hm
+
+[13:32:50.0000] <ljharb>
+ah. that doesn't update the branch - it builds the `/2020/` site *from* the `es2020` branch
+
+[13:33:02.0000] <ljharb>
+so that `/` is the main spec and `/2020/` is the last 2020 build
+
+[13:33:33.0000] <bakkot>
+ah, ok
+
+[13:33:37.0000] <ljharb>
+realistically we shouldn't update /2020/ after it's cut, and we should also keep around the old years
+
+[13:33:59.0000] <bakkot>
+yeah, agreed with both of those things
+
+[13:33:59.0000] <ljharb>
+at some point we could make a script that does that properly
+
+[13:34:30.0000] <bakkot>
+could
+
+[13:34:44.0000] <bakkot>
+could also just have a branch which has all of them
+
+[13:34:48.0000] <bakkot>
+has them committed, that is
+
+[13:34:55.0000] <bakkot>
+and update it once a year
+
+[13:35:15.0000] <ljharb>
+it'd have to be the same branch as the one that every master build updates tho
+
+[13:35:30.0000] <ljharb>
+and currently it's using `travis-scripts`, which doesn't have the ability to update a branch in place
+
+[13:35:35.0000] <ljharb>
+so part of the actions migration will be to fix that anyways
+
+[13:35:37.0000] <ljharb>
+https://github.com/tc39/ecma262/pull/2337
+
+[13:35:50.0000] <bakkot>
+no, I mean, do a `git co that-branch -- years-directory` and copy the files to the right place
+
+[13:35:59.0000] <ljharb>
+ah, right
+
+[13:37:06.0000] <ljharb>
+altho hmm
+
+[13:37:16.0000] <ljharb>
+lol `npm run build-travis` doesn't seem to run anyways
+
+[13:37:27.0000] <ljharb>
+i'll spend some time and detangle this.
+
+[13:37:59.0000] <bakkot>
+amazing
+
+[13:38:07.0000] <bakkot>
+tools are great!
+
+[13:38:13.0000] <ljharb>
+ah ok wait. scripts/auto-deploy.sh does run build-travis
+
+[13:38:20.0000] <bakkot>
+ahh
+
+[13:41:36.0000] <ljharb>
+so (－‸ლ) this is even more fun. part of the script is `git checkout es2020`, so it simply won't pick up the meta fixes unless i push them there
+
+[13:42:44.0000] <ljharb>
+i remember now. that's why i wanted travis-scripts to not always replace the entire branch - so i didn't have to rebuild old years every time
+
+[13:43:30.0000] <bakkot>
+ah
+
+[13:43:58.0000] <bakkot>
+but it does not run `npm i` so it will use the modern version of ecmarkup
+
+[13:44:02.0000] <bakkot>
+which is bad probably
+
+[13:44:08.0000] <bakkot>
+I like the "just commit all the files to a branch" idea
+
+[13:44:25.0000] <bakkot>
+all the files from old years, that is
+
+[13:45:18.0000] <bakkot>
+lol and travis-scripts is now apparently deprecated?
+
+[13:45:25.0000] <bakkot>
+the bitrot is real
+
+[13:46:12.0000] <ljharb>
+exactly
+
+[13:46:22.0000] <ljharb>
+and yeah travis-scripts is deprecated because travis is effectively dead. which is reasonable.
+
+[13:47:17.0000] <ljharb>
+so i think the appropriate path is to build a github actions script that can tack onto an existing gh-pages branch; and then build a command that's run on the push of an `esYYYY` branch that updates that dir in the gh-pages branch, and then manually update the old year branches
+
+[13:47:25.0000] <ljharb>
+then old ones never get changed and new ones get autoupdated
+
+[13:47:45.0000] <ljharb>
+(unless you have a better idea ofc)
+
+[13:48:53.0000] <bakkot>
+"manually update the old year branches" meaning, once a year when we do a release (and shortly after while backporting fixes)?
+
+[13:49:38.0000] <bakkot>
+or do you just mean, while setting this up you'd make those dirs manually?
+
+[13:49:41.0000] <ljharb>
+the latter
+
+[13:49:49.0000] <bakkot>
+sgtm
+
+[13:49:59.0000] <ljharb>
+but, it'd be setup to automatically handle it once a year when we do a release (and with backports)
+
+[13:50:39.0000] <bakkot>
+don't know if automating that part is worthwhile, given that it happens pretty rarely, but I agree it's the ideal solution
+
+[13:52:45.0000] <ljharb>
+it avoids the scenario where a backport forgets to update the year build
+
+[13:52:53.0000] <bakkot>
+yeah
+
+[13:53:17.0000] <bakkot>
+it's definitely better I just don't know that it happens enough to bother with
+
+[13:53:26.0000] <bakkot>
+but hey if you want to write that part I'm certainly not going to object
+
+[13:53:41.0000] <ljharb>
+ha, fair
+
+[14:02:33.0000] <bakkot>
+so, just to recap: we'll have the gh-pages branch which has all past year build artifacts committed, as well as the latest build artifact from master, and whenever master or esYYYY is updated it will 1) check out the just-updated branch 2) run `npm run build`, 3) `git checkout gh-pages && git checkout es${YEAR} -- out && mv out/* es${YEAR}/ && git add . && git commit --amend --no-edit && git push --force`
+
+[14:02:48.0000] <bakkot>
+I guess with appropriate tweak for step 3 to handle master
+
+[14:02:58.0000] <bakkot>
+or, wait
+
+[14:03:00.0000] <bakkot>
+not quite that
+
+[14:03:24.0000] <bakkot>
+delete the `git checkout es${YEAR} -- out` one since that isn't committed
+
+[14:03:45.0000] <bakkot>
+`git checkout gh-pages && mv out/* es${YEAR}/ && git add . && git commit --amend --no-edit && git push --force`
+
+[14:04:03.0000] <ljharb>
+right
+
+[14:04:06.0000] <bakkot>
+or `git checkout gh-pages && mv out/* ./ && git add . && git commit --amend --no-edit && git push --force` in the case of master
+
+[14:04:10.0000] <bakkot>
+sgtm
+
+[14:23:37.0000] <bakkot>
+is https://github.com/tc39/ecma262/pull/2337 worth landing in the mean time, do you figure?
+
+[14:29:34.0000] <ljharb>
+yeah, i think probably so. it's a useful refactor
+
+
+2021-03-02
+[18:53:31.0000] <shu>
+i apologize for lack of communication for past several days, i'm quite behind on some stuff
+
+[18:53:37.0000] <shu>
+wednesday is dedicated tc39 day
+
+[13:39:32.0000] <shu>
+parts of the temporal spec are wild
+
+[13:39:39.0000] <shu>
+how is it pulling bigints out of thin air
+
+[14:20:11.0000] <bakkot>
+aww, the multipage build failed to upload: https://travis-ci.org/github/tc39/ecma262/jobs/761193804
+
+[14:20:40.0000] <bakkot>
+Error: POST failed with: 413, body: { message: 'Request Too Long' }
+
+[14:24:58.0000] <shu>
+ljharb: i saw you have a call to discuss "from" lookups in temporal tomorrow
+
+[14:25:11.0000] <shu>
+i have a conflict for the first 30 minutes of that meeting, but my position is: it is very weird to me
+
+[14:25:27.0000] <shu>
+especially because it is a lookup off %Temporal.Calendar%, not Temporal.Calendar
+
+[14:26:07.0000] <shu>
+i'd like to hear the justification for a method to be a possible extension point, but not the objects that contain it
+
+[14:28:04.0000] <bakkot>
+i will be on that call as well; I had the same concern
+
+[14:29:01.0000] <shu>
+thanks, please relay mine if i can't make it
+
+[14:29:05.0000] <shu>
+but i'll try to show up on the second half
+
+[14:36:07.0000] <shu>
+in general there are too many hook points for my liking
+
+[14:40:04.0000] <shu>
+somehow it both has @@species **and** a per-method hook point, and then also asserts that the returned value from possibly monkey-patched methods also have an expected internal slot
+
+[14:40:13.0000] <shu>
+it is very hard for me to wrap my head around
+
+[14:47:38.0000] <ljharb>
+bakkot: ah right, there’s a hard size limit due to aws
+
+[14:47:56.0000] <ljharb>
+and yeah their idea of extensibility is just bizarre
+
+[14:48:18.0000] <ljharb>
+we simply will not be adding anything that encourages modifying builtins as an extension mechanism
+
+[15:06:45.0000] <shu>
+i also find that the Calendar methods accept string|Object to be problematic
+
+[15:07:14.0000] <bakkot>
+that's where a lot of the problems come from actually
+
+[15:07:14.0000] <shu>
+not really an editorial opinion, but i'd like calls into any kind of parser to be nice and explicit
+
+[15:07:40.0000] <shu>
+basically i'm wary to even finish reviewing this spec draft
+
+[15:07:48.0000] <shu>
+because i am Deeply Afraid of this being a security bug farm
+
+[15:08:12.0000] <bakkot>
+the decision to make a bunch of APIs consume strings lead to the decision to have a central place where you can define new calendars to be used by those APIs
+
+[15:08:33.0000] <bakkot>
+solution is, I would think, do not add a bunch of APIs which take strings
+
+[15:08:36.0000] <shu>
+yes
+
+[15:08:40.0000] <shu>
+i agree
+
+[15:08:59.0000] <shu>
+i... kinda feel bad that this is a pretty fundamental objection and they've been working on this for so long
+
+[15:09:48.0000] <bakkot>
+my hope is that it won't prove to be that fundamental
+
+[15:09:50.0000] <bakkot>
+we'll see though
+
+[15:11:00.0000] <bakkot>
+fwiw I think they do actually manage to have ~ a single place which calls out to the parser, which is in the .from methods
+
+[15:11:12.0000] <bakkot>
+all the string-consuming APIs look up and call something.from
+
+[15:11:12.0000] <bakkot>
+I think
+
+[15:11:50.0000] <ljharb>
+i believe that' strue
+
+[15:12:25.0000] <bakkot>
+ljharb re: size limit, do you know what the limit is and/or how to work around it?
+
+[15:13:00.0000] <ljharb>
+it's small, like a meg or two, and there's no way to work around it i'm aware of - i'm told it's a fundamental limitation to AWS payloads
+
+[15:13:11.0000] <bakkot>
+I'm guessing it's 5 megs
+
+[15:13:14.0000] <ljharb>
+yeah that sounds right
+
+[15:13:20.0000] <ljharb>
+i suppose we could upload to S3 and then serve from there, but then we'd have to pay for our own S3 storage
+
+[15:13:21.0000] <bakkot>
+since the payload is 5005.249kB
+
+[15:13:31.0000] <ljharb>
+are things like images duplicated?
+
+[15:13:39.0000] <bakkot>
+no, only duplicated thing is the table of contents
+
+[15:13:42.0000] <bakkot>
+which tbf is massive
+
+[15:14:09.0000] <bakkot>
+is it possible to upload a tarball or something, and have begin untar it?
+
+[15:14:10.0000] <ljharb>
+ah, hm
+
+[15:14:17.0000] <ljharb>
+p sure that's what we do
+
+[15:14:30.0000] <ljharb>
+altho maybe not, i'll have to look into it
+
+[15:14:39.0000] <ljharb>
+i think that the issue is that amazon won't untar it
+
+[15:14:53.0000] <ljharb>
+and the limit is based on what untarred contents you can deploy to aws
+
+[15:15:00.0000] <bakkot>
+oh, we do gzip it, looks like
+
+[15:15:07.0000] <bakkot>
+hah: https://github.com/tc39/ecma262/blob/master/scripts/publish-preview.js#L43
+
+[15:15:22.0000] <bakkot>
+apparently the script has a check which is slightly larger than the actual size
+
+[15:15:30.0000] <ljharb>
+that sounds right
+
+[15:15:32.0000] <bakkot>
+*actual limit
+
+[15:16:17.0000] <ljharb>
+the serverside is https://github.com/ljharb/tc39-ci/tree/master/src/http/post-preview-000u-000r
+
+[15:16:40.0000] <ljharb>
+so yeah it looks like it's stored on s3, unzipped
+
+[15:18:50.0000] <bakkot>
+that looks like it's uploading individual files, so the full bundle shouldn't be a problem
+
+[15:20:12.0000] <bakkot>
+oh, and the compression is also per-file, rather than the whole thing
+
+[15:20:20.0000] <bakkot>
+is the serverside thing something we control?
+
+[15:20:46.0000] <bakkot>
+'cause making it a gzip-of-list-of-files rather than a list-of-gzip-of-files would probably be sufficient
+
+[15:24:33.0000] <ljharb>
+the server endpoint certainly is, but i don't think that's compatible with s3
+
+[15:24:57.0000] <ljharb>
+meaning i think it's a list of gzips on purpose - you can't upload a zip of files to S3 and have it extracted, you have to upload each file individually
+
+[15:25:34.0000] <bakkot>
+uh
+
+[15:25:35.0000] <bakkot>
+maybe I am confused
+
+[15:25:39.0000] <bakkot>
+where does https://github.com/ljharb/tc39-ci/blob/master/src/http/post-preview-000u-000r/index.js run?
+
+[15:26:13.0000] <ljharb>
+in begin's aws lambda, i believe
+
+[15:26:26.0000] <bakkot>
+from reading that file it looks like there's two phases: files are sent to this script, and this script puts them, one at a time, into S3
+
+[15:26:29.0000] <ljharb>
+right
+
+[15:26:37.0000] <ljharb>
+and i believe that's the only way S3 accepts files
+
+[15:26:41.0000] <bakkot>
+sure
+
+[15:26:49.0000] <bakkot>
+so, this script runs code
+
+[15:27:00.0000] <bakkot>
+it could therefore do the unzipping itself
+
+[15:27:09.0000] <ljharb>
+and the size limit is all about what files are downloaded onto the lambda for https://github.com/ljharb/tc39-ci/tree/master/src/http/get-preview-000u-000r-000k-000etc to use
+
+[15:27:23.0000] <ljharb>
+oh so you're just talking about between CI, and the POST endpoint
+
+[15:27:26.0000] <ljharb>
+that we can certainly change
+
+[15:27:39.0000] <ljharb>
+but i'm not sure that helps the root of the problem
+
+[15:27:54.0000] <bakkot>
+I think it must be the root of the problem: the files are uploaded to S3 individually
+
+[15:28:08.0000] <bakkot>
+and each file is small
+
+[15:28:26.0000] <bakkot>
+the only individual message which is large is the one between CI and this endpoint
+
+[15:28:32.0000] <ljharb>
+right but the size limit is "the sum total of the unzipped files"
+
+[15:28:43.0000] <ljharb>
+"the unzipped size on disk", iow
+
+[15:28:47.0000] <bakkot>
+why unzipped?
+
+[15:29:02.0000] <ljharb>
+because that's the way S3 is architected to require.
+
+[15:29:08.0000] <ljharb>
+and lambda
+
+[15:29:19.0000] <bakkot>
+no, I mean, our s3 clearly has much more than 5mb of files on it
+
+[15:29:24.0000] <bakkot>
+since it has a whole bunch of previews
+
+[15:29:27.0000] <ljharb>
+yeah it's not the s3, it's the lambda
+
+[15:29:29.0000] <ljharb>
+https://github.com/ljharb/tc39-ci/blob/master/src/http/get-preview-000u-000r-000k-000etc/index.js
+
+[15:29:42.0000] <ljharb>
+each one is only allocated 6MB of disk space for the entire process
+
+[15:29:44.0000] <ljharb>
+(is my understanding)
+
+[15:29:54.0000] <bakkot>
+oh, sure, but you solve that by not unzipping the whole thing at once
+
+[15:30:09.0000] <ljharb>
+but it all has to be unzipped to be able to serve it later
+
+[15:30:41.0000] <bakkot>
+but not... on the lambda, right?
+
+[15:30:43.0000] <bakkot>
+like the files live in s3
+
+[15:30:45.0000] <ljharb>
+yes, on the lambda
+
+[15:30:45.0000] <ljharb>
+no
+
+[15:30:54.0000] <ljharb>
+they live in s3 but are copied to the lambda to be able to be served
+
+[15:31:25.0000] <ljharb>
+actually that doesn't sound right
+
+[15:31:27.0000] <bakkot>
+... are they?
+
+[15:31:45.0000] <ljharb>
+lol i pushed back on this really hard when setting it all up, and was told that it's an immutable constraint
+
+[15:31:50.0000] <ljharb>
+i'll ask again to try to recall why
+
+[15:32:17.0000] <bakkot>
+see if you can get them to be more specific about what the constraint actually is
+
+[15:32:41.0000] <bakkot>
+i.e. is it "the size of the message received by the POST endpoint" or "the amount of RAM used by the endpoint during upload" or what
+
+[15:33:40.0000] <ljharb>
+i suspect it's the former, but i'll ask and get back to you
+
+[15:34:18.0000] <bakkot>
+many thanks
+
+[15:35:10.0000] <bakkot>
+if it's the former we can fix it by switching from list-of-gzip-of-files to gzip-of-list-of-files
+
+[15:35:41.0000] <bakkot>
+fix it for this particular case, specifically, because in this particular case the gzip-of-list-of-files will compress much better.
+
+
+2021-03-03
+[21:14:46.0000] <ljharb>
+bakkot: they said `Lambda has a hard limit of 6MB req and res` and `And that 6MB is base64 encoded`
+
+[21:15:01.0000] <ljharb>
+so we can do multiple requests if we want, as long as each, base64 encoded, is under 6MB
+
+[21:15:30.0000] <bakkot>
+we should start by zipping all the files at once
+
+[21:16:12.0000] <ljharb>
+sure, sounds reasonable
+
+[21:18:24.0000] <bakkot>
+can the lambda instance have npm packages?
+
+[21:19:06.0000] <ljharb>
+the installed package is part of the payload
+
+[21:19:43.0000] <bakkot>
+payload?
+
+[21:30:46.0000] <bakkot>
+ljharb I'll make a PR to https://github.com/ljharb/tc39-ci ?
+
+[21:31:04.0000] <bakkot>
+or if you'd prefer to do it yourself that is also fine
+
+[21:31:10.0000] <ljharb>
+perfect, I’ll take a look tomorrow
+
+[21:31:33.0000] <ljharb>
+By payload i mean, the artifact that’s deployed to the lambda. But i don’t think that has a size limit really.
+
+[21:40:38.0000] <bakkot>
+ah, sweet
+
+
+2021-03-04
+[08:32:13.0000] <ljharb>
+it’d be super nice to get https://github.com/tc39/ecma262/pull/2113 in, if any of y’all have time to review
+
+
+2021-03-05
+[13:51:04.0000] <bakkot>
+ljharb: https://github.com/ljharb/tc39-ci/pull/11 / https://github.com/tc39/ecma262/pull/2340
+
+[13:51:39.0000] <bakkot>
+definitely a lower priority than the meeting next week though
+
+[13:51:43.0000] <ljharb>
+nice, ok cool
+
+
+2021-03-06
+[16:43:34.0000] <bakkot>
+ljharb: michael says he's fine with just your stamp on https://github.com/tc39/ecma262/pull/2340, so I think it's good to land
+
+[16:52:15.0000] <ljharb>
+awesome
+
+[17:00:06.0000] <ljharb>
+btw the link in the first line of "about" on https://ci.tc39.es/preview/tc39/ecma262/sha/281ab4ac876c013a11d4cd584dd702fcae1e7dd8/ looks bizarre, i assume that's the full justification
+
+[17:01:13.0000] <ljharb>
+(unrelated to your PR)
+
+[17:02:13.0000] <ljharb>
+rebased the multipage branch, it should be ready to land whenever we think enough people are ok with it
+
+[17:02:33.0000] <ljharb>
+i'll let you mark it as ready for review
+
+[17:06:18.0000] <bakkot>
+gotta get that one tweak in first, then I'll mark it ready
+
+[17:07:09.0000] <bakkot>
+and yeah I dunno what's up with the kerning on the slashes there
+
+
+2021-03-08
+[15:38:51.0000] <ljharb>
+Bakkot: do we want to try to land https://github.com/tc39/ecma262/pull/2339 right now, before i cut 2021? or should we hold off
+
+[15:40:29.0000] <ljharb>
+ or anything else
+
+
+2021-03-09
+[16:09:22.0000] <Bakkot>
+seems fine to hold off
+
+[16:09:53.0000] <Bakkot>
+if someone really wants it it would be pretty straightforward to backport, but I don't ever user the yearly editions so I don't really care
+
+[16:17:03.0000] <ljharb>
+sounds good
+
+[16:33:04.0000] <ljharb>
+in the intro, this is the text i'll be adding if there's no objections: ``` This specification, the 12<sup>th</sup> edition, introduces the `replaceAll` method for Strings; `Promise.any`, a Promise combinator that short-circuits when an input value is fulfilled; `AggregateError`, a new Error type to represent multiple errors at once; logical assignment operators (`??=`, `&&=`, `||=`); `WeakRef`, for referring to a target object
+
+[16:33:04.0000] <ljharb>
+without preserving it from garbage collection, and `FinalizationRegistry`, to manage registration and unregistration of cleanup operations performed when target objects are garbage collected; numeric separators (`1_000`); and `Array.prototype.sort` was made stable. ```
+
+[16:34:52.0000] <Bakkot>
+text is fine by me assuming that's the complete set of feature
+
+[16:35:06.0000] <Bakkot>
+might say "separators for numeric literals" rather than "numeric separators", I guess
+
+[16:36:05.0000] <ljharb>
+ah k
+
+[16:36:17.0000] <ljharb>
+yeah i looked at all the normative commits, and skipped over the ones that weren't new features
+
+[19:16:07.0000] <ljharb>
+ES2021: https://github.com/tc39/Reflector/issues/361
+
+[10:01:47.0000] <shu>
+ljharb: thanks for cutting it
+
+[10:01:56.0000] <ljharb>
+np
+
+[10:02:56.0000] <Bakkot>
+someone want to put the link to the slides on the agenda? I don't have it
+
+[10:03:04.0000] <shu>
+yep, let me do it now
+
+[10:04:20.0000] <shu>
+done
+
+[10:05:18.0000] <shu>
+we can link https://tc39.es/ecma262/2021 publicly on the slides now, yeah?
+
+[10:06:25.0000] <ljharb>
+yep
+
+[10:06:43.0000] <shu>
+who wants to present it this time?
+
+[10:07:02.0000] <michaelficarra>
+Kevin loves presenting
+
+[10:07:08.0000] <Bakkot>
+... do I?
+
+[10:07:12.0000] <michaelficarra>
+he does
+
+[10:07:15.0000] <Bakkot>
+happy to I guess
+
+[10:07:16.0000] <shu>
+do you?
+
+[10:07:28.0000] <shu>
+i'll be happy to once we're in person again
+
+[10:07:49.0000] <shu>
+though i don't know how badly Jitsi does with performance issues with slides at the same time
+
+[10:08:10.0000] <shu>
+Bakkot: why don't you speak and i'll present the slides
+
+[10:08:16.0000] <Bakkot>
+wfm
+
+[10:49:46.0000] <michaelficarra>
+btw this comment from jmdyck indicates I was correct about his misunderstanding of our plans for the structured header: https://github.com/tc39/ecma262/pull/545#issuecomment-791872521
+
+
+2021-03-12
+[11:41:45.0000] <ljharb>
+shu: re https://github.com/tc39/ecma262/pull/2316#issuecomment-797680662, I’d expect it needs a review from Kevin or Michael first; if you don’t think it does, please add the ready to merge label
+
+
+2021-03-13
+[16:15:36.0000] <shu>
+i'll wait for one of kevin or michael
+
+[16:15:55.0000] <shu>
+Bakkot: ^ 2 liner stamp to get this merged, then the HTML weakrefs PR can be merged
+
+[16:45:56.0000] <Bakkot>
+approved
+
+[17:27:54.0000] <shu>
+ty
+
+[18:43:51.0000] <Bakkot>
+shu did you want to review the multipage pr? if not it is good to go I think: https://github.com/tc39/ecma262/pull/2339
+
+
+2021-03-14
+[08:08:00.0000] <shu>
+i’m good to not review it
+
+
+2021-03-16
+[17:31:32.0000] <shu>
+Bakkot: do you think https://github.com/tc39/ecma262/pull/2316 also needs a review from michael?
+
+[17:42:55.0000] <Bakkot>
+I'll ping him
+
+[13:57:25.0000] <ljharb>
+throw a label on https://github.com/tc39/ecma262/pull/2316 if it's ready
+
+
+2021-03-21
+[00:22:09.0000] <Bakkot>
+ljharb I added ready-to-merge to https://github.com/tc39/ecma262/pull/2344 despite it only having my stamp; I think it does not need another stamp
+
+[09:25:39.0000] <ljharb>
+agreed, on it
+
+
+2021-03-24
+[09:24:31.0000] <ljharb>
+Bakkot: i just updated https://github.com/tc39/ecma262/pull/2125/ - the garbage CSS i put in there for "legacy" can be removed as soon as ecmarkup adds support for `legacy`.
+
+[09:24:40.0000] <Bakkot>
+sweet
+
+[14:34:43.0000] <ljharb>
+https://github.com/tc39/ecma262/pull/2350 also?
+
+[16:12:21.0000] <shu>
+oh man not gonna review 2290 until class fields are merged...
+
+[16:31:05.0000] <ljharb>
+shu: you can look at just the last commit and see only my changes :-)
+
+[16:31:08.0000] <ljharb>
+shu: but also fine to wait
+
+
+2021-03-31
+[14:32:17.0000] <shu>
+hm i wonder why i wasn't in the channel
+
+[14:32:41.0000] <shu>
+is the meet code ngt-ogtt-sjh?
+
+[14:33:00.0000] <ljharb>
+yes
+
+[14:33:04.0000] <ljharb>
+so, i'd made a mistake on the calendar
+
+[14:33:13.0000] <ljharb>
+the visible url was correct but its href was not
+
+[14:33:16.0000] <ljharb>
+it's fixed now
+
+[14:33:18.0000] <shu>
+ah, oops
+
+[14:33:19.0000] <ljharb>
+and kevin and i are in the new one
+

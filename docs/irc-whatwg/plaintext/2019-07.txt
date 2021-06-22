@@ -1,0 +1,1913 @@
+2019-07-01
+[07:13:29.0000] <annevk>
+domfarolino: a thing that would help with these very long running PRs is explicitly stating what changed
+
+[07:14:17.0000] <annevk>
+domfarolino: e.g., for lazyload as a reviewer I'm not sure if I need to (re)read all issue comments and all PR comments and ensure they're all taking into account
+
+[07:14:28.0000] <domfarolino>
+annevk: gotcha, i will try and address that better
+
+[07:17:00.0000] <annevk>
+domfarolino: so one thing I notice quickly skimming through things is that https://github.com/whatwg/html/issues/2806#issuecomment-481090691 suggests this can be used for tracking perhaps but there's no "fingerprint" thingy added in the PR
+
+[09:13:43.0000] <annevk>
+Claim about HTML on blink-dev: 'clearly describe what "transformToFragment" is supposed to do'
+
+[09:14:00.0000] <annevk>
+*blinks*
+
+
+2019-07-02
+[00:24:19.0000] <mathiasbynens>
+<script>document.write('\uD83D');</script><script>document.write('\uDE02');</script>
+
+[00:24:19.0000] <mathiasbynens>
+how does it render? Chrome: �� / Firefox: 😂 / Safari: (nothing)
+
+[00:34:43.0000] <annevk>
+mathiasbynens: oh, that's interesting
+
+[00:34:45.0000] <annevk>
+hsivonen: ^^
+
+[00:35:20.0000] <mathiasbynens>
+(<script>document.write('\uD83D'); document.write('\uDE02');</script> works as spec’d everywhere)
+
+[00:36:45.0000] <hsivonen>
+Interesting.
+
+[00:37:05.0000] <hsivonen>
+nox: ^
+
+[00:38:30.0000] <hsivonen>
+what happens to unpaired surrogates in the middle of document.write in Chrome? How far are we from changing the document.write argument to USVString?
+
+[00:41:40.0000] <hsivonen>
+looks like unpaired surrogates in the middle are preserved by Chrome and not turned into U+FFFD: https://software.hixie.ch/utilities/js/live-dom-viewer/saved/7044
+
+[00:43:22.0000] <hsivonen>
+mathiasbynens: it appears that the issue is that Chrome doesn't do coalesced text layout when text is split across two text nodes and there's an invisible element node in the middle
+
+[00:51:53.0000] <annevk>
+Hmm yeah, which is really a bug they should fix as it would affect a lot of languages
+
+[05:37:08.0000] <Ms2ger>
+annevk, ping https://github.com/whatwg/html/pull/4733
+
+[05:40:01.0000] <annevk>
+Ms2ger: I think Domenic should review that; I thing I wonder about is whether we should preserve the existing ID
+
+[05:40:15.0000] <annevk>
+a thing I*
+
+[06:03:30.0000] <Domenic>
+Ms2ger: will try to do today. It looks very comprehensive but since it's more than just a couple places I wanted to actually do my own double-check.
+
+[06:03:43.0000] <Ms2ger>
+Domenic, okay, sounds good
+
+
+2019-07-03
+[03:49:42.0000] <MikeSmith>
+nox: do you know if servo/rust-url fully conforms to the URL standard?
+
+[03:50:07.0000] <nox>
+"rust-url is an implementation of the URL Standard for the Rust programming language."
+
+[03:50:35.0000] <MikeSmith>
+nox: yeah I read that part :)
+
+[03:51:34.0000] <MikeSmith>
+I’m wondering in particular about UTS 46 support. I see it relies on https://docs.rs/idna/0.1.4/idna/uts46/index.html
+
+[03:52:36.0000] <MikeSmith>
+so really my question is whether that idna/uts46 library has complete/conforming UTS 46 support
+
+[03:53:14.0000] <nox>
+There are bugs. https://github.com/servo/rust-url/pull/484
+
+[03:54:33.0000] <MikeSmith>
+/me looks
+
+[04:00:09.0000] <nox>
+MikeSmith: Disregarding bugs, the idna crate supports whatever is needed for the URL standard and we don't actively implement idna things that are not needed for it.
+
+[04:00:25.0000] <MikeSmith>
+OK
+
+[04:00:46.0000] <MikeSmith>
+does the idna crate depend in ICU?
+
+[04:01:09.0000] <nox>
+No
+
+[04:01:23.0000] <MikeSmith>
+oh, that’s great then
+
+[04:01:51.0000] <MikeSmith>
+for the sake of comparison, in Java there's no way to get IDNA support without pulling in all 11MB of ICU4J
+
+[08:34:02.0000] <Ms2ger>
+@w3c: "We made fetch happen."
+
+[08:47:55.0000] <annevk>
+lol, time to find the login details for @fetchstandard
+
+[08:50:27.0000] <annevk>
+https://twitter.com/fetchstandard/status/1146446050934366209
+
+
+2019-07-04
+[17:10:23.0000] <TimothyGu>
+MikeSmith: there's also https://github.com/Sebmaster/tr46.js, which extracts the data it needs from Unicode as a build step
+
+[17:41:57.0000] <MikeSmith>
+TimothyGu: Oh cool, thanks
+
+[23:25:13.0000] <domfarolino>
+annevk: WRT the fingerprint thingy...I think the LazyLoad feature could be used to track/report a given user's scroll location on a page...but do we also think it could be used to fingerprint a user? Only thing I can think of is that the loading behavior could be correlated to UAs that support the feature etc.
+
+[23:51:14.0000] <annevk>
+domfarolino: yeah, we should separate fingerprint/tracking I suppose
+
+[00:01:43.0000] <domfarolino>
+annevk: We as in "HTML Standard would ideally provide a way to distinguish these concerns", or "domfarolino should create two fingerprint thingys in the LazyLoad attribute section"
+
+[00:11:12.0000] <annevk>
+domfarolino: Maciej suggested somewhere to split it to cover tracking vectors too
+
+[00:12:32.0000] <annevk>
+domfarolino: I think we need to highlight those vectors and recommend mitigations (i.e., if script is disabled, disable this as well)
+
+[00:15:02.0000] <annevk>
+domfarolino: I’d not block this on Infra improvements, but we can add some of the wording and a TODO comment or some such
+
+[00:31:36.0000] <domfarolino>
+annevk: Sounds good, thank you
+
+[12:21:50.0000] <rniwa>
+smaug____: yt?
+
+[12:22:04.0000] <smaug____>
+rniwa: yup
+
+[12:22:44.0000] <rniwa>
+smaug____: would you be at TPAC this year?
+
+[12:22:52.0000] <smaug____>
+yes
+
+[12:23:02.0000] <rniwa>
+smaug____: if so, I was wondering if we should allocate web components discussion time as well?
+
+[12:23:08.0000] <smaug____>
+I think so
+
+[12:23:11.0000] <smaug____>
+annevk: ^
+
+[12:23:27.0000] <rniwa>
+smaug____: unfortunately, apple hasn't joined newly chartered web apps WG yet as far as i know.
+
+[12:23:36.0000] <rniwa>
+smaug____: so it's kind of weird for me to ask for a time slot
+
+[12:23:52.0000] <rniwa>
+smaug____: I was wondering if you or someone else from Mozilla could ask for a room somewhere??
+
+[12:24:21.0000] <smaug____>
+we could
+
+[12:24:34.0000] <smaug____>
+on Thursday or Friday?
+
+[12:24:36.0000] <smaug____>
+or both?
+
+[12:24:46.0000] <smaug____>
+depends on agenda I guess
+
+[12:25:20.0000] <rniwa>
+smaug____: I highly doubt we need two days given there hasn't been much progress made
+
+[12:25:29.0000] <smaug____>
+very true
+
+[12:25:38.0000] <rniwa>
+smaug____: also, we probably have much less web devs?
+
+[12:25:53.0000] <smaug____>
+oh, right, Marcos is a chair
+
+[12:26:02.0000] <smaug____>
+I'll ping him
+
+[12:26:03.0000] <rniwa>
+smaug____: I think I'm mostly interested in nailing down scoped custom element registry
+
+[12:26:26.0000] <smaug____>
+I'd like us to spend again some time on open issues
+
+[12:26:27.0000] <rniwa>
+smaug____: and delegatesFocus, which rakina@google has been working on to spec
+
+[12:26:33.0000] <rniwa>
+smaug____: right
+
+[12:26:48.0000] <rniwa>
+smaug____ : I think TPAC would be a great place for that since all relevant WG people are there
+
+[12:27:11.0000] <rniwa>
+smaug____: I think having spring meeting to get all web dev interests & feedback
+
+[12:27:23.0000] <rniwa>
+smaug____: and TPAC meeting to resolve open issues is a great combo IMO
+
+[12:34:11.0000] <annevk>
+rniwa: FWIW, Tess might be able to get some HTML meeting that we could also use for this
+
+[12:34:38.0000] <annevk>
+Also, I agree with all things here 😊
+
+[12:34:39.0000] <smaug____>
+web components isn't really part of WebApps charter anymore
+
+[12:34:57.0000] <annevk>
+hober: ^^
+
+[12:37:16.0000] <rniwa>
+smaug____: oh, that's right.
+
+
+2019-07-05
+[18:10:05.0000] <MikeSmith>
+TabAtkins: about https://github.com/whatwg/html/issues/4752#issuecomment-508500008, I guess Bikeshed doesn’t yet provide a way to link to value definitions for global attributes?
+
+[18:12:57.0000] <MikeSmith>
+hmm, and maybe it doesn’t yet have a way to link to definitions for global attributes? (not just values)
+
+[21:29:53.0000] <MikeSmith>
+Domenic: FYI I finally got around to raising an SVG-spec issue about the spec no longer defining any attributes as required https://github.com/w3c/svgwg/issues/710
+
+[21:51:05.0000] <Domenic>
+\o/
+
+[04:50:07.0000] <annevk>
+JakeA: re https://twitter.com/jaffathecake/status/1147071838561984513 it could maybe fall out of the Storage Standard, but we haven't really properly layered all the things that we store on top of it
+
+[04:52:16.0000] <annevk>
+JakeA: I do think we should do more to standardize this stuff; I haven't had the time yet, but maybe I should try to find someone more actively
+
+[08:00:51.0000] <innovati>
+Is this the spot to ask about HTML Custom Elements, or Web Components? There are plenty of tools in use out there like Angular, React, etc that provide some kind of custom components for people building sites, but outside of those tools it's just kind of a black box as to what they're doing
+
+[08:01:37.0000] <innovati>
+I have found myself needing to modify or update websites built using these tools after the fact, externally, which means I have to look at the page, use Mutation Observers to watch for changes, and continually try to make sure my changes are present, not wiped out, but present every time they should be present
+
+[08:02:31.0000] <innovati>
+So my question is - in a future where people are using standards to build sites in similar ways, would the elements being output from standards-based tools be outputting things that the browser and JS would know about, and that would be simpler for me to extend from the outside?
+
+[08:03:24.0000] <innovati>
+Would some hypothetical React version be able to build on top of, and work alongside a different tool, sharing elements and 'components' without fighting to overwrite them and not have any knowledge of what the other tool thought about the component?
+
+[08:19:34.0000] <annevk>
+innovati: might depend a bit to what extent strong encapsulation is used and what you need to do
+
+[08:20:49.0000] <innovati>
+Is the difference between something like React and Heresy that the browser would know about, and other tools could also interact with the 'components' Heresy was working with, but React is currently kind of a black box to the browser and other JS? https://github.com/WebReflection/heresy
+
+[08:21:31.0000] <innovati>
+I don't do stuff with Web Components or these other tools but there's some kind of a difference or a distinction that's presently missing and I'm not sure how to put my finger on it but I know there's a better way than what we do now, and I believe the better tech might already exist
+
+[11:01:39.0000] <Krinkle>
+annevk: curious if you have a recommendation for 2019 for the use case of individually ephemeral values stored per-origin in the browser. I last looked at this in 2015, and at the time H2 was just coming up and there was a drive (at Wikipedia) to move away from cookies. Unfortunately, while sessionStorage (aka tabStorage) and localStorage have taken over a few use cases, the vast majority seems still only suitable for cookies. In particular because in
+
+[11:01:39.0000] <Krinkle>
+a large deployment, using localStorage means when keys change/evolve or features never used again, it accumulates. Hence resulting in loss of functionality after a while.
+
+[11:03:34.0000] <annevk>
+Krinkle: you’d have to do it in userland
+
+[11:03:37.0000] <Krinkle>
+We have a homemade abstraction over localStorage that does expiry through enumeration, but we don't enable it for most cases because it absolutely kills performance on mobile (eg. 200ms or more blocking I/O to iterate the keys, and 50ms+ to get their value).
+
+[11:04:14.0000] <Krinkle>
+it seems browsers don't read the per-origin thing into memory very well, so it's full disk I/O to open, read, query and close the underlying database every time complete no-go.
+
+[11:04:19.0000] <annevk>
+Krinkle: we have an idea around storage buckets that would be easier to isolate and manage, but still early days
+
+[11:04:47.0000] <Krinkle>
+yeah, the storage units and the way service workers does it seems very useful for PWA use of "caching"
+
+[11:05:03.0000] <annevk>
+Krinkle: Domenic et al are working on KV Storage which should do more things async
+
+[11:06:26.0000] <Krinkle>
+but that's different from more user-facing storing of "forgettable state", e.g. 15/200 random banners you've seen already, a section that's collapsed by default, an A/B test token, random crap like that (multiplied by 100). As a user navigates around the site, all of that builds up, but it never goes away, especially problematic for power users and regular contributors that interact with a ton of different front-end features.
+
+[11:07:01.0000] <Krinkle>
+(and worse in Firefox because if you visit one of the 900 wikis just once, it stays around forever and even our slow garbage collector can't reach it unless you visit the site again).
+
+[11:07:15.0000] <Krinkle>
+although I hear that's finally being changed
+
+[11:07:37.0000] <Krinkle>
+annevk: OK, so not something we can polyfill today yet with reasonable compat.
+
+[11:08:07.0000] <annevk>
+Only with IDB
+
+[11:08:20.0000] <Krinkle>
+IDB has TTL on keys?
+
+[11:08:43.0000] <annevk>
+Krinkle: it should not block as badly
+
+[11:08:53.0000] <annevk>
+Krinkle: cause async
+
+[11:09:18.0000] <annevk>
+Krinkle: you will also have more capacity
+
+[11:09:32.0000] <annevk>
+Gotta go
+
+[11:10:30.0000] <Krinkle>
+right, so manual garbage collecting could be more incremental and graceful.
+
+[11:11:07.0000] <Krinkle>
+Thanks, I think we could give that a go
+
+
+2019-07-06
+[22:12:21.0000] <domfarolino>
+annevk: sounds like maciej doesn’t have label access to HTML. Would it be good to change that?
+
+[22:37:09.0000] <annevk>
+domfarolino: I think I did already
+
+[22:37:20.0000] <domfarolino>
+Ok
+
+[22:37:37.0000] <annevk>
+domfarolino: did he mention it again?
+
+[22:45:28.0000] <domfarolino>
+https://github.com/whatwg/html/pull/4115#issuecomment-508302398
+
+[22:45:32.0000] <domfarolino>
+annevk: ^
+
+[22:45:46.0000] <domfarolino>
+Not sure if you gave him abilities after/before that comment though
+
+[22:49:20.0000] <annevk>
+After, ta!
+
+[13:07:38.0000] <innovati>
+What's the process like for adding new global attributes? Is that something that happens or is it very difficult to justify?
+
+
+2019-07-07
+[20:05:59.0000] <MikeSmith>
+innovati: you know about https://whatwg.org/faq#adding-new-features, right?
+
+[20:06:17.0000] <MikeSmith>
+especially step #1
+
+[20:06:23.0000] <MikeSmith>
+> Forget about the particular solution you have in mind! Solution time is later!
+
+[20:07:12.0000] <MikeSmith>
+so the process is basically to not propose new global attributes at all, ever
+
+[20:07:43.0000] <MikeSmith>
+but instead, explain what problem you want solved
+
+[20:09:07.0000] <MikeSmith>
+and then in that context note that you think a new global attribute might be a solution the problem, and why
+
+[07:55:01.0000] <innovati>
+MikeSmith Expressing what I know doesn't really give me any new information. I can write something up, but I still wouldn't know if I'm completely wasting 100% of my time
+
+[07:57:35.0000] <innovati>
+I'm not trying to propose a feature today, I'm wondering about the feasibility of global attributes possibly happening if a good solution was found. If it's not feasible ever I would try to explore something that was more feasible instead
+
+[07:59:44.0000] <innovati>
+I was really hoping for some insight about global attributes and what it takes for one to be accepted, I believe each global attribute that can exist carries a small performance hit when creating new elements? If that's true you'd think they would aim to keep the list as short as possible for reasons. Those kinds of reasons and considerations around what global attributes cost and mean are what I'm hoping to learn
+
+[08:06:55.0000] <innovati>
+I'm helping to explore ways that things like ResizeObserver, MutationObserver, and IntersectionObserver might be utilized and controlled from CSS in a standard way, and part of that will need to be a way to target matching elements with selectors.
+
+[08:07:53.0000] <innovati>
+There are ways to wrote something like that which are valid CSS but incredibly unlikely to ever get standardized, and there are ways you could express it that are a much smaller ask and stand a better chance actually maybe becoming something
+
+[08:09:44.0000] <innovati>
+I'd like to try my best to stick as close to reality as possible :D
+
+
+2019-07-08
+[06:53:49.0000] <annevk>
+innovati: adding new global attributes does not necessarily increase the cost of creating an element; those things are highly dependent on the implementation
+
+[06:54:10.0000] <annevk>
+innovati: and it's quite likely we'll add new global attributes, we've added lots over the last decade or so
+
+[06:54:21.0000] <annevk>
+innovati: just look at WAI-ARIA
+
+[06:55:09.0000] <annevk>
+(and in fact, with data-* we've already accepted an infinity of global attributes)
+
+[07:00:34.0000] <innovati>
+Thanks @annevk! I'm exploring some CSS concepts and it seems like to target elements it would either need the creation of a bunch of new CSS selectors, or possibly a bunch of new HTML attributes that existing CSS selectors could target - for either situation the way you'd prototype something like that today would use data-* attributes to 'fake' it so it's just good to know what's possible while continuing to explore
+
+[08:38:25.0000] <oliverdunk>
+Domenic: RE https://github.com/whatwg/html/issues/4752, I think the concept isn't even mentioned in a way that a definition could be pulled from. I guess I was wrong using the word export - the concept just needs to be identified semantically using some sort of tag
+
+[09:00:17.0000] <Domenic>
+oliverdunk: they're identified using <dfn> tags, right? E.g. https://html.spec.whatwg.org/multipage/form-control-infrastructure.html#attr-fe-autocomplete-family-name
+
+[09:00:55.0000] <oliverdunk>
+Domenic: Looking to refer to the full list of possible values, rather than a specific one
+
+[09:01:17.0000] <Domenic>
+oliverdunk: https://html.spec.whatwg.org/multipage/form-control-infrastructure.html#autofill-field
+
+[09:02:59.0000] <oliverdunk>
+Domenic: Hmm. I assumed that was referring to the attribute and not its values, but I think you're right :)
+
+[09:03:06.0000] <oliverdunk>
+Thanks for the help.
+
+[09:04:14.0000] <Domenic>
+:)
+
+
+2019-07-09
+[19:24:30.0000] <domfarolino>
+annevk: I imagine the lazy load spec PR isn't your highest priority review request, but if there's anything i can do to explain the changes/direction let me know
+
+[00:12:39.0000] <annevk>
+domfarolino: is there an updated description of goals/proposal now range requests are out?
+
+[00:14:11.0000] <annevk>
+domfarolino: and implementer commitments?
+
+[00:14:28.0000] <annevk>
+domfarolino: updated commit message we could use would help
+
+[00:14:57.0000] <annevk>
+domfarolino: I’ll have a look later and add this as a comment as I suspect you’re out
+
+[00:16:37.0000] <domfarolino>
+annevk: Not that I know of. Kinuko + Ben were interested in removing the range request bits as per https://github.com/whatwg/html/pull/3752#issuecomment-498114767. I believe safari either has shown interest or committed but I'd have to hunt for the bug.
+
+[00:17:12.0000] <domfarolino>
+annevk: I can write an updated commit message sometime hopefully later today (JST). you suspect I am out?
+
+[00:28:52.0000] <annevk>
+domfarolino: I was thinking you'd be asleep
+
+[00:29:32.0000] <domfarolino>
+annevk: Oh I see. I'm actually in japan until mid-Sept.
+
+[00:31:30.0000] <annevk>
+ah
+
+[00:31:41.0000] <annevk>
+domfarolino: wait, you're gonna leave before TPAC?
+
+[00:31:55.0000] <annevk>
+or I guess that is mid-Sept
+
+[00:32:50.0000] <domfarolino>
+annevk: actually no I don't think so. Plan is to stay for it, but it's technically not solidified yet
+
+[02:56:57.0000] <MikeSmith>
+oh wow bugzilla.mozilla.org now automatically switches to a night-mode thing?
+
+[02:57:04.0000] <MikeSmith>
+or did I just not notice it before?
+
+[02:57:27.0000] <MikeSmith>
+my nightly just got upgraded to 70
+
+[02:58:39.0000] <annevk>
+MikeSmith: I've heard some talk about us impl night mode
+
+[02:59:23.0000] <MikeSmith>
+annevk: aok, seems like it happened
+
+[02:59:33.0000] <MikeSmith>
+bmo doing some magic at least
+
+[04:51:14.0000] <GPHemsley>
+MikeSmith: they switched away from the ancient default theme, if that's what you mean
+
+[05:14:00.0000] <MikeSmith>
+GPHemsley: at night it switched to white text on a dark background
+
+
+2019-07-10
+[22:25:57.0000] <leonardus>
+What's the difference between http://example.org/dir and http://example.org/dir/
+
+[22:26:58.0000] <leonardus>
+(the trailing slash)
+
+[22:45:07.0000] <annevk>
+leonardus: different path
+
+[22:45:58.0000] <annevk>
+leonardus: per spec the latter has an empty path segment at the end
+
+[03:40:28.0000] <MikeSmith>
+nice Stack Overflow success story:
+
+[03:40:29.0000] <MikeSmith>
+https://stackoverflow.com/questions/56877116/flask-logs-duplicate-xhr-cors-requests-from-safari
+
+[03:41:03.0000] <MikeSmith>
+question posted to SO on July 3, with detailed repro steps
+
+[03:42:08.0000] <MikeSmith>
+...in fact, a github repo with the repro dependencies and instructions https://github.com/karls/flask-safari-troubleshoot
+
+[03:42:31.0000] <MikeSmith>
+then https://bugs.webkit.org/show_bug.cgi?id=199492 raised on July 4
+
+[03:43:19.0000] <MikeSmith>
+then Youenn lands a fix only July 9 https://trac.webkit.org/changeset/247276
+
+[05:31:02.0000] <ato>
+Apparently Chrome appends / to the URL when browsing a directory over file://.
+
+[05:31:36.0000] <ato>
+Is the behaviour of file:// covered by a standard, or is this intentionally out of scope?
+
+[05:34:09.0000] <Ms2ger>
+"For now, unfortunate as it is, file URLs are left as an exercise for the reader. "
+
+[05:35:11.0000] <annevk>
+I should maybe start using "implementation-defined" for things like that
+
+[05:42:50.0000] <ato>
+Ms2ger: Thanks.
+
+[05:42:57.0000] <ato>
+Ms2ger: Is this from URL?
+
+[05:43:03.0000] <Ms2ger>
+Fetch
+
+[05:43:13.0000] <ato>
+Ah.
+
+[05:47:09.0000] <annevk>
+ato: parsing is defined, fetching is not
+
+[05:47:29.0000] <annevk>
+ato: it's origin isn't either
+
+[05:47:35.0000] <annevk>
+its
+
+[05:47:36.0000] <annevk>
+ouch
+
+[05:48:05.0000] <ato>
+Great, thanks.
+
+[05:48:12.0000] <ato>
+Well not great, but now I see.
+
+[05:53:36.0000] <Dari>
+Chrome bug: closed because behaviour matches the spec https://bugs.chromium.org/p/chromium/issues/detail?id=20574 W3C bug: closed because "<ericwilligers_> dbaron: it is a little late to change that." "<ericwilligers_> dirk: confirm WebKit behaves same as Edge and Chrome and Firefox in creating a containing block."
+
+[05:53:57.0000] <Dari>
+Originally only Chrome had this behaviour, IE/FF/Opera all changed to match the spec. Instead of Chrome talking about what the spec says, and W3C talking about current browser behaviour, why don't people talk about what makes sense?
+
+[05:54:32.0000] <Dari>
+The purpose of position fixed is to make sure an element is always relative to the viewport, if under certain conditions it's basically just position: absolute/relative what purpose does it serve? No one can be confident in using if it only does what you expect it to under certain conditions.
+
+[05:54:52.0000] <Dari>
+Oh, this is the "3C bug btw https://github.com/w3c/csswg-drafts/issues/913
+
+[05:57:18.0000] <Dari>
+Someone on the W3C bug mentions that there's some complexity with changing this behaviour, but IE/FF/Opera did have this behaviour originally, and in it's current state it's effectively useless IMO, I don't think 'it would be hard' is a good excuse for closing the bug
+
+[06:05:58.0000] <annevk>
+This isn't the place to escalate
+
+[06:06:48.0000] <annevk>
+And if you want to overturn such a decision you'll have to justify the engineering cost involved somehow, relative to other work
+
+[06:07:09.0000] <annevk>
+As well as take into consideration the compatibility fallout if it goes entrenched behavior
+
+[06:09:25.0000] <Dari>
+What is the correct place?
+
+[06:12:15.0000] <annevk>
+Dari: leaving a comment on that issue, potentially filing a new issue given it's been almost a year (given it's almost a year, it seems even harder to overturn and you'll need even better justification; definitely more than what you wrote above)
+
+[06:30:21.0000] <Dari>
+Hmm, well it's hard to justify given factors you've mentioned. The only justification I have is that the proposed behaviour makes more sense, and I think that position fixed won't be used by people who've found out about the current behaviour (from discussion and resources I've seen online it feels like most people are still unaware of how it actua
+
+[06:30:21.0000] <Dari>
+lly works)
+
+[06:32:09.0000] <Dari>
+It's always going to be easier to leave it half broken than try and fix it
+
+[06:34:28.0000] <annevk>
+Dari: yeah, engineering tradeoffs are hard
+
+[06:34:59.0000] <annevk>
+Dari: note though that even if this is entrenched for whatever reason, offering some opt-out might still be a reasonable request
+
+[06:35:17.0000] <annevk>
+Dari: and worth doing if there are compelling use cases
+
+[06:35:58.0000] <annevk>
+Dari: and perhaps this will also motive you to get involved earlier and review other discussions going on 😊
+
+[06:36:05.0000] <annevk>
+motivate*
+
+[06:37:12.0000] <Dari>
+Thanks for your time, you've given me some things to think about
+
+[08:55:46.0000] <Domenic>
+annevk: do you have time for the navigation refactor (https://github.com/whatwg/html/pull/4664) today?
+
+[08:58:11.0000] <annevk>
+Domenic: no, hopefully tomorrow
+
+[08:58:28.0000] <Domenic>
+OK cool, thanks for letting me know. Just very excited to land that :)
+
+[09:18:12.0000] <annevk>
+Yeah, totally fair, and it'll probably help with COOP/COEP too so I should get to it
+
+[09:31:17.0000] <Domenic>
+The only really broken thing left with navigation after that is source browsing context, I think.
+
+[09:31:59.0000] <annevk>
+Oh my and multipart from a quick skim I did earlier
+
+[09:32:08.0000] <Domenic>
+Yeah true
+
+[09:33:26.0000] <annevk>
+I think we're quite close with source browsing context, esp. if navigation always happens synchronously (because then it can be a "source document" as it should be quite easily)
+
+[09:33:44.0000] <Domenic>
+Oh yeah I forgot we're making a lot of progress on sync vs. async navigation
+
+[09:34:06.0000] <Domenic>
+Although I guess there's a lot of implicitness in "element that caused the navigation" and thus "document that caused the navigation"
+
+[09:34:24.0000] <Domenic>
+That shouldn't be too hard to fix though, navigate doesn't have too many call sites in the spec
+
+[09:44:00.0000] <dtapuska>
+I'm hopeful to start taking another stab at the agent cluster stuff based on 4664
+
+[09:50:41.0000] <annevk>
+The other big thing is inheritance of document state into weird URL schemes
+
+[09:51:22.0000] <annevk>
+Oh and downloads
+
+[09:51:27.0000] <annevk>
+Hmm
+
+[09:53:18.0000] <annevk>
+/me whispers *session history*
+
+[10:38:39.0000] <Domenic>
+Inheritance of document state into weird URL schemes?
+
+[10:39:01.0000] <Domenic>
+downloads seem pretty reasonable to me
+
+[10:42:43.0000] <annevk>
+Domenic: e.g. referrer policy et al into srcdoc / about:blank / data: / blob:
+
+[10:43:00.0000] <annevk>
+Domenic: and in particular when is the policy copied and such
+
+[10:43:21.0000] <annevk>
+Domenic: afaik downloads aren't defined as a navigation still
+
+[10:43:30.0000] <Domenic>
+Downloads are defined as a navigation I am pretty sure
+
+[10:43:49.0000] <Domenic>
+I see the problem with weird URLs
+
+[10:43:56.0000] <annevk>
+"Handle the result of fetching request as a download."
+
+[10:44:00.0000] <Domenic>
+I see yes
+
+[10:44:29.0000] <Domenic>
+It's backwards from what you're proposing: navigations can end up as downloads. https://html.spec.whatwg.org/#navigating-across-documents:as-a-download
+
+[10:45:08.0000] <annevk>
+Well, that too, download="" just forces that code path (again, in impls)
+
+
+2019-07-11
+[17:51:30.0000] <MikeSmith>
+annevk: https://medium.com/bugbountywriteup/zoom-zero-day-4-million-webcams-maybe-an-rce-just-get-them-to-visit-your-website-ac75c83f4ef5
+
+[17:52:35.0000] <MikeSmith>
+> I also found that, instead of making a regular AJAX request, this page instead loads an image from the Zoom web server that is locally running. The different dimensions of the image dictate the error/status code of the server.
+
+[17:53:26.0000] <MikeSmith>
+> One question I asked is, why is this web server returning this data encoded in the dimensions of an image file? The reason is, it’s done to bypass Cross-Origin Resource Sharing (CORS).
+
+[17:56:59.0000] <MikeSmith>
+see see https://fosterelli.co/developers-dont-understand-cors
+
+[17:57:14.0000] <MikeSmith>
+*see also
+
+[17:58:41.0000] <MikeSmith>
+> Anecdotally, lots of developers I’ve talked with don’t understand well how CORS works. There’s also very a generous quantity of examples from questions on Stack Overflow. Unfortunately, these are often paired with pages that recommend very insecure defaults like this one in express which would make your application vulnerable if copied verbatim.
+
+[17:59:18.0000] <MikeSmith>
+> I’ve seen CORS confusion from both experienced and new developers. Is the CORS API too complex and confusing, or do we only need better developer education around issues like CORS and CSP? I’m not sure, but the current approach definitely doesn’t seem like it’s working.
+
+[21:29:59.0000] <annevk>
+Yeah, I don’t have great ideas around CORS, though we should lock down localhost more
+
+[21:37:15.0000] <MikeSmith>
+annevk: what is a bit shocking about that Zoom thing is the degree to which their engineers seemed to really not have any clue how things worked
+
+[21:39:53.0000] <annevk>
+I don’t understand why they used an image and not JSONP
+
+[21:40:21.0000] <annevk>
+I’m also surprised a browser would limit CORS, but not other things
+
+[21:40:48.0000] <annevk>
+Ooh, is it because of mixed content?
+
+[21:41:12.0000] <annevk>
+That actually seems plausible
+
+[21:43:00.0000] <annevk>
+I get the feeling they know the engineering well, but the ethics and ramifications of violating “platform law” not so much
+
+[21:43:38.0000] <annevk>
+Hopefully better now, as I doubt Mozilla will stop using them
+
+[21:44:06.0000] <MikeSmith>
+OK
+
+[22:32:35.0000] <cybai>
+does anyone work on ServiceWorker repo around 👀? I'd like to help to update the default value of optional dictionary for the SW repo but I will get compile error from my patch. I wonder I used correct syntax 🤔 or did I do something wrong? https://github.com/w3c/ServiceWorker/pull/1448
+
+[22:32:36.0000] <cybai>
+thanks
+
+[23:01:53.0000] <annevk>
+cybai: that’s great, thanks
+
+[23:02:18.0000] <annevk>
+cybai: we need to wait for Bikeshed updates and then rerun
+
+[23:02:46.0000] <cybai>
+annevk: ohh! I also thought about that! thanks for confirmation :D
+
+[23:03:23.0000] <cybai>
+/me will keep an eye on the bikeshed issue
+
+[08:32:37.0000] <dtapuska>
+annevk: The changes seem good on 4664.. Thanks!
+
+[08:35:44.0000] <Domenic>
+annevk: is the "allow sidechannel attacks" check flipped in 4734?
+
+[08:35:55.0000] <Domenic>
+it throws if "allow sidechannel attacks" is true.
+
+[08:36:25.0000] <annevk>
+Domenic: for ImageBitmap it is, as we don't want tainted data to be attacked
+
+[08:37:19.0000] <Domenic>
+Right, urgh, this is confusing... I need to re-page in how tainted bitmaps work, I guess.
+
+[08:37:45.0000] <Domenic>
+(Notably though, it's not clear that they work very well... https://github.com/whatwg/html/issues?utf8=%E2%9C%93&q=is%3Aissue+is%3Aopen+tainted )
+
+[08:38:43.0000] <annevk>
+Domenic: also, I just realized that this might be more complicated
+
+[08:39:12.0000] <annevk>
+Domenic: since we do allow CORP-annotated opaque responses to enter the process
+
+[08:40:02.0000] <annevk>
+This check would affect those too
+
+[08:41:28.0000] <annevk>
+It's still secure and I'm not sure we want something much more complicated for what is a corner case, but also needs some more thought
+
+[08:45:35.0000] <Domenic>
+Hmm we didn't manage to fix https://github.com/whatwg/html/issues/2455 still, darn
+
+[08:49:15.0000] <annevk>
+Filed https://github.com/whatwg/html/issues/4767 on "more thought"
+
+
+2019-07-12
+[00:39:00.0000] <domfarolino>
+annevk: (I already commented about this on GH, sorry for the redundancy, but) I'm curious..do you think deferred iframes should not refer to the document-causing-the-navigation at their eventual-load time?
+
+[00:41:18.0000] <domfarolino>
+Ohh. I think you're saying the way it would be spec'ed sounds like the iframe would reference a snapshot of the document's state
+
+[01:09:06.0000] <annevk>
+domfarolino: I think we should snapshot at navigation time generally, however here that should prolly be at attribute processing time as navigation would happen at a “weird” time
+
+[01:35:37.0000] <annevk>
+Hmm https://github.com/tc39/proposal-intl-displaynames/issues/32#issuecomment-510637281
+
+[02:14:18.0000] <annevk>
+MikeSmith: re https://github.com/whatwg/misc-server/pull/99 what I don't get is why we need a new file
+
+[02:14:43.0000] <annevk>
+MikeSmith: I'm not sure the current setup where the file named redirects contains the Content-Disposition information too, which isn't a redirect afaik
+
+[02:15:11.0000] <annevk>
+MikeSmith: or the 410 gone data
+
+[02:45:01.0000] <domfarolino>
+annevk: I’m wondering what might get us the closest behavior to existing lazy loading libraries. For example, JS-based lazy loading tools I think are likely to “insert” an iframe into the DOM just when it should be loaded, therefore attribute parsing and navigation is kicked off then. I feel like in the PR, deferring _everything_ buys us behavior closest to that, which IMO is intuitive and may match developer
+
+[02:45:01.0000] <domfarolino>
+expectations.  Does that make sense?
+
+[02:46:18.0000] <annevk>
+domfarolino: it's not clear to me why copying state at a non-deterministic point is better
+
+[02:46:48.0000] <annevk>
+domfarolino: it's clear why you might arrive at such a compromise in a polyfill, but this isn't that
+
+[02:47:18.0000] <domfarolino>
+annevk: you’re saying it’s non-deterministic because we’re essentially asynchronously waiting for our navigation conditions to be met?
+
+[02:48:45.0000] <annevk>
+domfarolino: yeah, it depends on something rather unrelated
+
+[02:48:59.0000] <domfarolino>
+> “it’s clear why you might arrive ...
+
+[02:49:01.0000] <domfarolino>
+True
+
+[02:51:08.0000] <domfarolino>
+annevk: Hmm. Would it be possible to wait for those conditions and then queue a task to start the navigation?
+
+[02:52:07.0000] <domfarolino>
+I see your concern though...I just wonder if it would be a gotcha
+
+[02:52:12.0000] <annevk>
+domfarolino: that's your proposed setup already (if it doesn't queue a task that's a bug)
+
+[02:52:35.0000] <domfarolino>
+annevk: it’s not explicit about it I believe. Probably should be
+
+[02:52:56.0000] <domfarolino>
+Could be wrong, Ben wrote those bits and I haven’t looked carefully
+
+[02:52:59.0000] <annevk>
+yes, but it's not a solution to this problem
+
+[02:59:00.0000] <domfarolino>
+I guess I don't entirely see it as a problem, but I definitely see what you're saying
+
+[03:01:19.0000] <annevk>
+domfarolino: you'll end up with weird cases where if the user does something that causes the URL to change scrolling to the thing might break some subtle thing
+
+[03:12:54.0000] <domfarolino>
+annevk: I see how that can happen, I'm just wondering if it won't, because of how developers already think about lazy loaded content (i.e., they may already expect the current state of the document to be the "source of truth" for an iframe lazily inserted)
+
+[04:30:19.0000] <annevk>
+domfarolino: sure, if you manage when to load it yourself, but that's not the case here and there's no callback either
+
+[07:42:02.0000] <JakeA>
+Is it fine to say some internal state is an enum? As in: A {{Foo}} object has an associated <dfn for="Foo">internal thing</dfn> which is an {{EnumOfSorts}}. Then later, the <dfn for="Foo" attribute>thing</dfn> getter must return the context object's [=Foo/internal thing=].
+
+[07:42:24.0000] <JakeA>
+Or must the internal definition duplicate the values of the enum?
+
+[07:44:39.0000] <JakeA>
+For instance: https://fetch.spec.whatwg.org/#concept-request-credentials-mode vs https://fetch.spec.whatwg.org/#dom-requestinit-credentials. Could both of these reference the same enum?
+
+[07:53:22.0000] <annevk>
+JakeA: it should probably be okay
+
+[08:01:49.0000] <JakeA>
+annevk: cheers!
+
+
+2019-07-14
+[21:09:26.0000] <domfarolino>
+annevk: So to be clear, one possible case that draws out what you're saying is if the page uses history.pushState or something
+
+[21:10:10.0000] <domfarolino>
+annevk: to manipulate the document's URL. So the document's URL at parse-time is different than at iframe-load time potentially
+
+[01:30:43.0000] <annevk>
+domfarolino: or the referrer policy
+
+[01:49:32.0000] <domfarolino>
+Right. Ok thanks
+
+
+2019-07-15
+[19:44:41.0000] <domfarolino>
+annevk: This would be less of an issue if *only* cross-origin iframes were deferred, right? (Not sure if it would be a non-issue though, and probably doesn't exactly solve the real issue)
+
+[22:02:02.0000] <annevk>
+domfarolino: no, sandboxing also matters here
+
+[00:55:37.0000] <JakeA>
+Is there a valid way in IDL to inherit/union enums?
+
+[01:39:03.0000] <annevk>
+JakeA: don't think so and I don't think we should add it necessarily, the whole partial thing is already messy (reposting now the netsplit is over)
+
+[01:39:47.0000] <JakeA>
+Fair enough. Yeah I missed that message in the split
+
+[07:52:00.0000] <bkardell>
+Domenic: it seems that we have some comments on the original issue from mozilla and chrome folks that generally unweirding the IDL for math elements would be good, which is really what we're looking for - it seems there is some discussion about where that should happen - move into element, or in the existing (new) HTMLOrSVGElement mixin or a new one... because of that I'm unsure where to take this...
+
+[07:52:33.0000] <bkardell>
+https://github.com/mathml-refresh/mathml/issues/83#issuecomment-509713648 for recent comments
+
+[07:54:09.0000] <bkardell>
+I think the thing is that there's definitely a change to HTML idl, we're just unsure where - we'd suggested just chaning the name of one interface, but I guess there are options -- how to pursue? advice? thoughts?
+
+[07:56:58.0000] <Domenic>
+bkardell: I feel like I've stated this before, but I'll try to be even more clear: I'm not interested in changing the name of HTMLOrSVGElement for a long time. I want to see some serious stability and usage of it in MathML before we make an editorial change in that regard. You should proceed with the current name, and gather interest in implementing *observable, testable changes*, not editorial renamings.
+
+[07:57:52.0000] <Domenic>
+For example, it would be very premature to rename it if, as it sounds like from that thread, people are interested in moving things to Element instead.
+
+[07:58:40.0000] <Domenic>
+As for how to make such observable, testable changes happen, I think the usual process: posting a PR, posting tests, getting implementer agreement, seeing some intent-to-ships...
+
+[08:02:49.0000] <annevk>
+Domenic: "for a long time"?
+
+[08:02:54.0000] <bkardell>
+posting tests seems pretty straightforward as observably it shouldn't matter how you achieve this, but posting a PR of what exactly?
+
+[08:03:24.0000] <annevk>
+bkardell: presumably there's some spec change on the Math side at least to make objects implement this interface?
+
+[08:03:34.0000] <bkardell>
+yes
+
+[08:03:37.0000] <annevk>
+bkardell: or if you move things to Element you'd need changes to both HTML and Math
+
+[08:03:46.0000] <annevk>
+bkardell: sounds like a PR to me
+
+[08:04:04.0000] <annevk>
+bkardell: but in general, assuming https://whatwg.org/working-mode#changes is followed changes can be discussed
+
+[08:05:09.0000] <annevk>
+bkardell: I mean, assuming that's followed I'd expect changes to be incorporated
+
+[12:07:00.0000] <innovati>
+Is there anything for <link> or <style> tags like what the media="" attribute does for the stylesheet contained inside for CSS feature queries, which in CSS use @supports and in JS can be tested with CSS.supports()? Does something like a supports="" attribute exist?
+
+[13:36:30.0000] <smaug____>
+I guess it was left unclear who could perhaps ask for space for the web components meeting @tpac. hober?
+
+[14:25:25.0000] <Krinkle>
+innovati: not that I'm aware of. It's also tricky to do, I imagine, because it wouldn't be backward-compatible.
+
+[14:25:40.0000] <Krinkle>
+the CSS syntax makes so that older agents ignore the whole of @supports { .. }
+
+[14:25:45.0000] <Krinkle>
+but HTML wouldn't behave that way
+
+[14:26:07.0000] <TabAtkins>
+innovati: There's not. It wouldn't make a ton of sense to add such, as @supports is rarely a single test for the whole stylesheet; those rules belong in the sheet itself.
+
+[14:30:21.0000] <innovati>
+people were asking, I think with the hope of not having to load the stylesheet in a browser they they know won't need it. Would the best approach for this to use JS and CSS.supports to conditionally link in only the needed stylesheets instead?
+
+[14:33:36.0000] <hober>
+smaug____: oh, umm, maybe? i'll ask.
+
+[14:35:02.0000] <smaug____>
+hober: rniwa pinged here, and then we realized webcomponents isn't anymore part of Web Apps WG (or Web Plat, can't recall its current name)
+
+[14:50:26.0000] <TabAtkins>
+innovati: Hm. I'm still on the side of "you won't normally wrap a whole stylesheet in a single @supports test", and if you're breaking up your stylesheets small enough that you *would* wrap the whole thing in one, you're probably paying way more in latency than you would be in transfer.
+
+[14:50:53.0000] <TabAtkins>
+innovati: Anyway, <style>@import("foo") all and supports(...);</style> should work.
+
+[14:53:44.0000] <innovati>
+TIL you can use media query list with @import, I've never seen anything like this before. What browsers support this kind of syntax?
+
+[15:02:32.0000] <TabAtkins>
+None, I think. ^_^
+
+[15:02:42.0000] <TabAtkins>
+Well, you can use MQs in all of them, I think.
+
+[15:02:46.0000] <TabAtkins>
+but not support queries.
+
+
+2019-07-16
+[23:23:14.0000] <domfarolino>
+annevk: Need to sanity check something. Imagine the following code `image = new Image(); image.src = "https://example.com" image.referrerPolicy = "no-referrer"`. This should send a request with no referrer header right?
+
+[23:25:02.0000] <domfarolino>
+Currently Firefox does not apply a Referer header, while Chrome has a full Referer. I believe Chrome is broken here?
+
+[23:26:12.0000] <domfarolino>
+I think the flow is like this, per spec: 1) Src is set, and #updating-the-image-data is invoked, queueing a microtask to finish the algo and fetch the image 2) Image's referrer policy is updated 3) The microtask is eventually run, referencing the latest `referrerPolicy` value of the image, fetching the resource
+
+[23:31:15.0000] <domfarolino>
+(eh, pretend my example is not missing a semicolon)
+
+[23:33:54.0000] <annevk>
+domfarolino: yeah seems like a bug in Chrome
+
+[23:51:40.0000] <domfarolino>
+annevk: So I think by that logic, the following would send a full referrer: `image = new Image(); image.src = "https://example.com"; queueMicrotask(() => { image.referrerPolicy = "no-referrer" })`
+
+[00:24:46.0000] <annevk>
+domfarolino: yeah, if the spec matches reality
+
+[00:25:23.0000] <annevk>
+The image spec hasn’t been maintained well unfortunately
+
+[00:25:31.0000] <domfarolino>
+Yeah :(
+
+[00:27:20.0000] <domfarolino>
+The above is correct in Chrome, but only because the first example fails (aka Chrome sends Referer more than it should)
+
+[00:27:43.0000] <domfarolino>
+But fails in Firefox (use Promise.resolve().then() instead of queueMicrotask)
+
+[00:28:39.0000] <domfarolino>
+oddly enoguh, even if you use setTimeout in Firefox (instead of Promise.resolve().then()) it still fails.
+
+[00:28:54.0000] <domfarolino>
+as in, the referrer is not sent when I think it should be. But oh well
+
+[00:32:57.0000] <annevk>
+domfarolino: does Fx support queueMicrotask? Also when does Fx include it?
+
+[00:35:52.0000] <annevk>
+domfarolino: oh, you're using Promise.resolve() because of lack of queueMicrotask support?
+
+[00:36:06.0000] <domfarolino>
+Yes
+
+[00:36:14.0000] <domfarolino>
+to your second question
+
+[00:36:38.0000] <annevk>
+domfarolino: it still failing with setTimeout is rather peculiar then, I guess that means it queues a task instead
+
+[00:36:51.0000] <annevk>
+domfarolino: and timers have higher priority
+
+[00:36:55.0000] <domfarolino>
+yeah I guess it must
+
+[00:37:03.0000] <domfarolino>
+ahh
+
+[00:37:12.0000] <annevk>
+domfarolino: if you queue a timeout from a timeout, does that change it? Or versus postMessage()?
+
+[00:37:47.0000] <annevk>
+domfarolino: to be fair, queue a task for "await a stable state" as I mentioned in the PR would make more sense and is required for when you invoke that from "in parallel"
+
+[00:40:17.0000] <domfarolino>
+annevk: queueing a timeout from a timeout does not change it at least, request is still sent w/o a Referer.
+
+[00:41:37.0000] <domfarolino>
+annevk: Hmm, queue a task just to queue microtask, and finally continue in parallel?
+
+[00:42:01.0000] <annevk>
+domfarolino: it cannot be random which task a microtask ends up in
+
+[00:42:09.0000] <annevk>
+domfarolino: that's bad
+
+[00:43:39.0000] <domfarolino>
+annevk: True. At the same time, queueing a task I don't think is safe from a compat perspective, right I think it breaks existing behavior (my latest comment in response to yours in the PR thread)
+
+[00:44:48.0000] <annevk>
+domfarolino: haven't read that yet, but it seems from these results it's rather unclear what the processing model is
+
+[00:45:39.0000] <annevk>
+/me goes to the PR
+
+[00:46:09.0000] <domfarolino>
+annevk: My assumption is that the only issue with #updating-the-image-data is that it calls "await a stable state", when it should instead be manually queueing a microtask.
+
+[00:46:37.0000] <domfarolino>
+That assumption (and the corresponding spec change) would not change current behavior, it is just sort of semantic
+
+[00:47:13.0000] <annevk>
+domfarolino: it would mean that the algorithm can only ever be invoked from the main thread, which does seem like a good thing to enforce really
+
+[00:47:39.0000] <domfarolino>
+But assuming the intention is to have #updating-the-image-data to queue a microtask to continue the rest of the algorithm (which is basically what it currently does, just by using "await a ..." incorrectly), I do not think we can change that to a task w/o compat fallout
+
+[00:47:41.0000] <annevk>
+domfarolino: maybe we should note that for the ambiguous caller case that it would have to queue a task if it wasn't same thread
+
+[00:48:15.0000] <annevk>
+domfarolino: fair, but it seems that browsers don't queue a microtask? At least Firefox does something else
+
+[00:49:43.0000] <domfarolino>
+annevk: But do we have to cater to ambiguous caller cases, if there are none in the spec? (Aka, no invocations of #updating-the-... actually happen from an in-parallel context)
+
+[00:50:23.0000] <domfarolino>
+annevk: Ok true, browsers are obviously not doing this correctly, hence my two examples above :(
+
+[00:51:39.0000] <annevk>
+domfarolino: doesn't the spec have an ambiguous caller case?
+
+[00:52:02.0000] <annevk>
+"A user agent that obtains images on demand must update the image data of an img element whenever it needs the image data"
+
+[00:52:18.0000] <annevk>
+That's extremely vague
+
+[00:52:37.0000] <domfarolino>
+annevk: lol true I suppose, that's pretty bogus
+
+[01:08:22.0000] <domfarolino>
+annevk: Also, if we were to "wait" for some viewport condition to happen before we create the #concept-request, we're defer the URL parsing relative to the node (...) as late as possible. Are you not OK with that?
+
+[01:08:44.0000] <domfarolino>
+(same with the state of some of the attributes, i.e., crossOrigin, referrerPolicy)
+
+[01:10:10.0000] <annevk>
+domfarolino: yeah, URL parsing has side effects
+
+[01:10:16.0000] <annevk>
+domfarolino: this would be bad for blob URLs for instance
+
+[01:11:28.0000] <domfarolino>
+annevk: sorry, really don't know much about blob URLs. Could you elaborate?
+
+[01:12:24.0000] <annevk>
+domfarolino: the moment you parse a blob URL the returned URL record takes ownership of the underlying Blob object (so if the blob URL were to be revoked, fetching that URL record later would not fail)
+
+[01:12:34.0000] <annevk>
+domfarolino: (implementations have bugs here)
+
+[01:16:05.0000] <domfarolino>
+annevk: Ah, so if we defer parsing, the blob URL could be revoked before parsing, and therefore fetching would fail in that case?
+
+[01:16:37.0000] <annevk>
+domfarolino: yeah
+
+[06:26:52.0000] <dtapuska>
+annevk: On https://github.com/whatwg/html/pull/4617  I wanted to define window agent not pulling in "similar-origin" because I want to be able to define some feature policy that forces separate agent allocations
+
+[06:27:53.0000] <dtapuska>
+So I tried to not have the "similar-origin" name in it.. And I wondered if all the references in the spec should be to the window agent, and however that is allocated is up to the similar-origin window agent algorithm
+
+[06:29:09.0000] <dtapuska>
+In terms of the "has an associated agent" that was my definition of a strong reference. Perhaps I'm not understanding how you mean a strong reference.
+
+[06:32:38.0000] <annevk>
+dtapuska: I don't think we need two types of window agents and I'd rather not rename the one we have for this refactoring
+
+[06:33:25.0000] <annevk>
+dtapuska: furthermore, an Agent Cluster holds a set of Agents, giving one of those Agents a special pointer seems inappropriate even if the window one is somewhat special
+
+[06:33:44.0000] <annevk>
+dtapuska: given how often we need to retrieve it simply retrieving the window type from the set seems fine
+
+[06:34:27.0000] <dtapuska>
+Huh which Agent has a special pointer?
+
+[06:34:43.0000] <annevk>
+dtapuska: your agent cluster has a special pointer to the window agent
+
+[06:35:18.0000] <dtapuska>
+Yes it has a pointer to the "one" window agent
+
+[06:35:22.0000] <annevk>
+dtapuska: and it's also somewhat wrong as there are quite a few agent clusters that don't
+
+[06:35:29.0000] <dtapuska>
+The rest of agents in the agent cluster are all unique
+
+[06:35:59.0000] <dtapuska>
+So how do you get the window agent of the window cluster for the algorithm to return it?
+
+[06:36:21.0000] <annevk>
+I'd write it the way I wrote it in the original issue I think
+
+[06:36:41.0000] <annevk>
+At least, I remember it saying something like "Return the similar-origin window agent of the agent cluster"
+
+[06:36:59.0000] <annevk>
+Which seems accurate enough until TC39 has created more precise language
+
+[06:37:34.0000] <dtapuska>
+Ok so generally leaving it a little undefined
+
+[06:38:10.0000] <dtapuska>
+I think that is fine.. because my feature policy thing was going to early out in obtaining an agent cluster
+
+[06:38:21.0000] <annevk>
+dtapuska: well, there's ever one agent of that type so it's not quite undefined I'd say
+
+[06:38:39.0000] <annevk>
+only ever*
+
+[06:39:17.0000] <annevk>
+And yeah, any kind of isolation would be at the agent cluster level
+
+[06:39:45.0000] <dtapuska>
+What about the definition of "similar-origin window agent" what do you think that would be like?
+
+[06:40:45.0000] <annevk>
+dtapuska: I guess I haven't quite thought through yet whether an Agent Cluster holding strong references makes sense, but I guess it does given how termination is supposed to work
+
+[06:41:40.0000] <annevk>
+dtapuska: I think ideally it doesn't hold realms and instead whenever we create a realm we add a pointer to the agent, as per the TC39 discussion
+
+[06:42:25.0000] <annevk>
+dtapuska: if we don't do that we'd need to start out with the empty set of realms and add the realms as they are created (and remove them at unclear times?)
+
+[06:42:31.0000] <dtapuska>
+Right.. so it is just an Agent that can block is false. That really is it
+
+[06:43:24.0000] <annevk>
+Yeah, I don't think we have an opinion on the other fields
+
+[06:44:54.0000] <annevk>
+(Well, and we enforce the set of realms to be Window objects with certain origins, but that's not really tied to creation.)
+
+[06:45:15.0000] <dtapuska>
+Can we write some non-normative text around it, maybe a note indicating that the Realms that use this agent should all have the same origin and should be allocated via the obtain-similar-origin-window-agent algorithm?
+
+[06:45:44.0000] <dtapuska>
+s/same/similar
+
+[06:46:03.0000] <annevk>
+dtapuska: as a statement of fact without "should" that'd be fine
+
+[06:46:40.0000] <annevk>
+dtapuska: it's enforced elsewhere (primarily agent cluster selection I guess)
+
+[06:47:45.0000] <dtapuska>
+Ok; so I'll use "will" instead
+
+[06:49:05.0000] <annevk>
+dtapuska: "all have ... and are allocated via ..." would also work and is slightly nicer
+
+[07:10:34.0000] <dtapuska>
+annevk: One other thing related to "shared agent clusters".. I named it this way because when I allocate agent clusters based on a feature policy they won't end up in the "agent cluster map".
+
+[07:10:52.0000] <dtapuska>
+The agent cluster map seemed to indicate with the name that it would have all agent clusters
+
+[07:10:56.0000] <dtapuska>
+but perhaps that is just me
+
+[07:14:57.0000] <annevk>
+dtapuska: so where do you store them instead?
+
+[07:15:40.0000] <annevk>
+dtapuska: the key abstraction was meant to allow for storing all things there so they're also easy to find during teardown
+
+[07:16:14.0000] <dtapuska>
+They aren't stored for those documents that have the policy, they can't share data with anyone else.. so the strong reference from the global to the agent is the main thing that is holding onto the agent
+
+[07:16:16.0000] <annevk>
+dtapuska: at least all things that have similar-origin window agents
+
+[07:19:06.0000] <annevk>
+dtapuska: we might still have to let them go through the browsing context group though in some way so when they are created they get the appropriate COOP/COEP state
+
+[07:20:28.0000] <annevk>
+dtapuska: but maybe it's correct that nothing but the document needs to keep a reference (we'll have to be careful about defining the lookup for dedicated worker agent creation)
+
+[07:20:35.0000] <Domenic>
+I'm not as deep into this as you two but it seems to me in an ideal world there should be a single "reference root", probably the UA, which then keeps things alive. With a general ownership structure of UA -> agent cluster -> agent -> realm <-> global. Not sure where BC groups/BCs fit in there though.
+
+[07:21:12.0000] <Domenic>
+To be clear though I think having a perfect reference graph is pretty far down on the list of important things to formalize
+
+[07:21:30.0000] <annevk>
+domfarolino: BCG holds "window" agent clusters; UA holds shared/service worker agent clusters and BCGs
+
+[07:21:35.0000] <annevk>
+Domenic: ^^
+
+[07:22:32.0000] <annevk>
+Domenic: although there was a suggestion that a UA holds session history which holds TLBCs which are part of a BCG, which might be better once we get to session history
+
+[07:23:44.0000] <annevk>
+And yeah, it's not entirely clear to me how in dtapuska's model we'd tear down the agent cluster easily when the tab is closed, it seems we'd have to go hunt for it
+
+[07:24:22.0000] <annevk>
+So I do think it's somewhat important to think this through, with the exception of session history although we should keep that in the back of our minds as well
+
+[07:24:33.0000] <dtapuska>
+So can we have a list of all agent clusters, and a separate map of shared agent clusters?
+
+[07:26:39.0000] <dtapuska>
+I don't think we need that immediately in this PR, but leads to the "shared agent cluster" naming over "agent cluster map"
+
+[07:27:53.0000] <annevk>
+dtapuska: what did you think about my earlier idea? That we only have a map and the document with a feature policy ends up with a special agent cluster key
+
+[07:32:21.0000] <dtapuska>
+annevk: Ya I thought about that too. But the question is what keying material you'd use that would be consistent for the document. You'd need to allocate some type of 'opaque origin' for agent cluster lookup that then the document could maintain I guess
+
+[07:33:32.0000] <annevk>
+dtapuska: key can be anything, so UUID or opaque origin or whatever would be fine
+
+[07:33:46.0000] <annevk>
+dtapuska: we could even use the Document object
+
+[07:34:06.0000] <dtapuska>
+No you can't use the Document object... the Agent is allocated *before* the document is created
+
+[07:34:47.0000] <annevk>
+dtapuska: oops, yeah, we'd have to generate a unique identifier
+
+[07:35:39.0000] <dtapuska>
+But ya a "agent cluster origin"  could be defined as origin and if policy is set it becomes a opaque origin, and that is passed to the obtain similar-origin window agent algorithm.
+
+[07:36:51.0000] <annevk>
+To be clear, "agent cluster key is an origin or a scheme-and-site" is meant to be extensible if we have a need, it doesn't have to fit into this mold necessarily
+
+[07:37:48.0000] <annevk>
+But opaque origin as key even though the agent does not have an opaque origin would certainly work, but we might wanna carefully explain what's going on there if we go down that route
+
+[07:37:52.0000] <dtapuska>
+Yup ok.. I don't disagree.. so I can change it back to "agent cluster map" then
+
+[11:59:16.0000] <annevk>
+dtapuska: maybe there should be some kind of lookup on a TLBC that falls back to a BCG so you can more eagerly collect when a TLBC is closed, but not observable so maybe not worth it, although maybe it is until we have remote WindowProxy; yeah it is observable that way…
+
+[14:16:29.0000] <lgrahl>
+o/ There was a cool web API overview page with links to all the specs but I forgot the URL. Maybe someone of you knows what I mean?
+
+[14:17:10.0000] <lgrahl>
+Found it: https://platform.html5.org/
+
+
+2019-07-17
+[20:21:36.0000] <annevk>
+dtapuska: maybe the BCG’s map should be weak, that would solve things
+
+[04:22:25.0000] <domfarolino>
+annevk: btw does this sound OK? https://github.com/whatwg/html/pull/3752#discussion_r303720464
+
+[04:24:23.0000] <annevk>
+domfarolino: more or less, you also have to account for it not delaying the load event I suspect
+
+[04:24:31.0000] <annevk>
+domfarolino: the current text doesn't do that quite as clearly either
+
+[04:24:38.0000] <domfarolino>
+agreed
+
+[04:24:48.0000] <annevk>
+domfarolino: (that would also make it observable whether you do it same-origin/cross-origin btw)
+
+[04:26:57.0000] <domfarolino>
+annevk: Hmm, well I'm wondering since the lazy load attributes are "strong hints" right, does that mean the UA could choose to defer the rest of the iframe navigation whenever it wants?
+
+[04:27:55.0000] <annevk>
+domfarolino: what is a strong hint? I think blocking or not blocking the load event better be normative
+
+[04:31:00.0000] <domfarolino>
+annevk: Sorry, I was referring to https://whatpr.org/html/3752/edc1e95...ba7593f/urls-and-fetching.html#lazy-loading-attributes "The attribute provides a hint...". I agree that deferred requests not blocking load event should be more rigorous. But it seems like whether a request is deferred or not ultimately depends on what the UA does with the hint
+
+[04:31:10.0000] <domfarolino>
+Maybe it shouldn't be a "hint", and should be more firm?
+
+[04:33:34.0000] <annevk>
+domfarolino: yeah, I guess we should reword that, it's definitely fine to fetch immediately, but certain aspects better be implemented consistently across user agents
+
+[04:37:36.0000] <domfarolino>
+annevk: yeah I think auto should be the only hint. The others should be “non-negotiable” perhaps
+
+[04:38:49.0000] <annevk>
+domfarolino: even with auto it should still be clear whether you delay the load event I think
+
+[04:39:08.0000] <annevk>
+domfarolino: and since that's the default it means that in that case you do delay
+
+[04:41:51.0000] <annevk>
+domfarolino: I guess I got that wrong as the default is different from omitting the attribute entirely
+
+[04:54:10.0000] <domfarolino>
+annevk: well I think with auto it’s not clear whether the UA will actually defer or not. But as long as we make clear that if the image does defer, load is not blocked. Else, load is, since the request wasn’t deferred.
+
+[04:54:33.0000] <domfarolino>
+annevk: Also it was my understanding that the missing value default was auto, is that wrong?
+
+[04:54:41.0000] <domfarolino>
+(On a train now can’t check)
+
+[04:54:58.0000] <domfarolino>
+s/image/request
+
+[04:55:39.0000] <annevk>
+domfarolino: oh right, in which case I'm right
+
+[04:56:17.0000] <annevk>
+domfarolino: with auto the behavior will have to be as if the attribute was not specified, which definitely delays the load event today
+
+[04:57:48.0000] <domfarolino>
+annevk: I think auto was introduced to let UAs determine whether imgs/iframes without the developer specifying the attribute. Is this bad?
+
+[04:58:19.0000] <domfarolino>
+If auto should just == eager, we should make it a binary attribute
+
+[04:58:47.0000] <annevk>
+domfarolino: if <iframe loading=auto> === <iframe> we cannot really change the status quo, right?
+
+[04:59:12.0000] <annevk>
+domfarolino: perhaps you didn't mean to have a missing value default?
+
+[04:59:53.0000] <annevk>
+I wonder if we should rename that to "missing attribute default" for clarity
+
+[05:00:22.0000] <annevk>
+"missing value" might mean empty string to some people
+
+[05:01:32.0000] <domfarolino>
+annevk: I think Ben’s goal with including “auto” initially was to give room in the future to change the status quo, i.e., possibly defer <iframe> (no attributes)
+
+[05:01:57.0000] <domfarolino>
+I’ll double check with him though to be sure. But yeah renaming that might be nice
+
+[05:02:50.0000] <domfarolino>
+But it’s equally possible Ben thought missing value default only applied to <iframe loading> (no value)
+
+[05:02:54.0000] <domfarolino>
+I will ask
+
+[05:08:38.0000] <domfarolino>
+I guess this is the trouble with changing spec authors
+
+[05:12:28.0000] <annevk>
+domfarolino: well, and not having clearly publicly logged discussions for all the design aspects to reflect upon
+
+[05:12:53.0000] <domfarolino>
+Heh that too
+
+[05:13:22.0000] <annevk>
+If that was done and there was some design involvement from multiple parties, you wouldn't really run into this
+
+[05:13:46.0000] <annevk>
+But now we're often hitting the design questions at the time of an HTML PR...
+
+[05:13:53.0000] <annevk>
+Which isn't ideal
+
+[05:46:38.0000] <domfarolino>
+annevk: Yeah, that makes sense
+
+[05:56:41.0000] <annevk>
+dtapuska: Domenic: https://github.com/whatwg/html/issues/4782
+
+[06:02:57.0000] <dtapuska>
+annevk: Yup I saw that.. I definitely agree it is a weak map (at least that is definitely how we implemented it in Chrome).
+
+[06:06:50.0000] <dtapuska>
+annevk: https://github.com/whatwg/html/pull/4772    this is mainly editorial...  the current inheritance across browsing contexts occurs even in the current published version.. It sounds like the double "remote" call is an implementation detail... ie; in Chrome we have an object representing the Remote Browsing Context so that doesn't really get cloned but the remote frame tree node has a copy of the feature policy so it
+
+[06:06:50.0000] <dtapuska>
+isn't a cross process messaging.. but that is an impl detail
+
+[06:14:10.0000] <annevk>
+dtapuska: I guess currently policies can't be changed, but when they can (as with CSP or Referrer Policy), it's not an impl detail
+
+[06:14:35.0000] <annevk>
+dtapuska: and there's folks continuously pushing for <meta>
+
+[06:16:56.0000] <dtapuska>
+annevk: Right but I'm just trying to have the spec better match Chrome's implementation at this point and I believe it is a reasonable editorial change for now. I don't want to get into the case where feature policy should or shouldn't be in the HTML spec
+
+[06:17:58.0000] <annevk>
+dtapuska: I thought you wanted shared understanding on how to model things?
+
+[06:19:06.0000] <dtapuska>
+annevk: I was going after that things should be created before the document is created.. And ya it might move higher before the browsing context is created in the future..
+
+[06:20:39.0000] <dtapuska>
+annevk: ie; determination of sandbox flags, creation of agent, determination of origin.. All the changes I'm making are before the document is created... Fundamentally this is probably done before the browser context is created.. probably when COOP and COEP are parsed..  In Chrome that would be in the browser process before determining which process the browserContext is going to get created in.
+
+[06:22:58.0000] <annevk>
+Sure, the specific concern I have is around navigateChild(); changeStateOfParent(); queryStateOfNavigatedChild()
+
+[06:23:23.0000] <annevk>
+I'd like changeStateOfParent() to never be able to affect the results
+
+[06:28:39.0000] <dtapuska>
+annevk: wrt  https://github.com/whatwg/html/pull/4617#discussion_r304388723  Do you expect two frames that aren't same-origin domain to be able to pass shared array buffers via postMessage?
+
+[06:29:05.0000] <annevk>
+dtapuska: if they are same-site, yes
+
+[06:29:23.0000] <annevk>
+dtapuska: or same agent-cluster, rather
+
+[06:30:10.0000] <annevk>
+dtapuska: a.example.com and b.example.com get shared memory without document.domain (it'd be pretty bad if document.domain changed what agent cluster you were part of)
+
+[06:30:35.0000] <annevk>
+dtapuska: assuming they're in the same BCG
+
+[06:37:17.0000] <dtapuska>
+annevk: Right so this comment is wrong.. Chrome currently doesn't do that for MessagePorts so I got confused
+
+[06:39:21.0000] <annevk>
+dtapuska: I'm not sure what you mean
+
+[06:39:34.0000] <annevk>
+dtapuska: what I'm saying is correct though, including in Chrome, see html/infrastructure/safe-passing-of-structured-data/shared-array-buffers/window-similar-but-cross-origin-success.sub.html for instance on WPT
+
+[06:40:13.0000] <annevk>
+dtapuska: I guess you're saying we need more MessageChannel coverage
+
+[06:41:04.0000] <dtapuska>
+annevk: Yes I wrote a WPT test for this https://chromium.googlesource.com/chromium/src/+/96f9c17b2cc57bc443580c8b4c6845424e8555b1
+
+[06:41:34.0000] <annevk>
+dtapuska: cool
+
+[06:41:47.0000] <annevk>
+dtapuska: the real complicated case with MessageChannel might also be worth testing
+
+[06:41:59.0000] <annevk>
+dtapuska: you have agent clusters A and B
+
+[06:42:07.0000] <annevk>
+dtapuska: you message a MessagePort to B
+
+[06:42:26.0000] <annevk>
+dtapuska: you message a SAB to the port still on A, but you don't call start() yet
+
+[06:42:36.0000] <annevk>
+dtapuska: you then message the MessagePort in B back to A
+
+[06:42:40.0000] <annevk>
+dtapuska: you call start
+
+[06:42:43.0000] <annevk>
+dtapuska: it should succeed
+
+[06:43:21.0000] <annevk>
+dtapuska: this is tracked at https://github.com/whatwg/html/issues/4209
+
+[06:44:11.0000] <dtapuska>
+annevk: Ya that is an interesting case I agree..
+
+[08:33:49.0000] <annevk>
+Domenic: it seems your questions are primarily about the non-session bits, right?
+
+[08:34:04.0000] <Domenic>
+annevk: I don't really understand enough to know whether that's true
+
+[08:34:18.0000] <annevk>
+Domenic: so we should make sure they're addressed somehow by dtapuska's PR
+
+[08:36:25.0000] <annevk>
+Domenic: I can sketch a simple collection case now I suppose; say in TLBC we navigate from "scheme-and-site" 1 to 2. This ends up creating two entries in TLBC's BCG's agent cluster map. The user agent can collect 1 once the navigation is complete, assuming they don't intend on doing bfcache or some such to it.
+
+[08:37:33.0000] <annevk>
+Domenic: similar if there was a nested browsing context created in 2 that ends up creating 3 and is then removed. 3 can be collected assuming no references to any of its objects are hold (objects have strong references to globals which hold strong references to agents which hold strong references to agent clusters).
+
+[08:40:35.0000] <annevk>
+(Hmm, technically nobody can hold references to objects from 3 but 3, but as I mentioned we currently assume 3's WindowProxy and Location objects can be accessed from elsewhere as we don't have explicit "remote" variants, and even if we did we might wanna pretend those remote variants have a strong cross-process pointer for specification-simplicity.)
+
+[12:04:37.0000] <bkardell>
+probably a silly question, but is there any prop anywhere or a getter that I don't know of that would give me a list of all of the browsers known (not custom) elements that wont parse as HTMLUnknownElement?
+
+[12:28:13.0000] <Domenic>
+bkardell: there is not. I think there is a feature request like this, either on whatwg/html or w3c/webcomponents.
+
+[13:04:47.0000] <innovati>
+bkardell I haven't discovered this yet ;) the closest I found was a JSON file in browser source code that listed them out, or writing a function that uses document.createElement() to check the constructor to see if that browser sees it as HTMLUnkownElement https://github.com/chromium/chromium/blob/6efa1184771ace08f3e2162b0255c93526d1750d/third_party/blink/renderer/core/html/html_tag_names.json5
+
+[13:06:49.0000] <annevk>
+TabAtkins: FWIW, the main problem is lack of agreement around creation; at some point constructors were gonna be it, but they haven’t quite made it. And then we have all these variants on setting attributes/properties/listeners at the same time. I guess most things beat the status quo, but would still be nice to get it right 😊
+
+[13:08:04.0000] <TabAtkins>
+Yup. There's solutions around all of this, of course, we just need to settle on one.
+
+[13:08:36.0000] <TabAtkins>
+(My element-creation helper, for example, interprets _-prefixed keys in the attributes bag as being properties, and _onFoo keys as being event listeners.)
+
+[13:08:47.0000] <TabAtkins>
+(That's probably a touch too hacky for the platform.)
+
+[13:09:22.0000] <TabAtkins>
+Tho for real, "foo" being an attribute, ".foo" being a property, and "on(foo)" being a listener, might legit work.
+
+[13:11:09.0000] <annevk>
+A think Yehuda proposed is something similar to the HTML parser. That you create with a context element and based on that it picks the namespace.
+
+[13:12:13.0000] <annevk>
+It could work, but might not be fast…
+
+[13:15:19.0000] <bkardell>
+Yeah, I mean - i really seem to bump into this a lot and I have a list of all of the elements that I use, but it always feels very icky and silly -  I guess I was just hoping the platform advanced something while I was looking the other way or something and I could stop that since I know there's been a lot of asks over the years.. :)  oh well, worth a shot
+
+[13:15:53.0000] <bkardell>
+good old list of elements it is :)
+
+[13:17:48.0000] <TabAtkins>
+annevk: I don't get why we need to be magical about this. There's like four collisions, and only *one* of them is something you'd generally create with a DOM API (<a>). Just list out all the elements, have the collisions default to HTML, and let you use a name prefix to disambiguate.
+
+[13:32:05.0000] <annevk>
+It depends a bit on what kind of code you want to simplify. I largely agree though and DOMChangeList has that API.
+
+[13:33:39.0000] <annevk>
+bkardell: it takes people to advance things and DOM/HTML isn’t invested in much at the core
+
+[13:36:24.0000] <bkardell>
+annvk I realize... I'm not sure if you read what I wrote there as a complaint or indictment or something, but if so it wasn't intended in any way... no harm in checking if there was a thing I wasn't aware of - I'm not sure this is 'common' I just seem to bump into it myself a lot because of the weird stuff I wind up into :)
+
+[13:37:32.0000] <annevk>
+All good, just clarifying why not everything is moving
+
+[13:39:01.0000] <bkardell>
+like, even myself, if I have to choose where to invest my finite time, it's probably not this... Trying to figure out how I efficiently go about getting folks to agree to particularly which shape of which idl should go where to achieve the goal with the same observable impacts seems more important/worth my own time :)
+
+[13:40:16.0000] <innovati>
+When I was looking into if I could get a list of supported tags for doing HTML templating, I had a peek at how other frameworks/libs do it, and almost all that had a list of known elements like this were outdated/inaccurate :/ also there was a lot of confusion around which elements are void elements or not
+
+[13:40:18.0000] <bkardell>
+but sometimes you get lucky and there's just an answer you missed or somethign
+
+[13:40:54.0000] <bkardell>
+I really didn't intend to open a can of worms :)
+
+
+2019-07-18
+[18:52:54.0000] <domfarolino>
+annevk: Chrome is interested in deferring images/iframes only for http(s) schemes (https://fetch.spec.whatwg.org/#http-scheme), which I think is reasonable. Would you agree?
+
+[22:31:09.0000] <MikeSmith>
+JakeA: https://stackoverflow.com/questions/57080393/create-a-response-in-cache-with-response-type-cors
+
+[23:24:12.0000] <annevk>
+domfarolino: it does not really address anything afaict
+
+[23:28:07.0000] <domfarolino>
+annevk: We are happy deferring after the navigation steps are synchronously entered (unlike how the current spec proposal is written now), but when we defer, I’m thinking we can do so only for those schemes
+
+[23:29:45.0000] <annevk>
+domfarolino: did you consider folks might still be able to redirect to some schemes? Might only be data URLs though
+
+[23:36:36.0000] <domfarolino>
+annevk: Is that an issue? I think the options are 1) Restricting loading=lazy to http/https 2) Expanding loading=lazy to http/https + more schemes. Either way, http/https schemes can be deferred regardless of what scheme a server would redirect to right?
+
+[00:20:20.0000] <annevk>
+domfarolino: sure
+
+[05:40:27.0000] <JakeA>
+MikeSmith: ta! There isn't enough detail to answer the question, so I've asked a follow-up
+
+[07:26:27.0000] <dtapuska>
+annevk: you good to merge https://github.com/whatwg/html/pull/4772 given there is now an open HTML issue tracking the feature policy issue?
+
+[07:35:49.0000] <MikeSmith>
+JakeA: thanks!
+
+[07:56:31.0000] <nox>
+https://github.com/servo/rust-url/issues/290#issuecomment-512851029 I feel like I've looked at things I shouldn't have looked at.
+
+[07:57:02.0000] <annevk>
+nox: you're responsible now, that's how that works
+
+[07:57:29.0000] <nox>
+Yep.
+
+[07:58:03.0000] <annevk>
+nox: SimonSapin successfully passed the baguette, though spilled the wine
+
+[07:58:58.0000] <nox>
+annevk: I'm happy about the cosmos making me look at exactly the right place though,
+
+[07:59:14.0000] <nox>
+annevk: I saw https://github.com/servo/rust-url/pull/491/files#diff-5987c3d692d1e8534581c18940213997L156 today earlier, and when I ran the updated tests the first one I saw was about #%20e
+
+[09:58:32.0000] <SimonSapin>
+nox: congrats on making Abyss Domain Expert
+
+[09:58:50.0000] <nox>
+SimonSapin: GO BACK TO PTO :P
+
+[09:59:25.0000] <nox>
+SimonSapin: Also I am also the Servo document.write expert I knew the feeling already. :D
+
+[10:14:52.0000] <SimonSapin>
+nox: https://github.com/servo/rust-url/commit/7f1bd6ce1c2fde599a757302a843a60e714c5f72#diff-2c09afcdc3c420ab0678ba9b5e83959cR1316
+
+[10:15:37.0000] <nox>
+SimonSapin: Cool!
+
+
+2019-07-19
+[02:02:37.0000] <nox>
+annevk: In the "Otherwise" part of https://url.spec.whatwg.org/#relative-state we do "If url is special and c is U+005C (\), validation error, set state to relative slash state",
+
+[02:02:54.0000] <nox>
+but in https://url.spec.whatwg.org/#relative-slash-state we do the exact same validation error again.
+
+[02:04:16.0000] <annevk>
+nox: one error for each \
+
+[02:04:34.0000] <annevk>
+nox: \\: two errors, \/: one error
+
+[02:05:01.0000] <nox>
+annevk: … I forgot we increase the pointer every time we change states.
+
+[02:06:05.0000] <annevk>
+nox: it's really about the loop, since you might not change state and it'll get increased
+
+[02:06:13.0000] <nox>
+Yeah
+
+[03:33:43.0000] <smaug____>
+unhandledrejection is weird
+
+[03:33:46.0000] <smaug____>
+and error prone
+
+[03:35:04.0000] <smaug____>
+if a web app has handler for that, and we make some new or even old API to return promises and reject, that may block the site to work if the site expects zero unhandledrejection events in order to work
+
+[03:36:22.0000] <smaug____>
+I could imagine mediaelement.play() to be used without need to deal with the promise
+
+[06:56:24.0000] <devsnek>
+I still don't get why someone trying to prevent XSS would use trusted types over createElement and such
+
+[06:57:21.0000] <devsnek>
+it reminds me of PHP people trying to sanitize queries before query substitution was added
+
+[15:23:15.0000] <Krinkle>
+*coughs* ahem, some people still do that in PHP, *cough*
+
+[16:01:18.0000] <TabAtkins>
+devsnek: The reason why is that createElement is terrible ergonomically.
+
+[16:02:04.0000] <TabAtkins>
+If you make a nice helper it suddenly becomes, frankly, *easier* to do things correctly and avoid all the escaping problems, but with the platform as written it's just so painful.
+
+[16:07:05.0000] <Domenic>
+I still think we should do https://web.archive.org/web/20160809024526/http://wiki.ecmascript.org/doku.php?id=harmony:quasis#secure_content_generation
+
+[16:08:58.0000] <Domenic>
+https://github.com/straker/html-tagged-template and https://github.com/whatwg/dom/issues/150 for more Friday night reading.
+
+[16:39:09.0000] <devsnek>
+TabAtkins: that's why we've got react and stuff though
+
+[16:39:47.0000] <devsnek>
+and I'd think security wins over ergonomics when discussing security features
+
+[16:47:58.0000] <devsnek>
+i've seen a few libs on npm for what domenic linked, the issue is that its hard to track strings of html around a large codebase compared to something like jsx where its an actual separate syntax from the surrounding script
+
+
+2019-07-21
+[20:45:04.0000] <domfarolino>
+annevk: Would appreciate your opinion on when beforeunload event should be fired for lazy iframes (context: http://crbug.com/985172#c3)
+
+[05:16:08.0000] <benjamingr_>
+Is there no way to compress a gzip file upload with transport encoding?
+
+[05:16:20.0000] <benjamingr_>
+(if it's not implemented anywhere - is it specced?)
+
+
+2019-07-22
+[04:10:08.0000] <nox>
+https://twitter.com/nokusu/status/1153260306212282369 Might interest people here or at least make them chuckle.
+
+
+2019-07-25
+[15:01:36.0000] <Domenic>
+annevk: ping on https://github.com/whatwg/html/pull/4759, spec is kind of in a bad halfway state at this point
+
+
+2019-07-26
+[00:04:58.0000] <annevk>
+I'm out until August 5
+
+[07:31:27.0000] <dtapuska>
+domenic: I know mkwst is out but would love some comments on https://github.com/whatwg/html/pull/4787
+
+
+2019-07-27
+[18:29:56.0000] <SamB>
+... strange ... https://dom.spec.whatwg.org/service-worker.js is seeing fetch requests for 'chrome-extension://' URLs.
+
+[20:11:40.0000] <SamB>
+and double WTH, Chrome does DNS resolution while *parsing* chrome-extension:// URLs ???
+
+[20:12:03.0000] <SamB>
+okay maybe not
+
+[20:12:47.0000] <SamB>
+chrome-extension://404/ gets treated oddly
+
+[16:28:32.0000] <MikeSmith>
+annevk: is the following actually correct?
+
+[16:28:36.0000] <MikeSmith>
+https://html.spec.whatwg.org/multipage/origin.html#concept-origin-tuple
+
+[16:28:52.0000] <MikeSmith>
+A tuple origin
+
+[16:28:53.0000] <MikeSmith>
+A tuple consists of:
+
+[16:28:53.0000] <MikeSmith>
+A scheme (a scheme).
+
+[16:28:53.0000] <MikeSmith>
+A host (a host).
+
+[16:28:53.0000] <MikeSmith>
+A port (a port).
+
+[16:28:55.0000] <MikeSmith>
+A domain (null or a domain). Null unless stated otherwise.
+
+[16:29:04.0000] <MikeSmith>
+..
+
+[16:29:18.0000] <MikeSmith>
+a tuple consisting of four parts?
+
+[16:30:18.0000] <MikeSmith>
+why both “A host” and “A domain”?
+
+[16:31:05.0000] <TimothyGu>
+The link for "tuple" should go to https://infra.spec.whatwg.org/#tuple, but yes that's correct
+
+[16:31:16.0000] <TimothyGu>
+The reason why we have both is `document.domain` I believe
+
+[16:31:53.0000] <TimothyGu>
+See https://html.spec.whatwg.org/multipage/origin.html#relaxing-the-same-origin-restriction
+
+[16:32:07.0000] <TimothyGu>
+MikeSmith: ^^
+
+[16:32:31.0000] <MikeSmith>
+TimothyGu: yup, much thanks — I just now followed the backrefs and it’s more clear
+
+
+2019-07-28
+[23:25:34.0000] <MikeSmith>
+I wonder if this distinction about domain as part of origin is relevant to developers
+
+[23:28:23.0000] <MikeSmith>
+I am thinking in particular about what the MDN docs should say
+
+[23:29:41.0000] <MikeSmith>
+in particular, https://developer.mozilla.org/en-US/docs/Web/Security/Same-origin_policy#Definition_of_an_origin
+
+[23:30:10.0000] <MikeSmith>
+> Two URLs have the same origin if the protocol, port (if specified), and host are the same for both. You may see this referenced as the "scheme/host/port tuple", or just "tuple". (A "tuple" is a set of items that together comprise a whole — a generic form for double/triple/quadruple/quintuple/etc.)
+

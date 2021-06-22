@@ -1,0 +1,3467 @@
+2020-02-01
+[06:30:06.0000] <jmdyck>
+rkirsling: re #1860, I still don't get the distinction (but I'm bringing it here because it doesn't seem that relevant to the pr any more). I understand the Date constructor being a "userland entity", something that users can access and invoke. But I don't understand what it would mean for the term to denote a distinct "spec entity".
+
+[06:39:29.0000] <jmdyck>
+Are you talking about the distinction between the intrinsic object %Date% and the current value of global `Date` property? I think the spec always means the former when it says "the Date constructor" (with or without backticks).
+
+
+2020-02-02
+[12:08:46.0000] <jmdyck>
+ljharb: so you'd like the first two commits of 1651 in a separate PR?
+
+[12:16:21.0000] <ljharb>
+i don’t think it’s me
+
+[12:16:37.0000] <ljharb>
+but certainly making a separate PR with non controversial parts is good
+
+[15:16:29.0000] <Cretezy>
+Hey everyone. I'd love a bit of feedback on this proposal: https://github.com/Cretezy/proposal-named-parameters
+
+[15:19:53.0000] <devsnek>
+Cretezy: what's the benefit over just passing objects
+
+[15:21:48.0000] <Cretezy>
+I think the main benefit is cleaner syntax for passing params inside an object to functions
+
+[15:22:48.0000] <Cretezy>
+Under the 'Inspiration' section there's prior work which has been implemented in other languages which benefited those languages
+
+[15:23:34.0000] <devsnek>
+in js you can do `function x({ y, z }) {} x({ y: ..., z:... })`
+
+[15:23:57.0000] <devsnek>
+vs `function x({{ y, z }}) {} x(y: ..., z: ...)`
+
+[15:24:12.0000] <devsnek>
+why is this better than the other one
+
+[15:24:31.0000] <devsnek>
+just the lack of braces in the call?
+
+[15:25:32.0000] <Cretezy>
+In practice yes. `x(y: 1, z: 2)` is a bit cleaner (at least IMO)
+
+[15:25:45.0000] <devsnek>
+i see
+
+[15:26:14.0000] <devsnek>
+personally i don't think that would be worth splitting the ecosystem between two different calling conventions
+
+[15:27:17.0000] <Cretezy>
+That's a fair point. To counter, there's a lot of ways new proposal has split usages of some features (for example destructing would be one to come to mind)
+
+[15:27:44.0000] <devsnek>
+how has destructuring split things
+
+[15:28:46.0000] <Cretezy>
+`const a = x(); a.y` vs `const { y } = x(); y`
+
+[15:28:59.0000] <devsnek>
+that's not a split
+
+[15:29:22.0000] <devsnek>
+what i mean is, dealing with whether you do `x({ a: 1 })` or `x(a: 1)`
+
+[15:29:48.0000] <devsnek>
+as the consumer of a function
+
+[15:30:02.0000] <Cretezy>
+Ah I see what you mean. If they equivalent, is there a different?
+
+[15:30:18.0000] <devsnek>
+are they equivalent?
+
+[15:30:37.0000] <devsnek>
+your proposal says the function has to be defined in a certain way
+
+[15:31:04.0000] <Cretezy>
+I might have to rewrite some parts of it. It's technically 2 proposals in 1
+
+[15:31:30.0000] <Cretezy>
+`{{ ... }}` = `{ ... } = {}`, and `x(y: z)` = `x({y: z})`
+
+[15:31:52.0000] <Cretezy>
+I'll rewrite it to make it less confusion, my bad for that
+
+[15:31:56.0000] <devsnek>
+i see
+
+[15:32:07.0000] <Cretezy>
+I batched them together since they would be commonly used together
+
+
+2020-02-03
+[23:12:28.0000] <Bakkot>
+shu have you been following https://github.com/WebAssembly/threads/issues/144 ?
+
+[23:13:38.0000] <Bakkot>
+(I ask because one of the proposals is to change how Atomics.wait works slightly)
+
+[06:43:47.0000] <annevk>
+Why does MakeBasicObject not take a list of internal methods as well?
+
+[06:47:33.0000] <jmdyck>
+which ones?
+
+[06:48:12.0000] <annevk>
+jmdyck: depends on the caller
+
+[06:48:44.0000] <jmdyck>
+so the non-ordinary ones, you mean?
+
+[06:49:00.0000] <annevk>
+jmdyck: yeah, defaulting the others makes sense
+
+[06:50:05.0000] <jmdyck>
+so when you say a list of internal methods, you mean not just the names (as it does with the internal slots), but the actual definition to be used for that internal method?
+
+[06:53:35.0000] <jmdyck>
+(*actual definitions to be used for those internal methods)
+
+[07:20:49.0000] <jmdyck>
+(^annevk)
+
+[07:21:28.0000] <annevk>
+jmdyck: hmm yeah, I guess it already has the slots, just not the implementations
+
+[07:22:22.0000] <annevk>
+jmdyck: yeah, I guess passing in the implementations would make sense
+
+[07:23:24.0000] <annevk>
+The current setup feels a little weird as it's still about a set of conventions to follow rather than an approach from first principles
+
+[07:24:24.0000] <jmdyck>
+and pr 1460 doesn't resolve that weirdness?
+
+[07:25:02.0000] <jmdyck>
+no, sorry, 1453
+
+[07:25:21.0000] <jmdyck>
+no, dang it.
+
+[07:25:59.0000] <annevk>
+jmdyck: it still seems like it allows weird things like calling Ordinary to make something and then mutate internal methods
+
+[07:26:00.0000] <jmdyck>
+I was right the first time, 1460. Ah, it's been merged.
+
+[07:26:04.0000] <annevk>
+jmdyck: you're not supposed to, but...
+
+[07:26:32.0000] <annevk>
+(it's also not entirely clear to me that IDL got notified about that change)
+
+[07:29:48.0000] <jmdyck>
+hold it, weren't you *advocating* for create-an-ordinary-and-then-mutate-its-internal-methods in 1453? ("... some have overridden internal methods. It would be nice if we could tack  those on at the end and not have to know about them upfront.")
+
+[07:34:21.0000] <annevk>
+jmdyck: 1) I think there might be a later comment where I agreed to alternatives 2) if the current setup didn't try to distinguish between Ordinary and Base as it does with notes I wouldn't have complained
+
+[07:34:46.0000] <jmdyck>
+I mean, I do kind of like the idea of passing all the internal stuff (both definitions for methods and initial value for slots) into the object-creation operation
+
+[07:58:12.0000] <jmdyck>
+One problem would be taking care of the two cases identified by bakkot here: https://github.com/tc39/ecma262/pull/1460#discussion_r373764030
+
+[08:00:10.0000] <jmdyck>
+Another would be bikeshedding the syntax to create a List of internal-method-names-and-their-definitions.
+
+[08:06:59.0000] <jmdyck>
+And I'm not sure the result would be clearer to the reader. So it might be a fair bit of work that ultimately isn't accepted.
+
+[08:07:15.0000] <jmdyck>
+So that sort of answers your initial question, annevk.
+
+[08:07:31.0000] <jmdyck>
+ljharb, do you have an opinion?
+
+[08:26:31.0000] <annevk>
+Note that a valid alternative to what I think is problematic might be to not call it OrdinaryCreate and not limit its use through prose. And everyone can just pick whatever the most convenient thing is to create their object. (Another alternative might be to freeze the internal methods at some point such that modifying them triggers an assert.)
+
+[08:29:27.0000] <jmdyck>
+re the first thing: you mean erase the distinction between MakeBasicObject and OrdinaryObjectCreate?
+
+[08:30:11.0000] <annevk>
+yeah
+
+[08:30:24.0000] <jmdyck>
+(i.e., roughly, drop OOC and replace calls with MBO)
+
+[08:31:17.0000] <jmdyck>
+well, that got some push-back in 1453
+
+[08:31:18.0000] <annevk>
+or keep it if it does something useful in addition, but don't try to prevent usage for non-ordinary objects if it makes sense for those (they also need the additional thing, plus yet more things)
+
+[08:33:46.0000] <jmdyck>
+well, i think the point is that OOC *doesn't* do (much) useful in addition to MBO, pretty much its whole point is to signal that an ordinary object is being created (i.e., an object that will remain ordinary after its creation).
+
+[08:35:57.0000] <annevk>
+I see, I should have checked
+
+[08:36:09.0000] <annevk>
+I guess in that case only the freezing suggestion makes some amount of sense
+
+[08:40:51.0000] <annevk>
+Thanks for walking me through things
+
+[08:42:18.0000] <jmdyck>
+the freezing suggestion (or something similar) came up before, but I'm having trouble finding it
+
+[08:52:11.0000] <jmdyck>
+re "such that modifying them triggers an assert": Well, we could have something like: Assert: We have now finished creating this object. There will be no further changes to its internal methods.
+
+[08:53:13.0000] <jmdyck>
+But to me, that's not a proper Assert, because you can't check it at the point it occurs. So it's more like a Note.
+
+[08:53:27.0000] <annevk>
+jmdyck: agreed
+
+[08:54:33.0000] <annevk>
+jmdyck: you'd need to make it explicit via some mechanism that setting an internal method can no longer be set, perhaps that's not worth it
+
+[08:55:07.0000] <jmdyck>
+My guess would be: not worth it.
+
+[08:55:33.0000] <jmdyck>
+We could place such a Note easily for exotics, but not so easily for ordinaries.
+
+[08:55:35.0000] <annevk>
+yeah, requiring them all upfront is really the way to do that
+
+[08:56:31.0000] <jmdyck>
+You want to put such a Note at the end of OrdinaryObjectCreate, but you can't because of functions.
+
+[08:58:04.0000] <jmdyck>
+but you could put it there and then modify it "(except for possibly [[Call]] and [[Construct]])"
+
+[09:00:22.0000] <jmdyck>
+I'm not sure such in-alg notes are a big win over the out-of-alg notes.
+
+[09:03:05.0000] <shu>
+Bakkot: kinda sorta based on what i’ve heard through emscripten folks in the office, i thought the conclusion was to just do it for the regular atomic ops
+
+[09:06:35.0000] <shu>
+annevk: jmdyck: i wouldn’t mind a List of slots and defs up front approach
+
+[09:06:58.0000] <shu>
+dunno if i’ll have cycles to work on it soonish, however
+
+[09:09:06.0000] <shu>
+but for both that and the freezing approach we’d need the new concept of an initialize-once internal slot
+
+[09:10:16.0000] <shu>
+how do y’all feel about keeping the mutation wording but introducing a initialize-once internal slot/method?
+
+[09:13:31.0000] <jmdyck>
+Most *slots* aren't initialize-once, I think.
+
+[09:13:45.0000] <shu>
+indeed they are not
+
+[09:13:58.0000] <shu>
+perhaps the new spec thing can be restricted to methods
+
+[09:14:27.0000] <shu>
+but it may also be useful to tighten down a subset of slots that are better off initialize once? unsure if we have anything like that
+
+[09:15:13.0000] <jmdyck>
+but I like the idea of passing in the *initial* value of slots, because then you're not separating the 'allocation' from the initialization.
+
+[09:16:17.0000] <shu>
+yes, though we’d still need to call out that we are changing the semantics of internal methods to such that it’s not permitted to set them after the fact
+
+[09:16:52.0000] <shu>
+to be clear i am also +1 passing initial value
+
+[09:17:44.0000] <shu>
+it’d also make the meta-identity thing explicit and clearer
+
+[09:17:54.0000] <devsnek>
+shu: there are changes to atomics.wait and atomics.notify
+
+[09:18:39.0000] <shu>
+what are they?
+
+[09:18:59.0000] <devsnek>
+uhhhhh
+
+[09:19:14.0000] <devsnek>
+wait should not fail if given 0 and on unshared iirc
+
+[09:19:28.0000] <shu>
+how does that affect js?
+
+[09:19:44.0000] <devsnek>
+currently it always throws on unshared right?
+
+[09:20:42.0000] <jmdyck>
+shu: I've thought about the up-front thing a bit before, I might have time to throw together at least a draft pr.
+
+[09:20:47.0000] <shu>
+this is unshared wasm memory right
+
+[09:21:04.0000] <devsnek>
+yeah
+
+[09:21:09.0000] <shu>
+jmdyck: cool
+
+[09:21:59.0000] <shu>
+i’d need to read the wasm spec
+
+[09:22:13.0000] <shu>
+does it normativelg reference Atomics
+
+[09:23:16.0000] <devsnek>
+it used to but I don't think it does anymore
+
+[09:23:31.0000] <devsnek>
+the problem is that some wasm stuff calls to atomics through js
+
+[09:23:39.0000] <annevk>
+(initialize-once for internal methods makes sense to me)
+
+[09:23:42.0000] <devsnek>
+like old old emscriptem
+
+[09:23:47.0000] <devsnek>
+emscripten
+
+[09:24:11.0000] <annevk>
+(not sure how this would work with the current override technique, guess that would have to be redone)
+
+[09:25:14.0000] <devsnek>
+tbh I haven't been tracking threading that much
+
+[09:25:18.0000] <devsnek>
+been focused on wasi
+
+
+2020-02-04
+[04:52:55.0000] <towc>
+hey all, I'm wondering about the future of https://github.com/tc39/proposal-bind-operator
+
+[04:53:21.0000] <towc>
+last update was 2 years ago, and it was already pitched in 2015
+
+[04:53:40.0000] <towc>
+I'd still love to see it happen
+
+[04:53:51.0000] <towc>
+but I don't see why it isn't happening
+
+[06:53:40.0000] <towc>
+quit
+
+[11:15:58.0000] <Lcfvs>
+Hi all
+
+[11:17:56.0000] <Lcfvs>
+Just a question about why add a `!` before `[...Array(10)].map(() => Array(1e7))` makes a memory leak, but not without it, please?
+
+[11:18:48.0000] <Lcfvs>
+(tested on Firefox & Chrome, same behavior)
+
+[11:19:58.0000] <bterlson>
+There isn't anything about that code that is leaky in either form. Somehow you are holding a reference to the massive array. When you add the !, you're just holding a reference to a single boolean.
+
+[11:22:01.0000] <Lcfvs>
+hmmm, ok, but why these browsers doesn't clear that array ?
+
+[11:22:30.0000] <Lcfvs>
+they make it, but after 15-30 seconds
+
+[11:22:40.0000] <bterlson>
+Would need to see the code around it. But just storing it in a variable in global scope will likely mean the browser won't collect it.
+
+[11:23:35.0000] <Lcfvs>
+there is no code around that, only that, running in console
+
+[11:24:12.0000] <Lcfvs>
+the memory consumption increases to 2-4Gb
+
+[11:24:47.0000] <Lcfvs>
+but after that, the GC seems to sleep for a long time
+
+[11:25:51.0000] <bterlson>
+I wouldn't test memory leaks in the console, it holds references to previous calculations e.g. with the special $_ variable.
+
+[11:29:13.0000] <Lcfvs>
+oh, ok, I see, thanks a lot, you saved my day ^^
+
+[11:30:58.0000] <Lcfvs>
+I'm helping on a french community, where another users came with that "bug", I searched all the day, nothing to explain that, for the first time, in JS x)
+
+[11:31:43.0000] <Lcfvs>
+* user
+
+[11:47:57.0000] <devsnek>
+Lcfvs: also objects may not get cleaned up for a very long time
+
+[11:48:03.0000] <devsnek>
+even if they have no references to them
+
+[11:48:17.0000] <devsnek>
+s/they have/there are/
+
+[11:49:51.0000] <Lcfvs>
+devsnek yeah, a common thing, that, but never heard about the console $_
+
+[11:51:03.0000] <devsnek>
+Lcfvs: there may also be other internal references when using devtools
+
+[11:51:35.0000] <devsnek>
+for example in chrome every object result is assigned a unique id that it can be reached from
+
+[11:51:41.0000] <devsnek>
+which needs to be manually cleared at a later point in time
+
+[11:51:51.0000] <Lcfvs>
+:o
+
+[11:52:46.0000] <Lcfvs>
+noted
+
+[11:52:51.0000] <Lcfvs>
+thanks too
+
+[12:15:07.0000] <Lcfvs>
+have a nice day, thx again ;)
+
+[14:56:50.0000] <keith_miller>
+shu: an example of the escape thing is: test/language/identifiers/val-return-via-escape-hex4.js
+
+[14:57:18.0000] <shu>
+keith_miller: great, thanks
+
+[14:57:36.0000] <keith_miller>
+here's one that tests for the opposite: test/language/expressions/object/ident-name-method-def-super-escaped.js
+
+[14:59:14.0000] <Bakkot>
+yeah those are fun to get right
+
+[14:59:21.0000] <Bakkot>
+everyone had bugs with those as of like a year or two ago
+
+[14:59:45.0000] <keith_miller>
+I think the spec says the first test is wrong
+
+[15:00:17.0000] <keith_miller>
+Since an escaped string cannot be a keyword per: https://tc39.es/ecma262/#sec-grammar-notation
+
+[15:00:28.0000] <Bakkot>
+right, that's what the test is asserting
+
+[15:00:39.0000] <Bakkot>
+it has the 'negative' metadata
+
+[15:00:51.0000] <keith_miller>
+?
+
+[15:00:59.0000] <keith_miller>
+It should be a valid identifier
+
+[15:01:10.0000] <Bakkot>
+oh, sorry
+
+[15:01:14.0000] <Bakkot>
+no, there's an error for that specifically
+
+[15:01:16.0000] <Bakkot>
+let me find it
+
+[15:01:20.0000] <keith_miller>
+"All terminal symbol code points specified in this way are to be understood as the appropriate Unicode code points from the Basic Latin range, as opposed to any similar-looking code points from other Unicode ranges. A code point in a terminal symbol cannot be expressed by a \ UnicodeEscapeSequence"
+
+[15:02:06.0000] <Bakkot>
+last error under https://tc39.es/ecma262/#sec-identifiers-static-semantics-early-errors
+
+[15:02:14.0000] <Bakkot>
+It is a Syntax Error if StringValue of IdentifierName is the same String value as the StringValue of any ReservedWord except for yield or await.
+
+[15:04:14.0000] <shu>
+ah, so it's supposed to be lexed as an identifier and then checked against the keyword list
+
+[15:04:36.0000] <Bakkot>
+yup
+
+[15:04:43.0000] <keith_miller>
+but... why?
+
+[15:04:44.0000] <keith_miller>
+lol
+
+[15:05:10.0000] <shu>
+evergreen question
+
+[15:06:04.0000] <Bakkot>
+everyone just has an "escaped keyword" token I think
+
+[15:06:10.0000] <Bakkot>
+or at least our parser does
+
+[15:06:13.0000] <Bakkot>
+v8's too if I remember right
+
+[15:06:17.0000] <Bakkot>
+https://github.com/shapesecurity/shift-parser-js/blob/6776a563274992579c01dbb53789b1f032c7deed/src/tokenizer.js#L132
+
+[15:06:26.0000] <Bakkot>
+https://github.com/v8/v8/blob/4b9b23521e6fd42373ebbcb20ebe03bf445494f9/src/parsing/parser.cc#L122-L125
+
+[15:06:33.0000] <shu>
+well keith's question is why do we care to error
+
+[15:06:41.0000] <Bakkot>
+sorry, that wasn't in response to "why"
+
+[15:06:44.0000] <shu>
+ah
+
+[15:06:58.0000] <Bakkot>
+just elaborating on the "lexed as an identifier" thing
+
+
+2020-02-05
+[07:04:35.0000] <mathiasbynens>
+shu, Bakkot, keith_miller: see https://mathiasbynens.be/notes/javascript-identifiers starting from "For web browsers, there is an exception to this rule, namely when reserved words are used" for relevant web compat background info + links to the ES2015 bugs where this was changed
+
+[07:05:22.0000] <mathiasbynens>
+e.g. the jsc change was here https://trac.webkit.org/changeset/185437/webkit
+
+[13:52:30.0000] <devsnek>
+named arrow functions in expression position
+
+[13:52:33.0000] <devsnek>
+good or bad idea
+
+[13:52:50.0000] <devsnek>
+would help with debugging i think
+
+[14:29:58.0000] <Bakkot>
+if you are going to name it just use a function expression
+
+[14:35:06.0000] <devsnek>
+Bakkot: but then you lose the this value
+
+[14:35:39.0000] <Bakkot>
+in the small fraction of cases where that's relevant, yes
+
+[14:35:52.0000] <Bakkot>
+I don't think that small fraction of cases merits new syntax
+
+[14:40:33.0000] <devsnek>
+oh well
+
+[14:46:17.0000] <rkirsling>
+I agree with Bakkot
+
+[14:48:48.0000] <devsnek>
+i guess you can also assign it to a variable and then pass it
+
+[14:49:02.0000] <devsnek>
+sad times
+
+[14:49:21.0000] <ljharb>
+devsnek: `({ f: () => {} }).f`
+
+[14:49:28.0000] <devsnek>
+oh no
+
+[14:50:42.0000] <rkirsling>
+nice.
+
+[15:26:52.0000] <howdoi>
+Async initialization is on stage 1 now?
+
+[15:27:57.0000] <ljharb>
+yes
+
+[15:28:47.0000] <howdoi>
+not yet on `tc39/proposals` ?
+
+[15:29:17.0000] <ljharb>
+ah, haven't pushed it up yet, let me do that
+
+
+2020-02-06
+[04:06:15.0000] <acagastya>
+I was wondering if it is possible to have optional getters and setters, or will it be a breaking change to implement that.
+
+[06:47:45.0000] <bradleymeck>
+acagastya: what do you mean optional?
+
+[06:47:56.0000] <bradleymeck>
+you can have only 1 or the other already
+
+[06:48:12.0000] <bradleymeck>
+or both
+
+[06:59:59.0000] <acagastya>
+I was running an old version of TypeScript where without a matching get/set pair, it would throw an error.
+
+[07:00:20.0000] <acagastya>
+I just checked with typescript⊙3 and it was not a problem.
+
+[07:02:35.0000] <acagastya>
+Though I get `'get' and 'set' accessor must have the same type.`
+
+[07:37:10.0000] <bradleymeck>
+thats a typescript question and probably best on their discussion areas, TC39 is JavaScript
+
+[08:34:19.0000] <acagastya>
+Isn't tc39 for ECMAScript and JavaScript is one variant of ES, just like TypeScript?
+
+[08:35:13.0000] <acagastya>
+I don't know, the naming is sometimes confusing, but TypeScript is supposed to adhere to ECMA standards, so I will put it there too.
+
+[08:36:17.0000] <devsnek>
+acagastya: the error you're getting is outside the realm of ecmascript
+
+[08:38:00.0000] <acagastya>
+ECMA does put restriction on the getter setter <name> accessing/modifying different things, and that, I think TS should not enforce strictly.
+
+[08:42:10.0000] <devsnek>
+ecmascript puts no restrictions on what the getter and setter are allowed to do
+
+[08:42:17.0000] <devsnek>
+they're just normal functions
+
+[08:45:17.0000] <acagastya>
+devsnek: Yes, I will file a bug for TypeScript stating tht.
+
+[11:34:09.0000] <devsnek>
+when would NewGlobalEnvironment(G, thisValue) be called with G !== thisValue
+
+[11:39:49.0000] <jmdyck>
+devsnek: when the host requires it to be otherwise
+
+[11:39:59.0000] <devsnek>
+jmdyck: i mean
+
+[11:40:01.0000] <devsnek>
+in reality
+
+[11:40:05.0000] <devsnek>
+like do browsers do that
+
+[11:40:08.0000] <devsnek>
+why do we have this functionality
+
+[11:40:12.0000] <jmdyck>
+ah reality.
+
+[11:40:21.0000] <jmdyck>
+a window proxy?
+
+[11:40:35.0000] <devsnek>
+`this === window`
+
+[11:40:59.0000] <devsnek>
+so you're saying
+
+[11:41:02.0000] <devsnek>
+the real non-proxy window
+
+[11:41:08.0000] <devsnek>
+would be [[GlobalObject]]
+
+[11:42:49.0000] <jmdyck>
+I'm not sure. All my notes say are "(e.g., a window proxy)" for the case you're asking about.
+
+[11:44:19.0000] <jmdyck>
+ljharb says (https://github.com/tc39/ecma262/pull/1463#discussion_r264312095): "all browsers supply a different globalThis value from the globalObject value (a window proxy)."
+
+[11:45:01.0000] <devsnek>
+i see
+
+[11:46:07.0000] <devsnek>
+i'm trying to make sense of v8's logic for creating contexts (realms)
+
+[11:47:17.0000] <devsnek>
+i guess in v8's case, the global object is always an ordinary object, and the this value is what is changed
+
+[12:34:25.0000] <ljharb>
+mhofman: re your question; i believe that SES deletes the `constructor` property entirely
+
+[12:34:34.0000] <ljharb>
+so that `.constructor` would always be undefined
+
+[12:34:56.0000] <mhofman>
+Thanks! makes sense
+
+[12:36:07.0000] <mhofman>
+(For reference, question was in SES, is  `Object.getPrototypeOf(function(){}).constructor !== Function` )
+
+[14:37:18.0000] <ljharb>
+mhofman: ah, turns out that they replace the constructor accessor so it provides `Function`, which always throws
+
+[14:51:18.0000] <keith_miller>
+shu: Is the TL;DR of issue 179 that our definition works?
+
+[14:51:38.0000] <shu>
+keith_miller: what is "our"?
+
+[14:51:59.0000] <shu>
+keith_miller: one idea you and i had was to null out all weakrefs, but bakkot gave a counterexample
+
+[14:52:09.0000] <shu>
+keith_miller: i *think* bakkot's proposed "Set of objects" thing works
+
+
+2020-02-07
+[16:06:37.0000] <ningu>
+is anyone aware of a javascript implementation of the rule-based transliterators in ICU? specifically something that could run in the browser, i.e. without having to bind to ICU?
+
+[16:06:45.0000] <ningu>
+I am not sure where to ask about this
+
+[16:07:02.0000] <devsnek>
+ningu: i'm not aware of such a thing
+
+[16:07:16.0000] <devsnek>
+you could try compiling libicu targeting wasm
+
+[16:07:20.0000] <ningu>
+yeah I guess
+
+[16:07:24.0000] <ningu>
+hrm
+
+[16:07:38.0000] <ningu>
+is there a way to tree-shake it and thereby leave out the code that isn't needed?
+
+[16:08:33.0000] <ningu>
+I am asking here cause I know that internationalization/unicode support in js is an ongoing effort and some folks here know about ICU
+
+[16:09:10.0000] <ningu>
+devsnek: anyway I'm happy to give the wasm route a go, as long as there's some way to end up with js that isn't enormous
+
+[16:09:27.0000] <devsnek>
+ningu: a good compiler already does that
+
+[16:09:29.0000] <devsnek>
+based on what you expose
+
+[16:09:32.0000] <ningu>
+I see
+
+[16:09:58.0000] <devsnek>
+assuming you're compiling libicu from source
+
+[16:10:02.0000] <ningu>
+not sure if I understand -- it isn't just the whole libicu that gets compiled? can you point me to a general guide for compiling libraries with wasm?
+
+[16:10:05.0000] <ningu>
+of course from source, yes
+
+[16:10:41.0000] <devsnek>
+basically when you compile
+
+[16:10:44.0000] <ningu>
+there is this https://developers.google.com/web/updates/2018/03/emscripting-a-c-library
+
+[16:10:49.0000] <devsnek>
+the compiler will only emit the symbols you actually use
+
+[16:11:01.0000] <devsnek>
+you don't need emscripten for this
+
+[16:11:04.0000] <devsnek>
+since there's no i/o
+
+[16:11:14.0000] <ningu>
+devsnek: ok got it, so the compile is part of the build/bundling of the js application that uses the library?
+
+[16:11:24.0000] <ningu>
+rather than first compile the library, then import it separately or something?
+
+[16:11:39.0000] <devsnek>
+you have a smaller wrapper c file
+
+[16:11:46.0000] <devsnek>
+that exposes the functions from libicu that oyu want
+
+[16:11:56.0000] <ningu>
+ok I see
+
+[16:12:10.0000] <devsnek>
+the compiler would only emit code for the stuff your wrappers use
+
+[16:12:36.0000] <ningu>
+you say I don't need emscripten, but this starts with it too: https://webassembly.org/getting-started/developers-guide/
+
+[16:12:39.0000] <ningu>
+so what's the alternative?
+
+[16:13:35.0000] <devsnek>
+emscripten is a mock implementation of libc
+
+[16:13:43.0000] <devsnek>
+the io parts of it anyway
+
+[16:13:57.0000] <devsnek>
+since you don't need that, you can just directly do `clang -target wasm32-unknown`
+
+[16:14:06.0000] <ningu>
+ok I see
+
+[16:14:29.0000] <ningu>
+and what about the wrapper file and exposing the functions? is there a guide to that?
+
+[16:14:44.0000] <devsnek>
+thats just like
+
+[16:14:45.0000] <devsnek>
+writing c
+
+[16:15:32.0000] <ningu>
+fair enough I guess. so you mean literally a function foo that passes through to call bar from icu (or possibly more complex)
+
+[16:15:50.0000] <ningu>
+and then compile that c file that includes the icu headers etc?
+
+[16:15:56.0000] <ningu>
+with the wasm target
+
+[16:16:15.0000] <ningu>
+I'll try with a hello world first
+
+[16:16:34.0000] <ningu>
+well, with a function that returns the square of an integer so no i/o :)
+
+[16:19:16.0000] <devsnek>
+ningu: yeah you'd just do like `__declspec(dllexport) int add(int a, int b) { return a + b; }`
+
+[16:19:20.0000] <devsnek>
+and then clang that up
+
+[16:19:25.0000] <devsnek>
+and the resulting wasm exports a function called add
+
+[16:19:38.0000] <ningu>
+what is that __declspec business?
+
+[16:20:00.0000] <devsnek>
+export visibility
+
+[16:20:27.0000] <ningu>
+ok, and I have to use clang not gcc right?
+
+[16:20:30.0000] <devsnek>
+yeah
+
+[16:21:22.0000] <ningu>
+I got this: wasm_test.c:1:12: warning: __declspec attribute 'dllexport' is not supported
+
+[16:23:09.0000] <devsnek>
+nice
+
+[16:24:41.0000] <devsnek>
+ningu: it might be `__attribute__ ((visibility ("default")))`
+
+[16:24:44.0000] <devsnek>
+it depends on the os and compiler
+
+[16:24:52.0000] <ningu>
+hrm ok
+
+[16:24:57.0000] <devsnek>
+you could also do
+
+[16:24:57.0000] <ningu>
+this is on linux
+
+[16:24:59.0000] <devsnek>
+`-Wl,--export=add`
+
+[16:28:16.0000] <ningu>
+ok I see, I was using the wrong version of clang, I need clang 8 and llvm 8
+
+[16:28:30.0000] <devsnek>
+aim for clang 10
+
+[16:28:41.0000] <devsnek>
+lots of perf stuff
+
+[16:28:49.0000] <ningu>
+ok
+
+[16:29:19.0000] <devsnek>
+also this is definitely off topic
+
+[16:29:24.0000] <ningu>
+sorry :)
+
+[16:29:35.0000] <devsnek>
+nah mb
+
+[16:29:48.0000] <ningu>
+##javascript is better?
+
+[16:30:39.0000] <devsnek>
+probably
+
+
+2020-02-08
+[15:18:21.0000] <devsnek>
+is it valid to pass ~empty~ to SameValue
+
+[15:18:26.0000] <devsnek>
+i'm thinking no
+
+[15:19:40.0000] <ljharb>
+devsnek: that's not a JS value, and https://tc39.es/ecma262/#sec-samevalue implicitly asserts both its args are
+
+[15:20:03.0000] <devsnek>
+thats what i was thinking yeah
+
+[15:22:43.0000] <devsnek>
+littledan: the tests for weakrefs/finalizationgroups appear to pass even if no collection is implemented
+
+[15:23:00.0000] <devsnek>
+like $262.gc is a no-op and the engine doesn't perform liveliness analysis yet
+
+[15:26:21.0000] <ljharb>
+the spec doesn't mandate any collection ever
+
+[15:27:38.0000] <devsnek>
+but we have tests that expect collection
+
+[15:27:52.0000] <devsnek>
+under the host-gc-exposed feature
+
+[15:29:03.0000] <devsnek>
+er host-gc-required
+
+[15:38:34.0000] <ljharb>
+ah, not sure there
+
+
+2020-02-09
+[16:02:44.0000] <devsnek>
+:wq
+
+[16:02:46.0000] <devsnek>
+oops
+
+[21:24:38.0000] <Bakkot>
+jridgewell: is logical assignment ready for review?
+
+[22:12:44.0000] <devsnek>
+TIL emu-import is a thing
+
+[23:45:41.0000] <rkirsling>
+Bakkot: wait a sec, were reviewers chosen?
+
+[23:59:31.0000] <ljharb>
+devsnek: ?
+
+[23:59:58.0000] <ljharb>
+rkirsling: yes, justin asked separately
+
+[00:00:30.0000] <rkirsling>
+ahh alrighty
+
+[00:15:35.0000] <jridgewell>
+Yes, it’s ready
+
+[08:37:17.0000] <devsnek>
+ljharb: apparently there is a thing in ecmarkup to have separate files already
+
+
+2020-02-10
+[18:48:56.0000] <jmdyck>
+annevk: shu: back on Feb 3 (https://freenode.logbot.info/tc39/20200203#c3183822) we were talking about supplying all the slot+method particulars when creating objects. ("up front" rather than after-the-fact). In my branch https://github.com/jmdyck/ecma262/tree/object_creation I've done just the 'slots' part. (caveat: I did it somewhat haphazardly and haven't checked for errors.) I think I prefer it, but I'm doubtful that it's w
+
+[18:48:56.0000] <jmdyck>
+rn. Let me know what you think.
+
+[19:17:15.0000] <shu>
+jmdyck: wonderful, i won't have cycles till mid week with wasm summit and post-tc39 stuff, but will try to prioritize before next editor meeting
+
+[19:17:17.0000] <shu>
+jmdyck: thank you
+
+[19:39:24.0000] <jmdyck>
+shu: No problem. I had it in mind to try something like this.
+
+
+2020-02-12
+[10:55:44.0000] <gkatsev>
+what's the latest status on the pipeline operator? Anything more recent than march 2018?
+
+[10:56:30.0000] <ljharb>
+gkatsev: i don't believe so
+
+[10:57:26.0000] <gkatsev>
+ljharb: that's what it looked like but wanted confirmation. Thanks.
+
+[11:29:30.0000] <jschoi>
+@gkatsev: From what I know, we’ve all been busy, but there has been work done in Babel on implementing the various proposals in their current states.
+
+[14:19:59.0000] <shu>
+jmdyck: i skimmed the slots commit on your object_creation branch, looks mostly fine though i also didn't check for correctness
+
+[14:20:25.0000] <shu>
+jmdyck: i do not like the fields-as-bullet-list formatting, however
+
+[14:20:41.0000] <shu>
+jmdyck: do you find the existing inline notation hard to read?
+
+[15:59:47.0000] <jmdyck>
+shu: I thought that if I used the existing Record 'constructor' syntax for slots and (perhaps moreso) for methods, people might complain that it's harder (than in the status quo) to see the discrete name-value pairs.
+
+
+2020-02-13
+[16:00:20.0000] <shu>
+hmm
+
+[16:00:52.0000] <shu>
+we could format longer lists of (slot, value)s better, but probably not a bullet list
+
+[16:01:10.0000] <jmdyck>
+That'
+
+[16:01:24.0000] <jmdyck>
+That's about all we've got at the moment.
+
+[16:12:00.0000] <jmdyck>
+And personally, I think it looks okay.
+
+[08:57:53.0000] <devsnek>
+with these new changes for how objects are created
+
+[08:58:01.0000] <devsnek>
+how is Array.prototype set up to correctly be an array
+
+[09:18:12.0000] <devsnek>
+> Let func be a new built-in function object that when called performs the action described by steps. The new function object has internal slots whose names are the elements of internalSlotsList.
+
+[09:18:20.0000] <devsnek>
+shouldn't this be done by MakeBasicObject somehow
+
+[09:23:45.0000] <ljharb>
+? https://tc39.es/ecma262/#sec-arraycreate passes slots to MakeBasicObject
+
+[09:24:06.0000] <ljharb>
+why would "make basic object" contain the knowledge about how to make a non-basic object?
+
+[09:24:43.0000] <devsnek>
+ljharb: Array.prototype is not specified to be created using ArrayCreate though is it?
+
+[09:24:46.0000] <devsnek>
+i couldn't find such a thing
+
+[09:26:12.0000] <devsnek>
+ljharb: also MakeBasicObject is just the base way to create an object
+
+[09:26:15.0000] <ljharb>
+oh
+
+[09:26:22.0000] <devsnek>
+OrdinaryCreateObject is for ordinary objects
+
+[09:26:39.0000] <ljharb>
+https://tc39.es/ecma262/#sec-properties-of-the-array-prototype-object lists that it's an array exotic object
+
+[09:26:45.0000] <devsnek>
+right
+
+[09:26:55.0000] <ljharb>
+so it doesn't use ArrayCreate but it's indistinguishable from having been called that way
+
+[09:27:02.0000] <devsnek>
+then why does ArrayCreate exist
+
+[09:27:13.0000] <devsnek>
+why don't we just say "Create an Array exotic object with the required internal slots"
+
+[09:27:34.0000] <devsnek>
+or rather why does ArrayCreate call MakeBasicObject
+
+[09:38:18.0000] <ljharb>
+i suspect we prefer the new ArrayCreate → MakeBasicObject approach, so it's likely that Array.prototype was overlooked. jmdyck?
+
+[09:41:15.0000] <devsnek>
+same issue for all the pre-es6 prototypes i think
+
+[09:41:41.0000] <devsnek>
+and builtin functions
+
+[09:42:42.0000] <ljharb>
+all the prototypes that remain exotic, yeah
+
+[09:43:24.0000] <devsnek>
+there might be more i guess
+
+[09:43:51.0000] <devsnek>
+i'm just going through engine262 and changing them all atm
+
+[11:59:22.0000] <jmdyck>
+devsnek: re "shouldn't this be done by MakeBasicObject somehow": ISTR that someone (domenic?) pointed out that PR 1460 didn't take on CreateBuiltinFunction.
+
+[11:59:32.0000] <jmdyck>
+I can't find it now though.
+
+[12:04:48.0000] <jmdyck>
+ljharb: re "it's likely that Array.prototype was overlooked": not so much overlooked as not quite in scope. 1460 was (I think) mostly targeting alg steps of the form "Let foo be a newly created Foo exotic object." Intrinsics like Array.prototype are created in CreateIntrinsics and not by a step of that form.
+
+[12:06:17.0000] <ljharb>
+ah k
+
+[12:06:24.0000] <ljharb>
+so, followup PRs are loosely planned for that?
+
+[12:06:48.0000] <jmdyck>
+not that i know of.
+
+[12:07:18.0000] <ljharb>
+ah k
+
+[12:17:32.0000] <jmdyck>
+In https://tc39.es/ecma262/#sec-properties-of-the-array-prototype-object, if we said (something like) "is created via ArrayCreate(0, %Object.prototype%)", that would cover bullets 2-4.
+
+[12:18:06.0000] <ljharb>
+sgtm
+
+[12:18:13.0000] <ljharb>
+(for all the exotic prototypes)
+
+[12:28:31.0000] <jmdyck>
+I think String.prototype is the only other.
+
+[13:12:23.0000] <ljharb>
+jmdyck: `Boolean.prototype` and `Number.prototype` seem to be as well
+
+[13:12:33.0000] <ljharb>
+also `Function.prototype`
+
+[13:14:11.0000] <jmdyck>
+They're not exotic.
+
+[13:14:32.0000] <jmdyck>
+Well, Function.prototype *could* be exotic, but it's not guaranteed to be.
+
+[13:14:45.0000] <ljharb>
+they have internal slots
+
+[13:14:53.0000] <ljharb>
+Boolean.prototype is a boolean, Number.prototype is a Number
+
+[13:15:23.0000] <jmdyck>
+yes?
+
+[13:15:40.0000] <jmdyck>
+i'm missing your point.
+
+[13:16:50.0000] <ljharb>
+so they should perhaps be using MakeBasicObject instead of saying "is itself a Boolean object; it has a [[BooleanData]] internal slot with the value false."
+
+[13:17:16.0000] <ljharb>
+ie it should say something like "is created via MakeBasicObject('[[BooleanData]]')"
+
+[13:18:28.0000] <jmdyck>
+Yup, that's a possibility. Probably OrdinaryObjectCreate rather than MakeBasicObject though.
+
+[13:18:34.0000] <ljharb>
+sure
+
+[13:20:16.0000] <jmdyck>
+(When I said "I think String.prototype is the only other", I was replying to your "for all the exotic prototypes")
+
+[13:21:16.0000] <jmdyck>
+(i.e., Array.p and String.p are the only guaranteed-exotic prototypes, I think.)
+
+[13:22:40.0000] <ljharb>
+ah ok
+
+[13:22:45.0000] <ljharb>
+i guess i meant, "isn't an ordinary object"
+
+[13:25:17.0000] <jmdyck>
+Boolean.p and Number.p are ordinary objects.
+
+[13:26:21.0000] <ljharb>
+they have internal slots
+
+[13:26:25.0000] <ljharb>
+ordinary objects don't
+
+[13:27:08.0000] <ljharb>
+or maybe, forget what i'm asserting about definitions; Boolean.p and Number.p are in a different category than Object.p and Date.p, whatever we call those categories
+
+[13:27:47.0000] <jmdyck>
+sure, depending how you set up your categories
+
+
+2020-02-14
+[09:12:57.0000] <devsnek>
+O.o `The other options - json and iso-8601 - are also synonymous and will output all datetimes as the human readable ECMA-262 format: YYYY-MM-DDTHH:MM:ss.`
+
+
+2020-02-15
+[18:24:05.0000] <devsnek>
+ljharb: your change of SameValueZero to SameValue causes a bunch of tests to fail
+
+[18:45:01.0000] <devsnek>
+(https://github.com/tc39/ecma262/pull/1827#issuecomment-586545198)
+
+[19:56:06.0000] <ljharb>
+devsnek: test262 tests?
+
+[19:56:41.0000] <ljharb>
+devsnek: everything except Atomics.store should already have converted -0 to +0 for that range
+
+[19:56:43.0000] <devsnek>
+ljharb: grep for tests starting with `toindex-*.js`
+
+[19:56:54.0000] <devsnek>
+the specific failure is -0.1
+
+[19:56:59.0000] <devsnek>
+you responded to my comment
+
+[19:57:02.0000] <ljharb>
+sure
+
+[19:57:05.0000] <ljharb>
+and i'll fix ToInteger
+
+[19:57:13.0000] <devsnek>
+its the same problem
+
+[19:57:15.0000] <ljharb>
+ah ok
+
+[19:57:23.0000] <devsnek>
+i just didn't realize what the actual cause was
+
+[19:57:59.0000] <ljharb>
+devsnek: wait, `floot(abs(-.01))` is +0
+
+[19:58:02.0000] <ljharb>
+*floor
+
+[19:58:08.0000] <devsnek>
+yes
+
+[19:58:08.0000] <devsnek>
+but
+
+[19:58:16.0000] <ljharb>
+devsnek: so how can -0.1 produce -0 with current master
+
+[19:58:20.0000] <devsnek>
+`that is the same sign as number`
+
+[19:58:22.0000] <ljharb>
+ohhh right
+
+[19:58:27.0000] <devsnek>
+:P
+
+[19:58:29.0000] <ljharb>
+on it
+
+[20:02:14.0000] <ljharb>
+devsnek: https://github.com/tc39/ecma262/pull/1871
+
+
+2020-02-17
+[12:45:40.0000] <bradleymeck>
+was there ever a proposal to add refs to JS?
+
+[12:46:35.0000] <jackworks>
+What do you mean by refs
+
+[12:47:08.0000] <bradleymeck>
+essentially a way to do pass by reference instead of w/e you want to call how parameters are passed currently
+
+[12:55:37.0000] <ljharb>
+bradleymeck: https://github.com/rbuckton/proposal-refs has never been presented, i think
+
+[12:57:01.0000] <bradleymeck>
+interesting
+
+[14:04:40.0000] <devsnek>
+bradleymeck: a year ago i experimented with reifying the Reference type using `&` and `*` syntax
+
+[14:04:56.0000] <devsnek>
+it worked well but i couldn't find any good use for it
+
+[14:14:36.0000] <bradleymeck>
+devsnek: I'm more interested in smart pointer or ref semantics that allow constraining usage
+
+[14:14:59.0000] <bradleymeck>
+https://github.com/rbuckton/proposal-refs/issues/6#issuecomment-587161053
+
+[14:17:57.0000] <Bakkot>
+bradleymeck: that seems like a job for your type system
+
+[14:19:08.0000] <devsnek>
+bradleymeck: i'm not sure what that example is trying to illustrate
+
+[14:19:31.0000] <devsnek>
+that `if foo === 1` should form an exclusive condition where foo can't be modified to be anything other than `1`?
+
+[14:24:18.0000] <bradleymeck>
+While held by a specific kind of ref, yes. That ref essentially has exclusive access
+
+[14:27:01.0000] <bradleymeck>
+Once that ref is gone, the variable is not exclusive
+
+[14:28:29.0000] <devsnek>
+technically references would be gc'd too
+
+[14:32:09.0000] <bradleymeck>
+Depends. Only if they are first class/go into gc values do they need gc
+
+[14:32:28.0000] <bradleymeck>
+I'd imagine it would have to be zero gc to work
+
+[14:32:31.0000] <devsnek>
+i mean if `let x = ref y` is a thing they're observable in some way
+
+[14:33:48.0000] <bradleymeck>
+The values they hold will be, for sure. But the ref itself might not be first class. Even if observable it doesn't have to be gc based
+
+[14:37:58.0000] <devsnek>
+non first class values in js seems odd but 🤷
+
+[14:38:07.0000] <devsnek>
+we made private fields so who knows
+
+[15:21:39.0000] <bradleymeck>
+Same for the live binding stuff, and how decorators are starting to look
+
+[15:21:54.0000] <bradleymeck>
+It's just JS branching out
+
+[15:56:57.0000] <devsnek>
+i really dislike it
+
+[15:57:34.0000] <ljharb>
+imo live bindings are terrible
+
+[15:57:48.0000] <devsnek>
+is live bindings just
+
+[15:57:49.0000] <ljharb>
+and the second-class nature of the latest decorators branch imo makes it untenable
+
+[15:58:08.0000] <devsnek>
+`@onchange(cb) let = a1`
+
+[15:58:12.0000] <devsnek>
+er
+
+[15:58:13.0000] <devsnek>
+let a = 1
+
+[15:58:14.0000] <devsnek>
+lol
+
+[15:58:29.0000] <devsnek>
+if you want to inspect scopes just reify scopes
+
+[15:58:35.0000] <ljharb>
+devsnek: it's like `export let a = 1; setTimeout(() => { a = 2; })` and the value change being propagated
+
+[15:58:39.0000] <devsnek>
+yeah
+
+[15:58:44.0000] <devsnek>
+oh i see what you mean
+
+[15:58:48.0000] <devsnek>
+module live bindings
+
+[15:58:53.0000] <devsnek>
+how are those not "first class"
+
+[15:59:35.0000] <devsnek>
+we have a dedicated module namespace object that lets you inspect them
+
+[15:59:37.0000] <ljharb>
+because you can't pass the binding around, only the value
+
+[15:59:51.0000] <devsnek>
+i don't think that's a non-first-class addition though
+
+[15:59:55.0000] <Bakkot>
+yeah that's never seemed weird to me
+
+[15:59:57.0000] <ljharb>
+the module namespace object is first class, but that's not bindings, that's like an exotic object
+
+
+2020-02-18
+[16:00:11.0000] <Bakkot>
+it's just like any other variable
+
+[16:00:19.0000] <devsnek>
+yeah its just a variable as far as i see it
+
+[16:00:20.0000] <ljharb>
+right, but not constrained by lexical scope.
+
+[16:00:35.0000] <devsnek>
+decorators though are definitely not first class
+
+[16:00:41.0000] <devsnek>
+language in a language :(
+
+[16:00:51.0000] <Bakkot>
+doesn't seem any weirder than `<script>let x = 1</script><script>console.log(x)</script>` working
+
+[16:00:59.0000] <Bakkot>
+top-level lexical scope is shared across files
+
+[16:01:03.0000] <Bakkot>
+/shrug
+
+[16:01:03.0000] <ljharb>
+Bakkot: i mean sure, script tags are weird
+
+[16:01:16.0000] <ljharb>
+but yeah i see what you mean
+
+[16:02:03.0000] <devsnek>
+the ref proposal from ron seems to be aimed at letting you decorate functions without everything falling apart
+
+[16:02:20.0000] <devsnek>
+in which case you wouldn't need to do the evil dsl approach
+
+[16:05:03.0000] <devsnek>
+its also kinda funny that people wanted to duplicate es slots with private fields, but es spec fields are a first class type that you can pass around
+
+[16:05:35.0000] <devsnek>
+literally private symbols
+
+[16:05:36.0000] <devsnek>
+oh well
+
+[06:32:17.0000] <littledan>
+devsnek: Spec-internally, private names are a thing that can be passed around also. It's just that neither one is exposed to script
+
+[06:33:38.0000] <littledan>
+(I don't have any problem with something or other that reifies private names, as the decorators proposal included for some time, but we had good reasons for choosing the "WeakMap" semantics.)
+
+[06:34:08.0000] <littledan>
+ljharb: The lexical contour was a TC39 decision, not a weirdness imposed by the environment, since I guess we thought it was important to preserve that kind of availability
+
+[07:14:02.0000] <ljharb>
+littledan: regardless of whether it was an imposition or not, the weirdness of script tags is why the lexical contour makes sense to me - but either way, live bindings are something I’m not a fan of
+
+[07:18:02.0000] <littledan>
+(I guess I don't really understand why live bindings were a goal of ES6 modules either, but here we are)
+
+[07:18:52.0000] <bradleymeck>
+i'm slowly getting concerned we may need to make bindings first class if there are concerns about JS security so that you can wire modules together without going through JS and export ... from
+
+[07:23:49.0000] <ljharb>
+wire how?
+
+[07:24:58.0000] <ljharb>
+or rather, why do you need to connect modules without going through the module system
+
+[07:34:07.0000] <bradleymeck>
+ljharb: you'd still go through the modules system, but not through JS itself
+
+[07:34:24.0000] <bradleymeck>
+this comes back to the idea that loading JS is dangerous that spawned module attributes
+
+[07:35:07.0000] <bradleymeck>
+if we expose the ability for non-JS to wire bindings, it seems we would want to do the same for JS itself even if you could not alter runtime generated modules
+
+[07:39:43.0000] <devsnek>
+littledan: I don't understand why private symbols aren't "weakmap semantics"
+
+[07:40:26.0000] <devsnek>
+in fact I'd say they're closer than what we have now
+
+[07:40:54.0000] <devsnek>
+we still use a lot of weak maps in node core because private fields are so limited
+
+[07:41:23.0000] <devsnek>
+we even use normal symbols in some cases because it just makes stuff easier, even if we lose out on the private guarantees
+
+[07:44:30.0000] <ljharb>
+bradleymeck: non-js already can, depending on how it creates the module record, no?
+
+[07:49:15.0000] <bradleymeck>
+ljharb: they could to some extent, but to my knowledge none of the other module record types do so
+
+[07:54:54.0000] <ljharb>
+i mean, export is how js sets up bindings - anything else can set them up however they want
+
+[09:15:49.0000] <littledan>
+devsnek: The private symbol proposals that were brought to TC39 didn't have weakmap semantics; they differed when it came to whether they were considered properties, how they interacted with proxies and [], etc
+
+[09:16:20.0000] <littledan>
+the private name objects that the decorators proposal contained did have these weakmap semantics, and skipped working with [], Proxy, etc
+
+[09:16:52.0000] <littledan>
+the contradiction was ultimately about, if it's property-like in some way, then people could develop expectations about it being property-like in some other way, and it snowballs into something that slams into one of our constraints
+
+[09:17:15.0000] <devsnek>
+a property that can't be found using key enumeration
+
+[09:17:26.0000] <devsnek>
+is literally a way to implement weak maps
+
+[09:17:29.0000] <littledan>
+for example, you could feel that it's important that everything which uses [] goes through Proxy. But internal slots don't do that.
+
+[09:17:45.0000] <littledan>
+I gave a presentation about this topic; let me find the slides
+
+[09:18:01.0000] <littledan>
+we literally spent years talking about this in committee...
+
+[09:18:36.0000] <littledan>
+https://docs.google.com/presentation/d/1lPEfTLk_9jjjcjJcx0IAKoaq10mv1XrTZ-pgERG5YoM/edit#slide=id.p
+
+[09:18:43.0000] <devsnek>
+https://github.com/tc39/ecma262/compare/master...devsnek:feature/private-symbols
+
+[09:18:55.0000] <devsnek>
+you can see the diff for proxies
+
+[09:19:22.0000] <devsnek>
+this doesn't seem complex enough to not reach at least stage 1
+
+[09:20:56.0000] <ljharb>
+if private symbols existed i'd probably want a) a way when creating a proxy to "tunnel them all" or "tunnel none", with the latter being the default and current behavior; and b) if i have a list of private symbols when creating the proxy, be able to trap them (separately from Get)
+
+[09:21:22.0000] <devsnek>
+right that's in my diff
+
+[09:21:57.0000] <devsnek>
+well you can't really say "tunnel all / tunnel none" because you can't define behaviour of symbols you can't touch
+
+[09:22:12.0000] <devsnek>
+but you can pass symbols you'd like to trap
+
+[09:25:15.0000] <littledan>
+for the tunneling thing, I was suggesting Proxy.transparent. But then people had various concerns with that
+
+[09:27:29.0000] <littledan>
+so, it seems pretty clear to me that all that allowPrivate stuff differs from WeakMap semantics.
+
+[09:27:38.0000] <ljharb>
+devsnek: ^ that's what i mean
+
+[09:27:40.0000] <ljharb>
+devsnek: ie, `new Proxy` would continue to "tunnel none"
+
+[09:27:56.0000] <ljharb>
+but we'd need a way to make a proxy that tunneled all private symbols, internal slots, and private fields
+
+[09:27:59.0000] <devsnek>
+what i meant is that you can't ask for one or the other
+
+[09:28:04.0000] <devsnek>
+it just has to be the default
+
+[09:28:21.0000] <ljharb>
+and then separately, a way to trap the things you can prove you have access to
+
+[09:28:33.0000] <littledan>
+so... the slide deck I posted above explains why WeakMap semantics are preferable. And the Proxy.transparent sketch shows that ,if we wanted opt-in tunneling and reasoned that it was OK, then we could do it on top of the current private fields/methods proposal.
+
+[09:28:44.0000] <ljharb>
+devsnek: i'm not sure why
+
+[09:28:45.0000] <devsnek>
+i don't disagree that weakmap is a good model
+
+[09:29:18.0000] <littledan>
+well, you're proposing something that differs from weakmap, so I'm confused
+
+[09:29:30.0000] <devsnek>
+i'm not proposing anything
+
+[09:29:45.0000] <littledan>
+I mean, you are linking to a PR which has a non-weakmap model
+
+[09:29:53.0000] <littledan>
+so, I'm just trying to explain how we arrived where we are
+
+[09:29:56.0000] <devsnek>
+hm?
+
+[09:30:01.0000] <devsnek>
+oh cuz it calls the handler by default
+
+[09:30:21.0000] <devsnek>
+yeah it could also return undefined or whatever is relevant
+
+[09:30:45.0000] <devsnek>
+that diff is more just about showing how simple the semantics of the whole thing can be
+
+[09:31:07.0000] <littledan>
+we already have a privacy construct at Stage 3; I think anything that's added from here should be in terms of "explaining" that proposal/exposing it in some way, rather than a parallel construct
+
+[09:31:30.0000] <devsnek>
+could explain private fields with symbols if they didn't throw
+
+[09:31:44.0000] <devsnek>
+another thing that doesn't align with weakmaps
+
+[09:32:00.0000] <devsnek>
+anyway i'm way too cynical about this
+
+[09:32:06.0000] <littledan>
+these things weren't accidental; they're design tradeoffs
+
+[09:32:38.0000] <devsnek>
+i mean even in the spec we do RequireInternalSlot
+
+[09:33:25.0000] <littledan>
+sure, and we could add something analogous to that for private fields and methods, if we want to
+
+[09:33:48.0000] <devsnek>
+we could probably explain them with private symbols if we just said that its the explicit .# syntax that does the throw
+
+[09:33:54.0000] <littledan>
+the design space for all this stuff is only so big. We made a tradeoff of WeakMaps + throwing, to be analogous to internal slots, and the rest sort of just follows
+
+[09:34:02.0000] <devsnek>
+then i could use [] and not have to have useless try catches everywhere
+
+[09:34:06.0000] <littledan>
+well, for many reasons, not just that one
+
+[09:34:27.0000] <littledan>
+I don't see any reason why [] couldn't throw; it's been able to forever with getters
+
+[09:34:35.0000] <devsnek>
+because throwing is terrible
+
+[09:34:52.0000] <devsnek>
+random api contract from someone's requirement somehow leaked into the spec
+
+[09:35:17.0000] <littledan>
+well, that's sort of a higher-level thing... there are lots of recent features and proposals that throw in various places
+
+[09:36:06.0000] <littledan>
+we spend a lot of time in committee debating which cases should throw, and making compromises
+
+[09:36:22.0000] <devsnek>
+ya i mean i was there
+
+[09:37:10.0000] <devsnek>
+i just never heard anything i found compelling for any of this
+
+[09:37:36.0000] <littledan>
+well, how do you think we should resolve disagreements like this in the future?
+
+[09:38:16.0000] <littledan>
+if we decide to keep adding things to the language or making changes, there will be more tradeoffs that some people won't find compelling
+
+[09:38:20.0000] <devsnek>
+i mean if i had been a delegate as is more normal, the resolution probably would've been me blocking stage 3
+
+[09:38:28.0000] <devsnek>
+so idk
+
+[09:38:45.0000] <littledan>
+well, how do you think we should make tradeoffs as a group, when we have other people who would've had strong concerns on the other side?
+
+[09:39:34.0000] <littledan>
+(personally I'm not convinced that battling threats of blocking is the best methodology)
+
+[09:39:44.0000] <devsnek>
+like i wouldn't be happy about it
+
+[09:39:49.0000] <devsnek>
+but as long as i cared one way or the other
+
+[09:40:21.0000] <devsnek>
+i don't think moving the language forward is worth adding features that are subpar (subjectively as it were)
+
+[09:40:58.0000] <littledan>
+well, I feel like *not* throwing would be subpar, and I'm not the only one in committee who feels that way
+
+[09:41:19.0000] <littledan>
+so, what do you do when we get to these contradictions? I do agree that we should think everything through and make sure everything that goes in the language is well-done.
+
+[09:41:36.0000] <devsnek>
+i mean there are things people care about and things they don't care about
+
+[09:41:53.0000] <devsnek>
+like some features hit impasses like this
+
+[09:42:43.0000] <littledan>
+right, well, I've seen us work hard on making agreements to work through impasses when features seem really important to some TC39 members
+
+[09:42:49.0000] <littledan>
+I think that's a good thing
+
+[09:43:16.0000] <littledan>
+(I guess it's going a lot slower than I'd like for some features, like decorators...)
+
+[09:43:32.0000] <devsnek>
+i'd probably also block decorators in their current form
+
+[09:43:54.0000] <littledan>
+what do you think the decorators proposal should do?
+
+[09:43:59.0000] <devsnek>
+should note those are the only two proposals i would do so for
+
+[09:44:22.0000] <devsnek>
+i don't think the decorator dsl is worth the feature
+
+[09:44:38.0000] <devsnek>
+i think we've already argued about this though so
+
+[09:44:41.0000] <littledan>
+do you mean, static decorators are not worth it, or it's not worth it to do any kind of decorators at all?
+
+[09:44:56.0000] <devsnek>
+decorators in some form would be cool
+
+[09:45:06.0000] <littledan>
+do you have an idea of another form that you'd like?
+
+[09:45:27.0000] <devsnek>
+yeah but it doesn't work with function declarations
+
+[09:45:36.0000] <devsnek>
+so i'd probably just say
+
+[09:45:39.0000] <devsnek>
+leave it to tooling
+
+[09:47:25.0000] <devsnek>
+worded another way, the ideal form of decorators wouldn't really work with js
+
+[09:47:28.0000] <devsnek>
+as sad as that is
+
+[09:47:49.0000] <devsnek>
+so i'd rather just not try to put anything in
+
+[09:48:45.0000] <littledan>
+(would any form of decorators work with function declarations?)
+
+[09:49:12.0000] <devsnek>
+ones that are hoisted into their own namespace
+
+[09:49:15.0000] <devsnek>
+is pretty much it
+
+[09:49:29.0000] <Bakkot>
+devsnek fwiw the "anyone can block anything" is not actually a rule, just a norm
+
+[09:49:35.0000] <littledan>
+well, if it has imperative code, when does that run?
+
+[09:49:47.0000] <devsnek>
+yeah like i said it doesn't really work out
+
+[09:50:02.0000] <littledan>
+I mean, that's an issue that would have to be resolved whether it's in tooling or the language
+
+[09:50:22.0000] <devsnek>
+i've seen tooling put decorators on function declarations
+
+[09:50:25.0000] <devsnek>
+i'm not sure what that does
+
+[09:50:30.0000] <devsnek>
+because i've never personally used it
+
+[09:50:31.0000] <devsnek>
+but it exists
+
+[09:50:49.0000] <devsnek>
+my point being people can at least choose the broken thing that suits them
+
+[09:53:05.0000] <littledan>
+I'm not really convinced by that as a design principle... lots of JS users don't really choose their language but rather are working in an environment where a lot of decisions are made for them. We're in a unique position to guide the ecosystem towards a good developer experience.
+
+[09:53:27.0000] <devsnek>
+and i think the static decorators are not a good developer experience
+
+[09:53:34.0000] <devsnek>
+so like....
+
+[09:53:38.0000] <littledan>
+for users, or decorator authors?
+
+[09:53:42.0000] <littledan>
+or both?
+
+[09:53:59.0000] <devsnek>
+define users in this context
+
+[09:54:14.0000] <littledan>
+I mean, developers who tend to use decorators from a framework but don't tend to make their own
+
+[09:54:40.0000] <devsnek>
+so not like, people browsing the web, but people using decorators
+
+[09:54:49.0000] <littledan>
+yeah, you're right, "user" is a funny word
+
+[09:54:55.0000] <devsnek>
+if you're doing some sort of emberjs thing i don't think it matters
+
+[09:54:58.0000] <littledan>
+yeah so I'm definitely open to iterating from static decorators to something else, but I want to figure out what that something else is
+
+[09:55:08.0000] <devsnek>
+but i think that's a bad way to think about it
+
+[09:55:36.0000] <devsnek>
+why should the dev using emberjs have to be relegated into this position of decorator user and never decorator author
+
+[09:55:46.0000] <littledan>
+OK, do you mean, "bad experience for people implementing decorators, and that set matters"?
+
+[09:55:52.0000] <devsnek>
+yeah
+
+[09:56:05.0000] <littledan>
+(I was hoping that the static decorator definition DSL would be a good developer experience too; I don't quite understand the problems with it)
+
+[09:56:07.0000] <devsnek>
+i don't think there should be a difference in level between people consuming and writing libraries
+
+[09:56:13.0000] <ljharb>
+littledan: "allow private" is weakmap semantics, but you pass the weakmap (or a proxy to the weakmap) to the proxy handling code, no?
+
+[09:56:25.0000] <littledan>
+ljharb: What do you mean?
+
+[09:56:36.0000] <devsnek>
+s/should be a difference/should have to be a difference/
+
+[09:56:40.0000] <littledan>
+nothing's passed to the proxy in the current design
+
+[09:57:18.0000] <littledan>
+devsnek: I think it's important that we bring a good developer experience to people who write libraries, and a good on-ramp, but it doesn't mean that the set of people is the same in practice or that we can't talk about the differences
+
+[09:57:56.0000] <devsnek>
+the first main issue i have is reflection
+
+[09:58:04.0000] <ljharb>
+littledan: right, i meant in a "allow tunneling" variant
+
+[09:58:14.0000] <devsnek>
+i dislike the idea of adding things that don't naturally have some first class way of interation
+
+[09:58:44.0000] <devsnek>
+the second thing is having to learn a new way of representing the manipulation of values
+
+[09:58:47.0000] <devsnek>
+not just a new api
+
+[09:59:16.0000] <littledan>
+ljharb: I guess. Well, anyway, see my slides linked above for more background on why we didn't select a tunneling approach.
+
+[09:59:59.0000] <littledan>
+devsnek: OK, you're opposed to anything second-class?
+
+[10:00:58.0000] <devsnek>
+not unilaterally
+
+[10:01:07.0000] <devsnek>
+but in the case of decorators, yes
+
+[10:01:25.0000] <ljharb>
+littledan: ftr i think the current approach is the right default - i'm saying that i think the extension should be a holistic and safe way to allow tunneling explicitly
+
+[10:02:10.0000] <littledan>
+ljharb: If someone wants to take it up, a starting point could be https://github.com/littledan/proposal-proxy-transparent/issues/4
+
+[10:02:22.0000] <littledan>
+I'd be totally open to handing this repo over to another champion
+
+[10:02:45.0000] <ljharb>
+noted
+
+[10:04:17.0000] <devsnek>
+also as long as you're here
+
+[10:04:32.0000] <devsnek>
+on the finalization subject
+
+[10:05:09.0000] <devsnek>
+as far as I can tell the only thing preventing real engines from infinite looping is the fact that they check for empty cells an order of magnitude less frequently than engine262 does
+
+[10:05:41.0000] <devsnek>
+which is why I thought it would be worth mentioning it explicitly as something to watch out for
+
+[10:19:14.0000] <littledan>
+maybe we should have an implementers guide. The readme is written more with JS developers as an audience, and I think it's best to keep it that way.
+
+[11:11:54.0000] <devsnek>
+littledan: is it expected that test262 would pass if $262.gc() was a noop
+
+[11:12:28.0000] <devsnek>
+actually i guess if the implementation collects at a high enough frequency it wouldn't need to do anything
+
+[11:12:45.0000] <littledan>
+devsnek: I haven't reviewed all the current test262 tests in detail, but I'd be comfortable with test262 tests being checked in which didn't work if $262.gc() weren't a no-op
+
+[11:13:08.0000] <littledan>
+if that restriction is made, then probably implementations need to share tests at some other level. I was happy that we were able to be flexible about this for Intl locales
+
+[11:13:11.0000] <devsnek>
+i think we currently have such tests
+
+[11:13:23.0000] <littledan>
+Good, that makes me happy
+
+[11:13:28.0000] <devsnek>
+but i'm not sure if its because engine262 has an incredibly high collection frequency or because the tests just don't expect it to do anything
+
+[11:13:51.0000] <littledan>
+I'm confused. I think if there are tests which don't pass if *too much* collection is done, then they're invalid
+
+[11:14:01.0000] <devsnek>
+oh sorry what i meant is
+
+[11:14:02.0000] <littledan>
+maybe if you mentioned a test, we could dig into it more?
+
+[11:14:08.0000] <devsnek>
+they pass even though $262.gc is a noop
+
+[11:14:14.0000] <TabAtkins>
+No-op is a valid GC strategy as long as you have enough memory. ^_^
+
+[11:14:38.0000] <littledan>
+devsnek: OK, well, that all sounds plausible
+
+[11:14:55.0000] <littledan>
+that sounds like a valid implementation of $262.gc() for your implementation
+
+[11:15:17.0000] <devsnek>
+i just wanted to check if thats valid cuz if it wasn't i'd want to dig in
+
+[11:17:18.0000] <devsnek>
+i could probably add weakset and weakmap at this point
+
+[11:17:22.0000] <devsnek>
+what a weird concept
+
+[11:18:53.0000] <devsnek>
+also there's barely a slowdown for my naive mark implementation which is pretty neat
+
+[11:19:12.0000] <devsnek>
+but it probably means the rest of engine262 is just so slow that even marking the entire heap is fast in comparison
+
+[11:26:13.0000] <littledan>
+I gathered that performance wasn't really a goal of engine262
+
+[11:28:31.0000] <devsnek>
+yeah lol
+
+[11:28:39.0000] <devsnek>
+well i try to keep it usable at least
+
+[11:29:09.0000] <devsnek>
+i think there are a couple of tests i skip because they take like 15 minutes to run though
+
+[11:29:21.0000] <rkirsling>
+I thought Weak* things are just specified to work in the presence of collection, not demand that collection occur?
+
+[11:29:37.0000] <ljharb>
+nothing demands collection occurs
+
+[11:29:40.0000] <rkirsling>
+yeah.
+
+[11:29:42.0000] <devsnek>
+https://gc.gy/49759181.png
+
+[11:30:08.0000] <ljharb>
+devsnek: but how will you know if engine262 handles html comments properly
+
+[11:30:08.0000] <devsnek>
+yeah i suppose i could implement them without the collection
+
+[11:30:33.0000] <devsnek>
+every once in a while i run them locally
+
+[12:13:34.0000] <devsnek>
+littledan: something potentially more interesting... i'm seeing 0% coverage for %FinalizationGroupCleanupIteratorPrototype%.next
+
+
+2020-02-19
+[16:41:52.0000] <rkirsling>
+wait, so if https://bugzilla.mozilla.org/show_bug.cgi?id=1574180 shipped in FF 70 and hasn't been rolled out, doesn't that confirm web compat of https://github.com/tc39/ecma262/pull/1490?
+
+[16:43:19.0000] <rkirsling>
+(er "hasn't been reverted", I mean; some WebKit-ese slipped out there)
+
+[17:17:30.0000] <ljharb>
+rkirsling: yes, but nobody from FF has commented that yet :-p
+
+[17:17:50.0000] <ljharb>
+("rolled out" to me means "shipped", not "reverted", so ty for the translation :-p)
+
+[17:22:26.0000] <rkirsling>
+(yeah I agree...which is why I'm surprised I said it just now. For WK, there's a metaphor in which revisions are "rolled in and out" of SVN trunk, as if it were a physical tree trunk built up from disc-shaped slices. It's annoying because it directly conflicts with the normal meaning of "roll out" in English, but I guess I've gotten used to it over the years)
+
+[02:58:20.0000] <littledan>
+devsnek: Glad you checked that! But, that's funny, I see a bunch of tests that should call that method, e.g., test/built-ins/FinalizationRegistry/prototype/cleanupSome/iterator-holdings-multiple-values.js (through ...)
+
+[02:59:01.0000] <littledan>
+devsnek: Anyway, sounds like it could be good to file a test262 issue to explain exactly what you're seeing, so that the experts there can verify that there's good coverage
+
+[09:21:49.0000] <devsnek>
+littledan: 👍🏻 i opened https://github.com/tc39/test262/issues/2507
+
+[11:28:27.0000] <bradleymeck>
+https://twitter.com/RReverser/status/1230208429790318594 i wish buffer.grow would come back XD
+
+[11:30:34.0000] <Bakkot>
+this seems like an adequate reason to add SharedArrayBuffer.grow all on its own, honestly
+
+[11:30:40.0000] <Bakkot>
+cc shu^
+
+[11:48:16.0000] <bradleymeck>
+Bakkot: it works on non-shared as well
+
+[14:51:35.0000] <littledan>
+note that WebAssembly.Memory may make different tradeoffs than ArrayBuffer, especially about whether to  allocate a whole 32-bit address space (removing the need for bounds checking by substituting virtual memory protection) or just a normal memory allocation (with bounds checking)
+
+[14:52:10.0000] <littledan>
+honestly I'm pretty surprised that DevRel is mentioning this without that other caveat (unless the implementation strategies changed since I learned about them)
+
+[14:54:06.0000] <Bakkot>
+littledan: re the layering PR: we are talking about that now and will have a short list of editorial changes to request shortly, and when they're made we can land it (or if you'd prefer we can make those ourselves I guess)
+
+[14:55:56.0000] <littledan>
+Bakkot: Good, looking forward to the list, and I'm happy to apply them
+
+[14:56:05.0000] <littledan>
+(or, either way)
+
+[14:57:39.0000] <Bakkot>
+littledan: https://github.com/tc39/ecma262/pull/1597#issuecomment-588517004
+
+[15:10:33.0000] <littledan>
+oh I see, thanks
+
+[15:27:03.0000] <Bakkot>
+if anyone is good at naming things, suggestions for names for https://github.com/tc39/ecma262/pull/1623 are actively solicited
+
+[15:28:50.0000] <Bakkot>
+Uint53-string and Uint32-string are kinda bad, if nothing else for the reason that one of them has the maximum value 2**53 - 1 and the other has the maximum value 2**32 - 2
+
+[15:32:06.0000] <rickbutton>
+"integer-like string" ?
+
+[15:35:50.0000] <rkirsling>
+what was the reason that I can't apply someone's suggestion to my PR again?
+
+[15:35:55.0000] <rkirsling>
+it's so frustrating
+
+[15:36:04.0000] <ljharb>
+rkirsling: because the suggester has commit access
+
+[15:36:09.0000] <ljharb>
+super annoying
+
+
+2020-02-20
+[20:06:04.0000] <jmdyck>
+Bakkot: re 1623: I'm doubtful there will be good names that convey the -1 vs -2 distinction, so I don't think that can be held against my suggested names. It'd be worth pointing out in a Note, though.
+
+[21:24:05.0000] <devsnek>
+littledan: memory protection requires a whole 4gb allocation?
+
+[21:24:53.0000] <devsnek>
+I thought you just needed page alignment
+
+[10:02:06.0000] <devsnek>
+now on npm --> https://www.npmjs.com/package/esvu
+
+[10:04:07.0000] <Bakkot>
+devsnek I missed the context; why this over jsvu?
+
+[10:04:28.0000] <devsnek>
+Bakkot: jsvu will only distribute engines that provide native binaries
+
+[10:04:46.0000] <devsnek>
+no additional runtime dependencies
+
+[10:04:50.0000] <devsnek>
+well sort of
+
+[10:04:58.0000] <devsnek>
+jsc still has additional runtime dependencies either way so
+
+[10:23:12.0000] <ljharb>
+so esvu atm is basically, jsvu + engine262?
+
+[10:25:33.0000] <devsnek>
++ graaljs
+
+[10:25:39.0000] <devsnek>
++ more in the future?
+
+[10:25:42.0000] <devsnek>
+idk
+
+[12:27:51.0000] <jmdyck>
+After a PR's commits have been squashed-on-merge, is there a way to get github to show the pre-squash commits?
+
+[12:31:05.0000] <TabAtkins>
+If you know the hash you should be able to navigate to the commit?
+
+[12:31:22.0000] <TabAtkins>
+Or if you can undelete the branch.
+
+[12:34:05.0000] <jmdyck>
+I restored the branch, but it just shows the single squashed commit.
+
+[12:44:11.0000] <devsnek>
+jmdyck: check your local reflogs
+
+[12:49:00.0000] <jmdyck>
+yeah, but that doesn't appear to tell me the pre-squash commits on a particular branch
+
+[12:49:37.0000] <jmdyck>
+I mean, I'm sure they're all there, but not identified as such.
+
+[12:51:11.0000] <ljharb>
+jmdyck: no, it's a force push to the PR branch
+
+[12:51:22.0000] <ljharb>
+jmdyck: the original commit hashes are still referenceable thoi
+
+[12:51:47.0000] <jmdyck>
+ah, i can use a hash for the branch.
+
+[12:52:36.0000] <ljharb>
+lmk if you need the pre-rebase commit for any of your PRs, they're probably still in my reflog
+
+[12:55:16.0000] <jmdyck>
+no thanks, I think I figured things out.
+
+[12:55:23.0000] <ljharb>
+kk
+
+[13:06:03.0000] <Bakkot>
+the default behavior of squash-and-merge in Github's UI on PRs is to leave the pre-squash commits on the branch, and just put the squashed one in master
+
+[13:06:39.0000] <Bakkot>
+(we do not use this on ecma262 though, for reasons)
+
+[14:54:17.0000] <keith_miller>
+shu: Lol you just re-proposed my original design :P
+
+[14:54:31.0000] <keith_miller>
+So obviously I'm on board!
+
+[14:56:12.0000] <shu>
+keith_miller: yes i figured you would be
+
+[14:57:19.0000] <shu>
+keith_miller: think we had to come full circle around "not useful for the engine to get backpressure" first
+
+[14:57:24.0000] <shu>
+i wonder if till will be convinced
+
+[14:58:20.0000] <keith_miller>
+shu: Idk, but Till doesn't come to tc-39 anymore and I'm not sure if he's even reading these threads (he hasn't replied)
+
+[14:58:40.0000] <keith_miller>
+I think Till's fully on board the WASM hype train now :P
+
+[14:59:33.0000] <shu>
+/me still wants to ship before end of march
+
+[14:59:41.0000] <keith_miller>
+🚂!
+
+[15:00:35.0000] <keith_miller>
+shu: Uhh, I think you gotta boot up those 📞 plenaries then?
+
+[15:02:34.0000] <shu>
+https://imgflip.com/i/3ptkkl
+
+[15:41:25.0000] <devsnek>
+i wonder if do expressions will ever happen
+
+
+2020-02-21
+[20:14:35.0000] <devsnek>
+the checks that proxies make on their traps make it difficult to accurately mock spec exotic objects
+
+[20:15:32.0000] <devsnek>
+for example module namespaces pretend to have properties that don't exist in their underlying ordinary object properties
+
+[20:16:10.0000] <Bakkot>
+jmdyck: re new names for integer / array index: to my eye Uint53 and Uint32 actively imply the absence of the -2 / -1 distinction which is therefore a strike against them as opposed to other names
+
+[20:20:41.0000] <Bakkot>
+devsnek: is there a reason you care about their underlying ordinary object properties? that is, is there a reason you wouldn't just proxy an object with all the properties of the module namespace?
+
+[20:21:04.0000] <Bakkot>
+(I am legitimately asking; I don't have all of the proxy invariants and module namespace object details paged in)
+
+[20:21:40.0000] <devsnek>
+so like
+
+[20:21:58.0000] <devsnek>
+GetOwnProperty basically says "look up the property from the module"
+
+[20:22:10.0000] <devsnek>
+but proxies don't let you return properties that don't exist on the target
+
+[20:22:13.0000] <devsnek>
+so now you have to like
+
+[20:22:17.0000] <devsnek>
+mirror the properties
+
+[20:22:26.0000] <devsnek>
+its not impossible to solve
+
+[20:22:30.0000] <devsnek>
+just not very obvious
+
+[20:22:47.0000] <Bakkot>
+ah
+
+[20:24:08.0000] <devsnek>
+i think the problem is that proxies try to verify the essential invariants against the target, even though you're trying to project the invariants through the modified traps
+
+[20:25:02.0000] <Bakkot>
+it's actually a kind of neat solution
+
+[20:25:17.0000] <Bakkot>
+to the problem of, not wanting to let people do incoherent things, but you don't have a type syste
+
+[20:25:18.0000] <Bakkot>
+m
+
+[20:25:35.0000] <devsnek>
+yeah its not terrible
+
+[20:25:40.0000] <devsnek>
+just makes things slightly more complex
+
+[20:25:42.0000] <devsnek>
+oh well
+
+[20:26:04.0000] <Bakkot>
+the solution being, in leiu of a type-system level proof, you just have to exhibit target object as an existence proof that you are not doing anything which you could not otherwise do, w.r.t the invariants
+
+[20:26:30.0000] <devsnek>
+instead of storing a list of exports i'm now using the object that represents the module's exported bindings as the target
+
+[20:29:00.0000] <ljharb>
+what do you mean, don't let you return properties that don't exist on the target?
+
+[20:29:20.0000] <ljharb>
+oh meaning you can't claim it's missing and then later claim it's there
+
+[20:29:32.0000] <Bakkot>
+ljharb: module namespace objects are not extensible
+
+[20:29:47.0000] <ljharb>
+right
+
+[20:29:56.0000] <devsnek>
+ljharb: rather, the exotic behaviour claims properties exist that do not actually exit
+
+[20:30:12.0000] <devsnek>
+well, they exist in terms of the exotic methods
+
+[20:30:20.0000] <devsnek>
+but not in terms of the underlying ordinary properties
+
+[20:30:23.0000] <devsnek>
+which is how proxies try to verify it
+
+[20:30:49.0000] <Bakkot>
+devsnek: hm, I would not regard the target as being "the underlying ordinary properties"
+
+[20:31:04.0000] <Bakkot>
+the target of a proxy is a different object than the proxy
+
+[20:31:10.0000] <Bakkot>
+it's just kind of hanging out
+
+[20:31:11.0000] <devsnek>
+yeah ik
+
+[20:31:11.0000] <Bakkot>
+being a witness
+
+[20:35:23.0000] <devsnek>
+is there no reference to the proxy object in a proxy trap
+
+[20:37:14.0000] <Bakkot>
+the object itself? I don't believe so, no
+
+[20:37:23.0000] <devsnek>
+i guess doing `this.get()` instead works
+
+[20:37:26.0000] <Bakkot>
+IIRC you get a reference to the handler object
+
+[20:49:12.0000] <devsnek>
+seems to work now, bad formatting aside https://gc.gy/49965493.png
+
+[21:13:21.0000] <jmdyck>
+Bakkot: so then how about 'Uint53-string' and (say) 'Uint32m-string', where the 'm' reminds you of the one value 'missing' from the Uint32 range.
+
+[21:16:28.0000] <ljharb>
+that's pretty obtuse i think
+
+[21:17:03.0000] <jmdyck>
+it's less obtuse than the status quo, i'd say.
+
+[21:19:32.0000] <ljharb>
+personally i want the names to reflect what they're for, not what they are
+
+[21:19:44.0000] <ljharb>
+(a very weak "want")
+
+[21:20:14.0000] <jmdyck>
+too weak to put it in the PR discussion?
+
+[21:20:22.0000] <ljharb>
+so far yes
+
+[21:20:27.0000] <shu>
+i cannot abide by uint32m-string
+
+[21:20:28.0000] <jmdyck>
+k
+
+[21:20:29.0000] <ljharb>
+but i did offer a suggestion
+
+[21:20:35.0000] <ljharb>
+one that wasn't responded to :-p
+
+[21:22:01.0000] <jmdyck>
+shu: note that I'm not thrilled with uint32m-string either, I'm just trying to address feedback.
+
+[21:22:07.0000] <shu>
+one suggestion i raised that Bakkot and mficarra didn't like was typeset the range directly
+
+[21:22:21.0000] <shu>
+jmdyck: indeed, sorry if i came off strong
+
+[21:22:31.0000] <devsnek>
+why not just say "integer index" and "array index"
+
+[21:22:35.0000] <shu>
+i still wanna try typesetting the range directly and see how it looks
+
+[21:22:44.0000] <devsnek>
+(I'm entering this conversation without context btw)
+
+[21:23:02.0000] <jmdyck>
+devsnek: see PR for reasons
+
+[21:23:09.0000] <shu>
+like {index key}_{0}^{2^32-2}
+
+[21:23:14.0000] <devsnek>
+which one
+
+[21:23:32.0000] <jmdyck>
+https://github.com/tc39/ecma262/pull/1623
+
+[21:23:57.0000] <devsnek>
+ah I got it
+
+[21:24:01.0000] <devsnek>
+string vs int
+
+[21:24:31.0000] <shu>
+also that it is pretty opaque that "array" means up to 2^32-2
+
+[21:24:38.0000] <jmdyck>
+shu: I don't understand your suggestion
+
+[21:24:43.0000] <shu>
+and "integer" means 2^53-1
+
+[21:24:58.0000] <devsnek>
+why not redefine those two things as ints and then refer to the string ones explicitly as "xyz index string"
+
+[21:25:31.0000] <jmdyck>
+that was ljharb's sugg in the pr discussion
+
+[21:25:44.0000] <jmdyck>
+sort of
+
+[21:25:56.0000] <shu>
+jmdyck: bakkot's objection to uint32 and uint53 are that they are actively misleading
+
+[21:26:11.0000] <devsnek>
+hmm github app might be hiding stuff
+
+[21:26:15.0000] <shu>
+because the top end of the range isn't uint32 max or uint53 max, but uint32 - 2 and uint53 - 1, respectively
+
+[21:26:39.0000] <jmdyck>
+(unit53 -1 *is* unit53 max)
+
+[21:27:11.0000] <Bakkot>
+this is a url: data:text/html,indexKey<sub>0</sub><sup style='margin-left:-.5em'>2<sup>53</sup>-1</sup>
+
+[21:27:18.0000] <Bakkot>
+that is what shu was suggesting
+
+[21:27:24.0000] <jmdyck>
+(or rather, 2^53 - 1 is what you would naturally expect uint53 max to be)
+
+[21:27:34.0000] <shu>
+yes that's what i'm proposing
+
+[21:27:44.0000] <shu>
+jmdyck: true enough, yes
+
+[21:30:38.0000] <shu>
+jmdyck: rather, the confusion is that uint32 won't mean the same thing as uint53 for the range, to which your suggestion was adding 'm', and the alternative of mine is to just show the range directly
+
+[21:32:19.0000] <shu>
+though now that i look at Bakkot's data url
+
+[21:32:26.0000] <shu>
+idk that ain't so good
+
+[21:33:12.0000] <jmdyck>
+so your suggestion was to use (the html for) "{index key}_{0}^{2^32-2}" everywhere my PR says "Uint32-string"?
+
+[21:33:34.0000] <shu>
+correct, and 2^53-1 for uint53
+
+[21:34:10.0000] <shu>
+to get across that 1) it's property key used as an index and 2) what the actual value range is
+
+[21:34:58.0000] <jmdyck>
+hm, well it puts the significant part ("53" or "32") in a superscript of a superscript.
+
+[21:35:22.0000] <shu>
+yeah
+
+[21:35:28.0000] <shu>
+i don't love my own suggestion fwiw
+
+[21:35:59.0000] <Bakkot>
+shu: it looks a little better with smaller sub/superscripts: data:text/html,indexKey<sub style='font-size: 10px'>0</sub><sup style='margin-left:-.5em;font-size: 10px'>2<sup>53</sup>-1</sup>
+
+[21:36:03.0000] <Bakkot>
+but yeah it is not... great
+
+[21:36:06.0000] <shu>
+and that was Bakkot's exact objection
+
+[21:39:33.0000] <ljharb>
+and why not name them with "array" and "string" rather than with the exact number range?
+
+[21:44:06.0000] <jmdyck>
+so "array index string" and "string index string"?
+
+[21:44:22.0000] <jmdyck>
+(modulo capitalization and hyphenation)
+
+[21:46:17.0000] <jmdyck>
+or maybe "array index key" and "string index key"
+
+[21:50:19.0000] <ljharb>
+sure, it's just more meaningful to me if it's described as being for an array, or for a string
+
+[21:50:45.0000] <ljharb>
+the array one is also the output of ToLength, so maybe something like that
+
+[21:53:57.0000] <jmdyck>
+Note that there's also a -1 vs -2 distinction hidden in "array" vs "string": Roughly speaking, the max "array index" is the maximum index of an array element, but the max "string index" is *one more than* the maximum index of a string element.
+
+[21:58:20.0000] <jmdyck>
+(which makes me wonder if there are lurking bugs for a string that is the max length)
+
+[22:35:16.0000] <jmdyck>
+my impression is that those "lurking bugs" don't exist, and the maximum "integer index" could be one lower than it is, without normative impact.
+
+[12:19:07.0000] <devsnek>
+why is OrdinarySetWithOwnDescriptor a separate section
+
+[13:13:03.0000] <Bakkot>
+devsnek: per git blame: https://github.com/tc39/ecma262/pull/992
+
+[13:56:26.0000] <devsnek>
+ah called from another spec
+
+[13:56:27.0000] <devsnek>
+neat
+
+
+2020-02-22
+[17:25:27.0000] <mnini>
+Greetings, how does it goes, when having some issues with specification? I have several ideas,...
+
+[17:26:30.0000] <mnini>
+First of all, Proxy should work even for variables, and it should return deep. Now at laest in Node.js, proxy doesn't let you control access even to nested objects.
+
+[17:26:53.0000] <mnini>
+But I'm just here to ask how do I if I want to improve something.
+
+[17:27:35.0000] <devsnek>
+if you want to make a change to the specification, you write up a proposal
+
+[17:27:40.0000] <devsnek>
+see here for more details: https://github.com/tc39/ecma262/blob/master/CONTRIBUTING.md#new-feature-proposals
+
+[17:28:09.0000] <devsnek>
+however, "deep" proxies are very unlikely to be picked up by the committee
+
+[17:28:20.0000] <devsnek>
+what you should do is return new proxies
+
+[17:50:23.0000] <ljharb>
+mnini: what do you mean "work even for variables"?
+
+[18:04:22.0000] <mnini>
+It doesn't make sense... Writting a preprocessor does bigger...
+
+[18:04:47.0000] <mnini>
+Evolution of language towards "uch this is so easy that I can write it"... I don't think it will have any negative inpact.
+
+[18:05:06.0000] <mnini>
+Along with long.long.objects...
+
+[18:05:27.0000] <mnini>
+Why it doesn't iterate by default, if only option is iteration?
+
+[18:06:04.0000] <mnini>
+Like I can have variable which has bindable get and set without an object.
+
+[18:06:20.0000] <mnini>
+Setter of object itself, not it's property
+
+[18:06:44.0000] <mnini>
+Invoking objects would also be pretty much SELF DESCRIBING CODE,
+
+[18:07:40.0000] <ljharb>
+mnini: i'm really not sure what you mean. "iteration" is the iterator protocol, which isn't a general object thing
+
+[18:08:44.0000] <mnini>
+Iterative... Recursive function setting up proxies is something that nobody wants to waste time with. Having default few levels deeper into value...
+
+[18:09:21.0000] <mnini>
+Like variable.nested.really.long.property = 0 doesn't works if everything is not an object, you must call another function etc...
+
+[18:09:33.0000] <mnini>
+That is reason we now need some "realms" or something...
+
+[18:09:53.0000] <mnini>
+If it binded before, now it could along with \ placed in there work like namespace.
+
+[18:11:34.0000] <mnini>
+space /variable.nested/ and suddenly you can have whole object binded to native values, because dot is on odd place on the keyboard.
+
+[22:45:50.0000] <rkirsling>
+huh. I was looking at some Intl failures for fun and I think this test is wrong 🤔
+
+[22:45:51.0000] <rkirsling>
+https://test262.report/browse/intl402/Collator/missing-unicode-ext-value-defaults-to-true.js
+
+[22:47:00.0000] <rkirsling>
+this thread https://github.com/tc39/ecma402/issues/223 led to a modification under 8.h here https://tc39.es/ecma402/#sec-resolvelocale
+
+[22:47:59.0000] <rkirsling>
+but if the locale has an explicit `-kn-true`, there's nothing there that specifies it to be canonicalized to just `-kn`
+
+[22:48:21.0000] <rkirsling>
+it's slightly worrying that SM does pass the test though
+
+
+2020-02-23
+[17:37:04.0000] <Bakkot>
+jmdyck: how have you been generating the headers in https://github.com/tc39/ecma262/pull/545 ?
+
+[03:47:33.0000] <jackworks>
+I'm curious about the `System.*` namespace. It seems that there was a time (maybe around 2017), some proposal is using the `System` namespace like it is a "standard library namespace" (like `java.lang.*` for Java) for their APIs like `System.getStackString` from https://tc39.es/proposal-error-stacks/ or `System.import(...)` for dynamic import iirc.
+
+[03:47:33.0000] <jackworks>
+Why does the System namespace no longer used today? When does it originate? Where does it comes from? Is there a history for that?
+
+[03:51:44.0000] <jackworks>
+Another question, SystemJS is a completely compatible ES Module translation target, is it a "legacy" from something like rejected proposal for ES Module? Does it related to the `System.*` namespace?
+
+[04:41:04.0000] <jmdyck>
+Bakkot: I generate the #545 headers via code in https://github.com/jmdyck/ecmaspeak-py, specifically https://github.com/jmdyck/ecmaspeak-py/blob/master/static_type_analysis.py
+
+[07:20:57.0000] <ljharb>
+jackworks: a number of proposals grant privileges, and were thus originally conceived as going on a “privilege-granting” object like System. dynamic import needed to be syntactic to be contextual; System.global ended up being a global (to match people’s usage) and because a global can be denied and linted against just like System usage
+
+[07:21:35.0000] <ljharb>
+jackworks: for stacks, it’s still somewhat of an open question but as long as virtualization can be done with them on Error, then there’s no need for System
+
+[07:22:23.0000] <ljharb>
+jackworks: SystemJS originated with a pre-2015 module spec, which includes the loader spec that never materialized, so I’m not sure how it’s different from the actual spec today (but there’s definitely no System namespace)
+
+[07:37:54.0000] <jackworks>
+Thanks for the explanation!
+
+
+2020-02-24
+[17:42:15.0000] <Bakkot>
+jmdyck: neat, thanks!
+
+[17:42:29.0000] <Bakkot>
+jmdyck: also I notice some of the headers seem to have some stray punctuation in the current commit, e.g. https://deploy-preview-545--ecma262-snapshots.netlify.com/#sec-updateempty
+
+[17:43:11.0000] <jmdyck>
+you mean the trailing underscores?
+
+[17:43:20.0000] <Bakkot>
+Yeah
+
+[17:44:20.0000] <jmdyck>
+those are intentional, to distinguish "made up" types from more-or-less 'official' types
+
+[17:44:52.0000] <Bakkot>
+Ah, neat, thanks
+
+[17:45:32.0000] <jmdyck>
+https://github.com/tc39/ecma262/pull/545#issuecomment-214957715
+
+[17:47:41.0000] <Bakkot>
+I could figure this out by reading it, but since it's 14k lines of code and you're here, is the type analysis you linked above interprocedural?
+
+[17:48:35.0000] <jmdyck>
+yup.
+
+[17:49:20.0000] <Bakkot>
+In particular, I am intending to get to https://github.com/tc39/ecma262/issues/1796 soon, hopefully, which will include specifying for each algorithm whether it returns a completion record or not, and it would be extremely helpful to automatically note when `ReturnIfAbrupt` and friends are used with an algorithm which does not return a completion record (or not used with an algorithm which does), so I can fix those usages
+
+[17:49:28.0000] <jmdyck>
+(It's a horrible kludge-fest, but it comes up with useful complaints sometimes.)
+
+[17:50:41.0000] <jmdyck>
+(yeah, i just remembered you had raised 1796, so was about to ask if that was your point of interest.)
+
+[17:58:21.0000] <jmdyck>
+I've got checks for using ReturnIfAbrupt or '?' when the operand can't be abrupt.
+
+[18:00:15.0000] <jmdyck>
+For RIA, currently only finding one...
+
+[18:02:08.0000] <jmdyck>
+https://tc39.es/ecma262/#sec-equality-operators-runtime-semantics-evaluation, second group, step 6. (Abstract Equality Comparison can't return abrupt)
+
+[18:02:32.0000] <jmdyck>
+For '?', four...
+
+[18:07:16.0000] <jmdyck>
+https://tc39.es/ecma262/#sec-runtime-semantics-forin-div-ofheadevaluation-tdznames-expr-iterationkind, step 6.c, EnumerateObjectProperties can't throw?
+
+[18:08:14.0000] <Bakkot>
+Do you happen to also have checks for using `!` when the operand can't be abrupt?
+
+[18:08:26.0000] <Bakkot>
+I am certain there's a lot more of those, since ljharb has been explicitly asking they be added
+
+[18:08:36.0000] <Bakkot>
+but it is my intent to get rid of them while I'm at it
+
+[18:09:30.0000] <jmdyck>
+https://tc39.es/ecma262/#sec-generator-function-definitions-runtime-semantics-evaluation, 2 calls to GeneratorYield, which can't return abruptly?
+
+[18:09:41.0000] <jmdyck>
+(and the 4th is a mistake)
+
+[18:10:39.0000] <Bakkot>
+"EnumerateObjectProperties can't throw" is correct; that's plausibly a leftover from the [[Enumerate]] trap existing
+
+[18:11:43.0000] <jmdyck>
+I had a check for '!' applied to an operand that can't be abrupt, but commented it out, because there are a lot of hits.
+
+[18:11:57.0000] <jmdyck>
+(not so many originally)
+
+[18:13:32.0000] <Bakkot>
+GeneratorYield can return abruptly, kind of
+
+[18:15:07.0000] <Bakkot>
+specifically, if I understand correctly the `?` in `Otherwise, return ? GeneratorYield(...)` is unwrapping the completion returned in 8.a of GeneratorYield, which can be abrupt via Generator.prototype.throw
+
+[18:17:50.0000] <jmdyck>
+but does the return in 8.a return a value to the caller of GeneratorYield?
+
+[18:18:45.0000] <jmdyck>
+Note says it doesn't.
+
+[18:18:50.0000] <jmdyck>
+or
+
+[18:18:56.0000] <Bakkot>
+It must, yes, because that's how the value gets to `yield`
+
+[18:19:24.0000] <jmdyck>
+yeah
+
+[18:19:50.0000] <Bakkot>
+The note says that it returns to the evaluation of the YieldExpression, which is to say, to my understanding, to the `?`
+
+[18:21:34.0000] <jmdyck>
+yeah, I don't entirely understand how the spec specifies generators yet
+
+[18:30:26.0000] <jmdyck>
+I uncommented that '!' check: it found 233 cases.
+
+[18:30:55.0000] <devsnek>
+does anyone know what the most spec compliant js parser is
+
+[18:31:01.0000] <devsnek>
+I'm guessing acorn or babel
+
+[18:32:26.0000] <devsnek>
+Bakkot: jmdyck: it returns to the exact point where it says "suspend the evaluation"
+
+[18:32:44.0000] <Bakkot>
+devsnek: I guess shift :P
+
+[18:32:50.0000] <Bakkot>
+babel and acorn are pretty loose
+
+[18:32:57.0000] <devsnek>
+Bakkot: current spec
+
+[18:33:02.0000] <devsnek>
+otherwise yes I'd go with shift
+
+[18:33:07.0000] <Bakkot>
+ah, probably babel
+
+[18:33:23.0000] <devsnek>
+I've finally figured out my plan for giving engine262 its own parser
+
+[18:33:29.0000] <jmdyck>
+hm, test262.report doesn't test parsers against test262-parser-tests
+
+[18:33:40.0000] <Bakkot>
+test262-parser-tests is pretty stale too
+
+[18:33:53.0000] <Bakkot>
+hoping to update it in the next month or two, but it'll probably slip
+
+[18:33:55.0000] <devsnek>
+I'm going to vendor something and then slowly modify it
+
+[18:34:13.0000] <devsnek>
+jmdyck: yeah I was thinking the same thing
+
+[18:34:23.0000] <devsnek>
+I'd love to add to it but it's closed source :(
+
+[18:35:34.0000] <jmdyck>
+which is closed source?
+
+[18:35:42.0000] <Bakkot>
+there's no source
+
+[18:35:48.0000] <devsnek>
+test262.report
+
+[18:35:51.0000] <Bakkot>
+oh, that one
+
+[18:35:57.0000] <Bakkot>
+I meant test262-parser-tests
+
+[18:36:04.0000] <devsnek>
+why do we have a separate repo for that
+
+[18:36:19.0000] <Bakkot>
+for the parser tests?
+
+[18:36:25.0000] <devsnek>
+yeah
+
+[18:36:35.0000] <Bakkot>
+mostly because they have a pretty different approach than main the test262 tests
+
+[18:36:53.0000] <devsnek>
+they could just be normal tests with a "parse" feature or something
+
+[18:36:57.0000] <devsnek>
+flag
+
+[18:37:15.0000] <devsnek>
+testing parsers filters for them, full engines run them normally
+
+[18:37:17.0000] <devsnek>
+everyone wins
+
+[18:37:28.0000] <Bakkot>
+the big differences are that they attempt to specify what a parse "should" be, they include any negative test anyone has ever found useful, and they include assertions that you reject things which are not explicitly prohibited by the specification
+
+[18:37:46.0000] <Bakkot>
+the second one is the main difference
+
+[18:37:50.0000] <devsnek>
+hmm
+
+[18:39:22.0000] <jmdyck>
+see https://github.com/tc39/test262/pull/559 for some background
+
+[18:42:19.0000] <jmdyck>
+why does engine262 want its own parser?
+
+[18:43:12.0000] <devsnek>
+because overriding acorn is painful
+
+[18:43:17.0000] <devsnek>
+and acorn had a lot of problems
+
+[18:43:24.0000] <devsnek>
+at least with regard to test262
+
+[18:43:36.0000] <devsnek>
+and estree kind of sucks
+
+[18:44:06.0000] <devsnek>
+I had to argue for like a month to get a not-broken estree form for optional chaining
+
+[18:47:58.0000] <Bakkot>
+I saw that thread
+
+[18:49:54.0000] <Bakkot>
+actually I see it still isn't settled
+
+[18:50:15.0000] <Bakkot>
+I am glad shift has taken the approach of being willing to make breaking changes in the ast format for each yearly release
+
+[18:53:03.0000] <devsnek>
+i don't understand the concept of not introducing new ast types for new syntax
+
+[18:55:04.0000] <devsnek>
+aw man babel parser has deps
+
+[18:55:42.0000] <Bakkot>
+sounds like you should keep using shift!
+
+[18:55:53.0000] <devsnek>
+i can't use shift unless it updates
+
+[18:56:11.0000] <Bakkot>
+you said you were going to vendor-and-patch anyway
+
+[18:57:29.0000] <devsnek>
+yeah patch like slow and small changes
+
+[18:57:41.0000] <devsnek>
+i don't have the bandwidth to make huge changes
+
+[18:57:46.0000] <devsnek>
+even within engine262
+
+[18:58:29.0000] <devsnek>
+actually i couldn't use shift cuz it doesn't use estree
+
+[18:58:38.0000] <devsnek>
+migrating away from estree will take a long time
+
+[18:58:55.0000] <Bakkot>
+ah, fair enough
+
+[18:59:03.0000] <Bakkot>
+well, you could use shift and then use the estree converted
+
+[18:59:09.0000] <Bakkot>
+this would be slightly silly but it would work
+
+[18:59:26.0000] <devsnek>
+there's a shift to estree converter?
+
+[18:59:27.0000] <Bakkot>
+https://github.com/shapesecurity/shift-spidermonkey-converter-js
+
+[18:59:40.0000] <Bakkot>
+it's also stale, but is pretty trivial to fix
+
+[18:59:49.0000] <Bakkot>
+if this were the only thing blocking you I would get it fixed
+
+[19:00:11.0000] <devsnek>
+that and lack of whatever has happened since whenever shift was last updated
+
+[19:00:19.0000] <devsnek>
+i haven't checked in a while so i don't have a list or anything
+
+[19:00:42.0000] <devsnek>
+> The parser supports version 6 (release candidate 2) of the ECMA-262 standard.
+
+[19:00:54.0000] <Bakkot>
+lol, that comment is false
+
+[19:00:58.0000] <Bakkot>
+it supports es2018
+
+[19:01:05.0000] <devsnek>
+ok not as terrifying
+
+[19:01:14.0000] <Bakkot>
+will support 2019 shortly after it's been cut
+
+[19:01:34.0000] <Bakkot>
+it's mostly optional chaining and nullish coalescing and `export * as ns from`, off the top of my head
+
+[19:01:36.0000] <devsnek>
+wasn't 2019 cut like a year ago?
+
+[19:02:12.0000] <Bakkot>
+... hm
+
+[19:02:15.0000] <Bakkot>
+I meant 2020
+
+[19:02:19.0000] <Bakkot>
+but it should support 2019
+
+[19:02:25.0000] <Bakkot>
+bah
+
+[19:02:41.0000] <Bakkot>
+we really have not had time to maintain it as well as I would like
+
+[19:03:15.0000] <devsnek>
+don't feel too pressured to maintain it for my benefit
+
+[19:03:18.0000] <Bakkot>
+2019 was just optional catch IIRC, as far as syntax goes
+
+[19:03:25.0000] <Bakkot>
+I mean, we use it a lot, just not with new features so much
+
+[19:03:53.0000] <Bakkot>
+we would like it to be usable by the community so people can help maintain it mostly :P
+
+[19:04:13.0000] <devsnek>
+well i'm sort of planning to vendor it
+
+[19:04:42.0000] <devsnek>
+probably not fantastic in terms of community
+
+[19:11:08.0000] <devsnek>
+i should raise some funds to hire an open source consulting firm to write a parser for engine262
+
+[19:13:11.0000] <Bakkot>
+please just contribute to an existing one
+
+[19:13:14.0000] <Bakkot>
+there are so many JS parsers
+
+[19:13:17.0000] <Bakkot>
+so many
+
+[19:13:58.0000] <devsnek>
+i've tried the whole use an existing one
+
+[19:14:01.0000] <devsnek>
+overriding sucks
+
+[19:14:04.0000] <jmdyck>
+Are there any that generate a tree that conforms to the ES grammar?
+
+[19:14:14.0000] <devsnek>
+i actively avoid working on syntactic features
+
+[19:14:36.0000] <Bakkot>
+jmdyck: there might be some automatically derived ones? but the grammar does not produce a typical AST
+
+[19:14:46.0000] <devsnek>
+i really need something in-tree
+
+[19:15:10.0000] <devsnek>
+especially since i want to convince people to try maintaining their proposals in engine262 at some point
+
+[19:15:12.0000] <devsnek>
+need low friction
+
+[19:15:31.0000] <jmdyck>
+indeed, not typical, but it's the tree you need if you want to run the ES pseudocode
+
+[19:16:07.0000] <devsnek>
+nothing i'm aware of actively tries to match the grammar in the spec
+
+[19:16:10.0000] <devsnek>
+shift is probably the closest
+
+[19:16:26.0000] <devsnek>
+there are parts of the spec that are just terrible for ast though
+
+[19:16:40.0000] <devsnek>
+comma operator
+
+[19:16:59.0000] <devsnek>
+basically parts of the spec that are never lowered to their own production
+
+[19:17:05.0000] <devsnek>
+`PrimaryExpression : this`
+
+[19:18:00.0000] <Bakkot>
+there's a bajillion intervening nodes in any interesting tree
+
+[19:18:38.0000] <jmdyck>
+yup
+
+[19:19:20.0000] <jmdyck>
+but again, that's what the syntax-directed operations want.
+
+[19:19:38.0000] <devsnek>
+and there are some parts that don't correspond to how something would actually be parsed
+
+[19:19:40.0000] <devsnek>
+like new expressions
+
+[21:32:11.0000] <jackworks>
+(typescript parse dynamic import as a CallExperssion where left = `import` syntax token; then it force the rule of only 1 parameter in type check level)
+
+[21:33:45.0000] <devsnek>
+estree used to do that too
+
+[21:34:11.0000] <devsnek>
+estree really likes to use nodes for the wrong thing so you end up emitting incorrect code
+
+[21:36:49.0000] <jackworks>
+I think dynamic import refuse to parse more than 1 argument is not a good idea, it will make future extension (like `import('', {})` in module attribute proposal) harder
+
+[21:37:21.0000] <jackworks>
+if it (more than 1 arg) is a runtime error it can be feature detected by `try` block
+
+[21:38:25.0000] <devsnek>
+that wouldn't really scale i don't think
+
+[21:38:27.0000] <jackworks>
+hm I mean, If it is not a syntax error but a runtime error today, future proposal that import with more than 1 arg can be feature detected by try block.
+
+[21:38:40.0000] <devsnek>
+you'd have to create a helper function
+
+[21:38:55.0000] <devsnek>
+babel already has too many helper functions
+
+
+2020-02-25
+[10:29:36.0000] <devsnek>
+shu: does chrome have a counter for __proto__ usage?
+
+[10:34:48.0000] <ljharb>
+devsnek: are you implying there's even the remotest chance it'd be web compatible to get rid of?
+
+[10:34:54.0000] <devsnek>
+ljharb: no
+
+[10:34:55.0000] <devsnek>
+lol
+
+[10:35:04.0000] <ljharb>
+what'd the counter be for?
+
+[10:35:10.0000] <devsnek>
+https://github.com/nodejs/node/issues/31951
+
+[10:35:31.0000] <devsnek>
+some bit of proof that this can't happen
+
+[10:35:56.0000] <ljharb>
+ah thanks
+
+[10:40:49.0000] <Bakkot>
+devsnek: ah, specifically for the getter/setter on Object.prototype
+
+[10:41:02.0000] <devsnek>
+i mean both if possible
+
+[10:41:10.0000] <devsnek>
+i assume the object literal extension would be like 100% of sites
+
+[10:41:18.0000] <devsnek>
+and the accessor would be 99.95%
+
+[10:41:52.0000] <Bakkot>
+I doubt the accessor is anything like that commonly used
+
+[10:41:55.0000] <Bakkot>
+but yeah I'm sure it's a fair bit
+
+[10:42:16.0000] <Bakkot>
+ljharb: I don't understand your point in that thread; it would be an opt-in flag, just like e.g. having a CSP to disable eval
+
+[10:45:05.0000] <ljharb>
+CSP is allowed by the spec via hooks
+
+[10:45:33.0000] <ljharb>
+being "opt in" imo doesn't just make everything ok
+
+[10:45:38.0000] <Bakkot>
+yeah but like
+
+[10:45:44.0000] <Bakkot>
+I do not understand why you think this isn't OK
+
+[10:45:47.0000] <Bakkot>
+this is a security issue
+
+[10:45:53.0000] <Bakkot>
+actual people actually suffer because of this
+
+[10:47:18.0000] <ljharb>
+like 3 or 4 of packages i maintain got CVE reports 2 years ago when they all went out re prototype pollution, i'm aware it's an issue. but i'm also aware it's an issue for a minority of use cases, and all popular frameworks and libs presumably have long been fixed
+
+[10:47:58.0000] <ljharb>
+if it's this severe a problem, then we should solve it in the language
+
+[10:49:39.0000] <Bakkot>
+and in your view is unacceptable for node to have a workaround which involves disabling part of the language in the - at minimum - years it will take us to solve it "in the language"?
+
+[10:55:55.0000] <ljharb>
+a workaround only employable by the people already aware of the issue, who already know how to select libraries that solve for it?
+
+[10:56:11.0000] <ljharb>
+the security argument supports disabling it by default, not via a flag
+
+[10:57:32.0000] <devsnek>
+i'm just not sure anyone could ever actually run with the flag
+
+[10:57:44.0000] <devsnek>
+unless you have some serious NIH
+
+[10:58:09.0000] <ljharb>
+that's at least something that can be somewhat empirically tested
+
+[10:58:12.0000] <ljharb>
+but i'm skeptical yes
+
+[10:59:52.0000] <devsnek>
+that's my only problem with the flag though
+
+[11:00:44.0000] <Bakkot>
+grepping around my local codebases, there's a lot of uses in babel's old helpers
+
+[11:00:58.0000] <Bakkot>
+but eslint has exactly one use in any transitive dependency which actually matters (in chalk)
+
+[11:03:59.0000] <devsnek>
+it creeps up on you
+
+[11:04:26.0000] <ljharb>
+uses of the getter, or of the setter?
+
+[11:16:45.0000] <Bakkot>
+the setter
+
+[11:17:05.0000] <Bakkot>
+I just put `Object.defineProperty(Object.prototype, '__proto__', { set: void 0 })` in the entrypoint before all the requires and started running code
+
+[11:17:09.0000] <Bakkot>
+it worked ok
+
+[11:19:17.0000] <ljharb>
+ah k
+
+[11:26:38.0000] <bradleymeck>
+could always just throw it onto the policies feature if people think the flag should be opt-out instead of opt-in. If you opt-in to policies a some things are prevented by default anyway
+
+[11:27:37.0000] <devsnek>
+you mean opt out of __proto__, not opt out of __proto__ being deleted, right?
+
+[11:27:40.0000] <ljharb>
+i'm still curious to understand what kind of person either lacks the knowledge to prevent prototype pollution or works in a system that isn't set up to prevent it, that would also choose to disable the setter
+
+[11:28:23.0000] <bradleymeck>
+devsnek: opt-out happens to stuff already by just using policies, you'd have to opt back in to the accessor
+
+[11:28:52.0000] <devsnek>
+oh you mean if policies are enabled
+
+[11:29:04.0000] <bradleymeck>
+policies / SES / / CSP / etc. all take the opt-in to a "safer" set of defaults
+
+[11:29:06.0000] <bradleymeck>
+yea
+
+[11:29:27.0000] <bradleymeck>
+then you have to opt-out selectively for things
+
+[11:29:52.0000] <devsnek>
+opt out of ==
+
+[11:30:30.0000] <bradleymeck>
+to my knowledge language syntax can't be opted out, so you couldn't opt-out of __proto__ in literals
+
+[11:30:34.0000] <bradleymeck>
+or ==
+
+[11:31:03.0000] <ljharb>
+you can hook into == with Symbol.toPrimitive tho
+
+[11:32:03.0000] <bradleymeck>
+you could make an id for every possible JS value... I guess? but even then it would be evaded by people using stuff that doesn't inherit your hook
+
+[11:32:30.0000] <ljharb>
+true
+
+[11:32:55.0000] <bradleymeck>
+https://www.npmjs.com/package/vengeful-god has a lot of dumb ideas
+
+[11:35:43.0000] <devsnek>
+https://www.npmjs.com/package/noasi
+
+[11:45:15.0000] <shu>
+devsnek: i don't see a counter on quick glance
+
+[11:45:43.0000] <shu>
+devsnek: that is, none of the counters with Prototype in the name seems to record general use of __proto__, always something more specific about certain prototypes
+
+[11:52:02.0000] <devsnek>
+shu: yeah I couldn't find anything either
+
+[11:52:15.0000] <devsnek>
+I wish node could contribute stats
+
+[12:07:03.0000] <bradleymeck>
+devsnek: unguarded assignment wouldn't be too hard to detect but lots of false positives
+
+[12:07:13.0000] <bradleymeck>
+then just run against the npm registry
+
+
+2020-02-26
+[21:36:32.0000] <arai_a>
+Hi, I'm developing a website to compare ECMAScript spec revisions and PRs https://arai-a.github.io/ecma262-compare/  and I want feedback, and wish to integrate it into the spec development workflow
+
+[21:39:43.0000] <arai_a>
+especially for PRs, I think the diff view can be used along with the existing rendered preview
+
+[21:48:47.0000] <ljharb>
+arai_a: it'd help if the dropdown list was instead, an autocomplete with PR number and title
+
+[21:48:55.0000] <ljharb>
+arai_a: and optionally also, sha or branch :-)
+
+[21:49:19.0000] <ljharb>
+arai_a: how is this hosted on github pages, do you have to periodically update it?
+
+[21:50:01.0000] <arai_a>
+good idea :)  I'll add an input field to enter PR number etc, and reflect it to other fields
+
+[21:50:21.0000] <arai_a>
+yes, it's periodically updated (every 30 minutes)
+
+[21:50:54.0000] <arai_a>
+the update is done by GitHub action, that clones the repo itself and ecma262 repo (and forks for PRs)
+
+[21:51:32.0000] <arai_a>
+https://github.com/arai-a/ecma262-compare/blob/master/.github/workflows/update.yml and https://github.com/arai-a/ecma262-compare/blob/gh-pages/build.py
+
+[21:52:47.0000] <arai_a>
+also, about selecting PR, you can specify it in URL, like https://arai-a.github.io/ecma262-compare/#pr=1881
+
+[21:53:23.0000] <arai_a>
+so, that can be used for PR comment
+
+[22:47:18.0000] <ljharb>
+arai_a: any change that can be a query string and not a hash?
+
+[22:48:17.0000] <arai_a>
+do you mean make it https://arai-a.github.io/ecma262-compare/?pr=1881
+
+[22:48:22.0000] <arai_a>
+?
+
+[22:51:08.0000] <ljharb>
+yeah
+
+[22:51:25.0000] <arai_a>
+how does that help?
+
+[22:51:40.0000] <ljharb>
+¯\_(ツ)_/¯ seems like a cleaner URL
+
+[22:51:48.0000] <ljharb>
+imo hashes are weird unless it's for scrolling
+
+[22:51:58.0000] <arai_a>
+I see. I'll try
+
+[22:52:11.0000] <arai_a>
+(I don't know how to modify it without reloading
+
+[22:55:15.0000] <ljharb>
+using window.pushState should do it
+
+[22:55:47.0000] <arai_a>
+thanks :D
+
+[23:03:14.0000] <arai_a>
+pushed the fix for search and query. will be deployed shortly
+
+[23:55:34.0000] <devsnek>
+arai_a: the fuck kind of magic is this
+
+[23:55:42.0000] <devsnek>
+this is incredible
+
+[23:58:33.0000] <devsnek>
+how are you generating these diff
+
+[23:58:36.0000] <devsnek>
+diffs
+
+[23:59:59.0000] <arai_a>
+spec HTML is split into sections, and stored into JSON file.  the client downloads those JSON files and compares each sections, and combines different sections to show
+
+[00:01:49.0000] <devsnek>
+i tried to do this a while ago but i couldn't figure out a consistent way to generate the diffs
+
+[00:03:31.0000] <arai_a>
+the diff itself is done by LCS on text+path sequence
+
+[00:03:39.0000] <devsnek>
+yeah i found the code
+
+[00:03:42.0000] <devsnek>
+this is awesome
+
+[00:04:29.0000] <arai_a>
+thank you :D
+
+[00:05:05.0000] <ljharb>
+arai_a: i'm super stoked to integrate this into 262 PRs
+
+[00:05:12.0000] <devsnek>
+^
+
+[00:06:34.0000] <arai_a>
+\o/
+
+[00:07:20.0000] <devsnek>
+arai_a: you might want to consider detecting fragmentation
+
+[00:07:39.0000] <devsnek>
+https://gc.gy/50409458.png
+
+[00:07:53.0000] <devsnek>
+like this should probably be split into a big red section and a big green section
+
+[00:08:54.0000] <devsnek>
+(even though there is common text between them)
+
+[00:09:21.0000] <arai_a>
+yeah, I'm experimenting tree-based LCS to solve that
+
+[00:10:55.0000] <arai_a>
+("Use experimental diff" checkbox in the page.  not sure if it work for this case tho
+
+[00:14:07.0000] <arai_a>
+devsnek: can you give me the URL for the case? I'll link to it in issue
+
+[00:15:36.0000] <devsnek>
+arai_a: https://arai-a.github.io/ecma262-compare/?pr=1597
+
+[00:15:47.0000] <devsnek>
+experimental mode helps a bit but still has some oddness
+
+[00:16:24.0000] <arai_a>
+thanks!  yeah, it needs some more fix
+
+[02:56:33.0000] <arai_a>
+applied some fix to experimental diff. now it should be shown as whole replace
+
+[11:30:22.0000] <jmdyck>
+arai_a: Why does https://arai-a.github.io/ecma262-compare/?from=f032005886d531aaffd02b3e90208ff08a47797b&to=2431eb385e4315471abd33f710b4ed5644e1b002 show "O section(s) found" ?
+
+
+2020-02-27
+[19:12:06.0000] <arai_a>
+the change is about markup https://github.com/tc39/ecma262/commit/2431eb385e4315471abd33f710b4ed5644e1b002
+
+[19:13:38.0000] <arai_a>
+jmdyck: the change is about markup in the source https://github.com/tc39/ecma262/commit/2431eb385e4315471abd33f710b4ed5644e1b002
+
+[19:13:55.0000] <arai_a>
+and those quotes are automatically added in the rendering result
+
+[19:14:30.0000] <jmdyck>
+ah, you're diffing the html output?
+
+[19:14:38.0000] <arai_a>
+yes
+
+[19:14:41.0000] <jmdyck>
+ok
+
+
+2020-02-28
+[10:36:41.0000] <jmdyck>
+Bakkot: re https://github.com/tc39/ecma262/pull/1885#issuecomment-592304266, I still don't follow. If by "PR snapshots" you mean the netlify renders, then https://deploy-preview-1885--ecma262-snapshots.netlify.com/#sec-identifiers-static-semantics-early-errors shows "[Yield, Await]" parameters for 5 productions.
+
+[10:37:02.0000] <Bakkot>
+jmdyck: that was not true 16 hours ago; ljharb fixed it in https://github.com/tc39/ecma262/commit/4307b77f1732186a6c67352c92b91f55de76387a
+
+[10:37:23.0000] <jmdyck>
+ah, ok.
+
+[10:46:45.0000] <ljharb>
+(that's why i hid those comments as "resolved")
+
+
+2020-02-29
+[10:26:20.0000] <devsnek>
+what happens if you call OrdinaryGet/etc on a proxy
+
+[10:26:42.0000] <devsnek>
+is that just not a valid thing to do or do proxies have the ability to store own properties
+
+[11:00:03.0000] <ljharb>
+I’d assume the former
+
+[11:03:04.0000] <devsnek>
+ljharb: eh, you can call OrdinaryGet on a module namespace object
+
+[11:03:14.0000] <devsnek>
+and there's no difference in how they're created i think
+
+[11:06:35.0000] <ljharb>
+you *can*, or you must?
+
+[11:06:49.0000] <ljharb>
+like i think the internal methods of the object are what governs what’s valid
+
+[11:06:52.0000] <devsnek>
+you must
+
+[11:07:03.0000] <ljharb>
+if it calls Ordinary, it’s valid, if not it’s not
+
+[11:07:08.0000] <devsnek>
+🤷🏻
+
+[11:07:25.0000] <ljharb>
+it wouldn’t make sense for a proxy to have its own properties
+
+[11:07:44.0000] <devsnek>
+proxy was an example
+
+[11:07:46.0000] <devsnek>
+i guess
+

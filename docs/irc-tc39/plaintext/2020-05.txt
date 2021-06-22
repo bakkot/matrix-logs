@@ -1,0 +1,3703 @@
+2020-05-01
+[07:51:52.0000] <jorendorff>
+Hi everyone - I'm curious about https://tc39.es/ecma262/#sec-script-semantics-runtime-semantics-evaluation Step 15
+
+[07:52:48.0000] <jorendorff>
+Anyone know why it's like that?
+
+[08:07:46.0000] <bradleymeck>
+jorendorff: i think you mislinked w/e you wanted to show
+
+[08:08:00.0000] <jorendorff>
+darn
+
+[08:08:18.0000] <jorendorff>
+Thanks, I meant https://tc39.es/ecma262/#sec-runtime-semantics-scriptevaluation
+
+[08:36:37.0000] <devsnek>
+jorendorff: why it asserts that the stack is not empty?
+
+[08:36:45.0000] <jorendorff>
+Yes
+
+[08:37:01.0000] <devsnek>
+because the context from realm init should be on the stack
+
+[08:38:34.0000] <jorendorff>
+What is "realm init"?
+
+[08:41:54.0000] <jmdyck>
+InitializeHostDefinedRealm creates an execution context and pushes it onto the stack
+
+[09:14:19.0000] <jorendorff>
+huh. ok, and another spec, like the HTML spec, can pop that execution context and keep it around?
+
+[09:14:50.0000] <jorendorff>
+is it ever actually used?
+
+[09:15:10.0000] <jorendorff>
+it's weird because it seems like we should've asserted that on entry
+
+[09:15:21.0000] <jorendorff>
+but also because I don't understand what this is for
+
+[09:21:40.0000] <jmdyck>
+https://github.com/tc39/ecma262/pull/1597#discussion_r296465769 may help
+
+[13:41:33.0000] <jorendorff>
+That is helpful.
+
+[14:00:31.0000] <devsnek>
+why do we have tests that allow ID_Continue characters as the start of IdentifierName
+
+[14:00:55.0000] <devsnek>
+mathiasbynens: ^
+
+[14:00:57.0000] <bakkot>
+presumably they are also ID_start?
+
+[14:01:12.0000] <devsnek>
+they are not
+
+[14:01:23.0000] <bakkot>
+link the test?
+
+[14:01:29.0000] <devsnek>
+language/identifiers/part-unicode-9.0.0.js
+
+[14:11:28.0000] <bakkot>
+that looks like a bug, yeah
+
+[14:13:06.0000] <bakkot>
+no wawit
+
+[14:13:09.0000] <bakkot>
+it's just hard to read
+
+[14:13:22.0000] <bakkot>
+it starts with `_`
+
+[14:13:57.0000] <devsnek>
+hmmm
+
+[14:14:30.0000] <devsnek>
+i guess that's why it wasn't matching ID_Start
+
+[14:15:44.0000] <bakkot>
+the message in the test is wrong though
+
+[15:13:31.0000] <devsnek>
+CreateDynamicFunction lists a bunch of conditions to throw syntax errors for
+
+[15:13:49.0000] <devsnek>
+but i'm thinking that maybe step 20.d covers all of them
+
+[15:16:25.0000] <bakkot>
+the supercall one at least is not, because it's an error for full functions, not for either parameters or the body
+
+[15:16:36.0000] <bakkot>
+my guess is that this is true for the others, without having looked
+
+[15:20:45.0000] <devsnek>
+oh hm
+
+[15:20:48.0000] <devsnek>
+that's kind of annoying
+
+
+2020-05-02
+[22:27:22.0000] <Sirisian>
+I was going to ask this years ago, but is Andreas Rossberg in this channel? Is he still part of TC39? He's on this list: https://github.com/orgs/tc39/people
+
+[10:22:22.0000] <ryzokuken>
+Hi all, could someone point me to the spec diff tool again?
+
+[10:25:26.0000] <Bakkot>
+ryzokuken: https://arai-a.github.io/ecma262-compare/
+
+[10:26:04.0000] <ryzokuken>
+Bakkot: precisely what I was looking for! Thanks a ton.
+
+[10:27:09.0000] <ryzokuken>
+but also, oof. It won't work for ECMA 402 😭
+
+
+2020-05-03
+[14:30:09.0000] <devsnek>
+Bakkot: is the idea behind the early error checker in shift parser that its like array.reduce except an ast instead
+
+[14:32:10.0000] <Bakkot>
+that is the idea behind reducers in general, yes
+
+[14:33:16.0000] <devsnek>
+you can never be too sure when the word monad comes into play
+
+[14:33:59.0000] <Bakkot>
+do we actually talk about monads?
+
+[14:34:08.0000] <Bakkot>
+I know we talk about monoids but those are less esoteric
+
+[14:36:15.0000] <devsnek>
+ah you're right it says MonoidalReducer not MonadalReducer
+
+[14:36:55.0000] <Bakkot>
+yeah
+
+[14:37:29.0000] <rkirsling>
+*monadic
+
+[14:38:27.0000] <devsnek>
+i'm trying to figure out how i want to do early errors in my parser
+
+[14:38:42.0000] <devsnek>
+the main issue so far is that every parse function is an entry point
+
+
+2020-05-04
+[22:08:47.0000] <devsnek>
+surprisingly useful https://gc.gy/56273905.png
+
+[22:09:53.0000] <ljharb>
+devsnek: tbh that `.spec` thing seems like it'd be a pretty handy standalone npm package
+
+[22:10:03.0000] <devsnek>
+well its not magic
+
+[22:10:19.0000] <devsnek>
+it uses the `// #sec-xyz` comment above every function in engine262's source
+
+[22:10:24.0000] <ljharb>
+ah ok
+
+[22:10:30.0000] <devsnek>
+i agree though
+
+[22:10:38.0000] <devsnek>
+i wanted to add something similar in node's repl
+
+[22:10:47.0000] <devsnek>
+for js stuff and node stuff
+
+[22:10:58.0000] <devsnek>
+though it would've been mdn not the spec in that case
+
+[22:14:54.0000] <ljharb>
+i'd want it for the spec :-p
+
+[22:30:08.0000] <Bakkot>
+new proposal? :D
+
+[22:30:14.0000] <Bakkot>
+the ultimate reflection mechanism
+
+[22:30:43.0000] <Bakkot>
+actually I guess to qualify as "ultimate" it would also need to include an interpreter for spec-ese
+
+[22:31:12.0000] <devsnek>
+Array.prototype.flat.__doc
+
+[22:33:01.0000] <Bakkot>
+`Set.prototype.add = spec.evaluate(spec(Set.prototype.add).replace('If value is -0, set value to +0', 'If false'))`
+
+[22:37:15.0000] <devsnek>
+oh gosh
+
+[06:58:54.0000] <Sirisian>
+littledan, I was looking at the operator overloading proposal. Would it be fair to say a lot of the complexity in the proposed syntax is due to a lack of function overloading? I understand it's stage 1.
+
+[06:59:38.0000] <littledan>
+I don't understand how function overloading would relate to it. it's true that the proposal's contents are largely about the dispatch semantics.
+
+[07:00:04.0000] <littledan>
+I don't think you'd want function overloading to behave with the restrictions that operator overloading is defined to have
+
+[07:00:36.0000] <Sirisian>
+The static kind of design?
+
+[07:01:16.0000] <Sirisian>
+(I'm not fully clear on the implementation specifics, was just reading the issues).
+
+[07:18:59.0000] <Sirisian>
+Would it be insane to use a TS-like syntax https://github.com/sirisian/ecmascript-types#classes-and-operator-overloading I'm not really clear on the big picture of what slows things down in V8 and such in regards to operator overloading. Is it being able to define new operators on individual instances that would require lookups and be unworkable? So the operators must be on global class types and all or nothing for all instances?
+
+[07:20:15.0000] <Sirisian>
+(Also I realize that Symbol doesn't work. I added that a while ago when someone suggested it. Apparently that's a bad idea).
+
+[08:32:29.0000] <jmdyck>
+Bakkot: so `spec.evaluate(str)` would return a function object that, when called, performs the algorithm steps in `str`?
+
+[08:32:48.0000] <Bakkot>
+that would be the idea!
+
+[08:32:55.0000] <Bakkot>
+(to be clear this is not a serious proposal)
+
+[08:37:39.0000] <jmdyck>
+yeah, it didn't sound entirely serious. Still, I think it'd be possible.
+
+[08:51:37.0000] <shu>
+Bakkot: i'd feel more comfortable with a spec.evaluate if we first sat down and worked through the meta-machinery
+
+[08:52:49.0000] <shu>
+ecma261.5, the ecma262 metalanguage
+
+[08:53:55.0000] <Bakkot>
+working on it
+
+[08:54:09.0000] <Bakkot>
+michael ficarra and I have a preliminary linter integrated with ecmarkup
+
+[08:54:28.0000] <Bakkot>
+so we can start enforcing stuff like "variables are defined before use" and so no
+
+[08:54:54.0000] <shu>
+i'm interested in what the linter thinks about lets-in-branches
+
+[08:55:16.0000] <Bakkot>
+(that rule isn't implemented yet, to be clear, but should be pretty straightforward)
+
+[08:55:30.0000] <shu>
+i'm interested in the policy question
+
+[08:56:00.0000] <Bakkot>
+for now I'd want to start with allowing them, since they're in the current spec
+
+[08:56:13.0000] <Bakkot>
+and if we eliminate them we can update the linter to enforce that
+
+[08:56:27.0000] <Bakkot>
+I don't actually mind them much though
+
+[08:56:34.0000] <shu>
+yeah i like them tbh
+
+[08:56:53.0000] <shu>
+at least the fairly structured version where two branches both introduce the same alias
+
+[08:57:45.0000] <Bakkot>
+I think there might be a place or two where there's a "If Foo let X be *" without a corresponding else, and later usages of X also guarded on Foo
+
+[09:04:51.0000] <shu>
+that also seems fine to me
+
+[09:04:59.0000] <shu>
+and could be checked by the linter with sufficient sophistication
+
+[09:30:44.0000] <devsnek>
+littledan: I had an idea about operator overloaded where you try to make it as scoped as possible
+
+[09:30:59.0000] <littledan>
+devsnek: Yes?
+
+[09:31:13.0000] <devsnek>
+sort of like `let x = with operator xyz { a + b }`
+
+[09:31:30.0000] <devsnek>
+this lets it be fairly dynamic
+
+[09:32:05.0000] <devsnek>
+you can put as much in the block as you want but overloaded operations tend to happen in clumps so they should stay fairly small
+
+[09:33:03.0000] <littledan>
+devsnek: Would that be a do expression?
+
+[09:33:13.0000] <devsnek>
+it could be, yes
+
+[09:33:24.0000] <littledan>
+(I mean, what were you picturing? what else would it be?)
+
+[09:33:28.0000] <devsnek>
+I haven't formalized this idea that much
+
+[09:33:46.0000] <devsnek>
+if we have do expressions it would make sense to (ab)use them here
+
+[09:33:59.0000] <littledan>
+I mean, to me, curly brackets with code in them feel like they should have statements in them
+
+[09:34:11.0000] <littledan>
+if it's an expression, I'd imagine parentheses
+
+[09:34:13.0000] <devsnek>
+a + b is an expression statement
+
+[09:34:16.0000] <littledan>
+right
+
+[09:34:29.0000] <devsnek>
+so yeah it uses completion
+
+[09:34:30.0000] <littledan>
+so, it'd work as a do expression
+
+[09:34:53.0000] <littledan>
+if we're OK with using completion values, that'd be fine. I guess no one has driven this to Stage 2, but it seemed like dherman made good progress last time it was discussed
+
+[09:35:00.0000] <devsnek>
+but anyway since it encourages small scoping, you can make the protocol more dynamic
+
+[09:35:17.0000] <littledan>
+hmm, I don't think I follow that part
+
+[09:35:30.0000] <littledan>
+I think we need to be static just for the integrity goals anyway
+
+[09:35:38.0000] <devsnek>
+since you're only paying for dynamic behaviour inside the block
+
+[09:36:27.0000] <littledan>
+"paying for" makes sense when thinking about performance cost, but the integrity things are sort of considered serious either way. The intention isn't that you're opting into chaos mode, but rather into something contained
+
+[09:36:49.0000] <devsnek>
+integrity?
+
+[09:37:16.0000] <littledan>
+see "predictability" in https://github.com/tc39/proposal-operator-overloading/blob/master/README.md#design-goals
+
+[09:37:40.0000] <devsnek>
+hm I think I feel exactly the opposite
+
+[09:37:47.0000] <littledan>
+hmm how so?
+
+[09:37:50.0000] <devsnek>
+they should be dynamic and changeable imo
+
+[09:37:56.0000] <littledan>
+why?
+
+[09:38:03.0000] <devsnek>
+more javascripty I guess
+
+[09:38:08.0000] <devsnek>
+that's why I like this language
+
+[09:38:10.0000] <littledan>
+lots of people have told me specifically, operator overloading shouldn't happen in JS because then it'd be too dynamic and changeable
+
+[09:38:22.0000] <littledan>
+so, I was trying to respond to that and find something contained
+
+[09:38:38.0000] <devsnek>
+all I've heard is that dynamic shouldn't happen because of performance
+
+[09:39:19.0000] <littledan>
+so, I guess I've been a little sloppy about keeping quotes around, but I've personally heard more concerns than just that
+
+[09:39:28.0000] <devsnek>
+fair enough
+
+[09:39:29.0000] <littledan>
+let me see what I can dig up
+
+[09:39:35.0000] <devsnek>
+I really don't like the static stuff though
+
+[09:39:54.0000] <littledan>
+I mean, for example, ljharb at the last TC39 meeting was saying operator overloading would make JS more confusing, wasn't he?
+
+[09:40:17.0000] <devsnek>
+I think that's mostly about wide scoping of the overloads
+
+[09:40:30.0000] <devsnek>
+if you have these narrow scopes it's very obvious when it happens
+
+[09:40:40.0000] <devsnek>
+although you still have the issue of forgetting to scope
+
+[09:40:56.0000] <littledan>
+you could also look at the responses here: https://twitter.com/littledan/status/1024958066066898944
+
+[09:41:42.0000] <littledan>
+so, i was specifically trying to defend against certain "attacks" against integrity in this proposal. Probably I didn't do a good enough job explaining this in the repo, since people keep asking me the same questions about making more dynamic
+
+[09:41:49.0000] <littledan>
+so that's something for me to work on
+
+[09:42:57.0000] <devsnek>
+I think operator overloading works better when it's by intention instead of by operator
+
+[09:43:17.0000] <devsnek>
+like how in rust you implement deref, not the star operator
+
+[09:43:46.0000] <devsnek>
+I think people saying "operator overloading is bad" tend along that pathway
+
+[09:44:35.0000] <littledan>
+hmm, do you have ideas for what that would mean concretely, given the operators we have in JS?
+
+[09:46:27.0000] <devsnek>
+I don't know if I have a concrete answer
+
+[09:49:28.0000] <devsnek>
+it occurs to me that people use macros for this in rust, which is almost like my scoping idea
+
+[09:49:47.0000] <devsnek>
+let x = vec_ops! { a + b }
+
+[09:52:08.0000] <littledan>
+yeah, I think that's a good thing to look into, but at the same time, I feel like it's appropriate that the operator overloading proposal uses "+" to identify overloading things like a+b
+
+[09:52:35.0000] <littledan>
+and, I don't think this has to do with the responses to my tweet, which were half about operator overloading making all JS code opaque and confusing
+
+[09:52:50.0000] <littledan>
+so the concern was on the usage side, not the definition side
+
+[09:53:23.0000] <devsnek>
+yeah that's what I mentioned above, with small scopes making it clearer where this happens
+
+[09:53:46.0000] <littledan>
+Sirisian: If we can think of a more intuitive, TS-like syntax, then I'd be all for using it. I was thinking about using decorators somehow, but I was also thinking about avoiding the dependency
+
+[09:53:54.0000] <devsnek>
+of course if scopes are involved you run into the problem of forgetting to use one
+
+[09:54:10.0000] <littledan>
+rbuckton has some ideas about nicer syntax too, but I can't figure out how the details would fit together
+
+[09:55:35.0000] <devsnek>
+could also use some modified operator form
+
+[09:56:01.0000] <devsnek>
+a @X+ b to add a and b together using X's rules
+
+[09:56:29.0000] <Sirisian>
+littledan, Do you still work on V8? Was curious.
+
+[09:56:42.0000] <littledan>
+not really, but my coworkers in Igalia do
+
+[09:57:03.0000] <devsnek>
+i think you've still got some TODO comments in v8
+
+[09:57:06.0000] <littledan>
+devsnek: That wouldn't meet the goals of letting us generalize BigInt and Decimal
+
+[09:57:11.0000] <littledan>
+yeah, I think I left a lot there...
+
+[09:57:24.0000] <littledan>
+I codesearched myself the other day and yeah
+
+[09:57:29.0000] <littledan>
+sorry
+
+[09:57:31.0000] <devsnek>
+1n @BigInt+ 1n
+
+[09:57:41.0000] <devsnek>
+lol you're definitely not the only one who leaves todos
+
+[09:58:05.0000] <littledan>
+devsnek: By "explain", I mean make it as if BigInt were a feature added through operator overloading
+
+[09:58:59.0000] <devsnek>
+I'm not sure that's inherently possible
+
+[09:59:09.0000] <devsnek>
+if we require additional syntax at or around usage sites
+
+[10:16:06.0000] <Sirisian>
+I'd probably explicitly mention using operator overloading for polyfilling types like you mentioned. Personally I want to polyfill all the types in my proposal. const a = new uint32(5); a /= 2; :O Once thought only possible with BigInt. Truly a paradigm switch. Complex numbers, vectors, and matrices. Should probably just make an explicit list of use cases and examples.
+
+[10:20:44.0000] <Sirisian>
+Also maybe I missed something, but I didn't understand the a.contents stuff in the code sample.
+
+[11:03:25.0000] <Sirisian>
+Just looked at it again. I thought it was extending the other library vector when I skimmed it. I get it now.
+
+[11:38:41.0000] <jmdyck>
+Bakkot: yes there are cases like that ("If Foo let X be *" without a corresponding else, and later usages of X also guarded on Foo)
+
+[15:00:16.0000] <littledan>
+devsnek: The idea has been that you'd imagine there would be an "operator overloading prelude" for the built-in types. It's an action item I have (from Mark) to actually write this prelude, to prove it's possible.
+
+[15:01:05.0000] <devsnek>
+is that tangible to user code?
+
+[15:01:35.0000] <littledan>
+Sirisian: Yes, i've been trying to accumulate use cases, and I'd appreciate your help in that. Feel free to make a PR to the explainer to add more use cases
+
+[15:01:56.0000] <littledan>
+devsnek: No, in general, you can't reflect over code in JS... how would it be tangible?
+
+[15:02:16.0000] <devsnek>
+if its not tangible then explaining it doesn't matter
+
+[15:02:27.0000] <littledan>
+I don't know what you mean by being tangible
+
+[15:02:34.0000] <littledan>
+maybe I'm not explaining the sense of "explaining" very well...
+
+[15:02:46.0000] <devsnek>
+js code can observe that there is a prelude and that it contains BigInt and Number
+
+[15:03:05.0000] <littledan>
+well, you can observe it by doing arithmetic calculations on BigInt and observing that it works rather than throwing a TypeError
+
+[15:03:13.0000] <littledan>
+that's the exact same way that you'd observe it for your own types
+
+[15:03:19.0000] <devsnek>
+ok so then again
+
+[15:03:23.0000] <devsnek>
+there's no point to defining a prelude
+
+[15:03:28.0000] <littledan>
+the goal is that you can do your own BigInt-like thing, and it'd really work
+
+[15:03:30.0000] <devsnek>
+because we're talking about behaviour not declarations
+
+[15:03:51.0000] <littledan>
+not sure what you mean. "defining a prelude" is a design-level exercise
+
+[15:03:58.0000] <littledan>
+(like writing spec text or explainers)
+
+[15:04:24.0000] <devsnek>
+i'm not sure how that matches the goal of explaining how bigint works
+
+[15:05:00.0000] <littledan>
+let's talk about this another time. I don't really know how to get across this concept of "explaining". I'll think about it some more.
+
+[15:05:32.0000] <littledan>
+"explaining" is a kind of TC39 jargon that predates me in committee; maybe it's not the best word
+
+[15:05:45.0000] <devsnek>
+i thought it meant representing some behaviour in a way that js code can also interact with
+
+[15:05:50.0000] <devsnek>
+like toStringTag
+
+[15:06:26.0000] <devsnek>
+if js code can't interact with the prelude it doesn't matter whether the prelude exists or not, its just some imaginary thing
+
+[15:08:40.0000] <littledan>
+so, ES6 explained a bunch of things in a way that also added tons of dynamism and reflection. For reasons that I tried to explain, we don't really have the option of adding all that dynamism in this case. But the core of "explaining" isn't dynamism or reflection, but the idea that the thing that's built-in is also something that you could do in user code. That's something real too.
+
+[15:09:06.0000] <littledan>
+(you might consider things without dynamism/reflection bad, or that this feature isn't worth it, but that doesn't mean that it isn't "explaining")
+
+[15:09:40.0000] <devsnek>
+to me it is like saying we're adding toStringTag but then not getting rid of [[ClassName]]
+
+[15:09:55.0000] <devsnek>
+or [[Class]] or whatever it was called
+
+[15:10:06.0000] <devsnek>
+like the magic is still there, on a separate layer from the stuff js can do
+
+[15:10:22.0000] <devsnek>
+bigint magically works in any scope and there's no js equiv
+
+[15:10:38.0000] <littledan>
+Well, there's some things that would have to be pretty special forever, like how + works with strings and non-strings. But I think most of the arithmetic operations should be completely explainable in terms of this general mechanism
+
+[15:11:06.0000] <littledan>
+BigInt would work with this "prelude" theory. That's the one special case
+
+[15:11:17.0000] <devsnek>
+if the prelude is invisible to js it doesn't exist
+
+[15:11:52.0000] <littledan>
+it's a concept, sure. (does anything really exist?)
+
+[15:11:57.0000] <devsnek>
+no i mean
+
+[15:12:00.0000] <devsnek>
+bigint is still special
+
+[15:12:05.0000] <devsnek>
+in the same way
+
+[15:12:37.0000] <littledan>
+yes, but it's special in just one way; it's not *as* special. That's how I'm defining the design goal, the only way that I can see this matching up with the need to have the operator overloading declarations be scoped
+
+[15:12:50.0000] <ljharb>
+would the small scope version allow operator stuff to be less static?
+
+[15:13:02.0000] <devsnek>
+its like if you said "every time a function is invoked, a parallel universe is created where the function is evaluated"
+
+[15:13:04.0000] <littledan>
+ljharb: In my opinion, no. Do you think it would? why?
+
+[15:13:06.0000] <ljharb>
+personally the second-class nature of the current operator (and decorators) proposal is a big sticking point for me
+
+[15:13:21.0000] <devsnek>
+from the perspective of js you could never observe such a thing
+
+[15:13:26.0000] <devsnek>
+so it doesn't matter
+
+[15:13:37.0000] <ljharb>
+devsnek: with a dep graph where half of the operators are transpiled and half are native, it'd be observable, no?
+
+[15:13:58.0000] <littledan>
+you can't observe "use strict", but we stick it in modules implicitly... I'm not really sure what you're talking about, why this is a goal
+
+[15:14:06.0000] <ljharb>
+which
+
+[15:14:06.0000] <devsnek>
+what are you talking about
+
+[15:14:10.0000] <devsnek>
+you can add use strict to code
+
+[15:14:19.0000] <devsnek>
+that is an observable change to js code
+
+[15:14:27.0000] <littledan>
+yes, just like adding `with operators from` delcarations
+
+[15:14:33.0000] <devsnek>
+i don't mean reflection
+
+[15:14:42.0000] <devsnek>
+i mean what humans using js can observe and interact with
+
+[15:14:53.0000] <devsnek>
+from that perspective bigint is just as magical
+
+[15:15:00.0000] <devsnek>
+right now there could already be a prelude with your behaviour
+
+[15:15:07.0000] <devsnek>
+adding or removing it doesn't change anything
+
+[15:15:27.0000] <littledan>
+BigInt is built-in. The idea is that it's special in a well-scoped way, limited to just what you could do with a prelude, not that it's *arbitrarily* special
+
+[15:15:53.0000] <littledan>
+that's the design goal I'm working towards. You can disagree about whether it's a worthwhile goal, but that's what I'm trying to communicate.
+
+[15:16:06.0000] <devsnek>
+your goal doesn't make sense to me
+
+[15:16:10.0000] <littledan>
+OK
+
+[15:16:51.0000] <devsnek>
+i can't judge whether it is worthwhile or not because it appears to me to be a non sequitur
+
+[15:18:06.0000] <devsnek>
+ljharb: my idea with the scoped version i talked about above is that it would allow more dynamicness
+
+[15:18:52.0000] <ljharb>
+meaning like, a protocol?
+
+[15:18:58.0000] <devsnek>
+yeah
+
+[15:19:07.0000] <devsnek>
+no need for anything static
+
+[15:19:51.0000] <devsnek>
+but dan said the static-ness was partially because people wanted it to have integrity
+
+[15:20:16.0000] <ljharb>
+what kind of integrity
+
+[15:20:33.0000] <ljharb>
+like, how + should be commutative?
+
+[15:20:35.0000] <ljharb>
+or something else
+
+[15:20:43.0000] <devsnek>
+i assume it means you can't patch someone's overloads
+
+[15:20:52.0000] <devsnek>
+which seems rather unjavascripty to me
+
+[15:21:02.0000] <ljharb>
+unless you've frozen it, i agree
+
+[15:22:02.0000] <ljharb>
+that's an expectation i have for builtins, but not for user code
+
+[15:23:53.0000] <devsnek>
+they have configurable: false for toStringTag
+
+[15:24:20.0000] <ljharb>
+toStringTag is a special (bad) case that i don't see as related to operators
+
+[15:28:05.0000] <Bakkot>
+devsnek: you can't patch someone's overloads today
+
+[15:28:30.0000] <Bakkot>
+like you can't redefine what "+" means in my code
+
+[15:28:36.0000] <devsnek>
+there aren't overloads today
+
+[15:28:40.0000] <Bakkot>
+so why would... we want to... start letting people do that?
+
+[15:29:12.0000] <Bakkot>
+I don't think "let other people change the semantics of my code" is really a goal anyone on the committee has
+
+[15:29:13.0000] <ljharb>
+that's exactly what operator overloading is trying to do
+
+[15:29:18.0000] <Bakkot>
+no it is not
+
+[15:29:22.0000] <ljharb>
+let other people define the semantics of my code
+
+[15:29:26.0000] <Bakkot>
+no?
+
+[15:29:31.0000] <Bakkot>
+not without my explicitly opting in
+
+[15:29:34.0000] <ljharb>
+whether people can do it once, or more than once, doesn't seem that different to me
+
+[15:29:54.0000] <ljharb>
+that's the same as referencing any property on any object tho
+
+[15:30:04.0000] <ljharb>
+you opt in to using that property, and it's possible it could be changed later
+
+[15:30:12.0000] <ljharb>
+(when you don't destructure it, obv)
+
+[15:30:32.0000] <Bakkot>
+and assuming it's not frozen, which in this proposal it would be
+
+[15:30:34.0000] <Bakkot>
+so hey, all is well
+
+[15:31:03.0000] <ljharb>
+so you mean like, it's a symbol protocol, but the syntax for declaring it freezes it?
+
+[15:32:10.0000] <ljharb>
+if so, that does seem reasonable to me; anyone can participate but the default/ergonomic behavior makes it robust
+
+[15:44:23.0000] <Bakkot>
+I think it also destructures when entering the block, so it's defensive twice
+
+[15:44:27.0000] <Bakkot>
+don't remember exactly though
+
+[15:44:32.0000] <Bakkot>
+it was a very early stage design
+
+[15:45:40.0000] <Bakkot>
+ah, yeah, it reads the Operators property and that thing can only be made by a built-in Operator factory which produces immutable values, cool
+
+[15:46:06.0000] <Bakkot>
+anyway obviously someone can just define the overloaded functions themselves in a way which has their behavior change over time
+
+[15:46:23.0000] <Bakkot>
+point is, you have to opt in to using someone else's operators, and random third-party code can't just muck with it
+
+
+2020-05-05
+[23:57:45.0000] <Sirisian>
+It didn't occur to me that you can name a class "Number".
+
+[00:12:49.0000] <Sirisian>
+ad-hoc example I was thinking about earlier for operator overloading: https://pastebin.com/pjRgwK4u uses extension classes. (Basically a class with just operators is merged into previous declarations).
+
+
+2020-05-06
+[19:24:14.0000] <Sirisian>
+Do you think anyone actually creates a "class Number {}" in their code? Would it be a breaking change for a proposal to depend on such syntax for "extending" the Number object?
+
+[19:54:42.0000] <rkirsling>
+it's a breaking change regardless of whether it breaks anybody, but I'd bet money that it does exist out there
+
+[20:45:00.0000] <Bakkot>
+yeah that's a totally reasonable thing to write
+
+[20:45:28.0000] <Bakkot>
+(maybe not totally)
+
+[21:10:55.0000] <rkirsling>
+it's definitely reasonable in a non-top scope
+
+[21:50:18.0000] <ljharb>
+Sirisian: `class extends Number` is how you extend the number object?
+
+[21:50:38.0000] <ljharb>
+Sirisian: if you mean, mutating it, it would be an absolutely horrific idea imo to provide any encouragement, let alone syntax, for mutating objects you don't own
+
+[22:05:48.0000] <Sirisian>
+ljharb, This was in the context of adding operators to a class. Was trying to think of a simple syntax that used extensions classes like in my above example. (The extensions would only work for defining operators). I guess in C++ if I remember it would be like creating a friend to a free function operator overload, but in that you need access to the class to define the friend to access private variables.
+
+[22:10:17.0000] <ljharb>
+i'm not sure what "friend" would mean in JS
+
+[22:20:19.0000] <Sirisian>
+In any case I'd need a way to refer to I guess the intrinsic object as the specification calls it. I don't think there's an elegant syntax that could be made for that. Starting to see why proposal uses the syntax it does.
+
+[05:15:05.0000] <annevk>
+String.isWellFormed(str), String.prototype.isWellFormed, or meh?
+
+[06:21:15.0000] <bradleymeck>
+likely friend in JS just means having a shared private id in scope
+
+[06:21:32.0000] <bradleymeck>
+you can do that with nested classes currently, but not across source texts
+
+[06:54:09.0000] <littledan>
+the operator overloading proposal was designed to meet multiple different integrity goals, described in the explainer. It feels like the discussion here was focusing on a subset of them.
+
+[09:44:02.0000] <Bakkot>
+annevk "well formed" in this context meaning "valid UTF-16"?
+
+[09:47:32.0000] <annevk>
+Bakkot: yeah, well-formed seems to be the term used for UTF-8 in ECMAScript
+
+[09:48:16.0000] <annevk>
+Bakkot: lone surrogate detector is also fine, I don't really care about the specifics
+
+[09:48:33.0000] <annevk>
+https://github.com/whatwg/encoding/issues/174 has context
+
+[09:50:57.0000] <Bakkot>
+seems reasonable to me; cc mathiasbynens
+
+[10:34:33.0000] <ljharb>
+sgtm too
+
+[14:39:46.0000] <Bakkot>
+anyone who has graphic design experience please weigh in on https://github.com/tc39/ecmarkup/pull/178
+
+[14:40:06.0000] <Bakkot>
+I am not a graphic designer and do not want to try to figure out what the correct graphic design is for this
+
+[14:40:18.0000] <Bakkot>
+or like UI/UX design really, not graphic design
+
+[14:43:06.0000] <rickbutton>
+if any v8 people around: are you aware of how v8 handles stack traces for errors thrown with inlined functions in the stack?
+
+[14:57:22.0000] <Sirisian>
+Bakkot, Standard convention for an accordion independent of left/right position is points right is closed and points down is open. That said I've seen the up/down used also. If it's on the left the former convention is more clearly correct. The trick is to pick one and make it part of your identity like tabs/spaces.
+
+[15:01:33.0000] <devsnek>
+rickbutton: there is a bit of data on sharedfunctioninfo which maps inline locations to usable source positions
+
+[15:02:20.0000] <rickbutton>
+thx! ill look there devsnek
+
+[15:02:39.0000] <devsnek>
+rickbutton: actually i lied its OptimizedCompilationInfo
+
+[15:04:26.0000] <rickbutton>
+cool
+
+[15:37:28.0000] <shu>
+rickbutton: is there a specific thing you're trying to do?
+
+[15:38:12.0000] <shu>
+rickbutton: https://source.chromium.org/chromium/chromium/src/+/master:v8/src/execution/frames.cc;l=1534?q=OptimizedFrame::Summarize&ss=chromium&originalUrl=https:%2F%2Fcs.chromium.org%2F is what iterates the inlined frames
+
+
+2020-05-07
+[22:07:36.0000] <devsnek>
+has anyone ever seen someone write `if (x) try { ...`
+
+[22:30:26.0000] <ljharb>
+i rarely see if's without curlies anymore, since heartbleed
+
+[22:32:02.0000] <devsnek>
+lol
+
+[00:22:18.0000] <Ms2ger>
+rwaldron, what's the status of https://github.com/tc39/test262/tree/master/implementation-contributed ?
+
+
+2020-05-08
+[20:53:36.0000] <devsnek>
+audio worklets remind me how nice it would be for that blocks proposal to become a thing
+
+[05:34:07.0000] <ryzokuken>
+youniesmahmoud: welcome
+
+
+2020-05-11
+[09:48:02.0000] <devsnek>
+mfw `return promise` can throw in async generators but not async functions
+
+[10:32:00.0000] <ljharb>
+devsnek: example?
+
+[10:32:12.0000] <devsnek>
+ljharb: `return Promise.reject()`
+
+[10:33:01.0000] <ljharb>
+why would that throw
+
+[10:33:11.0000] <devsnek>
+`return` performs an await in async generators
+
+[10:33:24.0000] <devsnek>
+https://gc.gy/56923403.png
+
+[10:34:18.0000] <Bakkot>
+yeah that's pretty weird
+
+[10:35:08.0000] <Bakkot>
+otoh does anyone actually `return` in a generator?
+
+[10:35:16.0000] <devsnek>
+i do
+
+[10:35:21.0000] <devsnek>
+but its not that common
+
+[10:35:25.0000] <Bakkot>
+why?
+
+[10:35:31.0000] <Bakkot>
+(sincerely; I'm curious what the use case is)
+
+[10:35:37.0000] <devsnek>
+my engine262 evaluator is built on generators
+
+[10:35:42.0000] <devsnek>
+not the async kind though
+
+[10:36:02.0000] <ljharb>
+yes that is very weird
+
+[10:36:27.0000] <devsnek>
+Bakkot: https://github.com/engine262/engine262/blob/parser/src/runtime-semantics/IfStatement.mjs#L21
+
+[10:36:27.0000] <Bakkot>
+what does `return` do for you there?
+
+[10:36:55.0000] <devsnek>
+its how i return values
+
+[10:37:02.0000] <devsnek>
+i use it like a normal return
+
+[10:37:14.0000] <Bakkot>
+hmm
+
+[10:37:29.0000] <Bakkot>
+I guess my question is, presumably this bottoms out somewhere where it isn't just generators deferring to generators
+
+[10:37:33.0000] <Bakkot>
+and that is the part I am interested in
+
+[10:37:50.0000] <devsnek>
+https://github.com/engine262/engine262/blob/parser/src/helpers.mjs#L141-L153
+
+[10:38:57.0000] <devsnek>
+https://github.com/engine262/engine262/blob/parser/src/abstract-ops/function-operations.mjs
+
+[10:39:03.0000] <devsnek>
+oops
+
+[10:39:03.0000] <devsnek>
+https://github.com/engine262/engine262/blob/parser/src/abstract-ops/function-operations.mjs#L124-L127
+
+[10:39:35.0000] <Bakkot>
+aha
+
+[10:39:36.0000] <Bakkot>
+neat
+
+
+2020-05-12
+[19:01:06.0000] <jridgewell>
+That seems like a bug, honestly.
+
+[19:02:13.0000] <ljharb>
+i remember a bit of discussion on it as an intentional decision
+
+[19:41:21.0000] <jridgewell>
+Seems its https://github.com/tc39/proposal-async-iteration/pull/102
+
+[19:41:36.0000] <jridgewell>
+With relevant slides at https://docs.google.com/presentation/d/1U6PivKbFO0YgoFlrYB82MtXf1ofCp1xSVOODOvranBM/edit#slide=id.p
+
+[20:32:30.0000] <jridgewell>
+This should be changeable
+
+[20:33:09.0000] <jridgewell>
+Justification slides at 8 and 9: https://docs.google.com/presentation/d/1U6PivKbFO0YgoFlrYB82MtXf1ofCp1xSVOODOvranBM/edit#slide=id.g223fba4116_0_207
+
+[20:33:45.0000] <jridgewell>
+These don't apply to `return Promise.reject()`, since any finalization would be able to run.
+
+[20:34:03.0000] <jridgewell>
+So it'd be a normal completion
+
+[20:34:26.0000] <jridgewell>
+We only need to ensure that the rejection is unwrapped before the iterator object settles
+
+[23:06:59.0000] <towc>
+are there any plans for named parameters in JS, handled like python would? I really dislike passing objects around when I don't have to, and when some parameters have no defaults
+
+[23:07:25.0000] <ljharb>
+unlikely. why do you dislike it?
+
+[23:08:56.0000] <towc>
+e.g.: `const add = (a, b, nanAsZero = false, undefinedAsZero = false) => ...; add(1, 2); add(1, 2, undefinedAsZero: true); add(1, 2, nanAsZero: true);`
+
+[23:10:35.0000] <towc>
+if I wanted optional named arguments, I'd have to do something like this: `const add = (opts = {}) => { const {a, b, nanAsZero = false, undefinedAsZero = false} = opts; ... }; add({a: 1, b: 2}); add({a: 1, b: 2, undefinedAsZero: true}); ...`
+
+[23:10:52.0000] <ljharb>
+i mean, you'd do `({ a, b, etc } = {})` but sure
+
+[23:10:56.0000] <ljharb>
+ie, you'd destructure inline
+
+[23:11:13.0000] <ljharb>
+also generally i'd say you want the required params to be positional
+
+[23:11:39.0000] <towc>
+or this, which I think is worse: `const add = (a, b, opts = {}) => ...; add(1, 2); add(1, 2, {undefinedAsZero: true}); ...`
+
+[23:12:05.0000] <ljharb>
+why is that worse?
+
+[23:12:19.0000] <towc>
+the signature is unnecessarily complicated
+
+[23:12:39.0000] <ljharb>
+it's extra curly braces
+
+[23:12:58.0000] <ljharb>
+how is that more complicated than adding an entirely new syntax
+
+[23:14:49.0000] <towc>
+I'm not sure, it feels like extra cognitive load, and acts as an obstacle to writing clean functions
+
+[23:15:00.0000] <ljharb>
+"clean" is very subjective
+
+[23:15:29.0000] <ljharb>
+from my perspective, kwargs would be less clean, and is extra cognitive load. object destructuring and defaults are cognitive load i already have to bear, since it's part of the language
+
+[23:17:05.0000] <towc>
+I'd like to write functions with object-named parameters, but then I'm worried the code users will be discouraged from writing the extra `{}` on the function call, and I start (unnecessarily) worrying about object memoization
+
+[23:17:37.0000] <Bakkot>
+towc: generally there's a pretty high bar for new syntax. it needs to make something very common significantly easier, or something which is effectively impossible possible. adding additional syntax for named parameters is just syntax sugar, so it would have to meet the "something very common significantly easier" bar, and my feeling is that it does not. using object destructuring is not significantly harder than named parameters
+
+[23:17:38.0000] <Bakkot>
+ would be.
+
+[23:17:40.0000] <ljharb>
+considering that's how a very large amount of the js ecosystem already does it, i don't think it will discourage anybody
+
+[23:19:02.0000] <Bakkot>
+(also, yeah, agreed with ljharb: destructuring-as-named-params is common practice in JS these days, so I don't think you should worry about users not being comfortable with the `{}`.)
+
+[23:20:41.0000] <towc>
+an interesting application would be to add names of the positional paremeters you're targeting, in function calls, which python allows. This would make dealing with older APIs much easier, without needing to modernize those APIs, and keeping everything backwards-compatible
+
+[23:21:03.0000] <towc>
+in python, you can do `def fn(a, b): ...; fn(b=1, a=2)`
+
+[23:21:53.0000] <towc>
+naming positional parameters, even if keeping the same order, could add a lot of optional clarity to user code
+
+[23:22:08.0000] <ljharb>
+that example is already valid syntax (it creates a global variable)
+
+[23:22:41.0000] <ljharb>
+i think it would work with the colons, but then it falls to the "high bar" Bakkot referenced
+
+[23:22:50.0000] <towc>
+well, in js using `=`, sure, but we could have `const fn = (a, b) => ...; fn(b: 1, a: 2)`
+
+[23:23:22.0000] <devsnek>
+sometimes i do wish we could name parameters like that
+
+[23:23:26.0000] <towc>
+I think it's worth thinking about, but thank you for your time :)
+
+[23:23:26.0000] <Bakkot>
+apart from everything else, it is common practice for build tools in javascript to change variable names, which means if we added this to existing functions in a non-opt-in manner it would mean substantially every build process would be breaking its input, which seems... bad
+
+[23:23:27.0000] <devsnek>
+but i don't think overall it is worth it
+
+[23:24:02.0000] <towc>
+oh, good point
+
+[23:24:22.0000] <towc>
+seems more like a feature for typescript than js
+
+[23:24:48.0000] <Bakkot>
+TS does not intend to add non-type features, so they're probably not interested
+
+[23:24:50.0000] <ljharb>
+p sure TS won't add any new non-type-related features
+
+[23:24:59.0000] <Bakkot>
+you could write a babel plugin for it though!
+
+[23:25:08.0000] <Bakkot>
+wouldn't be too tricky I expect
+
+[23:25:30.0000] <Sirisian>
+heh, when writing my type proposal I had a few people ask me about named parameters. Haven't thought about them in a while. I even added an example to show I wasn't conflicting with desired syntax.
+
+[23:25:36.0000] <Bakkot>
+(I don't really recommend it, since it would make other people picking up your codebases harder, but it's a possibility depending on your priorities)
+
+[23:26:02.0000] <devsnek>
+well they say that
+
+[23:26:10.0000] <devsnek>
+oh i got scroll'd
+
+[23:26:22.0000] <towc>
+yeah, I think I'll just need to stick to obscure positional parameter names, because that's what the teams I've worked on have been doing, forever
+
+[23:26:57.0000] <devsnek>
+now if we had monads
+
+[23:27:23.0000] <devsnek>
+you could just safely and functionally get the arguments
+
+[23:27:24.0000] <towc>
+s/positional parameter names/positional parameters/
+
+[23:28:26.0000] <towc>
+alright, thanks all, I'll be back with another failed idea in a few months, I'm sure :)
+
+[23:28:56.0000] <devsnek>
+keep 'em coming
+
+[23:28:58.0000] <devsnek>
+oh they quit
+
+[23:31:39.0000] <Sirisian>
+https://github.com/sirisian/ecmascript-types#named-arguments I think this is the example I saw a few times. Functions with lots of defaults.
+
+[23:32:38.0000] <Bakkot>
+I don't think you should really worry about it
+
+[23:32:59.0000] <Sirisian>
+yeah, I told other people it's so low priority it's not worth it.
+
+[23:33:20.0000] <Bakkot>
+destructuring is in all likelihood the only thing we will have for named parameters forever
+
+[23:33:33.0000] <Sirisian>
+Indeed
+
+[23:35:12.0000] <devsnek>
+you could also just use global variables
+
+[23:35:29.0000] <devsnek>
+`f(a=1)` and check the value of `globalThis.a` in `f`
+
+[23:35:48.0000] <ljharb>
+lol
+
+[23:36:45.0000] <Sirisian>
+Creative.
+
+[23:38:19.0000] <Bakkot>
+or just introduce a new calling convention: `with (f.args) f(a = 1, b = 2)`, where `f.args` is a proxy which emulates f's parameters
+
+[23:38:33.0000] <Bakkot>
+(don't even need a proxy I guess, come to think)
+
+[23:39:24.0000] <devsnek>
+i love it
+
+[09:59:41.0000] <bradleymeck>
+Bring back zones, but one per fn call
+
+
+2020-05-13
+[13:03:23.0000] <bradleymeck>
+ruh roh
+
+[13:03:31.0000] <bradleymeck>
+export {no_no_no_no_no as await};
+
+[13:03:59.0000] <bradleymeck>
+did await as an identifier not have a strict mode angry ban in that specific location?
+
+[13:04:45.0000] <ljharb>
+why would it?
+
+[13:04:57.0000] <ljharb>
+it's a valid identifier outside of an async function
+
+[13:05:34.0000] <ljharb>
+altho that may actually present a problem for TLA, lol
+
+[13:05:43.0000] <bradleymeck>
+not in module? you can't do `var await =` in a module
+
+[13:05:45.0000] <ljharb>
+oh no, nvm, because of the space
+
+[13:05:55.0000] <ljharb>
+are you sure? you can in strict mode.
+
+[13:06:03.0000] <bradleymeck>
+yes, await is reserved
+
+[13:06:06.0000] <ljharb>
+hm, ok
+
+[13:06:29.0000] <ljharb>
+so you can't `import { await } from './mod'`?
+
+[13:06:40.0000] <ljharb>
+or i guess you might be forced to rename it
+
+[13:06:52.0000] <ljharb>
+in which case the export is "fine" for some value of fine
+
+[13:07:42.0000] <bradleymeck>
+yea... i guess but its... weird
+
+[13:08:31.0000] <ljharb>
+so is `then` as an export name
+
+[13:09:08.0000] <bradleymeck>
+then only is weird due to how people consume it
+
+[13:09:17.0000] <ljharb>
+exactly like `await`, then :-)
+
+[13:09:21.0000] <bradleymeck>
+this is an id that can be exported but no var can be named that
+
+[13:09:34.0000] <bradleymeck>
+so on both ends it is strange
+
+[13:09:58.0000] <bradleymeck>
+though, honestly i wish we would just allow arbitrary string names when renaming anyway...
+
+[13:11:16.0000] <ljharb>
+you can have a named export `yield` too
+
+[13:11:29.0000] <ljharb>
+probably all the reserved words
+
+[13:11:47.0000] <ljharb>
+but i mean, if you have to do `as` to export it then it seems reasonable to have to do `as` to import it
+
+[13:13:38.0000] <bradleymeck>
+not all of them, but its weird
+
+[13:13:39.0000] <bradleymeck>
+https://tc39.es/ecma262/#sec-exports-static-semantics-early-errors
+
+[13:13:59.0000] <bradleymeck>
+it only checks the names of the bindings? not what they are renamed to?
+
+[13:15:48.0000] <ljharb>
+hmm, https://tc39.es/ecma262/#prod-NamedExports says `IdentifierName as IdentifierName`
+
+[13:16:06.0000] <ljharb>
+and that early error says "For each IdentifierName n in ReferencedBindings of NamedExports"
+
+[13:16:16.0000] <bradleymeck>
+import side DGAF about what you grab
+
+[13:16:17.0000] <ljharb>
+"ReferencedBindings" seems to restrict it to the LHS of the as
+
+[13:16:50.0000] <bradleymeck>
+wait... :thinking:
+
+[13:21:38.0000] <bradleymeck>
+well some things blow up if you put bad things on the RHS it seems
+
+[13:30:42.0000] <bradleymeck>
+i think somethign might be impl wrong (everywhere?) cause i can export `package` but it looks like no engine lets me import it...
+
+[13:30:51.0000] <ljharb>
+even renamed?
+
+[13:31:00.0000] <ljharb>
+that's fascinating, you could presumably get it off the namespace
+
+[13:31:10.0000] <bradleymeck>
+correct https://tc39.es/ecma262/#sec-identifiers seems like package should be a banned rename
+
+[13:31:30.0000] <bradleymeck>
+since RHS of export with the rename needs an identifier
+
+[13:31:39.0000] <bradleymeck>
+and identifier should exclude reserved word
+
+[13:31:52.0000] <bradleymeck>
+oh, but we are using IdentifierName not identifier...
+
+[13:31:55.0000] <ljharb>
+right
+
+[13:31:58.0000] <bradleymeck>
+:stare:
+
+[13:32:48.0000] <bradleymeck>
+import uses IdentifierName too, but no one allows it to be a reserved word
+
+[13:35:58.0000] <ljharb>
+so is that a bug in engines, they should be allowing it?
+
+[13:36:09.0000] <ljharb>
+sounds like a job for some test262 tests
+
+[13:38:57.0000] <bradleymeck>
+yea they should be allowing it *grumbling*
+
+[13:40:09.0000] <bradleymeck>
+honestly given that... why aren't we allowing arbitrary string names?
+
+[13:40:27.0000] <bradleymeck>
+export {x as "why not"};
+
+[13:42:12.0000] <ljharb>
+yeah that's a fair question
+
+[13:44:20.0000] <bradleymeck>
+`export {_ as this}` is now my favorite
+
+[13:47:44.0000] <ljharb>
+a module with only reserved words as exports, plus "then", so that the only way you can ever import it is synchronously as a namespace
+
+[14:01:58.0000] <bradleymeck>
+i'm particularly curious about this given JSON could have any key represented as a string
+
+[14:17:43.0000] <Bakkot>
+in my parser "export { a as await }` and `import { await as b } from ''` are legal
+
+[14:17:48.0000] <Bakkot>
+also with s/await/if/ or whatever
+
+[14:17:56.0000] <Bakkot>
+could've sworn there were test262 tests for this
+
+[14:18:22.0000] <shu>
+i ran into `as` exports the other day
+
+[14:18:48.0000] <shu>
+it's quite confusing, there was an incorrect test262 test about named exports that happened to be named "default"
+
+[14:18:54.0000] <bradleymeck>
+`this` works in both positions, but `package` and the ilk in that section are odd
+
+[14:19:35.0000] <Bakkot>
+how so?
+
+[14:19:46.0000] <Bakkot>
+that is, if they're odd in the spec in that position, how are they odd?
+
+[14:20:25.0000] <bradleymeck>
+implementations don't like you importing that name
+
+[14:20:45.0000] <bradleymeck>
+spec says you should be allowed to `import {package as _}`
+
+[14:21:09.0000] <bradleymeck>
+even more fun, abstract module record doesn't have any restrictions on exported names
+
+[14:21:59.0000] <bradleymeck>
+pretty sure that could come back to bite things
+
+[14:22:50.0000] <Bakkot>
+seems to work fine in node?
+
+[14:23:25.0000] <Bakkot>
+let b = 0;
+
+[14:23:25.0000] <Bakkot>
+export { b as package };
+
+[14:23:25.0000] <Bakkot>
+import { package as a } from './import-reserved.mjs';
+
+[14:23:34.0000] <Bakkot>
+node --experimental-modules import-reserved.mjs import-reserved.mjs
+
+[14:23:35.0000] <Bakkot>
+works fine
+
+[14:25:26.0000] <ljharb>
+Bakkot: don't even need the flag in 13.7+
+
+[14:26:20.0000] <bradleymeck>
+Bakkot: didn't work in the browsers i just tried mmm
+
+[14:27:50.0000] <Bakkot>
+bradleymeck: works fine in Chrome
+
+[14:28:00.0000] <Bakkot>
+also Firefox
+
+[14:28:13.0000] <Bakkot>
+did you get the order of the `as` things backwards?
+
+[14:28:37.0000] <Bakkot>
+(also safari)
+
+[14:28:40.0000] <bradleymeck>
+maybe i did do a typo
+
+[14:28:48.0000] <bradleymeck>
+or its the darn service workers
+
+[14:28:58.0000] <bradleymeck>
+:stares at local dev:
+
+[14:29:40.0000] <devsnek>
+it should be any valid IdentifierName
+
+[14:29:47.0000] <devsnek>
+`export { a as function }`
+
+[14:30:07.0000] <bradleymeck>
+thats a good one
+
+[14:30:21.0000] <devsnek>
+if that isn't valid in an engine its a bug
+
+[14:32:17.0000] <devsnek>
+the idea about allowing string literals there is interesting though
+
+[14:32:34.0000] <devsnek>
+i'd be in favor
+
+[14:34:04.0000] <bradleymeck>
+i think either allowing everything or constraining would be fine, but right now it is in an odd place
+
+[14:35:40.0000] <devsnek>
+it seems fairly consistent to me atm
+
+[14:36:16.0000] <devsnek>
+i would actually worry that allowing strings would make people confuse it for a property name and they might write `x as [y]` or something
+
+[14:36:40.0000] <bradleymeck>
+well right now abstract module records can export arbitrary names
+
+[14:36:50.0000] <bradleymeck>
+so it isn't like other languages can't export these
+
+[14:37:14.0000] <devsnek>
+wasm is the most glaring
+
+[14:37:20.0000] <devsnek>
+its imports and exports are utf8 strings
+
+[14:43:33.0000] <devsnek>
+actually that's an argument to allow export as "string", so you can interop with modules expecting those exports
+
+[14:44:05.0000] <bradleymeck>
+yea probably
+
+[14:45:35.0000] <bradleymeck>
+well i think thats more pertinent than "from 'foo' import" so maybe we can swap that agenda item out
+
+[14:48:01.0000] <ljharb>
+i'd just add both but tell the chairs that that one is low priority
+
+[14:48:21.0000] <bradleymeck>
+yea
+
+[14:48:29.0000] <devsnek>
+we should probably set aside a few hours for export as string, very high priority
+
+[14:48:58.0000] <bradleymeck>
+i somewhat doubt it breaks more than a hour given that wasm already can do it
+
+[14:49:07.0000] <devsnek>
+oh yeah i was kidding lol
+
+[14:49:13.0000] <devsnek>
+i'd assume 30 minutes at most
+
+[14:49:34.0000] <devsnek>
+you can also mention commonjs
+
+[14:50:38.0000] <bradleymeck>
+we are still arguing if we can support CJS named exports at all I thought? people were hesitant about a static analysis approach and pretty negative towards the other ones
+
+[14:54:49.0000] <devsnek>
+bradleymeck: generated esm wrappers can use it
+
+[14:55:12.0000] <bradleymeck>
+fair enough
+
+[15:04:16.0000] <bradleymeck>
+https://github.com/tc39/agendas/pull/748
+
+[15:05:40.0000] <bradleymeck>
+spec text wouldn't be too hard
+
+
+2020-05-14
+[07:35:19.0000] <bradleymeck>
+i kind of wish we had a Object.defineProperties that just took (Object, [...props], {configurable, enumerable, writable}) and modified the listed props
+
+[07:35:26.0000] <bradleymeck>
+but that seems soo... weird
+
+[09:46:05.0000] <ljharb>
+bradleymeck: `Object.defineProperties(obj, Object.fromEntries(props.map((prop) => [prop, { configurable, enumerable, writable }])))`?
+
+[09:49:05.0000] <bradleymeck>
+ljharb: thats quite a mouthful
+
+[09:49:32.0000] <bradleymeck>
+i'm still not convinced that boilerplate is a good sign even if it shows we can already do things
+
+[09:55:33.0000] <ljharb>
+well sure, you'd wrap that in an abstraction
+
+[09:55:46.0000] <ljharb>
+but i'm curious about the use case where you don't care which property has which aspect
+
+[09:56:52.0000] <bradleymeck>
+setting various props to enumerable all at once, or setting various props to non-configurable/writable; not doing it for all properties
+
+[09:57:15.0000] <bradleymeck>
+see things like in the DOM standard or classes where you want things to be done prop by prop rather than all or nothing
+
+[09:57:36.0000] <ljharb>
+ah i suppose since it's not "all props", i can see it making sense
+
+[09:58:05.0000] <ljharb>
+but also `props.forEach((prop) => Object.defineProperty(obj, prop, { configurable, enumerable, writable }))`
+
+[09:58:09.0000] <ljharb>
+lots of ways to spell it
+
+
+2020-05-15
+[10:44:06.0000] <bradleymeck>
+targos per https://github.com/nodejs/node/pull/32202 , make test with `--without-intl` seems to fail to build at all for me locally due to eslint wanting to use the non-intl form how are you running your build/test
+
+[14:39:47.0000] <jorendorff>
+does anyone have the graph of edges in the builtins, maybe as a dot file?
+
+[14:40:22.0000] <ljharb>
+edges?
+
+[14:40:35.0000] <ljharb>
+what constitutes a node and a line between them in your graph
+
+[14:41:18.0000] <jorendorff>
+a node is an object, let's say, and an edge is (informally speaking) a gc-strong reference.
+
+[14:41:53.0000] <jorendorff>
+more formally, if x.[[Prototype]] is y, then there's an edge x -> y; if x has a property whose value, getter, or setter is y, then x -> y; and so on
+
+[14:42:00.0000] <ljharb>
+so like, you want to know which builtins strongly point to which others (initially), and which builtins internally reference intrinsics?
+
+[14:43:57.0000] <devsnek>
+jorendorff: you can probably generate that
+
+[14:44:03.0000] <jorendorff>
+hmmm. do builtins effectively reference their realm's intrinsics? I don't remember how the spec works w.r.t. things like calling a function across realms
+
+[14:44:21.0000] <devsnek>
+do you mean well known intrinsics?
+
+[14:44:33.0000] <devsnek>
+well known intrinsics are strongly referenced by the realm itself
+
+[14:45:06.0000] <jorendorff>
+In any case I am happy to do without references from builtins to intrinsics due to their algorithms
+
+[14:45:31.0000] <devsnek>
+https://gist.github.com/devsnek/377e4a52d83e786613997af82710d4db
+
+[14:45:49.0000] <devsnek>
+this is from a bit of test code i have but it walks over everything accessible from `globalThis`
+
+[14:46:46.0000] <ljharb>
+jorendorff: i mean, in that case it's just an object property graph, yes?
+
+[14:47:02.0000] <jorendorff>
+ljharb: I don't know.
+
+[14:47:14.0000] <devsnek>
+anything they reference with %ThisNotation% is strongly referenced by the realm
+
+[14:47:37.0000] <jorendorff>
+at least should cover [[Prototype]] which isn't a property
+
+[14:47:59.0000] <devsnek>
+hm i should add [[Prototype]] to my walker
+
+[14:48:12.0000] <ljharb>
+jorendorff: `__proto__` is, but sure. what's the goal?
+
+[14:48:48.0000] <jorendorff>
+I want to know if it is possible to find cycles (that are not .constructor/.prototype cycles)
+
+[14:51:16.0000] <jorendorff>
+I want to know if there are any other than the ones that look like
+
+[14:51:26.0000] <jorendorff>
+m ---> %FunctionPrototype% ---> %ObjectPrototype% ----> m
+
+[14:51:33.0000] <jorendorff>
+where m is some nonstatic method of Object
+
+[14:53:50.0000] <ljharb>
+it's not just methods, `Number.MAX_VALUE.constructor.MAX_VALUE`
+
+[14:54:18.0000] <ljharb>
+`String.constructor.name.constructor.name`, etc
+
+[14:54:34.0000] <jorendorff>
+those aren't cycles in the graph I'm asking for...
+
+[14:54:51.0000] <ljharb>
+ok so you don't want constructor/prototype but you do want [[Prototype]]?
+
+[14:55:20.0000] <jorendorff>
+I can write code that walks this graph, and notices, constructor/prototype cycles, and disregards them
+
+[14:55:39.0000] <jorendorff>
+it's ok for the graph to have those
+
+[14:56:21.0000] <devsnek>
+now that i think about it
+
+[14:56:33.0000] <devsnek>
+engine262's gc might be useful since it sees all the internal properties
+
+[14:56:39.0000] <devsnek>
+and its easy to modify
+
+[14:56:42.0000] <jorendorff>
+the property of cycles i'm interested in here
+
+[14:56:47.0000] <jorendorff>
+is that an implementation that populates the builtins lazily
+
+[14:57:12.0000] <jorendorff>
+needs a strategy for these
+
+[14:57:15.0000] <jorendorff>
+it could atomically fill in one strongly connected component at a time, without issues;
+
+[14:57:35.0000] <jorendorff>
+or try to replace some edges with tripwires that trigger more lazy initialization;
+
+[14:57:36.0000] <devsnek>
+does anything actually do that?
+
+[14:57:37.0000] <jorendorff>
+etc. etc.
+
+[14:58:16.0000] <jorendorff>
+SpiderMonkey does, and actually ... surely all the browsers do for the HTML builtins, because that namespace, woof
+
+[14:58:21.0000] <devsnek>
+wasn't there a proposal to whatwg or smth about making it easier for engines to lazily load things and the engines basically said "that doesn't matter"
+
+[14:58:30.0000] <rkirsling>
+JSC has lazy-loading of builtins but I don't believe it's done in a tiered fashion per se
+
+[14:59:00.0000] <rkirsling>
+oh I wasn't even thinking about stuff above 262; definitely necessary there
+
+[15:00:02.0000] <devsnek>
+actually what is meant by lazy loading builtins
+
+[15:00:30.0000] <jorendorff>
+...indeed :)
+
+[15:00:36.0000] <devsnek>
+like lazily creating the actual heap objects?
+
+[15:00:41.0000] <jorendorff>
+yes
+
+[15:01:30.0000] <devsnek>
+and engines do that instead of just serializing precreated heaps?
+
+[15:01:58.0000] <jorendorff>
+"just"
+
+[15:02:02.0000] <jorendorff>
+yeah, apparently
+
+[15:02:24.0000] <devsnek>
+interesting
+
+[15:03:02.0000] <jorendorff>
+total memory usage for a fully populated global is no joke either
+
+[15:04:08.0000] <rkirsling>
+https://github.com/WebKit/webkit/blob/master/Source/JavaScriptCore/runtime/JSGlobalObject.cpp#L924
+
+[15:05:55.0000] <ljharb>
+… fun how all commonly used polyfill systems end up fully enumerating the global object
+
+[15:06:09.0000] <devsnek>
+lol
+
+[15:06:15.0000] <ljharb>
+as a result, i wonder what percentage of sites would actually benefit from lazy loading
+
+[15:06:34.0000] <ljharb>
+(without some kind of heuristic around the detection mechanisms, at least)
+
+[15:06:49.0000] <Bakkot>
+presumably those sites don't actually care much about performance
+
+[15:06:49.0000] <devsnek>
+i wish i could find this issue
+
+[15:06:52.0000] <jorendorff>
+that's a really good point
+
+[15:06:57.0000] <ljharb>
+i wouldn't say they don't care
+
+[15:07:02.0000] <ljharb>
+i'd say correctness trumps perf
+
+[15:07:21.0000] <Bakkot>
+easy to be correct without doing that; just don't use things which need polyfilling
+
+[15:07:24.0000] <devsnek>
+porque no los dos a la v8's heap snapshots
+
+[15:07:31.0000] <ljharb>
+lol
+
+[15:07:57.0000] <Bakkot>
+I am kind of joking but kind of not; that's what my team does, and we support back to ie9
+
+[15:08:19.0000] <ljharb>
+yes but that's only doable for very targeted use cases with devs that have very niche knowledge
+
+[15:08:24.0000] <ljharb>
+it's not practical for the vast majority
+
+[15:08:50.0000] <Bakkot>
+depends how much you care about performance
+
+[15:09:01.0000] <devsnek>
+going by how the web performs
+
+[15:09:03.0000] <Bakkot>
+though I dunno, it's not that  hard
+
+[15:09:05.0000] <devsnek>
+i'd say most people don't
+
+[15:09:09.0000] <Bakkot>
+right, yes
+
+[15:11:11.0000] <rkirsling>
+agree with Bakkot's perspective; there's a lot you can do with transforms without needing full polyfills
+
+[15:12:04.0000] <ljharb>
+rkirsling: not for instance methods, without types
+
+[15:12:27.0000] <ljharb>
+also there's tons of random brokenness in various versions of shipped builtins that requires repairing
+
+[15:12:34.0000] <ljharb>
+ie, it's not just about missing things
+
+[15:12:34.0000] <devsnek>
+just use jquery
+
+[15:30:40.0000] <rkirsling>
+but if you're gonna polyfill S.p.matchAll you're not gonna be instantiating anything you wouldn't otherwise
+
+[15:31:28.0000] <rkirsling>
+and I'm not sure why an app wouldn't have to be aware of "brokenness"
+
+[15:31:42.0000] <rkirsling>
+in the browsers it supports
+
+[15:32:52.0000] <rkirsling>
+hence I think if you're aiming for perf, you're not gonna be polyfilling in an unconsciously broad way
+
+
+2020-05-16
+[06:46:31.0000] <jmdyck>
+Bakkot: https://github.com/tc39/ecmarkup/blob/995bad09f5dfd34e5d7d6d7b54a4daadc89d3d49/src/lint/rules/algorithm-line-endings.ts#L10 says "`Else if foo, then.` + substeps"  That dot after "then"  shouldn't be there.
+
+[06:49:02.0000] <jmdyck>
+(BTW, it'd be nice if there were a consistent rule e.g. there are substeps if and only if the prior line ends in ':', but it would touch a lot of lines for not much gain.)
+
+[13:56:00.0000] <devsnek>
+can someone with a mac test installing xs with esvu master real quick
+
+[13:56:29.0000] <ljharb>
+devsnek: what commands do you want me to run
+
+[13:56:39.0000] <devsnek>
+`esvu install xs` i guess
+
+[13:57:36.0000] <ljharb>
+https://www.irccloud.com/pastebin/uWpAhS00/
+
+[13:57:51.0000] <devsnek>
+that was on master?
+
+[13:58:02.0000] <ljharb>
+no, just latest esvu
+
+[13:58:10.0000] <ljharb>
+i npm install -g it
+
+[13:58:10.0000] <devsnek>
+can you check master
+
+[13:58:19.0000] <ljharb>
+ugh do i have to clone the repo
+
+[13:58:28.0000] <devsnek>
+`npm i -g devsnek/esvu` should work
+
+[13:58:57.0000] <rkirsling>
+whooooa something happened to test262 report two days ago that made the scores doubled-ish: https://test262.report/?date=2020-05-14
+
+[13:59:23.0000] <devsnek>
+oh nice
+
+[13:59:34.0000] <ljharb>
+devsnek: k, did that, now `esvu ❯ version 1.2.2 \n XS ❯ Checking version... \n XS ✔ Up to date`
+
+[13:59:50.0000] <devsnek>
+hm alright
+
+[13:59:53.0000] <devsnek>
+i guess the ci is borked
+
+[14:17:03.0000] <rkirsling>
+looks like Yulia had already reported an issue: https://github.com/bocoup/test262-report-issue-tracker/issues/20
+
+[14:17:58.0000] <rkirsling>
+guess we should savor the bug
+
+[14:18:24.0000] <rkirsling>
+since all of JSC's scores are 100%+ now 😂
+
+[14:30:59.0000] <Bakkot>
+jmdyck: thanks, fixed the comment
+
+[14:31:18.0000] <devsnek>
+TIL semicolons are actually completely optional after do-while
+
+
+2020-05-17
+[21:51:41.0000] <devsnek>
+i've changed my mind, the most complex part of the spec is actually the rules for what constitutes valid identifiers and declarations
+
+[22:23:59.0000] <theskillwithin>
+ic
+
+
+2020-05-19
+[19:49:54.0000] <devsnek>
+was it intentional that typeof throws if the reference is in tdz instead of being 'undefined'
+
+[19:54:19.0000] <ljharb>
+p sure yes
+
+[20:00:12.0000] <rkirsling>
+yeah that doesn't seem like it'd be an oversight
+
+[20:01:22.0000] <devsnek>
+i don't think its a bug or anything
+
+[20:01:29.0000] <devsnek>
+just sufficiently corner case enough that you never know
+
+[01:29:49.0000] <ystartsev>
+in this section of the spec: https://tc39.es/ecma262/#table-37 in the evaluate part -> does transitively mean to maintain relationships across objects?
+
+[01:29:58.0000] <ystartsev>
+or is it something else?
+
+[10:55:48.0000] <devsnek>
+browser debuggers say that Math.random() has no side effects
+
+[10:56:05.0000] <Bakkot>
+that's arguably true
+
+[10:56:10.0000] <devsnek>
+yeah i mean
+
+[10:56:17.0000] <devsnek>
+it doesn't modify any js state
+
+[10:56:21.0000] <Bakkot>
+(it would be a lot more true if it were a CSPRNG)
+
+[10:56:29.0000] <devsnek>
+but it is confusing for the preview to show one thing
+
+[10:56:33.0000] <devsnek>
+and then hitting enter to show another
+
+[10:56:45.0000] <Bakkot>
+`new Date` has the same problem
+
+[10:56:57.0000] <devsnek>
+nice catch
+
+[10:57:26.0000] <devsnek>
+dates and random are the only two things where that can happen i think
+
+[10:57:57.0000] <Bakkot>
+among JS builtins, yeah
+
+[10:58:53.0000] <Bakkot>
+https://github.com/google/caja/wiki/SES#no-monkey-patching-primordials
+
+[11:04:19.0000] <devsnek>
+Bakkot: https://chromium-review.googlesource.com/c/v8/v8/+/2207805
+
+[11:04:22.0000] <bradleymeck>
+ystartsev: my understanding is it is being used to mean a deep ordered graph traversal of all the dependency graph rather than a shallow traversal (in post order in this case, though TLA gets a little bit interesting here). i do know transitive is often used in JS package management terms to describe a nested/implicit dependency
+
+[11:05:39.0000] <devsnek>
+yeah i think its being used here like module a -> module b -> module c
+
+[11:05:46.0000] <devsnek>
+module a evaluates module c
+
+[14:44:36.0000] <devsnek>
+node 14.3.0 is here
+
+[14:44:40.0000] <devsnek>
+with --experimental-top-level-await
+
+
+2020-05-20
+[01:06:35.0000] <ystartsev>
+thanks bradleymeck & devsnek
+
+[13:47:43.0000] <jorendorff>
+Is this a spec bug? `Reflect.construct(Object, [], class C {})` seems like it'll trip an assertion in the spec
+
+[13:48:34.0000] <ljharb>
+jorendorff: which assertion?
+
+[13:48:37.0000] <jorendorff>
+because classes have [[Construct]], but IsCallable(C) is false
+
+[13:48:46.0000] <ljharb>
+no it's not
+
+[13:48:58.0000] <ljharb>
+(unfortunately) classes have a [[Call]] slot with an error-throwing function in it
+
+[13:49:05.0000] <jorendorff>
+oh, that makes sense
+
+[13:49:10.0000] <jorendorff>
+I was thinking of step 2 of https://tc39.es/ecma262/#sec-getprototypefromconstructor
+
+[13:49:23.0000] <ljharb>
+imo it doesn't make sense :-) it'd be much better if classes lacked a [[Call]]
+
+[13:49:40.0000] <ljharb>
+and we could still change that! but it'd require non-observable changes to `typeof`, and observable changes to Proxy
+
+[13:49:50.0000] <ljharb>
+and lots of non-observable spec changes
+
+[13:50:19.0000] <jorendorff>
+i knew that, just blanked on it
+
+[13:50:20.0000] <devsnek>
+some people have been known to use proxies to check for construct slots
+
+[13:50:43.0000] <ljharb>
+devsnek: the change i'd like to make wouldn't break that; it'd just let you *also* check for call slots.
+
+[13:51:21.0000] <jorendorff>
+...which you can also do, but you'd get a different answer for classes
+
+[13:51:27.0000] <devsnek>
+when was [[Construct]] added
+
+[13:51:44.0000] <ljharb>
+jorendorff: true
+
+[13:51:47.0000] <ljharb>
+devsnek: ES6
+
+[13:51:50.0000] <devsnek>
+sad
+
+[13:52:00.0000] <devsnek>
+should've just not had [[Construct]] imo
+
+[13:52:06.0000] <ljharb>
+that's also an alternative
+
+[13:52:09.0000] <ljharb>
+or was
+
+[13:52:30.0000] <jorendorff>
+alas :)
+
+[13:53:06.0000] <devsnek>
+its kind of interesting that all engines implement tail calls for Function.prototype.call and Reflect.call and such
+
+
+2020-05-21
+[23:14:38.0000] <devsnek>
+https://es.discourse.group/t/triple-backtick-template-literal/337/2
+
+[00:30:36.0000] <Bakkot>
+"indentation in template literals is sometimes ugly" does not seem like it warrants adding a fourth kind of string literal, on its own
+
+[06:59:46.0000] <devsnek>
+I wonder if proper const references could be implemented performantly
+
+[07:00:17.0000] <devsnek>
+references/variables whatever
+
+[07:18:41.0000] <bradleymeck>
+what do you mean
+
+[07:34:54.0000] <devsnek>
+bradleymeck: like `superconst x = {}; x.a = 1` throws an error
+
+[07:36:15.0000] <devsnek>
+in my mind specifying this behaviour would be pretty easy but i'm not sure about the performance for actual impls
+
+[07:36:19.0000] <bradleymeck>
+so any reference with a base of `x` would error if you tried to use a mutation operator (since getters can mutate :shrg)
+
+[07:36:39.0000] <devsnek>
+yeah you basically just mark the references
+
+[07:36:47.0000] <devsnek>
+and marked references create new marked references
+
+[07:37:01.0000] <bradleymeck>
+wouldn't it be able to find that during codegen?
+
+[07:37:03.0000] <devsnek>
+so even if you did `const y = x; y.a = 1` it would throw
+
+[07:37:17.0000] <bradleymeck>
+oh, well... thats mmmm
+
+[07:37:33.0000] <devsnek>
+yeah that part i think makes codegen slightly hard
+
+[07:37:40.0000] <devsnek>
+although i wonder
+
+[07:37:59.0000] <devsnek>
+`const y = (() => x)()`
+
+[07:38:02.0000] <devsnek>
+that would clear the marker
+
+[07:38:18.0000] <bradleymeck>
+that would add a branch to each op on any potentially non-local ref which seems... no bueno
+
+[07:39:41.0000] <bradleymeck>
+cause you also get into strange things like `let x = {}; superconst y = x; x = y; x.z = 1//?`
+
+[07:40:32.0000] <devsnek>
+maybe just allowing that to not throw is reasonable
+
+[07:41:08.0000] <devsnek>
+not like this is a security feature
+
+[09:21:04.0000] <ljharb>
+https://npmjs.com/dedent exists, why does it need syntax?
+
+[09:27:51.0000] <devsnek>
+ljharb: i think its useful enough to be built in, and you can't tag an already tagged template
+
+[09:31:52.0000] <bradleymeck>
+stares at https://twitter.com/garybernhardt/status/1260668609837187073
+
+[09:34:34.0000] <devsnek>
+lul
+
+[09:35:34.0000] <Bakkot>
+I'd be fine with shipping a builtin dedent API
+
+[09:36:01.0000] <Bakkot>
+you can make it compose with other template tags: dedent(fn) could return a tag which does dedenting and then invokes fn
+
+[09:36:26.0000] <Bakkot>
+though it's a little non-obvious what the right behavior is there, since interpolated strings might themselves contain linebreaks and indentation
+
+[09:36:41.0000] <Bakkot>
+probably you just assume they don't, though
+
+[09:37:56.0000] <ljharb>
+Gary’s using it wrong tho :-)
+
+[09:38:03.0000] <ljharb>
+it’s not meant to be called as a function
+
+[09:38:52.0000] <devsnek>
+it is
+
+[09:39:12.0000] <devsnek>
+in the example on the npm page
+
+[09:39:24.0000] <Bakkot>
+yeah that's explicitly one of the things it supports
+
+[09:39:43.0000] <devsnek>
+in any case
+
+[09:40:00.0000] <devsnek>
+i think almost every template literal i've ever written that spans multiple lines
+
+[09:40:05.0000] <devsnek>
+has this indentation problem
+
+[09:41:12.0000] <devsnek>
+i can only imagine people liking this feature
+
+[09:41:19.0000] <ljharb>
+yeah that’s fair
+
+[09:41:27.0000] <ljharb>
+I’d like it too, but it doesn’t seem worth the cost
+
+[09:41:56.0000] <devsnek>
+what cost
+
+[09:42:01.0000] <Bakkot>
+seems worth it as an API
+
+[09:42:02.0000] <Bakkot>
+not as syntax
+
+[09:42:07.0000] <Bakkot>
+syntax is expensive
+
+[09:42:34.0000] <devsnek>
+this seems pretty simple in terms of both implementation and human understanding
+
+[09:42:53.0000] <Bakkot>
+it is still something you are making everyone who learns the language learn
+
+[09:42:57.0000] <Bakkot>
+that is expensive
+
+[09:43:56.0000] <devsnek>
+it seems more than worth it from my perspective
+
+[09:44:05.0000] <Bakkot>
+/shrug
+
+[09:44:14.0000] <Bakkot>
+you are welcome to present to the committee
+
+[09:45:02.0000] <Bakkot>
+but I would wager extremely good odds that most people will agree it is not worth it as syntax
+
+[09:55:22.0000] <Bakkot>
+I have a rule of thumb about syntax, which is that it should either be taking something which is common and awkward to do without syntax and making it easy, or taking something which is effectively impossible and making it possible
+
+[09:56:02.0000] <Bakkot>
+dedenting can be done as without syntax very easily, though it's embarrassing that none of the popular published libraries do it right (assuming this thread is to be trusted)
+
+[10:21:44.0000] <ljharb>
+is it that it's broken in general, or only for String.raw output
+
+[10:26:40.0000] <Bakkot>
+broken in general
+
+[10:26:56.0000] <Bakkot>
+dedent('a\\nb'), which contains no linebreaks, returns `a\nb`, which does
+
+[10:29:47.0000] <Bakkot>
+(String.raw output is just normal strings you could write yourself, though, so the question doesn't really make sense)
+
+[10:30:31.0000] <devsnek>
+i think using String.raw was just to illustrate that escapes weren't being passed in
+
+[10:34:03.0000] <ljharb>
+ah k
+
+[14:26:12.0000] <jridgewell>
+I actually love this, and I highlight why this needs to be syntax in my reply on es.discourse.group
+
+[14:27:13.0000] <jridgewell>
+Having this as an API prevents you from using it as a tag
+
+[14:27:33.0000] <jridgewell>
+Eg
+
+[14:28:53.0000] <Bakkot>
+jridgewell: you could make "String.dd(tag)` contents `" do the right thing though
+
+[14:29:57.0000] <Bakkot>
+i.e. String.dd(fn) would return a function which wrapped `fn` and passed it the same things it would have been passed if it had been used as a tag directly, except dedented
+
+[14:30:13.0000] <jridgewell>
+https://www.irccloud.com/pastebin/eZtDzhud/dedenting.js
+
+[14:32:25.0000] <jridgewell>
+I think making it a higher-order function is a lot more cost than adding syntax
+
+[14:32:37.0000] <Bakkot>
+... what, why
+
+[14:33:09.0000] <devsnek>
+i think the higher order function is weirder
+
+[14:33:12.0000] <jridgewell>
+Because I hate higher-order functions…
+
+[14:33:15.0000] <devsnek>
+i'm not gonna comment on cost
+
+[14:33:24.0000] <devsnek>
+actually i will say
+
+[14:33:32.0000] <devsnek>
+its less apparent what is happening
+
+[14:33:33.0000] <Bakkot>
+jridgewell you hate... map?
+
+[14:33:37.0000] <jridgewell>
+Functions that return more funcitons is way more complex than individual functions
+
+[14:33:49.0000] <devsnek>
+map says what it is doing with the function
+
+[14:33:50.0000] <Bakkot>
+devsnek strong disagree, nothing about "```" suggests what's going on
+
+[14:33:57.0000] <devsnek>
+maybe if you call it dedentMap
+
+[14:33:59.0000] <jridgewell>
+Limiting higher-order to just fucntion-returning functions
+
+[14:34:02.0000] <devsnek>
+mapDedent(f)
+
+[14:34:12.0000] <devsnek>
+whatever fp people call these functions
+
+[14:34:13.0000] <Bakkot>
+jridgewell you hate Function.prototype.bind?
+
+[14:34:20.0000] <jridgewell>
+Yes
+
+[14:34:24.0000] <Bakkot>
+well
+
+[14:34:34.0000] <Bakkot>
+I don't think this preference ought to guide the design of JS
+
+[14:35:08.0000] <jridgewell>
+Besides `bind`, I can't think of any other higher-order in the language
+
+[14:35:09.0000] <Bakkot>
+also, though, I don't think people actually need to think about what's going on
+
+[14:35:41.0000] <devsnek>
+even if you don't know that triple backtick performs deindentation
+
+[14:35:47.0000] <Bakkot>
+you'd be like "how do I use dedent with my tag?" and stackoverflow would say "write String.dedent(tag)` foo `"instead of "tag` foo `" and you would go about your life
+
+[14:36:02.0000] <Bakkot>
+under the hood, yes, what's happening is that there is a function which returns a function
+
+[14:36:08.0000] <Bakkot>
+but that is not something people actually need to think about
+
+[14:36:41.0000] <devsnek>
+if we're considering stackoverflow a valid solution to unclear apis
+
+[14:36:46.0000] <devsnek>
+i have many things i wish to propose
+
+[14:36:52.0000] <Bakkot>
+it's not unclear
+
+[14:36:57.0000] <Bakkot>
+it's just not something you were aware of
+
+[14:37:12.0000] <Bakkot>
+we are considering "I don't know about this feature" to be something solved by stackoverflow, yes
+
+[14:37:14.0000] <devsnek>
+you can guess what `x.map((a) => a + 1)` does
+
+[14:37:31.0000] <Bakkot>
+you can guess what String.dedent`` does too
+
+[14:37:37.0000] <Bakkot>
+also String.dedent(tag)``
+
+[14:37:40.0000] <devsnek>
+`dedent(html)` looks like gibberish to me
+
+[14:37:42.0000] <ljharb>
+it buffs out dents
+
+[14:38:12.0000] <Bakkot>
+devsnek I maintain String.dedent(tag)`` is strictly easier to understand at a glance than tag``` ``` is
+
+[14:39:00.0000] <devsnek>
+yeah i think completely the opposite
+
+[14:39:07.0000] <jridgewell>
+Same
+
+[14:39:10.0000] <Bakkot>
+nothing about ``` suggests dedenting is going on
+
+[14:39:23.0000] <devsnek>
+i care more about the tag than the dedent
+
+[14:39:25.0000] <Bakkot>
+just the opposite, to me, since ``` in _every other language_ means "exactly what's in here, raw, with no changes"
+
+[14:39:52.0000] <devsnek>
+i only know of python
+
+[14:39:56.0000] <devsnek>
+which has dedent
+
+[14:40:02.0000] <devsnek>
+but also doesn't have tagged templates
+
+[14:40:19.0000] <Bakkot>
+python has it as an API, yes
+
+[14:40:24.0000] <Bakkot>
+that being the sensible place to put it
+
+[14:40:30.0000] <Bakkot>
+instead of adding a new type of string literal to the language
+
+[14:40:34.0000] <devsnek>
+if we didn't have tags i might agree with you
+
+[14:40:58.0000] <devsnek>
+maybe we need a standard way to compose tags
+
+[14:41:43.0000] <Bakkot>
+tag composition doesn't usually make sense
+
+[14:41:53.0000] <Bakkot>
+it happens to for dedent, because dedent doesn't need to do interpolation
+
+[14:41:55.0000] <Bakkot>
+but most tags do
+
+[14:42:26.0000] <devsnek>
+what if its called dedentWithTag
+
+[14:42:27.0000] <rkirsling>
+was there prior art for tagged templates? it's still such an interesting concept to me
+
+[14:42:52.0000] <ljharb>
+rkirsling: "quasiliterals" in some language, iirc
+
+[14:43:10.0000] <devsnek>
+lol of course its elang
+
+[14:43:21.0000] <devsnek>
+mark miller is everywhere
+
+[14:43:43.0000] <Bakkot>
+devsnek I am fine with dedentWithTag + also dedent, and no overloads
+
+[14:43:50.0000] <Bakkot>
+though I don't really see what's wrong with the overload
+
+[14:43:56.0000] <rkirsling>
+I thought you mistyped erlang for a sec
+
+[14:44:08.0000] <devsnek>
+erights.org
+
+[14:44:35.0000] <rkirsling>
+does that language have users? seems weird to use personal research as prior art
+
+[14:44:53.0000] <ljharb>
+rkirsling: i mean, that's where Promise comes from.
+
+[14:45:05.0000] <rkirsling>
+o_o
+
+[14:45:22.0000] <ljharb>
+afaik E invented the concept, and other langs' Futures/Promises/etc come from that?
+
+[14:45:24.0000] <devsnek>
+every interesting feature in modern programming languages came from E or smalltalk
+
+[14:45:34.0000] <devsnek>
+don't @ me
+
+[14:45:45.0000] <ljharb>
+one of those probably used @ for the first time
+
+[14:45:58.0000] <rkirsling>
+wowsers, I've never heard of this
+
+[14:47:33.0000] <rkirsling>
+I mean the CS concept of a Future is 20 years older than that according to Wikipedia
+
+[14:47:58.0000] <rkirsling>
+er rather apparently "promise" dates to 1976, and "future" to 1977
+
+[14:48:04.0000] <rkirsling>
+interesting
+
+[14:49:23.0000] <devsnek>
+lol mark and dean are in the wikipedia page on futures and promises
+
+[14:51:00.0000] <ljharb>
+rkirsling: promise.then(future)
+
+[14:51:16.0000] <rkirsling>
+heh
+
+[14:51:55.0000] <devsnek>
+apparently they invented the promise pattern that js promises are based on
+
+[14:53:37.0000] <rkirsling>
+that's pretty amazing, to be on the first-ish implementation end of something that propagated to every language
+
+[14:54:33.0000] <ljharb>
+quite the personal research :-p
+
+[14:55:22.0000] <devsnek>
+i think i came up with a novel way of storing some data structure at some point
+
+[14:55:33.0000] <devsnek>
+i think it was tree related
+
+[14:56:02.0000] <devsnek>
+oh it was unicode character name mapping
+
+[14:56:07.0000] <devsnek>
+i hope i still have that code
+
+[14:56:09.0000] <rkirsling>
+I mean, "personal" aside, it does seem to be a matter of research? if I'm following correctly
+
+[14:56:52.0000] <rkirsling>
+but I guess it sounds like the more literal meaning would've been by Liskov in the 80s: https://en.wikipedia.org/wiki/Argus_(programming_language)
+
+[14:57:50.0000] <rkirsling>
+oops nope
+
+[14:57:54.0000] <rkirsling>
+"It seems that promises and call-streams were never implemented in any public release of Argus,[16] the programming language used in the Liskov and Shrira paper."
+
+[14:58:48.0000] <rkirsling>
+and then the Xanadu implementation is claimed to be "independent"
+
+[14:58:51.0000] <rkirsling>
+of that
+
+[14:59:39.0000] <rkirsling>
+so it's definitely research if you're inventing new (mini-)paradigms
+
+
+2020-05-22
+[07:20:46.0000] <ryzokuken>
+I was looking through the spec, couldn't find an example of iterating over keys of a Record.
+
+[07:20:59.0000] <ryzokuken>
+do any of you remember any?
+
+[07:21:49.0000] <ryzokuken>
+or can I just `For each field _myField_ of _myRecord_, do`?
+
+[07:24:52.0000] <bradleymeck>
+ryzokuken: i dont think we do that
+
+[07:25:43.0000] <ryzokuken>
+bradleymeck: I see. Well, if I wanted to do something like that, how would I?
+
+[07:25:51.0000] <ryzokuken>
+Use an abstract op to get the fields?
+
+[07:26:05.0000] <bradleymeck>
+i don't believe we state records are like object / they don't have an enumeration method
+
+[07:26:08.0000] <ryzokuken>
+I mean, as a `List`.
+
+[07:26:28.0000] <bradleymeck>
+even then, the key isn't a value on its own
+
+[07:26:48.0000] <ryzokuken>
+Ah, I see.
+
+[07:26:56.0000] <bradleymeck>
+i believe 402 has a mechanism that extends this a bit? /me digs about
+
+[07:27:08.0000] <ryzokuken>
+This is a 402 proposal btw
+
+[07:27:22.0000] <ryzokuken>
+so I'd be more than happy to reference 402.
+
+[07:27:27.0000] <bradleymeck>
+https://tc39.es/ecma402/#conventions
+
+[07:29:06.0000] <ryzokuken>
+bradleymeck: do you specifically mean
+
+[07:29:09.0000] <ryzokuken>
+>  As an extension to the Record Specification Type, the notation “[[<name>]]” denotes a field whose name is given by the variable name, which must have a String value. For example, if a variable s has the value "a", then [[<s>]] denotes the field [[a]].
+
+[07:29:11.0000] <ryzokuken>
+?
+
+[07:29:21.0000] <bradleymeck>
+then you could state `for each field F in R as a String in List order:`
+
+[07:29:36.0000] <bradleymeck>
+but even 402 doesn't ever enumerate fields
+
+[07:29:40.0000] <ryzokuken>
+Aaah, perfect.
+
+[07:29:43.0000] <bradleymeck>
+i'm curious why you would enumerate a field
+
+[07:29:56.0000] <ryzokuken>
+Yeah, I just grep'd for it, it doesn't.
+
+[07:30:29.0000] <bradleymeck>
+ah, no https://tc39.es/ecma402/#sec-basicformatmatcher has it
+
+[07:30:37.0000] <bradleymeck>
+"For each property shown in Table 6, do"
+
+[07:31:39.0000] <ryzokuken>
+Ah, sounds good. I can just reference a table instead.
+
+[07:31:52.0000] <ryzokuken>
+Thanks a ton for clarifying this.
+
+
+2020-05-23
+[05:06:02.0000] <jmdyck>
+ryzokuken (and bradleymeck): the 262 spec has one case of iterating over the fields of a record, at the bottom of https://tc39.es/ecma262/#sec-validateandapplypropertydescriptor: "For each field of _Desc_ that is present" where _Desc_ is a Property Descriptor.
+
+[05:47:26.0000] <ryzokuken>
+jmdyck: oh wow.
+
+[05:47:36.0000] <ryzokuken>
+Great catch, I'd have never caught that one.
+
+[05:47:53.0000] <ryzokuken>
+Well, I just made a table and started iterating on the table fields.
+
+
+2020-05-25
+[14:23:16.0000] <devsnek>
+does anyone still include chakra in their eshost config
+
+[14:23:59.0000] <Bakkot>
+I do, yeah
+
+[14:24:14.0000] <Bakkot>
+chakra still runs a lot of code
+
+[14:24:45.0000] <devsnek>
+do you ever update it
+
+[14:25:08.0000] <devsnek>
+(i assume they don't push updates for IE when they update chakra)
+
+[14:25:17.0000] <Bakkot>
+I type jsvu occasionally
+
+[14:25:37.0000] <devsnek>
+makes sense
+
+
+2020-05-26
+[07:32:14.0000] <jmdyck>
+Bakkot: In https://github.com/tc39/ecma262/pull/2013, the Travis build is failing because ecmarkup is complaining about the lines
+
+[07:32:17.0000] <jmdyck>
+<pre><code class="javascript">constructor(...args) { super(...args); }</code></pre>
+
+[07:32:18.0000] <jmdyck>
+and
+
+[07:32:25.0000] <jmdyck>
+<pre><code class="javascript">constructor() {}</code></pre>
+
+[07:33:26.0000] <jmdyck>
+But those lines exist in current master. (I've just changed lines around them.)
+
+[07:34:08.0000] <jmdyck>
+I've looked at the ecmarkup code, and I can't figure out why it complains for my PR but not for master.
+
+[07:35:20.0000] <devsnek>
+jmdyck: i like your proposal
+
+[07:35:22.0000] <devsnek>
+pr
+
+[07:35:42.0000] <jmdyck>
+tx
+
+[07:36:20.0000] <devsnek>
+ok real question time, should we use AggregateError for handling the array of errors from parsing :P
+
+[07:38:13.0000] <jmdyck>
+from the Promise.any proposal
+
+[07:47:45.0000] <devsnek>
+sort of joking, but it might encourage implementations to actually support reporting multiple early errors
+
+[10:42:12.0000] <alystair>
+why aren't 'true' and 'false' strings truthy/falsy?
+
+[10:44:15.0000] <bradleymeck>
+alystair: history, can't change now
+
+[10:45:07.0000] <jackworks>
+That's a super footgun
+
+[10:50:10.0000] <ljharb>
+it'd be super weird that `str + 'e'` might suddenly make it falsy
+
+[10:50:31.0000] <ljharb>
+i don't think it's a footgun in the language; i think it's perhaps one in HTML, and server frameworks like express, and CLI arg parsers
+
+[11:11:27.0000] <TabAtkins>
+I suspect jackworks is saying that "false" being falsey would be a footgun, not the *lack* of said feature. ^_^
+
+[11:11:57.0000] <TabAtkins>
+And yeah, YAML shows pretty clearly the problem with implicitly mixing the string value space with other types
+
+[11:17:30.0000] <ljharb>
+ohhh right, in that case sorry jackworks, i agree :-)
+
+[11:26:05.0000] <devsnek>
+booleans should have been symbols. in this essay I will anger everyone for no reason
+
+[12:40:09.0000] <alystair>
+hehe
+
+[12:40:22.0000] <alystair>
+thanks all
+
+[14:15:17.0000] <TabAtkins>
+`Symbol.t` and `Symbol.nil`, ship it
+
+[14:35:07.0000] <Sirisian|Work>
+littledan, In the operator overloading spec why is there a RightOperatorDefinitions? I haven't thought too hard about this, but JS has no binary operators in the form "a operator b" that can't be written a.operator(b) right?
+
+[14:35:34.0000] <littledan>
+sorry, I don't understand the question
+
+[14:35:49.0000] <littledan>
+the idea is that you could overload stuff like number * vector, if you define a vector class
+
+[14:35:58.0000] <littledan>
+(which is one of the motivating examples in the post)
+
+[14:36:17.0000] <littledan>
+can you just use methods instead? sure, if you don't care about that particular ergonomics thing
+
+[14:36:37.0000] <Sirisian|Work>
+Wouldn't Number have an operator set and then just have the Vector operator in it's LeftOperatorDefinitions?
+
+[14:48:28.0000] <Sirisian|Work>
+Just so I understand things. Every class type (and Number, BigInt, etc) would have an Operator Set with a unique OperatorCounter identifier. So if you define N classes (counting Number, BigInt, etc) in theory you'd have a NxN matrix. (Probably stored in a different data structure in practice). What I'm wondering is based on JS's current types couldn't this just store the lower or upper triangle of the matrix and thus just
+
+[14:48:28.0000] <Sirisian|Work>
+LeftOperatorDefinitions.
+
+[14:48:58.0000] <Sirisian|Work>
+er JS's current operators*
+
+[15:11:26.0000] <TabAtkins>
+Sirisian|Work: An important bit is that the set of operations is not meant to be adjustable after-the-fact, I think. So the Vector author can't modify Number's overrides.
+
+[15:41:32.0000] <Sirisian|Work>
+That makes sense if it's to control the not editing aspect. I'll read the spec closer.
+
+
+2020-05-27
+[08:55:58.0000] <jorendorff>
+where's the agenda for this week's meetings?
+
+[08:58:02.0000] <jorendorff>
+oh lol they're next week
+
+[08:58:54.0000] <jorendorff>
+https://github.com/tc39/agendas/blob/master/2020/06.md
+
+
+2020-05-28
+[21:07:42.0000] <Bakkot>
+jmdyck: you had a comment on https://github.com/tc39/ecma262/issues/828 today which disappeared
+
+[21:07:50.0000] <Bakkot>
+did you delete it on purpose, or is github broken?
+
+[21:08:12.0000] <jmdyck>
+on purpose.
+
+[21:08:36.0000] <jmdyck>
+meant to cancel, but comment-and-close button is in the same place
+
+[21:08:55.0000] <Bakkot>
+yeah, that UI is not great
+
+[08:55:17.0000] <jorendorff>
+devsnek: hey, i don't know if you saw, but yulia and I asked for a slot on the agenda for iterator helpers next week
+
+[08:55:35.0000] <devsnek>
+jorendorff: yeah yulia told me 👍🏻
+
+[08:55:51.0000] <jorendorff>
+devsnek: ok, cool, I want to make sure there are no surprises for you in this presentation
+
+[08:56:12.0000] <jorendorff>
+the goal is to get committee approval for a specific specification approach
+
+[08:56:22.0000] <devsnek>
+how did you end up feeling about
+
+[08:56:23.0000] <devsnek>
+https://github.com/tc39/proposal-iterator-helpers/issues/86#issuecomment-632768983
+
+[08:58:43.0000] <jorendorff>
+devsnek: I like it. I think the specification ends up shorter and cleaner that way
+
+[08:58:57.0000] <devsnek>
+🎉
+
+[08:58:58.0000] <jorendorff>
+than if we make every one of these its own iterator "class" with three methods
+
+[08:59:17.0000] <jorendorff>
+it's not drastically shorter and cleaner but the difference is real, fewer steps, fewer spec sections
+
+[08:59:47.0000] <devsnek>
+and it handles state cleanly
+
+[09:00:05.0000] <jorendorff>
+devsnek: is it OK to say in a slide that the idea is to pick an approach now, and try for Stage 3 next time?
+
+[09:00:27.0000] <devsnek>
+yeah definitely not time for stage 3 yet
+
+[09:01:25.0000] <jorendorff>
+👍 ok
+
+[09:02:50.0000] <jorendorff>
+devsnek: the champions will be ok with this?
+
+[09:09:40.0000] <devsnek>
+they were fine with generators at least
+
+[09:10:50.0000] <devsnek>
+i'll ping them
+
+[12:15:39.0000] <bradleymeck>
+has anyone attempted to propose a non-propagating promise handler method? e.g. `Promise.prototype.handle(fn, errfn): void`
+
+[12:15:48.0000] <bradleymeck>
+i don't see any refs on a quick glance
+
+[12:16:50.0000] <TabAtkins>
+bradleymeck: What's the difference between `.handle()` and a `.then()` that you just ignore the return value of?
+
+[12:17:30.0000] <bradleymeck>
+no return value, can't do the evil unhandledRejection dance that .then has, likely wouldn't swallow the error
+
+[12:17:59.0000] <TabAtkins>
+Ah, hm, kk.
+
+[12:18:03.0000] <bradleymeck>
+https://twitter.com/bradleymeck/status/1266060854111408129
+
+[12:18:17.0000] <bradleymeck>
+see thread leading up to that
+
+[12:18:45.0000] <bradleymeck>
+basically unused return position of .then is a propagation point for unhandledRejection
+
+[12:19:35.0000] <TabAtkins>
+yup, got it.
+
+[12:23:27.0000] <devsnek>
+bradleymeck: where do errors thrown in `fn` go
+
+[12:25:03.0000] <bradleymeck>
+i presume it just lets it propagate through, since it is on a new tick that would be to w/e the global exception handler is
+
+[12:25:43.0000] <bradleymeck>
+i certainly have written `p.catch(e => setTimeout(() => {throw e;}))` before and it would go through same path
+
+[12:26:00.0000] <bradleymeck>
+right now i don't think there is a way to escape the promise swallowing state in raw JS itself?
+
+[12:26:00.0000] <devsnek>
+so host hook
+
+[12:26:09.0000] <bradleymeck>
+not a new one
+
+[12:26:20.0000] <ljharb>
+bradleymeck: what would happen if the handle function threw
+
+[12:26:22.0000] <devsnek>
+HostHandleErrors or whatever its called
+
+[12:26:24.0000] <ljharb>
+that'd still be an unhandled rejection
+
+[12:26:38.0000] <bradleymeck>
+ljharb: it isn't rejecting a promise, it is just throwing
+
+[12:26:49.0000] <ljharb>
+bradleymeck: right but sync or async
+
+[12:26:55.0000] <bradleymeck>
+idk what you mean
+
+[12:26:59.0000] <devsnek>
+oh the report errors hook was removed
+
+[12:27:04.0000] <ljharb>
+like how would it throw an exception
+
+[12:27:14.0000] <ljharb>
+it'd just be uncatchable until a global uncaught exception hook?
+
+[12:27:25.0000] <ljharb>
+one that no JS env is required to provide?
+
+[12:27:38.0000] <devsnek>
+sure
+
+[12:28:46.0000] <ljharb>
+that sounds pretty bad to me
+
+[12:28:51.0000] <bradleymeck>
+ljharb: i mean, you can always wrap stuff in try/catch
+
+[12:28:58.0000] <bradleymeck>
+this is the same behavior as... many things
+
+[12:28:59.0000] <devsnek>
+bradleymeck: thinking a bit more, maybe something like `.then().catch().join()`
+
+[12:29:01.0000] <ljharb>
+not if it's not synchronous
+
+[12:29:05.0000] <devsnek>
+or `.end()` as a less biased name
+
+[12:29:12.0000] <bradleymeck>
+ljharb: it shouldn't be sync
+
+[12:29:14.0000] <ljharb>
+(`.done` is the one with precedent, iirc)
+
+[12:29:19.0000] <bradleymeck>
+promise state cannot be inspected sync
+
+[12:29:31.0000] <ljharb>
+bradleymeck: right but you can't wrap everything inside a function that can throw in try/catch
+
+[12:29:45.0000] <bradleymeck>
+ljharb: ?
+
+[12:29:46.0000] <ljharb>
+and that boilerplate is not better than "remembering to chain promises"
+
+[12:30:03.0000] <bradleymeck>
+what do you mean you can't put try/catch around a function
+
+[12:30:06.0000] <ljharb>
+the `handleFn`, it could throw in default args, or inside a `catch` block
+
+[12:30:10.0000] <ljharb>
+you can put it around a sync function call
+
+[12:30:15.0000] <ljharb>
+you can't put it around `p.handle(handleFn)`
+
+[12:30:34.0000] <bradleymeck>
+that isn't any different from other promise handlers
+
+[12:30:51.0000] <devsnek>
+i think ljharb is saying
+
+[12:30:57.0000] <devsnek>
+the problem is missing exceptions
+
+[12:30:57.0000] <ljharb>
+the other promise handlers always produce a new promise, and thus an opportunity to handle the error
+
+[12:31:02.0000] <devsnek>
+so adding something that still misses exceptions
+
+[12:31:02.0000] <ljharb>
+and thus a possible unhandled rejection
+
+[12:31:05.0000] <devsnek>
+doesn't fix the problem
+
+[12:31:20.0000] <ljharb>
+adding a promise method that doesn't produce a new promise just solves one problem by creating a larger one
+
+[12:32:39.0000] <bradleymeck>
+ljharb: the person attaching the handler is responsible for the errors in their handler. I don't understand.
+
+[12:32:55.0000] <devsnek>
+isn't that true at any level
+
+[12:32:57.0000] <bradleymeck>
+thats the whole reason you end up with process.nextTick style rethrows in node
+
+[12:33:27.0000] <ljharb>
+the person calling `.then` is responsible for handling the new promise that's produced. how is that different
+
+[12:33:47.0000] <bradleymeck>
+it isn't which is why I'm very confused
+
+[12:34:03.0000] <bradleymeck>
+the behavior delegation is still on the person calling the method to handle
+
+[12:34:19.0000] <bradleymeck>
+one you have to wrap the returned promise is you want to do things, the other you wrap the handler
+
+[12:34:31.0000] <ljharb>
+oh sure. if a method returns a promise. then the caller is responsible for handling that promise's possible rejection
+
+[12:34:36.0000] <bradleymeck>
+if you wrap the handler you can 100% guarantee in both cases no "unhandled" events occur
+
+[12:34:55.0000] <ljharb>
+the handler might produce a rejected promise tho
+
+[12:35:04.0000] <bradleymeck>
+not if you wrap that handler
+
+[12:35:12.0000] <ljharb>
+how do you "wrap" that in a way that's not the same problem you're trying to avoid?
+
+[12:35:38.0000] <ljharb>
+`new Promise((resolve) => handler())` wraps it, sure, but then you have another potential rejection to handle
+
+[12:35:43.0000] <bradleymeck>
+p.then(v=> {try { return f(v) } catch (e) {} }, () => {})
+
+[12:35:59.0000] <bradleymeck>
+i mean... you *could* write that
+
+[12:36:04.0000] <ljharb>
+how is that better than `p.then(f).catch()`?
+
+[12:36:27.0000] <devsnek>
+`.catch(() => {})`*
+
+[12:36:31.0000] <ljharb>
+no need
+
+[12:36:37.0000] <ljharb>
+you can even do that as the async function, and prevent your consumer from having possible unhandled rejections
+
+[12:36:58.0000] <ljharb>
+devsnek: p sure `.then()` and `.catch()` work with no args
+
+[12:37:02.0000] <bradleymeck>
+i mean that snippet above wouldn't be, but a .handle or something seems to have less need for all of this wrangling of promise propagation of errors
+
+[12:37:16.0000] <bradleymeck>
+you just asked how you could do it and i gave a way
+
+[12:37:17.0000] <ljharb>
+right, i'm saying that it seems like it moves the need around at best
+
+[12:38:06.0000] <ljharb>
+like you had your `p.handle(handler)` above. how do you deal with the asynchronous rejection if `handler` produces a rejection?
+
+[12:38:08.0000] <devsnek>
+ljharb: if you leave out the argument to catch it defaults to `(v) => throw v`
+
+[12:38:15.0000] <bradleymeck>
+it creates fewer promises and doesn't have the error swallowing behavior since global hooks for errors do exist without the tick heuristic involved either. it is just a way of expressing intent
+
+[12:38:23.0000] <ljharb>
+devsnek: oops, you're right
+
+[12:38:37.0000] <bradleymeck>
+ljharb: handler cannot produce a rejection, the function can throw
+
+[12:38:47.0000] <bradleymeck>
+there is no place for the rejection to reject
+
+[12:38:47.0000] <ljharb>
+ps, rofl, i typed `Promise.reject(3).` in the chrome console and immediately got an unhandled rejection warning
+
+[12:39:02.0000] <devsnek>
+its not wrong
+
+[12:39:25.0000] <ljharb>
+sure it is, those warnings aren't supposed to appear synchronously, nor before i hit enter
+
+[12:39:40.0000] <ljharb>
+if it's eagerly evaluating as i type for UX reasons it should be suppressing the warnings until i hit enter
+
+[12:39:52.0000] <ljharb>
+bradleymeck: handler will be invoked asynchronously
+
+[12:39:54.0000] <bradleymeck>
+unhandledRejection is a heuristic thing
+
+[12:40:13.0000] <ljharb>
+right but until i hit enter in the repl the JS engine has no way to know what i'm typing
+
+[12:40:25.0000] <bradleymeck>
+ljharb: yes? like nextTick, setImmediate, setTimeout, a lot of events, etc.
+
+[12:40:29.0000] <ljharb>
+bradleymeck: if handler throws asynchronously, there is no way to catch that
+
+[12:40:36.0000] <ljharb>
+bradleymeck: none of those are in JS.
+
+[12:40:50.0000] <bradleymeck>
+ljharb: correct? but you can't handle a dropped promise ref either
+
+[12:41:02.0000] <ljharb>
+wait i'm confused now, which thread is that part of
+
+[12:41:18.0000] <ljharb>
+indeed, i can't handle a rejected promise when the promise is no longer reachable
+
+[12:41:23.0000] <bradleymeck>
+i'm only talking about a .handle
+
+[12:41:50.0000] <bradleymeck>
+my argument is unhandled rejection is a different thing than unhandled exception
+
+[12:42:05.0000] <bradleymeck>
+and you currently only have a way to propagate unhandled rejection in JS
+
+[12:42:09.0000] <ljharb>
+i agree with that, notably in node where i don't think an unhandled rejection should crash the process :-)
+
+[12:44:00.0000] <devsnek>
+bradleymeck: in any case, i think anything that requires a change in behaviour
+
+[12:44:06.0000] <devsnek>
+is not great
+
+[12:44:16.0000] <bradleymeck>
+devsnek: change in behavior?
+
+[12:44:17.0000] <devsnek>
+since the problem is forgetting to do exception handling
+
+[12:44:34.0000] <devsnek>
+the solution can't involve assuming people don't forget to do something
+
+[12:44:41.0000] <bradleymeck>
+i don't think we can state we can prevent forgetting exception handling
+
+[12:45:45.0000] <bradleymeck>
+i'm more interested in the fact that only providing a fulfillment handler even if the promise rejects is stuck in an odd place
+
+[12:45:48.0000] <devsnek>
+honestly i think the solution will be
+
+[12:45:53.0000] <devsnek>
+some form of async context thing
+
+[12:46:00.0000] <devsnek>
+just wrap your app in an async context
+
+[12:46:34.0000] <bradleymeck>
+so async context is a bit different
+
+[12:46:55.0000] <devsnek>
+one of the things it can do is tell where a rejected promise came from
+
+[12:46:58.0000] <bradleymeck>
+there is a different between unhandled rejection which by language default is a noop even if pretty much all hosts have moved it to an event
+
+[12:47:29.0000] <bradleymeck>
+and unhandled exception which is the form that propagates as some form of error in all the environments
+
+[12:48:00.0000] <devsnek>
+right
+
+[12:49:43.0000] <bradleymeck>
+so, even if you wrap things in some kind of context, you still want to disambiguate that
+
+[12:51:50.0000] <devsnek>
+uncaught exceptions rip through async context
+
+[12:55:49.0000] <bradleymeck>
+well you can't make an uncaught exception once you are in promise hell
+
+[12:55:54.0000] <bradleymeck>
+at least not in pure js
+
+[12:56:29.0000] <devsnek>
+i'm not sure what we're talking about anymore lol
+
+[12:56:33.0000] <devsnek>
+i was just saying you could do
+
+[12:56:48.0000] <devsnek>
+`new AsyncContext().onError(error handler)`
+
+[12:57:40.0000] <bradleymeck>
+i'm stating that if your async context is started up, ala something like otherPromise.then(doThingInAContext) doThingInAContext can never create a unhandled exception in JS
+
+[12:58:16.0000] <devsnek>
+well the error gets handled in the async context's error handler
+
+[12:58:21.0000] <devsnek>
+which isn't a promise reaction
+
+[12:58:32.0000] <devsnek>
+so if that throws its not a rejection
+
+[12:59:29.0000] <bradleymeck>
+what do you mean
+
+[12:59:41.0000] <bradleymeck>
+how does it get out of being in the promise handler position and thus a rejection position
+
+[13:03:26.0000] <devsnek>
+bradleymeck: the async context's error handler isn't a promise reaction
+
+[13:03:29.0000] <devsnek>
+idk how else to say that
+
+[14:30:12.0000] <ljharb>
+gut checkL can step 3.e.ii ever fail to define the property? https://tc39.es/ecma262/#sec-ordinarysetwithowndescriptor
+
+[14:55:03.0000] <Bakkot>
+yeah, if the object is frozen
+
+[14:55:21.0000] <Bakkot>
+or prevent-extension'd
+
+[14:55:35.0000] <Bakkot>
+or sealed
+
+[14:55:40.0000] <ljharb>
+ok, and in those cases would you expect the current behavior where it silently avoids the issue?
+
+[14:56:00.0000] <Bakkot>
+what  do you mean by silently avoids?
+
+[14:56:14.0000] <ljharb>
+i mean that `DefineOwnProperty` returns false when it fails
+
+[14:56:21.0000] <ljharb>
+so there's no abrupt completion for the ? to unwrap
+
+[14:56:24.0000] <ljharb>
+so, nothing happens
+
+[14:56:41.0000] <ljharb>
+ie the note on https://tc39.es/ecma262/#sec-createdataproperty
+
+[14:56:48.0000] <ljharb>
+(that's why CreateDataPropertyOrThrow exists)
+
+[15:02:46.0000] <devsnek>
+ljharb: it can still throw
+
+[15:03:29.0000] <devsnek>
+for example with proxies
+
+[15:04:43.0000] <devsnek>
+people even use `Object.defineProperty(); return true;` instead of  `return Reflect.defineProperty()` because the former gives better error messages
+
+[15:06:31.0000] <ljharb>
+devsnek: sure but would OrdinarySetWithOwnDescriptor be called with a proxy?
+
+[15:07:32.0000] <devsnek>
+not sure about proxies
+
+[15:07:37.0000] <devsnek>
+but its used on lots of exotic objects
+
+[15:08:19.0000] <ljharb>
+right but the spec for OrdinarySetWithOwnDescriptor right now says that trying to add a property to a frozen/sealed/non-extensible object won't throw, if i'm reading it right
+
+[15:09:05.0000] <devsnek>
+for the objects defined in the spec i think that's true
+
+[15:10:12.0000] <ljharb>
+right but like, `Object.freeze(Array.prototype).foo = 3` throws in strict mode
+
+[15:11:11.0000] <Bakkot>
+if you have a proxy which doesn't handle some trap, it just uses the underlying object's trap
+
+[15:11:33.0000] <Bakkot>
+`(new Proxy({}, { get defineProperty(){ throw 'no'; } })).a = 0` throws `'no'` via OrdinarySetWithOwnDescriptor 3.d.iv
+
+[15:11:54.0000] <Bakkot>
+sorry, v3.e.ii
+
+[15:12:04.0000] <Bakkot>
+*via 3.e.ii
+
+[15:12:09.0000] <Bakkot>
+I am having difficulty with the typing today
+
+[15:12:09.0000] <ljharb>
+it throws in practice
+
+[15:12:13.0000] <ljharb>
+but in the spec text it does not throw
+
+[15:12:22.0000] <Bakkot>
+the thing I wrote throws in the spec
+
+[15:12:23.0000] <ljharb>
+oh wait
+
+[15:12:30.0000] <ljharb>
+right, because `O.[[DefineOwnProperty]]` throws
+
+[15:12:34.0000] <ljharb>
+ohhh i see
+
+[15:12:42.0000] <ljharb>
+so even on an ordinary object, it'd throw in the frozen etc case
+
+[15:12:56.0000] <ljharb>
+but the note on https://tc39.es/ecma262/#sec-createdataproperty says "If it does exist and is not configurable or if O is not extensible, [[DefineOwnProperty]] will return false."
+
+[15:13:02.0000] <ljharb>
+which isn't an exception
+
+[15:13:20.0000] <ljharb>
+so how does my above example throw in strict mode?
+
+[15:14:00.0000] <Bakkot>
+https://tc39.es/ecma262/#sec-putvalue
+
+[15:14:07.0000] <Bakkot>
+putvalue step 6.c
+
+[15:15:33.0000] <devsnek>
+speaking of strict references
+
+[15:15:35.0000] <ljharb>
+ok, so does that mean that `O.[[DefineOwnProperty]]`` won't ever return false in the normal object case (because it won't get there if it would otherwise have), but if a proxy returns false, it'd be silently ignored?
+
+[15:15:48.0000] <ljharb>
+(in the line i'm talking about in OrdinarySetWithOwnDescriptor, i mean)
+
+[15:16:05.0000] <Bakkot>
+it does get there?
+
+[15:16:26.0000] <ljharb>
+Bakkot: what invokes PutValue in the normal frozen object case?
+
+[15:16:43.0000] <Bakkot>
+assignmentexpression evaluation
+
+[15:16:47.0000] <Bakkot>
+https://tc39.es/ecma262/#sec-assignment-operators-runtime-semantics-evaluation
+
+[15:17:18.0000] <ljharb>
+ok, and PutValue invokes [[Set]]
+
+[15:17:49.0000] <devsnek>
+did the [[Set]] op used to be called [[Put]]
+
+[15:18:12.0000] <ljharb>
+Bakkot: but then how does assignment end up invoking OrdinarySetWithOwnDescriptor ?
+
+[15:18:34.0000] <ljharb>
+ah i see, nvm
+
+[15:18:51.0000] <Bakkot>
+devsnek yup
+
+[15:19:00.0000] <Bakkot>
+http://es5.github.io/#x8.12.5
+
+[15:19:01.0000] <ljharb>
+ok so then the "return `false`" is intentional there, because other code checks it and throws everywhere it happens to be used
+
+[15:19:06.0000] <ljharb>
+thanks for talking me through that
+
+
+2020-05-29
+[06:42:49.0000] <bradleymeck>
+shu: do weakrefs allow finalizers on the value of a private field if there is no references to the private identifier anymore?
+
+[06:44:18.0000] <bradleymeck>
+e.g. `function hmmm(a) { class O { #a; constructor(a) {this.#a = a;} }; return new O(a); }` would that prevent `a` from having finalizers run?
+
+[06:44:47.0000] <bradleymeck>
+would s/that/the return value/
+
+[07:33:05.0000] <devsnek>
+I guess that sort of requires treating private symbols like ephemerons
+
+[07:34:53.0000] <bradleymeck>
+i'm completely fine with it never running finalizers personally
+
+[07:35:11.0000] <bradleymeck>
+i just am struggling to understand this situation
+
+[07:35:55.0000] <devsnek>
+if a private field is created but there are no references around to observe it did it ever really happen
+
+[07:37:28.0000] <bradleymeck>
+well it is `unreachable` isn't super clearly defined
+
+[07:52:49.0000] <shu>
+bradleymeck: not sure i understand
+
+[07:53:10.0000] <shu>
+bradleymeck: what value is the finalized registered to in the example, a?
+
+[07:53:24.0000] <bradleymeck>
+shu: so if I have an Object `a` and it has a private field `#foo`
+
+[07:54:15.0000] <bradleymeck>
+if `a.#foo` is no longer reachable since all code that has the identifier `#foo` in scope has been collected, can you collect `a.#foo`/run its finalizer
+
+[07:55:03.0000] <bradleymeck>
+this was brought up when discussing symbols in weak collections yesterday in Realms call @_o
+
+[07:55:08.0000] <shu>
+oh i see
+
+[07:55:30.0000] <shu>
+that depends on the optimizations an engine does around private fields
+
+[07:56:41.0000] <shu>
+seems to reduce to escape analysis in general, so unlikely to be done in the interpreter and baseline tiers
+
+[07:56:42.0000] <bradleymeck>
+i'd agree there, just more trying to see if it was prohibited for some reason
+
+[07:56:49.0000] <shu>
+no not prohibited
+
+[07:56:52.0000] <bradleymeck>
+ok
+
+[07:57:01.0000] <shu>
+just seems unlikely to happen in practice to me
+
+[09:25:31.0000] <jmdyck>
+question re TemplateCharacter :: `\` NotEscapeSequence
+
+[09:27:40.0000] <jmdyck>
+There are early error rules that disallow it in untagged TemplateLiterals, but it's allowed in tagged TemplateLiterals, right?
+
+[09:27:54.0000] <Bakkot>
+right
+
+[09:28:09.0000] <Bakkot>
+per https://github.com/tc39/proposal-template-literal-revision
+
+[09:28:16.0000] <Bakkot>
+s/per/as a consequence of/
+
+[09:29:50.0000] <devsnek>
+good consequences
+
+[09:30:58.0000] <jmdyck>
+Ok, so the TV of `\` NotEscapeSequence is *undefined*, and that'll come up when you invoke TemplateStrings with _raw_ = *false*, right?
+
+[09:31:41.0000] <Bakkot>
+sounds right to me
+
+[09:32:18.0000] <jmdyck>
+So in GetTemplateObject, an element of _cookedStrings_ might be *undefined*?
+
+[09:32:25.0000] <Bakkot>
+indeed
+
+[09:32:31.0000] <Bakkot>
+that's observable in userland, even:
+
+[09:32:44.0000] <jmdyck>
+but it also says "Let _cookedValue_ be the String value _cookedStrings_[_index_]."
+
+[09:32:47.0000] <Bakkot>
+console.log`\x` is an array with `0` element `undefined`
+
+[09:33:28.0000] <Bakkot>
+ah, yup, looks like that is stale
+
+[09:33:37.0000] <Bakkot>
+it is a String or `undefined`
+
+[09:33:51.0000] <Bakkot>
+probably easier to just say `be cookedStrings[index]`, and not assert on the type
+
+[09:34:01.0000] <jmdyck>
+right
+
+[09:34:23.0000] <Bakkot>
+this was an oversight in https://github.com/tc39/ecma262/pull/773, looks like
+
+[09:34:34.0000] <Bakkot>
+nice catch
+
+[09:35:36.0000] <devsnek>
+i should figure out a nice way to put those assertions in engine262
+
+[09:35:56.0000] <Bakkot>
+someday we'll build type checking into the CI
+
+[09:36:02.0000] <Bakkot>
+probably not this year, hopefully this decade
+
+[09:36:08.0000] <Bakkot>
+it would catch so many editorial bugs
+
+[09:36:37.0000] <Bakkot>
+jmdyck: are you inclined to make the PR fixing the above? I'll do it if not.
+
+[09:37:04.0000] <jmdyck>
+Yeah, I can do it some time today.
+
+[09:37:12.0000] <Bakkot>
+sweet, thanks
+
+[09:38:56.0000] <jmdyck>
+My static type checking exploded in TemplateStrings, which led me (eventually) to that step in GetTemplateObject
+
+[11:02:14.0000] <devsnek>
+jorendorff: re your slides, v8's opinion was that using generators would be the same or faster, not the same or slower
+
+[11:02:37.0000] <jorendorff>
+ok, i'll edit that out before the presentation
+
+[11:02:45.0000] <jorendorff>
+thanks for the feedback
+
+[11:02:51.0000] <devsnek>
+well if other engines have concerns it could be slower that's useful too
+
+[11:02:58.0000] <devsnek>
+just want to make sure we have all the info
+
+[12:47:05.0000] <jorendorff>
+devsnek: I just deleted it. I noticed that the screenshot I have of your sketch of option 3 has a typo
+
+[12:47:24.0000] <devsnek>
+typo?
+
+[12:47:38.0000] <jorendorff>
+devsnek: step 3 calls %SyncMap% with one this-value and one argument, but %SyncMap% takes two positional arguments, no this
+
+[12:48:06.0000] <devsnek>
+doesn't it do "IteratorHelperStart" or something
+
+[12:48:22.0000] <jorendorff>
+oh, it does
+
+[12:48:52.0000] <jorendorff>
+then that could work! no worries
+
+[12:48:56.0000] <devsnek>
+i'm imagining that calls the generator and skips next()
+
+[12:49:51.0000] <jorendorff>
+I was imagining that it would call .next() once on the generator, yes
+
+[12:50:16.0000] <jorendorff>
+and discard the result
+
+[12:50:27.0000] <devsnek>
+yep
+
+[12:50:29.0000] <jorendorff>
+but i don't understand yet why it's helpful to have the arguments in a different form
+
+[12:50:40.0000] <jorendorff>
+than, say, Call()
+
+[12:50:42.0000] <devsnek>
+hmm
+
+[12:50:47.0000] <devsnek>
+the this value isn't used
+
+[12:51:19.0000] <devsnek>
+IteratorHelperStart doesn't technically exist yet so we are free to do whatever we want
+
+[12:51:30.0000] <jorendorff>
+right, i agree
+
+[12:51:37.0000] <jorendorff>
+this can definitely be made to work
+
+[14:05:16.0000] <jmdyck>
+wow, PR 1519 is a blast from the past. Took me a while to page that all back in.
+
+[14:27:51.0000] <Bakkot>
+Yup!
+
+[14:27:59.0000] <Bakkot>
+I'm trying to get some of the older outstanding ones in
+
+[14:28:20.0000] <Bakkot>
+Particularly since we might restructure a bunch of stuff as a consequence of https://github.com/tc39/ecma262/issues/1950
+
+[14:30:33.0000] <jmdyck>
+indeed
+
+[14:31:39.0000] <jmdyck>
+any idea of when 1950 might land?
+
+[14:34:04.0000] <Bakkot>
+we're going to talk about it at the meeting next week, to give the delegates the opportunity to raise objections, and then it will depend on one of us having the time to do the work
+
+[14:34:10.0000] <Bakkot>
+well, and there's a few more details to work out
+
+[14:34:43.0000] <Bakkot>
+e.g. I think it might make sense to keep Evaluation and Early Errors together with the grammar, as they currently are
+
+[14:35:11.0000] <devsnek>
+i wish they were grouped together
+
+[14:35:18.0000] <devsnek>
+its impossible to find early errors
+
+[14:35:26.0000] <Bakkot>
+hmmmm
+
+[14:35:37.0000] <Bakkot>
+Does grouping them make it any easier?
+
+[14:35:50.0000] <devsnek>
+the only way to find an early error if you don't know the exact prose
+
+[14:35:56.0000] <Bakkot>
+My thinking was, at least for Evaluation, you want to be able to click on a production to see how it evaluates
+
+[14:35:59.0000] <devsnek>
+is to grep through every single early error section
+
+[14:36:23.0000] <Bakkot>
+well, right, but is that... any harder than scrolling through all of them in one place?
+
+[14:36:42.0000] <Bakkot>
+always just C-f "Semantics: Early" and then C-g across all of the sections
+
+[14:36:51.0000] <Bakkot>
+I don't think scrolling through a single section would be any easier than that
+
+[14:37:29.0000] <devsnek>
+i think the problem rn is
+
+[14:37:51.0000] <devsnek>
+they seem to be written by people who already know what they are
+
+[14:38:12.0000] <devsnek>
+for someone reading the spec to try to figure out what semantics need to be applied, it is very difficult
+
+[14:39:17.0000] <Bakkot>
+grouping would help with this, you think?
+
+[14:39:47.0000] <devsnek>
+i think it would be a good first step
+
+[14:39:53.0000] <devsnek>
+i'm not sure i have a perfect solution
+
+[15:11:51.0000] <jmdyck>
+Bakkot:  https://github.com/tc39/ecma262/pull/2022 has the cookedStrings fix.
+
+[15:12:02.0000] <jmdyck>
+(and others)
+
+[15:17:15.0000] <jmdyck>
+re 1590: if you keep Evaluation together  with the grammar, would you also keep things like NamedEvaluation and LabelledEvaluation?
+
+[15:19:28.0000] <jmdyck>
+devsnek, when you say "grouped", you mean "close to the corresponding grammar"?
+
+[15:19:46.0000] <devsnek>
+i meant have one section for all the early error stuff
+
+[15:20:00.0000] <jmdyck>
+ah, ok.
+
+[15:27:45.0000] <jmdyck>
+Maybe, after each chunk of defining grammar (or after each production? hm), there could be a list of SDOs that are defined on those productions, and clicking the SDO-name would take you to the appropriate portion of that SDO's section.
+
+[15:28:38.0000] <jmdyck>
+(You'd want the list generated automatically, presumably.)
+
+[15:30:11.0000] <Bakkot>
+hmm, named evaluation is interesting
+
+[15:30:25.0000] <Bakkot>
+yeah, I think it might make more sense to have backreferences
+
+[15:30:39.0000] <Bakkot>
+I could also probably get `evaluating |Production|`  to link to the right place
+
+[15:31:18.0000] <jmdyck>
+(That should maybe be re-cast into a proper SDO-call.)
+
+[15:33:20.0000] <Bakkot>
+Maybe. It does read nicely, currently.
+
+[15:38:17.0000] <Bakkot>
+jmdyck: re: 1950, another consideration is that https://github.com/tc39/ecma262/pull/2007 almost certainly needs to land first
+
+[15:38:31.0000] <Bakkot>
+since it is a pretty pervasive change
+
+[15:39:11.0000] <jmdyck>
+yep
+
+[15:40:39.0000] <Bakkot>
+(I am assuming that 545 won't be too hard to rebase, since it's automatically generated, but let me know if this is not so.)
+
+[15:42:53.0000] <jmdyck>
+yeah, i think it'll be okay.
+

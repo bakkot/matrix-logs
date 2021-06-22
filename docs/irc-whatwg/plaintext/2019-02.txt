@@ -1,0 +1,5503 @@
+2019-02-01
+[16:58:51.0000] <MikeSmith>
+https://stackoverflow.com/questions/52791470/how-to-package-or-import-html-templates-without-html-imports
+
+[06:11:12.0000] <annevk>
+So I want to add rel="" to <form>
+
+[06:11:17.0000] <annevk>
+Should I recast <form> as a hyperlink?
+
+[06:11:39.0000] <annevk>
+That seems pretty reasonable from my perspective, but maybe folks think that's nonsense?
+
+[06:12:05.0000] <annevk>
+Domenic: MikeSmith: ^^
+
+[06:12:16.0000] <nox>
+annevk: I’m going to push a PR to the insert algo of the DOM spec either later today or next week.
+
+[06:12:44.0000] <annevk>
+nox: sounds exciting
+
+[06:13:11.0000] <nox>
+annevk: https://gist.github.com/nox/0bb2a3f5f0223b3ec273d97d586db7eb
+
+[06:13:23.0000] <nox>
+According to a pedantic reading of the spec, that should log null.
+
+[06:13:38.0000] <nox>
+Err, a collection of length 0
+
+[06:14:03.0000] <annevk>
+nox: oh, so that's a pretty complicated issue
+
+[06:14:13.0000] <nox>
+annevk: Is there an issue already?
+
+[06:14:23.0000] <nox>
+Safari seems to follow the spec and the others not.
+
+[06:14:52.0000] <annevk>
+nox: https://github.com/whatwg/dom/issues/575 and variants
+
+[06:15:14.0000] <annevk>
+nox: it basically seems that some browsers have an additional queue to do script things from
+
+[06:15:54.0000] <nox>
+annevk: I see the issue a bit differently.
+
+[06:15:55.0000] <MikeSmith>
+annevk: I think even if the rel="" thing hadn’t come up, it could make sense to recast <form> as a hyperlink
+
+[06:15:58.0000] <annevk>
+nox: I ran out of time/interest last time I attempted to fix it
+
+[06:16:18.0000] <annevk>
+MikeSmith: cool
+
+[06:16:31.0000] <nox>
+annevk: To me it is more about Chrome/Firefox making no difference between two children of a fragment and two children of a div being added to the tree.
+
+[06:17:03.0000] <nox>
+E.g., they don’t run insertion steps etc until every child of the fragment are added to the tree where they belong.
+
+[06:17:44.0000] <nox>
+annevk: It reminds me of a change I did for adopting a node, where a single loop was changed into two separate loops for running the adopting steps.
+
+[06:18:03.0000] <MikeSmith>
+annevk: yeah, since <form> navigates, it also makes sense for to associate link types with it
+
+[06:18:40.0000] <MikeSmith>
+but as far as noopener and noreferrer too, I think those never should have become link types to begin with
+
+[06:18:51.0000] <MikeSmith>
+I realize it’s a lost cause now
+
+[06:20:01.0000] <annevk>
+MikeSmith: it did stray a bit from the original relationship angle, indeed
+
+[06:20:23.0000] <annevk>
+MikeSmith: I guess the main thing we don't want with <form> is for it to match :link and :visited though
+
+[06:20:43.0000] <MikeSmith>
+yeah if you consider that the semantics of putting rel=stylesheet href=foo into a document is that it means the resource at foo is a stylesheet for the document
+
+[06:20:52.0000] <annevk>
+It seems those pseudo-classes are pretty clearly defined in terms of those elements
+
+[06:20:52.0000] <MikeSmith>
+oh
+
+[06:21:03.0000] <MikeSmith>
+right
+
+[06:21:21.0000] <annevk>
+nox: I don't think that's correct
+
+[06:21:43.0000] <annevk>
+nox: the insertion/removal steps are run, but scripts/styles are done later in a separate queue
+
+[06:22:13.0000] <annevk>
+nox: I found a way to observe this difference somewhere, I initially also thought the fix was what you're suggesting there
+
+[06:22:56.0000] <annevk>
+nox: I might be mistaken, it's been a while, but I'm pretty sure it was not that "simple"
+
+[06:29:35.0000] <nox>
+annevk: I think you are mistaken.
+
+[06:30:07.0000] <nox>
+annevk: Let me give you another snippet
+
+[06:31:30.0000] <nox>
+annevk: https://gist.github.com/nox/520dd79ff14023888e6d02f10f800ec2
+
+[06:32:07.0000] <nox>
+annevk: If it just delayed running the script, wouldn't the element not be upgraded?
+
+[06:42:30.0000] <annevk>
+nox: imagine you insert a document fragment containing an script followed by an iframe, when the script executes the iframe already needs to have its nested browsing context et al created
+
+[06:42:54.0000] <nox>
+annevk: https://gist.github.com/nox/cb5cd57ac2c07966b6f19767a6e29d4e
+
+[06:43:58.0000] <nox>
+annevk: This prints 0 in Safari and 1 in Firefox.
+
+[06:44:11.0000] <nox>
+annevk: AFAIK, changing selectedness of options and whatnot is part of insertion steps, right?
+
+[06:44:24.0000] <annevk>
+I don't know
+
+[06:44:41.0000] <nox>
+https://html.spec.whatwg.org/multipage/form-elements.html#the-select-element:nodes-are-inserted
+
+[06:47:10.0000] <nox>
+annevk: I'll comment with my few snippets.
+
+[06:48:14.0000] <annevk>
+nox: it might mean that none of this quite makes sense, but I'm pretty sure Gecko at least has an additional queue of sorts
+
+[06:48:22.0000] <nox>
+annevk: Yes it does.
+
+[06:48:27.0000] <annevk>
+nox: perhaps it does selectedness differently
+
+[06:48:49.0000] <nox>
+annevk: No, using a additional queue would definitely make the script run after selectedness was handled.
+
+[06:49:01.0000] <nox>
+(Printing 1 means it printed the index after it was handled)
+
+[06:49:27.0000] <nox>
+annevk: I'm looking into that because I randomly found we introduced a similar concept of delaying the execution of scripts in Servo and it doesn't interact very well with insertion steps.
+
+[06:49:59.0000] <annevk>
+I'd be glad if we could sort this out somehow since not having script execution defined is not great of course
+
+[06:50:18.0000] <annevk>
+There's similar issues on the whatwg/html side around the parser and scripts
+
+[06:59:57.0000] <annevk>
+nox: https://github.com/whatwg/dom/pull/576 does indeed have that iframe/script example as to why running insertion steps later doesn't work
+
+[07:01:44.0000] <nox>
+annevk: It is *so* weird.
+
+[07:02:14.0000] <nox>
+annevk: https://gist.github.com/nox/78b0034279dbdc902e2786ee99fee75c
+
+[07:02:24.0000] <nox>
+This prints 1, according to the spec it should print 0.
+
+[07:03:56.0000] <nox>
+Ah never mind, I'm dumb dumb.
+
+[07:04:58.0000] <nox>
+Forgot how promises get run, hah.
+
+[07:06:19.0000] <nox>
+annevk: https://gist.github.com/nox/78b0034279dbdc902e2786ee99fee75c This prints 0/constructed/connected in Safari and constructed/connected/1 in Firefox, which to me makes absolutely no sense.
+
+[07:07:10.0000] <nox>
+0/constructed/connected, to me, is what the spec currently says to do,
+
+[07:07:25.0000] <nox>
+OTOH constructed/connected/1 sounds really really weird to me.
+
+[07:07:41.0000] <annevk>
+nox: I'm not sure why you keep referencing the spec, it's not reliable for these things
+
+[07:08:03.0000] <nox>
+annevk: Sure, let's forget about the spec!
+
+[07:08:25.0000] <nox>
+annevk: Do you have any clue why Firefox and Chrome would construct/connect the custom element before being able to say there is 1 custom-element in the tree?
+
+[07:09:20.0000] <nox>
+annevk: AAAAAH, ignore me.
+
+[07:09:39.0000] <nox>
+annevk: Never realised that defining a custom element would upgrade every existing element which was already in the tree…
+
+[07:09:42.0000] <nox>
+That explains a lot.
+
+[07:09:50.0000] <annevk>
+nox: define() runs [CEReactions]
+
+[07:09:57.0000] <annevk>
+nox: right
+
+[07:10:05.0000] <nox>
+annevk: I referenced the spec because it doesn't seem to me like Safari isn't aligned with it in any circumstance.
+
+[07:11:53.0000] <nox>
+annevk: But the latest issue you linked with style/script does show that Safari doesn't follow the spec in that case, so thanks.
+
+[07:12:30.0000] <annevk>
+nox: it seems to me the spec is broken for several cases, also iframe/script
+
+[07:12:40.0000] <annevk>
+nox: hmm, maybe not for iframe
+
+[07:20:48.0000] <nox>
+annevk: https://github.com/whatwg/dom/pull/576
+
+[07:21:03.0000] <nox>
+"annevk requested a review from nox on 21 Feb 2018" 😂
+
+[07:22:42.0000] <annevk>
+nox: aha, now I don't even have to apologize for leaving this unsolved
+
+[07:25:03.0000] <nox>
+annevk: Hah!
+
+[08:02:49.0000] <annevk>
+Domenic: if you could have another look at revising event loops that'd be great
+
+[08:03:21.0000] <annevk>
+Domenic: another thing I thought of is that we could require 1:1, but allow user agents (when it's safe) to block one loop on another via a line of prose
+
+[08:03:44.0000] <annevk>
+Domenic: that would simplify the spec model and also give us a way out for worklets
+
+[08:04:23.0000] <annevk>
+Domenic: and to be clear, the reason I'm working on event loops is primarily to get rid of unit of related browsing contexts and friends
+
+[08:04:35.0000] <annevk>
+Domenic: it's effectively the last major dependency on that
+
+[08:17:14.0000] <Domenic>
+annevk: I'll try to find time before the weekend.
+
+[08:17:55.0000] <Domenic>
+I'll be sure to run your new idea past our implementers, but so far they have preferred a spec that reflects implementations, and I think that is the correct priority of constituencies even if one that is more theoretically pure would make our jobs as spec authors simpler.
+
+[08:17:58.0000] <annevk>
+Domenic: thanks, would be nice to be able to get back to it directly after
+
+[08:18:42.0000] <annevk>
+Domenic: note that currently we already have different loops for worklets and windows
+
+[08:18:59.0000] <annevk>
+Domenic: unless they want to write a patch that fixes that, I think my approach is the only way forward there
+
+[08:19:03.0000] <Domenic>
+Yeah, lots of confusion caused by that already, unfortunately :(
+
+[08:19:20.0000] <annevk>
+Domenic: unless you want to block the refactoring on me fixing a bug someone else introduced, which seems rather unfair
+
+[08:19:39.0000] <annevk>
+Domenic: and at that point I'd like some kind of escalation of talking directly to the people involved
+
+[08:19:53.0000] <Domenic>
+Heh, isn't it you who always says we should fix our foundations before building on them?
+
+[08:21:46.0000] <annevk>
+Domenic: so yes, but 1) I still don't really see this as being problematic 2) I think unit of related browsing contexts is a far bigger problem and worth fixing sooner
+
+[08:22:16.0000] <Domenic>
+Sure, we all have different priorities.
+
+[08:23:08.0000] <annevk>
+Domenic: that's rather dismissive
+
+[08:23:37.0000] <Domenic>
+No, I'm just saying, please try to see both sides.
+
+[08:23:50.0000] <annevk>
+Domenic: so why isn't Google putting resources into fixing the worklet mess?
+
+[08:24:04.0000] <annevk>
+Domenic: afaik only Google is shipping worklets...
+
+[08:24:13.0000] <annevk>
+Domenic: maybe we should take that out instead?
+
+[08:24:37.0000] <Domenic>
+I'm finding this conversation unproductive and hard to deal with first thing in the morning, and I have a meeting in 5, so I would ask that we resume it at a later time.
+
+[08:25:09.0000] <annevk>
+Domenic: I basically only have European office hours
+
+[08:29:39.0000] <astearns>
+annevk: could you summarize or send pointers to explain "the worklet mess"? I haven't been following what's getting messed up there
+
+[08:30:28.0000] <annevk>
+astearns: basically, must worklets always be concurrent, or not? I think it depends on the type of worklet, but the spec gives them all the same concurrent event loop
+
+[08:30:52.0000] <astearns>
+thanks
+
+[08:31:12.0000] <annevk>
+astearns: however, if they'd sometimes have to share a window event loop, that would undermine a bunch of infrastructure, which makes assumptions about window event loops (currently browsing context event loops)
+
+[08:32:05.0000] <annevk>
+astearns: and I think it's more complicated, it's that in principle they're allowed to be concurrent, but some types are also allowed to be interweaved
+
+[08:32:26.0000] <annevk>
+(but eg audio is prolly not, at least, that'd seem bad)
+
+[08:42:16.0000] <annevk>
+Domenic: so would it work if we kept the existing wording, except replaced it to say similar-origin window agent, and leave the security issue and worklets as a follow-up?
+
+[08:42:47.0000] <annevk>
+Domenic: then there wouldn't be a regression
+
+[08:44:10.0000] <annevk>
+Domenic: anyway, it would be good to know what exactly would unblock this since I'm not really sure what to do given the current text and the problems I keep running into with it and thus far you haven't really gotten concrete
+
+[08:44:47.0000] <annevk>
+Domenic: and despite this apparently being a priority for Google I don't see any issues about it, which is odd?
+
+[13:04:23.0000] <TabAtkins>
+annevk: form-as-hyperlink reads well to me. I... *may* have done exactly that to get a POST-ing "link" before...
+
+[13:31:50.0000] <annevk>
+TabAtkins: 🎉
+
+[13:34:58.0000] <annevk>
+I’m somewhat surprised this analogy has not been made before
+
+[13:58:50.0000] <TabAtkins>
+A <form action=GET><button /></> and an <a /> are basically identical semantically.
+
+
+2019-02-02
+[17:38:18.0000] <MikeSmith>
+annevk: what about referrerpolicy for <form>
+
+[22:54:37.0000] <annevk>
+MikeSmith: I was thinking of adding that after
+
+[04:15:03.0000] <lgrahl>
+Anyone of you on FOSDEM?
+
+[04:17:39.0000] <gsnedders>
+Yes.
+
+[05:09:04.0000] <gsnedders>
+Matrix just got described as a kitchen sink of a spec. Time to move it into HTML?
+
+[06:08:37.0000] <nox>
+gsnedders: I blew air out my nose.
+
+
+2019-02-04
+[01:06:24.0000] <ubuntutr>
+hi
+
+[01:06:24.0000] <ubuntutr>
+hih
+
+[01:06:25.0000] <ubuntutr>
+hi
+
+[01:06:37.0000] <ubuntutr>
+� � � �
+
+[01:06:52.0000] <ubuntutr>
+����
+
+[01:07:53.0000] <ubuntutr>
+?
+
+[03:33:18.0000] <nox>
+annevk: Took me the time to write my damn comment to realise I had just paraphrased yours.
+
+[04:30:17.0000] <annevk>
+nox: are you me one year ago?
+
+[04:34:03.0000] <nox>
+annevk:  https://irccloud.mozilla.com/file/Nf3BBf5Y/C-658VsXoAo3ovC.jpg
+
+[04:47:58.0000] <nox>
+annevk: I keep mentioning the spec because I can’t write tests, and tests should follow the spec even if we expect them to fail because the spec should be changed, right?
+
+[04:48:28.0000] <nox>
+No idea why I can’t write tests, I wanted to say I want to write tests.
+
+[04:48:44.0000] <nox>
+UGGGGGGH I can’t English it’s going to be a long long week.
+
+[04:52:42.0000] <Ms2ger>
+Generally, yes
+
+[04:53:34.0000] <annevk>
+nox: you could write .tentative. tests that assume some new spec
+
+[04:54:21.0000] <annevk>
+nox: sometimes it might even be okay for those to not be tentative and contain a pointer to some issue that has the agreed upon resolution that nobody has made the time for to put in the spec
+
+[04:54:29.0000] <nox>
+annevk: But we don’t know what the new spec should be so would it be useful to test for current spec for now?
+
+[04:54:30.0000] <annevk>
+nox: "it depends"
+
+[04:54:39.0000] <annevk>
+nox: sure
+
+[04:54:42.0000] <nox>
+Ok!
+
+[04:54:49.0000] <annevk>
+nox: assuming the current spec makes sense...
+
+[04:55:17.0000] <nox>
+I think it does, or rather it does on one front and not on the other.
+
+[06:29:44.0000] <annevk>
+Domenic: thanks for the feedback on the event loop refactoring. I replied to a bunch of your feedback to give some additional context that could use follow-up. I might also push out a commit with some of the more trivial fixes that don't require further collaboration.
+
+[06:31:09.0000] <annevk>
+nox: are you planning on working more on this btw? I guess writing tests and then seeing what the model should maybe be?
+
+[06:31:20.0000] <nox>
+annevk: Yes!
+
+[06:31:44.0000] <annevk>
+nox: cool, I'm happy to help a bit down the road, but I'm rather swamped with projects atm
+
+[06:31:58.0000] <nox>
+annevk: Yeah, no worries, that's why I wanted to write tests for current behaviour,
+
+[06:32:23.0000] <annevk>
+That's great to hear
+
+[06:32:26.0000] <annevk>
+thanks
+
+[06:32:27.0000] <nox>
+annevk: then we know exactly how things fail in the current implementation of browsers and I don't need to ping you every 5 minutes about how you think the spec should be changed. :)
+
+[06:32:37.0000] <annevk>
+hah
+
+[06:35:35.0000] <nox>
+annevk: Where should I put such tests? /dom/nodes/Node-append-DocumentFragment.html?
+
+[06:36:23.0000] <nox>
+s/append/appendChild/
+
+[06:36:32.0000] <nox>
+I could otherwise just add them to Node-appendChild.html.
+
+[06:43:44.0000] <annevk>
+nox: maybe a new file that also has script or style in the name?
+
+[06:44:04.0000] <annevk>
+nox: since it's only observable when specific HTML features are involved
+
+[06:46:21.0000] <nox>
+annevk: I wonder if I shouldn't make multiple files, given I must use async_test in a weird way given some code is passed through dynamically-added scripts.
+
+[06:46:56.0000] <annevk>
+nox: also seems fine, I just wouldn't put this in existing tests until the whole model is better understood and a cemented part of the standards
+
+[06:47:02.0000] <nox>
+Ok
+
+[06:48:44.0000] <nox>
+annevk: Random idea, we should have a js`` thing in WPT tests, which is just a string that contains JS code and that editors can highlight as JS.
+
+[10:05:02.0000] <annevk>
+nox: sorry, missed that, some context please?
+
+[10:05:54.0000] <annevk>
+nox: my editor knows about the script element and .js…
+
+[10:09:13.0000] <domfarolino>
+annevk: To be clear, in https://github.com/whatwg/html/pull/4048/files#r249709166, are you referring to the "the below steps will never run" bit
+
+[10:19:30.0000] <nox>
+annevk: Oh that was to set the text contents of a script element through JS code
+
+[10:20:25.0000] <annevk>
+domfarolino: on mobile; the this seems wrong comment?
+
+[10:20:47.0000] <annevk>
+domfarolino: it’s about the added newline
+
+[10:22:33.0000] <annevk>
+In hindsight I should have made that clearer
+
+[10:51:08.0000] <TabAtkins>
+nox: Oh, you just mean having a built-in `js` string tag, which is just `String.raw` but with the semantic that it's JS inside there, so editors can highlight confidently?
+
+[10:51:23.0000] <nox>
+Yes
+
+[10:53:22.0000] <TabAtkins>
+I think editors should go ahead and assume that `js`, `html`, or `css` string tags are those langs, yeah.
+
+[11:32:21.0000] <domfarolino>
+annevk: oh ok thanks
+
+[11:48:21.0000] <annevk>
+nox: oh interesting
+
+
+2019-02-05
+[17:01:36.0000] <domfarolino>
+Seems infra does not describe an "array"; so what is our idiomatic of removing a single element in an array in spec prose. Do we pop? Do we "remove the last-inserted element"? If I can guarantee there is only one element, can I "empty" it?
+
+[00:05:35.0000] <annevk>
+littledan: is https://github.com/WebAssembly/threads build on top of JavaScript's model or actual threads?
+
+[00:06:05.0000] <annevk>
+domfarolino: are we talking about a list or an actual JavaScript object?
+
+[00:07:16.0000] <littledan>
+I think it's supposed to kind of correspond to JS's model, but in WebAssembly's core specification, they would like to avoid referencing JS or web specs, to ensure it works for other environments as well
+
+[00:07:47.0000] <littledan>
+Correspondingly, JS doesn't layer on top of Wasm either ...
+
+[00:09:05.0000] <littledan>
+A long-term hope among many who work on Wasm is to create a shared, GC'd heap, even if that's not suitable for JS
+
+[00:09:06.0000] <annevk>
+littledan: as I understood it from Luke, Wasm Threads effectively use workers and postMessage() under the hood, so yeah, they'd be affected in the sense that this is how they'd end up working
+
+[00:09:22.0000] <annevk>
+littledan: right, okay, so these Wasm Threads are the worker things then
+
+[00:09:31.0000] <littledan>
+Right... The idea is to encode this correspondence in the JS and Web APIs
+
+[00:09:33.0000] <annevk>
+littledan: then yeah, feel free to also post there or move it?
+
+[00:09:46.0000] <annevk>
+littledan: I keep wondering when we'll do host integration for Wasm btw
+
+[00:09:53.0000] <annevk>
+littledan: do you know anything about that?
+
+[00:09:59.0000] <littledan>
+What's missing?
+
+[00:10:19.0000] <annevk>
+littledan: shouldn't module fetching branch on the Wasm MIME type somehow?
+
+[00:10:24.0000] <littledan>
+I mean, I should know, since I'm the editor of the host integration spec
+
+[00:10:29.0000] <annevk>
+littledan: or can you not import Wasm from JS?
+
+[00:10:32.0000] <littledan>
+Well, it does, in the web spec
+
+[00:10:43.0000] <annevk>
+littledan: but module fetching is defined in HTML
+
+[00:10:52.0000] <littledan>
+I hope to make more progress on the module integration this week
+
+[00:11:08.0000] <littledan>
+We should have a PR against HTML for proper layering, I agree
+
+[00:11:24.0000] <littledan>
+Some of the HTML modules refactoring will be in common
+
+[00:11:24.0000] <annevk>
+littledan: okay, I'm wondering about the HTML bits in particular
+
+[00:11:51.0000] <annevk>
+littledan: HTML also has a bunch of JavaScript integration stuff, hopefully less of that is needed for Wasm since it only does modules, but it seems at least some would be needed
+
+[00:12:17.0000] <littledan>
+https://github.com/WebAssembly/esm-integration/pull/21
+
+[00:13:01.0000] <littledan>
+Specifically https://littledan.github.io/esm-integration/#html-modifications
+
+[00:14:34.0000] <littledan>
+We discussed this at TPAC and folks there seemed onboard, but I have had trouble convincing people in the tooling ecosystem
+
+[00:14:55.0000] <littledan>
+So I wanted to improve docs and talk more with them first
+
+[00:15:11.0000] <littledan>
+But if you are interested in an HTML PR, I am happy to do that
+
+[00:15:50.0000] <annevk>
+littledan: ah great
+
+[00:16:57.0000] <annevk>
+littledan: so I like that kind of thing, as it makes extensions more visible
+
+[00:17:15.0000] <littledan>
+OK, good to know
+
+[00:17:21.0000] <annevk>
+littledan: it also paves the path for adding other types, such as JSON
+
+[00:18:00.0000] <littledan>
+JSON would be nice and easy!
+
+[00:18:16.0000] <littledan>
+Everyone loves JSON
+
+[00:18:43.0000] <annevk>
+😃
+
+[00:19:24.0000] <littledan>
+So what module types do we want to support soon? JS, Wasm, HTML, CSS, JSON, any more?
+
+[00:19:33.0000] <littledan>
+CSV :)
+
+[00:19:46.0000] <littledan>
+CBOR? Spec people love CBOR
+
+[00:21:09.0000] <littledan>
+Re: we could allow importing images and videos, to be abstract assets, to be put in src
+
+[00:22:06.0000] <littledan>
+Re: asset imports https://github.com/sebmarkbage/ecmascript-asset-references
+
+[00:26:42.0000] <littledan>
+annevk: ^
+
+[00:27:28.0000] <annevk>
+littledan: a lot of those are discussed in various issues
+
+[00:27:39.0000] <annevk>
+littledan: I'm assuming CBOR is trolling
+
+[00:27:54.0000] <annevk>
+littledan: and I'm not sure CSV has a good enough parser specification
+
+[00:27:56.0000] <littledan>
+Yeah, half
+
+[00:28:12.0000] <littledan>
+If I said YAML it'd be trolling
+
+[00:28:16.0000] <annevk>
+I guess if the packaging thing ends up happening there might really be CBOR
+
+[00:28:17.0000] <littledan>
+OK, I will check issues
+
+[00:28:33.0000] <annevk>
+littledan: https://github.com/w3c/webcomponents/issues/759
+
+[00:28:51.0000] <annevk>
+littledan: https://github.com/whatwg/html/issues/4315
+
+[00:29:03.0000] <annevk>
+littledan: w3c/webcomponents also has a JSON issue and various HTML issues
+
+[00:29:14.0000] <littledan>
+Oh thanks, I missed the JSON issue
+
+[00:29:20.0000] <annevk>
+littledan: haven't seen anything for CSV, but it did cross my mind
+
+[00:29:52.0000] <littledan>
+I have seen another custom JS module system that exposes JSON modules
+
+[02:15:32.0000] <domfarolino>
+Talking about a list, i.e., whatever we have “Let x be an array”
+
+[02:21:09.0000] <Ms2ger>
+?
+
+[02:22:03.0000] <Ms2ger>
+domfarolino, avoid saying that, I suppose? Infra defines lists, not arrays: https://infra.spec.whatwg.org/#lists
+
+[02:43:50.0000] <annevk>
+Yeah, please don't use the word array for something that's a list
+
+[02:44:47.0000] <annevk>
+(Note that IDL will eventually be such that it converts a list into an array depending on what the getter/method does.)
+
+[02:45:03.0000] <annevk>
+s/does/returns/
+
+[08:06:17.0000] <annevk>
+Domenic: left a comment on the PR for the worklet event loop issue; I still don't see it working as the tasks aren't really associated with anything and elsewhere we blindly copy particular state of a task if it's in a window event loop
+
+[09:29:30.0000] <domfarolino>
+annevk: For context, was mostly referring to step 2 in https://html.spec.whatwg.org/multipage/images.html#updating-the-source-set, as I'm refactoring it a bit
+
+[09:30:02.0000] <domfarolino>
+Not sure if I should keep it as "array", or "list".
+
+[09:30:27.0000] <annevk>
+domfarolino: changing that to https://infra.spec.whatwg.org/#lists would be great
+
+[09:30:33.0000] <domfarolino>
+ok
+
+[09:30:47.0000] <annevk>
+domfarolino: a lot in HTML predates Infra
+
+[09:30:52.0000] <domfarolino>
+I figured haha
+
+[09:30:59.0000] <annevk>
+domfarolino: before Infra everyone made up data structures as they went
+
+[09:31:03.0000] <annevk>
+domfarolino: without defining them...
+
+[09:31:09.0000] <domfarolino>
+perfect :(
+
+[09:31:20.0000] <domfarolino>
+Yeah Infra i really nice
+
+[09:31:22.0000] <domfarolino>
+is*
+
+
+2019-02-06
+[18:38:31.0000] <Jessidhia>
+twitter thread but... what do you think? https://twitter.com/jessidhia/status/1092975303171833856
+
+[18:39:29.0000] <Jessidhia>
+adding HTMLElement#scrollBlock and HTMLElement#scrollInline to make writing-mode aware scroll properties instead of having to do various magic with #scrollLeft
+
+[04:28:13.0000] <nox>
+annevk: https://github.com/web-platform-tests/wpt/pull/15264
+
+[06:49:42.0000] <nox>
+annevk: I feel like the spec behaviour is saner, but then I don't forget this channel's topic nor that most browsers don't follow that bit of the spec.
+
+[06:50:27.0000] <annevk>
+nox: again, the spec is broken due to <iframe>, no?
+
+[06:50:50.0000] <nox>
+annevk: Mmmh
+
+[06:51:07.0000] <annevk>
+Hmm, maybe it's not broken, but it just doesn't match implementations
+
+[06:51:13.0000] <annevk>
+It's been a while
+
+[06:51:15.0000] <nox>
+Yeah, that I agree with.
+
+[06:54:02.0000] <annevk>
+nox: I guess the question is to what extent https://github.com/whatwg/dom/pull/576#issuecomment-368522669 true is
+
+[06:55:15.0000] <nox>
+annevk: I don't even compute what a "safe point" is.
+
+[06:55:50.0000] <annevk>
+nox: script can execute without messing up assumed invariants
+
+[06:56:00.0000] <nox>
+Which invariants?
+
+[06:56:25.0000] <nox>
+I'm curious where the current behaviour of Firefox comes from, why was it deemed important to be able to access iframes' browsing contexts from scripts that are inserted before them iframes.
+
+[06:56:26.0000] <annevk>
+nox: e.g. the script removes some reference node
+
+[06:56:42.0000] <annevk>
+nox: leading following insertions astray somehow
+
+[06:57:11.0000] <annevk>
+nox: this is also a problem with the eventual speccing of mutation events (unless they get removed, any day now I'm sure)
+
+[06:57:28.0000] <nox>
+annevk: Before or after Attr stops being a Node? :p
+
+[06:58:26.0000] <annevk>
+nox: so yeah, the current algorithm doesn't defend against child moving around
+
+[06:58:48.0000] <annevk>
+nox: child's index could become much larger therefore than parent has children
+
+[07:04:31.0000] <nox>
+annevk: Not sure what you mean.
+
+[07:05:25.0000] <annevk>
+nox: 7.2 of https://dom.spec.whatwg.org/#concept-node-insert is not robust against script execution
+
+[07:05:45.0000] <annevk>
+nox: if a script moved child around, it's index could end up much larger, and you'd have an out-of-bounds error for the insert operation it invokes
+
+[07:06:02.0000] <nox>
+mmh
+
+[07:06:05.0000] <annevk>
+(which is not defined since Infra assumes error-free invocation atm)
+
+[07:06:16.0000] <nox>
+annevk: I don't follow, child's index is always ok
+
+[07:07:10.0000] <nox>
+I mean, the child maybe could have been moved to somewhere entirely different, in which case it's a problem, but child's index is always the correct index of child.
+
+[07:07:34.0000] <annevk>
+nox: it's correct for the child, but not correct for the parent anymore
+
+[07:07:41.0000] <nox>
+Ok, I see.
+
+[07:07:42.0000] <annevk>
+nox: and it's the parent where we are inserting
+
+[07:07:53.0000] <nox>
+annevk: I guess I should make a test that plays with that.
+
+[08:23:24.0000] <annevk>
+Domenic: https://github.com/whatwg/html/pull/4214 is ready once more \o/
+
+[08:39:35.0000] <Ms2ger>
+Anyone know if there's already tests for named property getters with custom elements?
+
+[08:45:39.0000] <annevk>
+Ms2ger: rniwa might, but I suspect not
+
+[10:37:48.0000] <Domenic>
+Nice, new data: URL spec being implemented in WebKit https://trac.webkit.org/changeset/240706/webkit/
+
+[10:39:16.0000] <Domenic>
+https://trac.webkit.org/browser/webkit/trunk/Source/WebCore/platform/network/ParsedContentType.h?rev=240706#L39 is a little worrying though
+
+[11:11:39.0000] <annevk>
+Hmm yeah, I guess we should ask
+
+[11:14:37.0000] <annevk>
+Domenic: why is X unclear to you? If you navigate a browsing context you might get a different agent and loop, as the event loop link explains
+
+[11:23:03.0000] <Domenic>
+annevk: it's not clear to me that clicking on one of the many terms referenced in that paragraph will lead to an explanation for X, right?
+
+[11:23:15.0000] <Domenic>
+annevk: sorry for review delay today, having computer problems :(
+
+[11:40:57.0000] <nox>
+annevk: I wonder what happens if you insert 3 scripts from a div and the first one changes the third one during its execution.
+
+[11:48:31.0000] <nox>
+annevk: Wrote a quite interesting test for that, found difference between Safari and rest of the world again.
+
+[11:48:58.0000] <nox>
+Ah no, Firefox fails it but Chrome passes it.
+
+[11:50:12.0000] <nox>
+https://github.com/web-platform-tests/wpt/commit/b1247749f1ac2e0fcc440e3cc0f8b1a10e9eeb42
+
+[11:51:53.0000] <annevk>
+Domenic: you mean for a reader not knowing anything? Seems you first need to read about event loops anyway and then you get this
+
+[11:52:50.0000] <Domenic>
+annevk: I mean for reader trying to understand session history, yeah.
+
+[11:53:34.0000] <annevk>
+Domenic: it seems you would naturally read up on event loops as this is similarly called
+
+[11:54:04.0000] <Domenic>
+Maybe, but I think the previous state made it easier to understand without having to assume people will do that
+
+[11:55:30.0000] <annevk>
+Domenic: perhaps, but we also want to change most things session history so it’s not clear that investing in clarity helps here when it doesn’t much match what is going on
+
+[11:55:56.0000] <Domenic>
+I just much prefer a style of making incremental improvements, not regressions, and not saying that it's OK to make things worse because they're already bad.
+
+[11:55:59.0000] <annevk>
+nox: pass/fail remain confusing to me when we are not sure on the model
+
+[11:56:17.0000] <nox>
+annevk: Fair
+
+[11:56:41.0000] <nox>
+annevk: I don't really care which pass or fail, just stating that it does to show that things are unclear.
+
+[11:58:44.0000] <annevk>
+Domenic: it’s not clear to me this is worse, but okay
+
+[12:00:18.0000] <nox>
+The last test I added definitely feels like Firefox is wrong on this one.
+
+[12:32:25.0000] <annevk>
+nox: I wonder if we need to test mutation events too
+
+[12:58:46.0000] <nox>
+annevk: Step 8 you mean? It happens after the two loops of step 7 so I don't think so.
+
+[12:59:20.0000] <nox>
+Oh, mutation events from DOM mutations happening from a script inserted in tree through JS?
+
+[12:59:26.0000] <yoav>
+Hey! Is there an HTML concept that maps to "browser process"?
+
+[13:00:09.0000] <annevk>
+yoav: only aspirational: agent cluster
+
+[13:00:31.0000] <annevk>
+yoav: in practice they often share one
+
+[13:00:46.0000] <annevk>
+yoav: more of an ES concept, too
+
+[13:01:28.0000] <yoav>
+Cool, thanks. I'll read up on that!
+
+[13:10:16.0000] <Mek>
+that actually maps more to "renderer process" than "browser process", at least in chromium lingo
+
+[13:10:33.0000] <Mek>
+browser process would just be "user agent" or something like that I imagine
+
+[13:30:07.0000] <nox>
+annevk: I also wonder what happens if you do script.append("", "foo();")
+
+[13:30:19.0000] <nox>
+Whether foo() gets executed or not I mean.
+
+[15:49:26.0000] <jyasskin>
+https://html.spec.whatwg.org/multipage/history.html#session-history seems to say that when a Document is discarded, it gets removed from its session history entry, but https://html.spec.whatwg.org/multipage/window-object.html#discard-a-document doesn't actually say to touch the session history. Am I missing something?
+
+
+2019-02-07
+[21:04:34.0000] <annevk>
+jyasskin: not necessarily, session history is a bit broken
+
+[21:06:22.0000] <annevk>
+Mek: yoav: ah, I read past browser, yeah, that is not specified that well; in parallel is sometimes that
+
+[21:07:11.0000] <annevk>
+nox: only when script is inserted later on, aiui
+
+[21:20:39.0000] <jyasskin>
+annevk: Thanks.
+
+[21:21:03.0000] <jyasskin>
+annevk: You may get a PR tomorrow.
+
+[22:05:27.0000] <annevk>
+😊
+
+[02:07:18.0000] <nox>
+annevk: I feel like we should do a first patch to the insert algo, that makes differences between fragments and normal nodes disappear.
+
+[02:08:13.0000] <annevk>
+nox: which differences are you thinking of?
+
+[02:10:08.0000] <nox>
+annevk: https://dom.spec.whatwg.org/#concept-node-insert Make steps 7.1-7.3 its own loop, and reloop over each node in nodes for steps 7.4-7-7.
+
+[02:11:13.0000] <nox>
+annevk: Oh also, I'm curious about why step 7 says "For each node in nodes, *in tree order*", nodes is supposed to be a list at that point.
+
+[02:11:58.0000] <annevk>
+nox: that seems like a bug
+
+[02:12:55.0000] <nox>
+annevk: Making two loops make the algo not do dumb stuff if child's index changes.
+
+[02:12:57.0000] <annevk>
+nox: so that means all nodes are inserted by the time we execute scripts?
+
+[02:13:17.0000] <nox>
+annevk: Yes. This is still not exactly what Firefox and Chrome do but it brings us closer.
+
+[02:13:20.0000] <annevk>
+nox: how does that work for <script></script><iframe></iframe>?
+
+[02:13:39.0000] <nox>
+annevk: It doesn't fix that problem, according to the spec the iframe would still not have its insertion steps ran yet.
+
+[02:14:03.0000] <nox>
+It just fix the issue of moving around child during the insertion of multiple nodes from a fragment.
+
+[02:14:18.0000] <nox>
+annevk: I don't know if such partial fixes are a thing, hence me asking you :)
+
+[02:14:37.0000] <annevk>
+nox: I think we should do a complete solution
+
+[02:14:41.0000] <nox>
+Ok
+
+[02:14:46.0000] <annevk>
+nox: as we might well end up with a different setup in the end
+
+[02:14:50.0000] <nox>
+annevk: I have a complete solution in mind
+
+[02:15:04.0000] <annevk>
+nox: e.g., protect against weird indexes or have this separate script loop thingy
+
+[02:15:41.0000] <nox>
+annevk: I don't know how one can protect against weird indexes without two separate non-nested loops though.
+
+[02:16:12.0000] <nox>
+My idea for the script/iframe thing is: make "insertion steps" take a "list of pending script preparations", then after you looped over all elements to run their insertion steps, prepare each script in order in the list.
+
+[02:16:56.0000] <nox>
+(And make scripts' insertion steps just add themselves to that list)
+
+[02:19:31.0000] <nox>
+We may otherwise prefer to make insertion steps take a queue of pending script executions, and change "Immediately execute the script block, even if other scripts are already executing." to "Queue the script on the queue of pending script executations" in the "prepare a script" algo.
+
+[02:19:52.0000] <annevk>
+nox: so that would roughly be the Firefox approach?
+
+[02:20:04.0000] <nox>
+annevk: And the Chrome one, I think?
+
+[02:20:28.0000] <annevk>
+nox: I don't remember 😃
+
+[02:20:32.0000] <nox>
+annevk: Heh.
+
+[02:20:54.0000] <nox>
+annevk: I would very much prefer if the queue is an argument to the insertion steps, at the very least,
+
+[02:21:03.0000] <annevk>
+nox: so yeah, something like that sounds like the best way forward, perhaps we don't want to call it quite script executions as style stuff was on that queue too, but overall sounds good
+
+[02:21:06.0000] <nox>
+annevk: jdm added a similar concept to Servo, but he made the queue live on document,
+
+[02:21:24.0000] <nox>
+and it was super hard to realise it's specific to DOM tree mutations and can be self-contained in the insertion algo.
+
+[02:21:27.0000] <annevk>
+nox: so we hand the elements a queue they can put stuff in?
+
+[02:21:36.0000] <nox>
+Yeah.
+
+[02:21:42.0000] <nox>
+annevk: Not sure what you mean about styles.
+
+[02:21:57.0000] <annevk>
+nox: iirc there's a case where you can observe when <style> gets its sheet set
+
+[02:22:03.0000] <annevk>
+nox: it happens in that queue iirc
+
+[02:22:23.0000] <annevk>
+nox: I like your approach of not introducing new global state, so +1 if that really works
+
+[02:22:29.0000] <nox>
+Nice
+
+[02:23:53.0000] <nox>
+https://github.com/whatwg/dom/pull/576#issuecomment-368598457 Oh I misread that, I see what you mean.
+
+[02:24:13.0000] <nox>
+annevk: queue of deferred insertion steps? What about a word related to "finalization"?
+
+[02:25:03.0000] <annevk>
+nox: deferred seems good, finalization sounds like weak refs
+
+[02:25:51.0000] <nox>
+annevk: Yeah, just not sure whether having both "insertion steps" and "deferred insertion steps" is a good idea
+
+[02:26:23.0000] <annevk>
+nox: it seems fine, the latter is only a variable
+
+[02:26:49.0000] <annevk>
+nox: could also name it _deferredSteps_ or some such
+
+[02:27:03.0000] <nox>
+Ok
+
+[02:30:57.0000] <nox>
+annevk: About https://github.com/whatwg/dom/pull/576#issuecomment-368598457
+
+[02:31:29.0000] <nox>
+I'll write a new test just to check something: I'm not sure it's null because it's really supposed to be done after scripts, or if it's null because we go through a fragment.
+
+[04:23:25.0000] <xPaw>
+Heyo, I've had this silly idea and wonder if it's worth trying to pursue or not. JS api that would trigger the emoji picker native to the platform (chrome has a emoji in context menu for any input), with how complicated emojis are with all the modifiers and what not, it might not be a terrible idea
+
+[04:24:13.0000] <xPaw>
+Having a JS api to trigger it would allow web devs to replace any libraries implementing an emoji picker with the one native to the platform (e.g. button click event, call the emoji picker, which would pop up the native one)
+
+[04:45:04.0000] <annevk>
+xPaw: it does seem like a reasonable request given how prominent those kind of widgets are in OS stacks
+
+[04:46:44.0000] <xPaw>
+i don't know where to raise such an issue so it can be discussed or turned into a spec
+
+[04:47:35.0000] <xPaw>
+chrome devs probably have a better idea, since they already had to deal with emoji pickers in each relevant platform
+
+[04:49:25.0000] <annevk>
+xPaw: https://discourse.wicg.io/ seems like a reasonable place to start for this
+
+[04:52:44.0000] <xPaw>
+looks like it was discussed already https://discourse.wicg.io/t/invoke-emoji-input/1030
+
+[04:54:22.0000] <annevk>
+xPaw: yeah, though that's declarative; seems worth re-raising with the API angle as motivating factor, while acknowledging that past thread
+
+[04:54:29.0000] <annevk>
+anyway, up to you
+
+[04:54:33.0000] <xPaw>
+sure, thanks
+
+[04:54:44.0000] <annevk>
+xPaw: https://whatwg.org/faq#adding-new-features might also be of interest as general guidelines around this
+
+[05:03:54.0000] <xPaw>
+i've created https://discourse.wicg.io/t/js-api-to-trigger-the-platform-native-emoji-picker/3353
+
+[06:10:03.0000] <nox>
+annevk: Is changing the contents of a Text node in a script element supposed to trigger its preparation?
+
+[06:12:49.0000] <annevk>
+nox: I'm not sure what HTML says, but bz did point out that Firefox at least does some amount of preparation when connected, and then executes the preparation in the deferred steps, so if an earlier deferred step modified the script that probably wouldn't affect what it will execute
+
+[06:12:57.0000] <annevk>
+/me looks at what HTML says
+
+[06:13:39.0000] <nox>
+annevk: Pretty sure what Firefox does is the reason why my test with 3 scripts fail on it.
+
+[06:13:49.0000] <nox>
+That's unrelated to my question though. :P
+
+[06:14:22.0000] <nox>
+"If node is a Text node and its parent is not null, run the child text content change steps for node’s parent." when replacing data in a Text element,
+
+[06:14:33.0000] <annevk>
+nox: understood, but I thought I'd mention that distinction here...
+
+[06:14:36.0000] <nox>
+and IIRC HTMLScriptElement doesn't have any child text content change steps.
+
+[06:14:57.0000] <annevk>
+nox: yeah, script element processing model only triggers on being connected
+
+[06:15:10.0000] <annevk>
+nox: and maybe when the src attribute is set for the first time? unclear
+
+[06:15:19.0000] <nox>
+annevk: Is there a test for that? Do you think I should write one?
+
+[06:15:57.0000] <annevk>
+nox: I suspect there might be some tests for that wherever the script element tests are
+
+[06:18:37.0000] <nox>
+Ok!
+
+[06:19:25.0000] <annevk>
+(it is somewhat frustrating that it often feels like it'd be quicker to write a test then to find an existing HTML Standard test)
+
+[06:33:49.0000] <gsnedders>
+annevk: (yeah, that's definitely a problem too often :/)
+
+[06:42:27.0000] <nox>
+Who uses VS Code here?
+
+[06:42:35.0000] <nox>
+Tempted to quickly publish bikeshed syntax as an extension.
+
+[06:44:44.0000] <nox>
+annevk: Aha https://dom.spec.whatwg.org/#concept-node-insert step 7.4
+
+[06:45:20.0000] <nox>
+Need to test inserting a script and a Text node into a style element and see if the style's child text content change steps get executed before or after the script.
+
+[06:46:17.0000] <annevk>
+nox: sounds to me you're quickly catching up with zcorpan
+
+[06:46:24.0000] <nox>
+Hah
+
+[06:46:31.0000] <nox>
+I'll take that as a compliment, for sure. :D
+
+[06:48:53.0000] <nox>
+annevk: Oh btw, step 3 of https://html.spec.whatwg.org/multipage/#update-a-style-block
+
+[06:49:00.0000] <nox>
+is a shadow root always itself in a document?
+
+[06:49:48.0000] <annevk>
+nox: no
+
+[06:49:55.0000] <nox>
+Is that spec correct, then?
+
+[06:51:44.0000] <annevk>
+nox: I'm not sure, but the combination with the child text content change steps seem a little wrong, yeah
+
+[06:52:04.0000] <annevk>
+nox: pretty sure there was a reason we didn't go with "connected" either though
+
+[06:52:37.0000] <nox>
+I interpreted step 3 as limiting the creation of the stylesheet to style elements which are actually in a document that is actually rendered and whatnot,
+
+[06:52:48.0000] <nox>
+but I guess that it's the wrong interpretation anyway if it's just any document, right?
+
+[06:53:13.0000] <annevk>
+yeah, there are some tests that test these steps
+
+[06:54:13.0000] <nox>
+TIL stylesheets get loaded in any document, the more you know…
+
+[06:55:32.0000] <nox>
+annevk: So do you think the bit about shadow tree is wrong and it should use "becomes connected" instead?
+
+[06:55:52.0000] <nox>
+I.e. we shouldn't create style sheets for style elements that are in a shadow root that is itself not in a document tree?
+
+[06:57:45.0000] <annevk>
+nox: I'm not sure, nothing here changed in a while
+
+[06:57:50.0000] <nox>
+Ok
+
+[06:59:25.0000] <annevk>
+nox: per https://github.com/whatwg/html/issues/1194 it seems intentional
+
+[06:59:54.0000] <nox>
+Amazing
+
+[07:00:21.0000] <nox>
+Almost forgot to forget my sense of logic on this one.
+
+[07:01:15.0000] <annevk>
+2019 and people still haven't internalized the logic of the web
+
+[07:01:29.0000] <annevk>
+(narrator: and for the better)
+
+[07:12:11.0000] <nox>
+annevk: Heh
+
+[07:12:42.0000] <nox>
+annevk: At the very least, those investigations made me find out about CDATASection which we don't have in Servo,
+
+[07:12:54.0000] <nox>
+and your wonderful comment about waiting to be 30yo to reinstate it, good stuff :D
+
+[07:13:39.0000] <annevk>
+nox: now you need to wait until you're 30yo to impl it
+
+[07:14:06.0000] <nox>
+annevk: Joke's on you, I'm 31 already. :P
+
+[07:14:20.0000] <nox>
+annevk: I'm probs going to make it an easy issue, that interface just exists and doesn't do anything particular, right?
+
+[07:14:39.0000] <nox>
+An intern made a whole tutorial about adding an interface to Servo, may as well make use of it.
+
+[07:15:00.0000] <annevk>
+nox: there might be some Text <> CDATASection stuff around normalize(), I forgot, but nothing too involved
+
+[07:15:07.0000] <nox>
+Ok
+
+[13:47:58.0000] <jyasskin>
+I've forwarded xPaw's discourse thread to the folks who did the Chrome emoji picker.
+
+[13:49:09.0000] <jyasskin>
+nox: I'd love a bikeshed syntax extension. I tried one locally based on the markdown syntax, and realized I don't know .tmLanguage well enough to do it right.
+
+[14:12:27.0000] <jyasskin>
+Should the ->ES part of https://heycam.github.io/webidl/#es-DOMString be using https://tc39.github.io/ecma262/#sec-stringcreate?
+
+[14:13:27.0000] <TabAtkins>
+jyasskin: There's already a tmLanguage for Bikeshed in the bikeshed repo?
+
+[14:13:50.0000] <jyasskin>
+TabAtkins: ... I should have looked there.
+
+[14:13:56.0000] <TabAtkins>
+hahaha
+
+[14:14:08.0000] <TabAtkins>
+It's not, like, perfect, but it does a decent job.
+
+[14:22:46.0000] <Domenic>
+jyasskin: nope, that creates objects like `new String(x)`, whereas we want to create new objects like `String(x)`. (Well, technically `String()` has a special-case for symbols which we don't want, but that's a separate story.)
+
+[14:23:39.0000] <jyasskin>
+Domenic: Ok then. At the very least, "the String value that represents the same sequence of code units that the IDL DOMString represents" isn't precise enough?
+
+[14:25:18.0000] <Domenic>
+jyasskin: it's about as precise as the ES spec, where the equivalent is in https://tc39.github.io/ecma262/#sec-string-literals-static-semantics-stringvalue
+
+[14:25:25.0000] <Domenic>
+"Return the String value whose code units are the SV of this StringLiteral. "
+
+[14:26:25.0000] <jyasskin>
+Huh. Ok, then I won't worry about being more precise when I need to convert a URL's serialization to an ES String.
+
+[14:27:18.0000] <Domenic>
+Yeah, should be fine, although I'm a little worried about the fact that you're in a context where IDL can't shield you from that
+
+[14:51:44.0000] <jyasskin>
+Domenic: Yeah, I'm uncomfortable about that aspect of https://w3c.github.io/network-error-logging/#generate-a-network-error-report.
+
+[14:52:01.0000] <Domenic>
+Ah, right, that one :)
+
+[14:52:32.0000] <jyasskin>
+For now, I've decided that's not my circus.
+
+
+2019-02-08
+[02:26:08.0000] <annevk>
+I have a collection of objects and now I want to describe a subset of that collection via some kind of comparison. What's the way to write that down? (An agent whose set of realms consists of all the Window objects whose [comparison that needs to hold true for any Window objects in the subset].)
+
+[02:27:00.0000] <annevk>
+I guess I'll just go for some indirection
+
+[03:55:39.0000] <nox>
+annevk: I want to add another new concept,
+
+[03:56:13.0000] <nox>
+annevk: I want a "children change steps" thing,
+
+[03:56:33.0000] <nox>
+Because in HTML we have:
+
+[03:56:46.0000] <nox>
+'When a script element that is not marked as being "parser-inserted" experiences one of the events listed in the following list, the user agent must immediately prepare the script element: (…) The script element is connected and a node or document fragment is inserted into the script element, after any script elements inserted at that time.'
+
+[03:57:23.0000] <nox>
+And that seems a bit hand-wavy to me. What do you think?
+
+[03:59:42.0000] <annevk>
+nox: that handwavy thing should be fixed by these deferred steps
+
+[03:59:52.0000] <nox>
+annevk: Nope.
+
+[03:59:59.0000] <nox>
+annevk: This part is about inserting nodes in a script.
+
+[04:00:20.0000] <nox>
+So deferred steps are about the inserted scripts in that script,
+
+[04:00:25.0000] <nox>
+not the script itself.
+
+[04:00:53.0000] <nox>
+See what I mean?
+
+[04:01:05.0000] <annevk>
+nox: what's the test that demonstrates the effect that cannot be explained by deferred steps?
+
+[04:01:43.0000] <nox>
+annevk: Let's say you insert 2 scripts and a text node in an empty script.
+
+[04:02:11.0000] <nox>
+annevk: How do you make sure you prepare the script exactly once after the two scripts and the text node were added?
+
+[04:03:44.0000] <annevk>
+nox: it does seem like you need children changed for that, if that is what actually happens
+
+[04:04:26.0000] <annevk>
+nox: so this is when you do: script=document.body.appendChild(document.createElement("script"));script.appendChild(2 scripts and a text node)?
+
+[04:04:33.0000] <nox>
+annevk: I can write a test yes, but AFAIK that's what Chrome and Firefox do.
+
+[04:04:40.0000] <nox>
+annevk: Yes
+
+[04:05:12.0000] <annevk>
+nox: and the HTML Standard already deals in a special way with empty scripts? (what's empty? whitespace?)
+
+[04:05:22.0000] <annevk>
+nox: anyway, then I guess, yes
+
+[04:05:29.0000] <nox>
+Whitespace I think is ok
+
+[04:05:43.0000] <annevk>
+nox: incidentally, "children changed" might help us with some mutation observer feature request
+
+[04:06:09.0000] <nox>
+My plan is to run "children changed" just before we start executing the deferred steps,
+
+[04:06:17.0000] <annevk>
+nox: perhaps text children changed should be removed then though?
+
+[04:06:35.0000] <nox>
+with the "children changed" of script elements just queuing themselves to the passed deferred steps.
+
+[04:06:59.0000] <nox>
+annevk: Ugh, it can't be children changed,
+
+[04:07:08.0000] <nox>
+children changed sounds like something that also exists on children removal,
+
+[04:07:15.0000] <nox>
+but scripts don't do anything when you remove their children.
+
+[04:07:42.0000] <nox>
+annevk: I don't know about removing text children changed, that would e.g. make a style recreate a stylesheet when adding an element in them. That currently doesn't happen.
+
+[04:08:09.0000] <annevk>
+nox: well, it can be children changed and the observer for various elements does the appropriate filtering?
+
+[04:08:31.0000] <annevk>
+nox: anyway, general idea sounds good
+
+[04:08:41.0000] <nox>
+The observer? You mean passing to children changed the same kind of additional data as the childList mutation observers,
+
+[04:08:42.0000] <nox>
+?
+
+[04:09:33.0000] <annevk>
+nox: yeah, not 100% sure yet though
+
+[04:10:28.0000] <annevk>
+I'd need to review all the various call sites and vague web components related proposal
+
+[04:17:18.0000] <nox>
+annevk: If I name the sink "deferredSteps",
+
+[04:17:26.0000] <nox>
+what do I need the items inside when I dequeue them?
+
+[04:18:13.0000] <annevk>
+nox: it seems fine to call it deferredStepsQueue
+
+[04:18:17.0000] <nox>
+Ok
+
+[04:18:37.0000] <nox>
+annevk: and sorry again for all the questions, HTML does "Let steps be the result of dequeueing from parallelQueue's algorithm queue.", how do I link "dequeueing"?
+
+[04:18:48.0000] <annevk>
+The principle of not putting types into variable names does not really apply to containers I think, though I'm not sure if that's stated anywhere
+
+[04:18:52.0000] <nox>
+I know I can do <a for=queue>dequeue</a> but I don't know about the -ing
+
+[04:19:00.0000] <annevk>
+At some point I should study some literature around this I guess
+
+[04:20:12.0000] <annevk>
+nox: I think Bikeshed knows enough English for it to work, but you can always use <a for=queue lt=dequeue>deqeueing</a> if it fails
+
+[04:20:35.0000] <annevk>
+nox: I'd try without lt="" first though
+
+[04:20:39.0000] <nox>
+https://tabatkins.github.io/bikeshed/#conjugating
+
+[04:20:41.0000] <nox>
+Nice
+
+[04:23:58.0000] <nox>
+annevk: Found https://github.com/whatwg/dom/issues/34#issuecomment-125571750 linked in an HTML document near the definition of "insertion steps", hah.
+
+[04:26:06.0000] <annevk>
+"Seems fairly trivial."
+
+[04:26:21.0000] <annevk>
+I've learned since then to avoid those words
+
+[04:32:36.0000] <nox>
+TabAtkins: My bikeshed is stuck at "Downloading anchor data..."
+
+[04:33:27.0000] <Ms2ger>
+/me grumbles at TabAtkins
+
+[04:33:53.0000] <Ms2ger>
+Mentioned me in one wpt commit, and I got at least two dozen emails about it
+
+[04:34:22.0000] <nox>
+And if I try to use the one online, it goes "FATAL ERROR: Found unmatched text macro [SNAPSHOT-LINK]. Correct the macro, or escape it with a leading backslash."
+
+[04:35:29.0000] <nox>
+The most frustrating part is that --verbose does nothing;
+
+[04:35:36.0000] <nox>
+so I can't see how it fails to download the thing.
+
+[04:36:15.0000] <gsnedders>
+Ms2ger: you're not the only person who has grumbled about that recently
+
+[04:40:02.0000] <nox>
+Welp, can't find a bikeshed issue that helps me, so I can't check my work :(
+
+[04:40:12.0000] <nox>
+Is it often broken?
+
+[04:43:39.0000] <nox>
+[SNAPSHOT-LINK] isn't even written in dom.bs, this is frustrating.
+
+[04:48:08.0000] <nox>
+annevk: https://github.com/whatwg/dom/pull/732
+
+[04:48:23.0000] <nox>
+annevk: Probably half a gazillion people to ping on that but I don't know who.
+
+[05:03:44.0000] <nox>
+annevk: What does "IPR" stand for?
+
+[05:04:02.0000] <nox>
+Ah, clicking on the link helps
+
+[05:04:43.0000] <nox>
+annevk: Ok, made my membership public as told on the wiki.
+
+[05:05:48.0000] <annevk>
+nox: ta
+
+[05:05:58.0000] <annevk>
+nox: you can now contribute to the WHATWG \o/
+
+[05:06:12.0000] <annevk>
+contribute PRs*
+
+[05:06:14.0000] <nox>
+annevk: So that means last time I contributed I wasn't even an employee? :D
+
+[05:06:33.0000] <nox>
+Omg,
+
+[05:06:39.0000] <nox>
+my last contrib before that one was "Sun Feb 28 14:53:05 2016",
+
+[05:06:52.0000] <annevk>
+nox: that's pre-IPR
+
+[05:06:52.0000] <nox>
+I started at Mozilla 2 weeks later hah.
+
+[05:07:00.0000] <nox>
+Oh ok :
+
+[05:07:01.0000] <nox>
+:)*
+
+[05:07:14.0000] <annevk>
+If you were not employed today you could sign up in some other manner
+
+[05:07:24.0000] <annevk>
+https://participate.whatwg.org/agreement
+
+[05:07:59.0000] <nox>
+I fixed stuff in adopt a node and replace a node years ago, nice to see there are still tree mutation issues. :P
+
+[05:13:47.0000] <annevk>
+I've heard that most browsers still do some dumb stuff with (multiple adjacent) empty text nodes
+
+[05:14:01.0000] <annevk>
+That probably warrants more test coverage
+
+[05:14:31.0000] <nox>
+What kind of dumb stuff?
+
+[05:18:36.0000] <annevk>
+nox: don't update rendering was one of them
+
+[05:18:42.0000] <annevk>
+nox: if one of those nodes is modified
+
+[05:20:03.0000] <nox>
+Nice
+
+[06:01:24.0000] <nox>
+annevk: The text content changed stuff isn't observable AFAICT, I just don't think it's particularly useful to run them, say, 3 times for 3 text nodes added. I can revert this part of the change though.
+
+[06:02:10.0000] <nox>
+Anyway, lunch time :)
+
+[06:02:27.0000] <annevk>
+nox: ah okay, no then it's probably better like this
+
+[07:16:38.0000] <nox>
+annevk: I’ll write the HTML patch next
+
+[07:18:02.0000] <annevk>
+nox: \o/
+
+[07:18:32.0000] <annevk>
+nox: I need to go for the day, but this is all very exciting, getting a little closer to understanding what "insert" actually means
+
+[07:18:41.0000] <annevk>
+Main remaining piece is mutation events I suppose
+
+[07:19:00.0000] <annevk>
+*hint* *hint*
+
+[07:19:05.0000] <nox>
+annevk: It’s years overdue, don’t worry about needing to go for the day :D
+
+[07:19:29.0000] <nox>
+annevk: Do you have sound notifications on IRC or can I ping you during the weekend just so you can read what I said on Monday?
+
+[07:25:54.0000] <nox>
+I don’t want to disturb you during time off heh.
+
+[08:12:43.0000] <annevk>
+nox: I only see stuff when I look
+
+[08:13:43.0000] <annevk>
+Does anyone know about GSoC? Is there a WHATWG entry? I got an email…
+
+[08:20:01.0000] <Domenic>
+Ms2ger: regarding writing a test for NewTarget's realm vs. current Realm, are you aware of Reflect.construct?
+
+[08:20:35.0000] <Ms2ger>
+Domenic, I tried this: http://software.hixie.ch/utilities/js/live-dom-viewer/saved/6584
+
+[08:35:32.0000] <TabAtkins>
+nox: [SNAPSHOT-LINK] is in the whatwg boilerplate, and provided by the build script
+
+[08:36:07.0000] <TabAtkins>
+Weird that updating was frozen tho
+
+[08:40:35.0000] <nox>
+TabAtkins: I realised afterwards that I can just make a PR and let whatever bot that puts the preview links in the PR description do its job, no problems. :)
+
+[08:40:49.0000] <TabAtkins>
+That works too.
+
+[08:42:14.0000] <TabAtkins>
+Wait, also: if you've got "Downloading anchor data", either you're purposely doing a --skip-manifest, or your Bikeshed is *very* old.
+
+[08:45:09.0000] <TabAtkins>
+nox: Have you run `git pull` in your bikeshed folder in, like, the last year?
+
+[08:45:29.0000] <nox>
+TabAtkins: Yes. :D
+
+[08:46:02.0000] <nox>
+My HEAD commit is d76ab51ece93be5af3a1621c820b89fd4f9cc432
+
+[08:46:44.0000] <TabAtkins>
+Yeah, that's the right HEAD. And you're just running `bikeshed update`?
+
+[08:47:01.0000] <nox>
+Yep
+
+[08:47:37.0000] <TabAtkins>
+Do you get a "Falling back to a manual update" message?
+
+[08:47:58.0000] <nox>
+TabAtkins: Yep!
+
+[08:48:04.0000] <nox>
+https://irccloud.mozilla.com/pastebin/EM07FlnF/
+
+[08:48:06.0000] <nox>
+Full output ^
+
+[08:48:56.0000] <TabAtkins>
+Oh, you have... no data files at all.
+
+[08:50:21.0000] <TabAtkins>
+Ok, new question. When you're running `git pull`, are you in the folder mentioned in those error messages?
+
+[08:50:43.0000] <TabAtkins>
+Because I suspect you didn't run the install correctly, and it put bikeshed in an odd place and is running off of that instead.
+
+[08:51:25.0000] <nox>
+Ah right, that's probably it.
+
+[08:52:46.0000] <TabAtkins>
+Quite often when someone is running into mysterious errors it's because they wildcatted the install, rather than doing what the instructions said. ^_^
+
+[08:53:17.0000] <nox>
+I did pip install . at some point
+
+[08:56:21.0000] <TabAtkins>
+Yup, missed the `--editable /path/to/cloned/bikeshed` arg there
+
+[09:15:03.0000] <nox>
+Oh
+
+[09:26:27.0000] <TabAtkins>
+/me tut tuts
+
+[09:31:55.0000] <nox>
+annevk: FYI some bits of the spec say " <li>Let <var>removedNodes</var> be the empty list."
+
+[09:32:00.0000] <nox>
+(the empty list vs an empty list)
+
+[09:38:31.0000] <annevk>
+nox: oh I do like the for strings
+
+[09:38:54.0000] <nox>
+annevk: I can't parse that. 😂
+
+[09:39:04.0000] <annevk>
+nox: less clear on things that get mutated
+
+[09:39:17.0000] <nox>
+Oh I see.
+
+[09:39:57.0000] <annevk>
+nox: I guess you can leave that nit and Domenic and I should standardize on style in Infra
+
+[09:40:28.0000] <nox>
+TabAtkins: I think I correctly followed the instructions that time, bikeshed update succeeded.
+
+[09:40:34.0000] <nox>
+Now doing bikeshed spec dom.bs says `FATAL ERROR: Couldn't find an appropriate include file for the defaults inclusion, given group='whatwg' and status='None'.`
+
+[09:41:20.0000] <nox>
+Running just bikeshed says `FATAL ERROR: Found unmatched text macro [SNAPSHOT-LINK]. Correct the macro, or escape it with a leading backslash.`
+
+[09:41:32.0000] <TabAtkins>
+Dom has a make file that fills in some things not included in the spec itself
+
+[09:41:57.0000] <nox>
+oh
+
+[09:42:05.0000] <TabAtkins>
+That's not part of Bikeshed, it's just how annevk does things
+
+[09:42:22.0000] <nox>
+Ack, I didn't even have to install bikeshed apparently given it goes through the Web API.
+
+[09:42:36.0000] <TabAtkins>
+Lol
+
+[09:44:42.0000] <nox>
+annevk: Amended, pushed and commented.
+
+[11:10:05.0000] <MDude>
+Huh, this is odd. Supposedly, HTML5 has tags like <aside> which ought to have certain layout attributes by default, but they apparently don't work properly unless some CSS style is applied to them?
+
+[11:10:23.0000] <MDude>
+I guess their isn't a way to tell the browser to just use some default style instead of either explicitly defining one or just having no layout control at all.
+
+[12:09:38.0000] <Domenic>
+MDude: what do you mean by "out to have certain layout attributes by default"?
+
+[12:29:34.0000] <TabAtkins>
+The sectioning elements are all display:block by default, but that's all they get.
+
+[12:36:54.0000] <MDude>
+Ah
+
+[12:41:19.0000] <MDude>
+It just seemed like they would do something on their own, or else they would just be implemented as class attributes instead of as their own tags.
+
+[12:44:01.0000] <Domenic>
+MDude: not sure what other styles you would expect. But, they're mostly about semantics, not about styling.
+
+[12:44:30.0000] <TabAtkins>
+They were introduced *because* they were found to be extremely common classes; by promoting those words to tagnames, mechanical tools (like screenreaders or search spiders) can make more informed decisions about how to treat the contents, rather than guessing based on classname.
+
+[12:44:38.0000] <Domenic>
+I.e., they make it easier for human readers of the source code (and theoretically search engines and accessibility tools, although I'm not sure about implementation status there) to understand the content.
+
+[12:46:15.0000] <TabAtkins>
+a11y tools do indeed take advantage of them, since they come with the appropriate landmark roles by default
+
+
+2019-02-09
+[00:48:49.0000] <MikeSmith>
+https://drafts.csswg.org/css-text-3/#text-justify-property
+
+[00:48:57.0000] <MikeSmith>
+WARNING: mysqli_connect(): (HY000/2002): Can't connect to local MySQL server through socket '/var/run/mysqld/mysqld.sock' (111)
+
+[00:49:25.0000] <MikeSmith>
+I guess Peter maintains that server?
+
+[05:34:45.0000] <gsnedders>
+FWIW: hi, I'm going by Sam (they/them) nowadays; if you want more explanation, go see https://gsnedders.com/who-even
+
+[05:37:37.0000] <Jessidhia>
+🏳️‍🌈
+
+[05:38:31.0000] <Jessidhia>
+you might want to update your IRC client settings to send back the correct one on a WHOIS query
+
+[05:38:42.0000] <gsnedders>
+Jessidhia: uh, thanks!
+
+[05:39:00.0000] <gsnedders>
+I'm sure there's a million other places I've not realised I need to change :)
+
+[05:39:23.0000] <Jessidhia>
+indeed... ><
+
+[06:09:37.0000] <annevk>
+/me waves to Sam
+
+[06:10:02.0000] <annevk>
+I can fix a bunch of documents on Monday for you
+
+[06:11:07.0000] <gsnedders>
+<3
+
+[07:12:17.0000] <nox>
+gsnedders: HI SAM
+
+[07:14:24.0000] <nox>
+gsnedders: Might want to have a shell command ready to add an entry to .mailmap too :)
+
+[08:03:19.0000] <nox>
+annevk: One issue with my DOM patch is that HTML can't just say "do that when the element becomes connected" anymore, and must instead explicitly define the "insertion steps" for the element directly.
+
+[08:04:49.0000] <annevk>
+nox: that seems okay given the limited number of elements affected
+
+[08:05:06.0000] <nox>
+Yep
+
+[08:05:10.0000] <nox>
+annevk: Just style and script.
+
+[08:05:23.0000] <nox>
+I did script, just need to patch style now.
+
+[08:06:19.0000] <nox>
+annevk: I also patched the definitions of "becomes connected" and friends, saying "when the insertion steps are invoked with it as the *FIRST* argument" (so adding "first").
+
+[08:06:52.0000] <nox>
+annevk: Ah also I need to write a new test,
+
+[08:07:40.0000] <nox>
+Adding this kind of tree to the document through a script: <script id="s1"><script>stuff_that_changes_s1()</script>some_code();<script id="s2>…</script></script>
+
+[08:08:03.0000] <nox>
+I think some_code() should end up being ran before s2, because the first inner script changes s1.
+
+
+2019-02-10
+[23:45:42.0000] <annevk>
+JakeA: I broke https://github.com/w3c/ServiceWorker/commits/master somehow, but CI provides no useful information
+
+[00:05:01.0000] <JakeA>
+annevk: I'll take a look tomorrow
+
+[00:55:28.0000] <annevk>
+JakeA: thanks, guess I’ll refrain from
+
+[00:55:40.0000] <annevk>
+landing simple PRs from now on
+
+[01:10:42.0000] <JakeA>
+annevk: it should usually be ok. Or, the CI should have noticed the issue in the PR. I'll see what's up
+
+
+2019-02-11
+[02:02:18.0000] <annevk>
+nox: thanks for writing all the patches, I guess later today I should make some time to review all the tests to make sure coverage and browsers matches intuition
+
+[02:04:14.0000] <nox>
+annevk: I need to patch my steps to make them follow the new spec
+
+[02:04:26.0000] <nox>
+My tests* sorry
+
+[02:09:04.0000] <annevk>
+nox: I'm a little sceptical about script not doing its work in two parts, but we'll see
+
+[02:09:12.0000] <annevk>
+nox: I left a comment on that in the PR
+
+[02:09:51.0000] <annevk>
+nox: I guess maybe with style there's also that condition to consider, that what is queued might have gotten invalidated by something else that runs first
+
+[02:10:51.0000] <nox>
+annevk: I don’t think scripts should do their job in two parts yeah
+
+[02:11:43.0000] <nox>
+There is a step for “if it’s not connected then return” IIRC during preparation
+
+[02:19:42.0000] <nox>
+annevk: I'm not sure what you mean about style.
+
+[02:20:21.0000] <nox>
+annevk: Step 6 of prepare a script is "If the element is not connected, then return. The script is not executed."
+
+[02:23:39.0000] <annevk>
+nox: if all the things in "update a style block" indeed happen at this later time
+
+[02:24:10.0000] <annevk>
+nox: e.g., that means .sheet points to the old style sheet, if any
+
+[02:24:18.0000] <nox>
+annevk: Ah I see what you mean, if a previous script recreated the stylesheet, it should probably not get invalidated again?
+
+[02:25:54.0000] <annevk>
+nox: I'm not sure I follow that example, but basically ensuring it's robust against tempering that can happen between the operation being appended to the queue and it being run
+
+[02:26:13.0000] <annevk>
+tampering*
+
+[02:26:41.0000] <nox>
+annevk: You insert a script followed by a style,
+
+[02:26:51.0000] <nox>
+that queues "prepare a script" followed by "update a style",
+
+[02:27:07.0000] <nox>
+"prepare a script" executes the script, which modifies the style block, which runs "update a style" on its own,
+
+[02:27:22.0000] <nox>
+should the previously-queued "update a style" recreate the stylesheet again?
+
+[02:28:11.0000] <annevk>
+nox: [insert Palpatine meme]
+
+[02:28:18.0000] <nox>
+This is not a problem for scripts thanks to the "already-started" flags and whatnot, so I wonder if I should add a "soon-to-be-updated" flag to styles.
+
+[02:46:15.0000] <nox>
+annevk: I amended my existing tests according to the spec changes I made,
+
+[02:46:24.0000] <nox>
+annevk: I'll write one for the thing I just described today.
+
+[03:54:32.0000] <nox>
+https://github.com/servo/rust-url/issues/483 Is that really an invalid URL?
+
+[03:59:00.0000] <nox>
+https://github.com/servo/rust-url/issues/483#issuecomment-462303299 Oh
+
+[05:05:27.0000] <JakeA>
+annevk: Fixed the service worker spec build issue. No idea why it was seg faulting. Switched to the HTTP API.
+
+[05:05:39.0000] <Ms2ger>
+annevk, did you check html for CreateBuiltinFunction callers, btw?
+
+[05:06:15.0000] <annevk>
+Ms2ger: lol I didn't
+
+[05:06:24.0000] <annevk>
+Ms2ger: there are none
+
+[05:06:44.0000] <Ms2ger>
+Ok, thanks for checking :)
+
+[05:07:07.0000] <Ms2ger>
+annevk, webidl pr is good to merge?
+
+[05:08:11.0000] <annevk>
+Ms2ger: yeah
+
+[05:46:42.0000] <annevk>
+nox: left a couple more comments; this might require a few rounds until I fully grasp all the things again; feel free to leave nits unfixed as I can also push some fixup commits once we're close
+
+[05:47:16.0000] <annevk>
+nox: once we're more or less "ready" might also be good to let bz do a quick check
+
+[05:56:27.0000] <nox>
+annevk: No worries.
+
+[05:57:00.0000] <nox>
+annevk: I had a sudden spurge of motivation today, will do all the nits.
+
+[06:05:57.0000] <nox>
+annevk: I need to write the couple of tests you suggested and the one about stylé invalidation anyway.
+
+[07:08:31.0000] <yoav>
+annevk: Is there a Fetch definition for what is "cross-origin"?
+
+[07:09:09.0000] <yoav>
+RT has https://w3c.github.io/resource-timing/#dfn-cross-origin which points at RFC 6454, which we agreed is not great
+
+[07:09:57.0000] <annevk>
+yoav: https://html.spec.whatwg.org/#same-origin is the source of truth
+
+[07:09:58.0000] <yoav>
+I can define origin comaprison in RT, but seems like it should go in a more generic place (like Fetch)
+
+[07:10:17.0000] <yoav>
+ok, cool
+
+[07:10:21.0000] <yoav>
+I'll just point there
+
+[07:10:28.0000] <annevk>
+sg
+
+[08:40:16.0000] <nox>
+I read "French definition" instead of "Fetch definition", that was confusing.
+
+[09:52:14.0000] <annevk>
+nox: maybe that explains why CORS is so confusing
+
+[09:52:24.0000] <nox>
+Ah ah ah ah ah ah
+
+[09:57:30.0000] <annevk>
+Domenic: so GitHub actions would make tweeting easy?
+
+[09:58:27.0000] <Domenic>
+annevk: that is my understanding back when I looked at them first, but I should re-confirm. No progress on getting in the beta so maybe we should just write a script...
+
+[09:58:35.0000] <annevk>
+Domenic: it seems we could somewhat easily add it to the deploy script too perhaps? Would take some time though
+
+[09:59:05.0000] <Domenic>
+Credentials management seems like the tricky part
+
+[09:59:11.0000] <annevk>
+Domenic: we could also fix the URL bug and maybe suppress Meta: things
+
+[09:59:17.0000] <Domenic>
+Also we may want to write it in not-bash...
+
+[09:59:18.0000] <annevk>
+Yeah
+
+[09:59:51.0000] <Domenic>
+(which might require updating all the travis.yml)
+
+[10:01:27.0000] <annevk>
+Would be nice to reuse the ssh auth somehow
+
+[10:03:01.0000] <Domenic>
+We could also do a webhook and use credentials stored on the server
+
+[10:03:36.0000] <Domenic>
+That'd probably be easier for me to do at least since it'd reuse a lot of the participate.whatwg.org arch
+
+[10:22:43.0000] <annevk>
+Domenic: oh yeah if those still exist, seems reasonable
+
+
+2019-02-12
+[00:36:20.0000] <annevk>
+Domenic: when can you review https://github.com/whatwg/html/pull/4350?
+
+[02:13:51.0000] <nox>
+annevk: Currently doing my style test, will push a bunch of commits soon to wpt.
+
+[02:21:39.0000] <nox>
+annevk: It seems like only Firefox postpones style sheet creation.
+
+[02:23:08.0000] <nox>
+Wait no, it's worse than that.
+
+[02:25:57.0000] <annevk>
+nox: be sure to thank it if it doesn't spark joy
+
+[02:26:28.0000] <nox>
+annevk: Wait for it 😎
+
+[02:27:01.0000] <nox>
+annevk: https://github.com/web-platform-tests/wpt/pull/15264/commits/5082ab66dbe7c24b3a62f86251fc1ba81de79690#diff-e454c28d2f53c313161aa05dbdeca653R36
+
+[02:27:34.0000] <nox>
+This is what my new prose unexpectedly requires, and what Firefox actually does.
+
+[02:28:13.0000] <annevk>
+nox: seems reasonable
+
+[02:29:59.0000] <nox>
+annevk: You think so? I literally wrote the opposite assertion at first because I was thinking "surely browsers don't do that".
+
+[02:31:01.0000] <nox>
+annevk: Chrome fails at the first assertion because it already created a style sheet when the script starts executing,
+
+[02:31:37.0000] <nox>
+and it does so for both tests, it doesn't matter whether the element are inserted from a div or from a fragment.
+
+[02:32:31.0000] <nox>
+Same for Safari in the case of inserting from a div.
+
+[02:33:05.0000] <annevk>
+nox: so they create the style sheet at insertion time?
+
+[02:33:14.0000] <nox>
+annevk: Yes, contrary to Firefox.
+
+[02:33:22.0000] <annevk>
+nox: that might also be okay? I don't know if there's a problem with that?
+
+[02:33:27.0000] <annevk>
+nox: something to ask bz
+
+[02:33:32.0000] <nox>
+Yeah.
+
+[02:33:49.0000] <nox>
+annevk: I just thought from reading the various issues that it was common behaviour among all browsers. Clearly I misread.
+
+[02:35:41.0000] <nox>
+annevk: https://github.com/whatwg/dom/pull/576#issuecomment-368598457
+
+[02:35:57.0000] <nox>
+That should read "Except in Edge and in Chrome" I think :)
+
+[02:39:17.0000] <nox>
+annevk: So I should ping bz on the HTML PR no?
+
+[02:39:55.0000] <annevk>
+nox: yeah let's do that
+
+[02:40:25.0000] <annevk>
+nox: I've also tried to add some more cross linking, but haven't dug up all the DOM issues yet
+
+[02:40:29.0000] <nox>
+annevk: The postponing itself is why Firefox recreates a stylesheet for no reason in my latest test,
+
+[02:40:39.0000] <nox>
+so if we stop doing that, we also fix that "problem".
+
+[02:44:39.0000] <nox>
+annevk: https://github.com/whatwg/html/pull/4354/files#r255897129 Done
+
+[02:44:52.0000] <annevk>
+nox: still curious about the multiple script case where s1 modifies s2
+
+[02:45:01.0000] <nox>
+annevk: I added that
+
+[02:45:07.0000] <annevk>
+oh
+
+[02:45:10.0000] <nox>
+annevk: https://github.com/web-platform-tests/wpt/pull/15264/commits/ba850650821a4b0d28c1c8b623a262abc346403f
+
+[02:45:34.0000] <nox>
+annevk: I already had a similar one for scripts inserted from a div, the document fragment isn't that much different.
+
+[02:45:48.0000] <nox>
+Mostly differs in Safari given it inserts nodes from fragments one by one.
+
+[02:46:13.0000] <annevk>
+nox: I guess this does indicate the modification affects order, but it doesn't demonstrate it affects what gets executed
+
+[02:46:25.0000] <nox>
+annevk: I don't understand what you mean.
+
+[02:46:47.0000] <nox>
+annevk: Oh you mean I shouldn't add an empty string but some more code?
+
+[02:46:48.0000] <annevk>
+nox: say the script was first "y = 1" and then it got changed to "y = 2"
+
+[02:46:55.0000] <annevk>
+nox: aya
+
+[02:46:59.0000] <annevk>
+uh
+
+[02:47:19.0000] <annevk>
+aye
+
+[02:47:32.0000] <nox>
+annevk: I'll append s3Ran = true then.
+
+[02:47:48.0000] <annevk>
+sg
+
+[02:49:40.0000] <nox>
+annevk: Done.
+
+[02:50:48.0000] <nox>
+annevk: I forgot one
+
+[02:52:38.0000] <nox>
+annevk: Inserting a script in a script, and make it change its parent script.
+
+[03:01:43.0000] <nox>
+annevk: Ouch, my spec is wrong when it comes to that case.
+
+[03:03:26.0000] <annevk>
+aww
+
+[03:05:59.0000] <nox>
+annevk: Ok, indeed we need to split prepare a script in two.
+
+[03:07:02.0000] <nox>
+annevk: Or maybe not!
+
+[03:09:05.0000] <nox>
+Everyone is wrong and all in their own way.
+
+[03:09:57.0000] <nox>
+annevk: https://github.com/web-platform-tests/wpt/pull/15264/commits/f8fef1d7127b7559aa9e19a9ebec07f169f9055e
+
+[03:10:01.0000] <annevk>
+[so close.jpg]
+
+[03:10:14.0000] <annevk>
+/me looks
+
+[03:10:16.0000] <nox>
+So this test shows two things:
+
+[03:10:41.0000] <nox>
+Safari and Chrome start executing the code inserted in s1 and fail at assert_true(s2Started, "s2 did not start");
+
+[03:11:04.0000] <nox>
+Firefox starts executing the code in s2 and fail at assert_true(s1Started, "s1 did not start");
+
+[03:12:05.0000] <nox>
+So Safari and Chrome don't seem to follow the current spec which states: 'the user agent must immediately prepare the script element: (…) The script element is connected and a node or document fragment is inserted into the script element, *after any script elements inserted at that time.*'
+
+[03:12:56.0000] <nox>
+And Firefox may or may not be following that bit of the spec, depending on how you read it.
+
+[03:13:05.0000] <nox>
+I personally expected s1 to be ran when s2 modifies it.
+
+[03:13:28.0000] <annevk>
+Running s1 then s2 does not seem too bad to me
+
+[03:13:53.0000] <nox>
+Now I wonder which order is used for a nested script inside a script inside a div inserted in a document.
+
+[03:14:15.0000] <nox>
+annevk: So making s2 impossible to change s1 then?
+
+[03:14:22.0000] <nox>
+(Given scripts are executed only once)
+
+[03:16:27.0000] <nox>
+annevk: I would prefer running s1 then s2 too, because that keeps evaluation in tree order.
+
+[03:16:44.0000] <nox>
+It is a bit at odds with my test with three scripts where the first one changes the third one, though.
+
+[03:16:56.0000] <nox>
+Ah no it's not at odds never mind.
+
+[03:18:06.0000] <nox>
+s1 then s2 is current Chrome behaviour
+
+[04:01:35.0000] <gsnedders>
+nox: ah, as I thought .mailmap doesn't affect `git log` by default :/
+
+[04:02:10.0000] <nox>
+gsnedders: GH uses it AFAIR
+
+[04:02:39.0000] <nox>
+Ah right I forgot that my local config enables it https://github.com/nox/dotfiles/blob/master/config/git/config#L44
+
+[04:12:04.0000] <yoav>
+annevk: Would appreciate your thoughts on https://github.com/w3c/resource-timing/issues/202. Basically, if a user goes to page A.COM which loads a CORS-enabled resource from b.com, and the resource contains `ACAO: a.com\r\nTAO: a.com`, what's expected to happen?
+
+[04:12:25.0000] <yoav>
+would the origin serialization keep the origin as "A.COM"?
+
+[04:15:09.0000] <annevk>
+yoav: assuming that's ASCII, no
+
+[04:15:46.0000] <yoav>
+oh, so there's a lowercasing phase that I missed? Can you point me to it?
+
+[04:15:55.0000] <yoav>
+(assuming ASCII indeed)
+
+[04:16:50.0000] <annevk>
+yoav: URL parser
+
+[04:18:10.0000] <yoav>
+ok. So in the example above, TAO and ACAO will pass checks
+
+[04:18:23.0000] <yoav>
+OTOH, `ACAO: A.COM` will never pass
+
+[04:18:27.0000] <yoav>
+is that correct?
+
+[04:18:35.0000] <annevk>
+yoav: aye
+
+[04:18:53.0000] <yoav>
+cool
+
+[04:19:15.0000] <annevk>
+(you also need a scheme there, but I guess that's clear)
+
+[04:20:58.0000] <yoav>
+yeah
+
+[06:49:59.0000] <nox>
+annevk: How can a script element be connected and have text contents and still not be executed?
+
+[06:50:32.0000] <nox>
+annevk: Forget that question I misread something.
+
+[06:51:09.0000] <nox>
+annevk: I'll patch my HTML patch to make it always execute the script in which we just added contents be evaluated first, given that's what Chrome seem to do and what I think is the most logical.
+
+[06:53:45.0000] <nox>
+annevk: Shouldn't we ping someone working on Chrome too?
+
+[06:55:46.0000] <annevk>
+nox: tkent-google might be able to help here
+
+[06:56:04.0000] <nox>
+annevk: Ok.
+
+[06:56:47.0000] <nox>
+annevk: At least, the DOM changes are solid, and if we end up preparing scripts in tree order (with the one in which we added stuff prepared first), we can even simplify "children added steps" to not use deferredStepsQueue.
+
+[07:19:15.0000] <smaug____>
+wanderview: you might know... any service worker heavy web sites, especially sites which use service workers heavily during page load?
+
+[07:38:28.0000] <wanderview>
+smaug____: some large sites using service worker FetchEvent are mobile.twitter.com, photos.google.com, m.uber.com
+
+[07:39:09.0000] <wanderview>
+smaug____: for sites that are hitting performance problems, though, they often gate on navigationPreload (not implemented in FF yet) or have not launched their FetchEvent support yet
+
+[07:39:58.0000] <smaug____>
+wanderview: anything using fetch()
+
+[07:40:08.0000] <smaug____>
+given how SW is implemented in Gecko
+
+[07:40:28.0000] <smaug____>
+but aha, photos
+
+[07:40:33.0000] <smaug____>
+that could be something for desktop
+
+[07:40:35.0000] <smaug____>
+/me tests
+
+[07:40:57.0000] <wanderview>
+the photos one may be mainly a fallback to network
+
+[07:41:01.0000] <wanderview>
+I can't recall
+
+[07:41:26.0000] <wanderview>
+smaug____: do you mean a case where the site is doing something like evt.respondWith(fetch(evt.request)) in their service worker?
+
+[07:42:00.0000] <smaug____>
+something like that
+
+[07:42:11.0000] <smaug____>
+anything where SW controls the network connection
+
+[07:42:50.0000] <wanderview>
+ok... "anything where SW controls the network connection" does not require fetch() to be used... so not sure what you meant by that
+
+[07:43:29.0000] <smaug____>
+or uses Cache
+
+[07:44:02.0000] <smaug____>
+wanderview: ok, in practice heavy use of Cache API or fetch()
+
+[07:44:27.0000] <wanderview>
+smaug____: this is the URL use of ThrottledTaskQueue you mentioned in that bug?
+
+[07:44:29.0000] <smaug____>
+looks like photos.google.com at least uses cache
+
+[07:44:32.0000] <smaug____>
+yes
+
+[07:45:57.0000] <wanderview>
+I'm doubtful that is significant, but I guess measuring is always a good idea
+
+[07:46:37.0000] <smaug____>
+it is definitely very significant
+
+[07:46:46.0000] <smaug____>
+there are profiles showing that
+
+[07:47:28.0000] <smaug____>
+during page load normal prio queue is very busy
+
+[07:48:18.0000] <smaug____>
+but ok thanks, photos.google.com is a good example for desktop
+
+[07:48:53.0000] <wanderview>
+I thought MT URL parsing was no longer necessary anyways
+
+[09:04:01.0000] <annevk>
+nox: counter to bz would also be iframe or some such
+
+[09:05:22.0000] <annevk>
+nox: I hope this works out as it seems the resulting model is not that complex
+
+[09:06:25.0000] <nox>
+Yeah
+
+[09:15:16.0000] <wanderview>
+smaug____: btw, if you just want to stress service worker subresource loading paths, then JakeA's site here is good: https://jakearchibald.github.io/service-worker-benchmark/
+
+[09:15:24.0000] <wanderview>
+sorry I didn't think of that initially
+
+[09:16:14.0000] <smaug____>
+wanderview: great, thanks! I'm so noob with service worker stuff
+
+[09:17:49.0000] <wanderview>
+smaug____: word of warning, you have to be careful not to trigger image cache with that site... I find opening in a new tab is better than a reload
+
+[15:12:34.0000] <TabAtkins>
+Hmm, wondering what APIs might be invoking CSS's "parse a component value" algorithm. I find that Manifests is, in parsing theme-color, but that's hard to test. Anyone know of another that I can invoke more easily?
+
+
+2019-02-13
+[00:39:13.0000] <TimothyGu>
+Domenic: did you happen to miss https://github.com/whatwg/html/pull/4229?
+
+[01:48:54.0000] <Ms2ger>
+Given that https://www.w3.org/Bugs/Public/ is shutting down, should we migrate the WebIDL bugs to github?
+
+[03:15:06.0000] <MikeSmith>
+Ms2ger: that would seem to make sense yeah
+
+[04:48:49.0000] <nox>
+annevk: I discussed with bz yesterday, and I found out how to specify Firefox' behaviour in prose, for comparison with my own proposed changes, I'll make a comment showing the differences later today.
+
+[04:57:38.0000] <gsnedders>
+MikeSmith: is there any way to dump the data from there or anything? :/
+
+[04:59:29.0000] <annevk>
+nox: focus handling seems good to test
+
+[04:59:51.0000] <annevk>
+nox: removing a focused input or some such
+
+[05:03:44.0000] <MikeSmith>
+gsnedders: I guess bugzilla must have some way yeah
+
+[05:07:29.0000] <gsnedders>
+MikeSmith: I know there's a whole load of CSS2 stuff in there, but I have no desire to get that out until I'm being paid
+
+[07:02:55.0000] <Domenic>
+annevk: I like "setting the document.domain attribute (in)appropriately" ^_^
+
+[07:06:03.0000] <annevk>
+I was hoping you would 😃
+
+[07:31:35.0000] <MikeSmith>
+I see https://github.com/WICG/html-modules just got created
+
+[07:43:41.0000] <annevk>
+Ugh, that should really be an HTML PR imo
+
+[07:46:15.0000] <MikeSmith>
+annevk: yeah
+
+[07:46:35.0000] <MikeSmith>
+nobody responded to your comment about that
+
+[08:44:53.0000] <Ms2ger>
+Domenic, any more thoughts on https://github.com/heycam/webidl/pull/635 ?
+
+
+2019-02-14
+[02:01:29.0000] <nox>
+annevk: Progress woohoo https://github.com/whatwg/html/pull/4354#issuecomment-463566900
+
+[02:12:46.0000] <annevk>
+nox: \o/
+
+[02:15:12.0000] <nox>
+annevk: So where am I supposed to look at in the spec for focus handling? :D
+
+[02:16:20.0000] <annevk>
+nox: HTML defines some of it
+
+[02:16:54.0000] <annevk>
+nox: search for "focusing steps"
+
+[02:17:45.0000] <annevk>
+nox: I guess the main question is whether blur is dispatched if you remove an element that's focused (or insert it elsewhere)
+
+[02:18:02.0000] <nox>
+annevk: Aren't they always invoked through a queued task?
+
+[02:18:45.0000] <nox>
+Ah no, ok.
+
+[02:21:58.0000] <nox>
+annevk: https://html.spec.whatwg.org/multipage/interaction.html#focus-processing-model:unfocusing-steps This is the important thing you want me to test right?
+
+[02:24:55.0000] <annevk>
+nox: <input>.focus() getting unfocused by removal and maybe <input autofocus> potentially getting focused by insertion? Though I think the latter does use a task
+
+[02:25:13.0000] <annevk>
+nox: I'm having a hard time coming up with other scenarios for this
+
+[02:25:18.0000] <nox>
+Yeah the latter definitely uses a task.
+
+[06:39:42.0000] <annevk>
+So nobody ever created tests for <iframe name>
+
+[06:39:58.0000] <annevk>
+I should not be surprised, but I am
+
+[07:45:07.0000] <nox>
+annevk: So what I need to try to test for is when blur/focus events are fired, is that right?
+
+[08:03:56.0000] <nox>
+I need to test that https://html.spec.whatwg.org/multipage/links.html#link-type-stylesheet:fetch-and-process-the-linked-resource
+
+[08:08:43.0000] <nox>
+When the spec says "Wait until algorithm asynchronously completes with result", that means we block, right?
+
+[08:09:49.0000] <annevk>
+nox: that step "blocks", yes
+
+[08:10:34.0000] <annevk>
+nox: such a "Wait" statement should only be found in stuff that's "in parallel", except perhaps if it's legacy
+
+[08:11:32.0000] <nox>
+annevk: When is link.sheet updated?
+
+[08:11:40.0000] <nox>
+(For <link rel=stylesheet>)
+
+[08:12:29.0000] <annevk>
+nox: the set of steps that dispatches load, before it's dispatched
+
+[08:12:49.0000] <nox>
+annevk: Do you have a spec link for that? I lost myself.
+
+[08:13:03.0000] <annevk>
+nox: domfarolino has been refactoring
+
+[08:13:14.0000] <annevk>
+and I'm not sure that was ever super well-defined
+
+[08:13:55.0000] <nox>
+annevk: Also not sure whether that matters or not but in https://html.spec.whatwg.org/multipage/custom-elements.html#custom-element-reactions we may understand that the callback is immediately invoked, but that's not what happens right?
+
+[08:14:24.0000] <annevk>
+nox: look for "process the linked resource" and how it's defined for stylesheet
+
+[08:14:29.0000] <nox>
+Ok thanks.
+
+[08:15:27.0000] <annevk>
+nox: scroll down to [CEReactions] for the exact timing on custom element reactions
+
+[08:15:42.0000] <annevk>
+nox: they're basically run at the point when IDL returns to JS
+
+[08:16:40.0000] <nox>
+Yeah that's what I gathered, so that can't interfere with the insertion algo.
+
+[08:19:20.0000] <annevk>
+nox: yeah, if you do insertBefore() or appendChild() it's be 1) "actual insert" 2) "this new queue you're working on " 3) "custom element reactions"
+
+[08:19:30.0000] <annevk>
+it'd be*
+
+[08:19:42.0000] <nox>
+https://twitter.com/nokusu/status/1096081486082723841 wtf
+
+[08:29:21.0000] <nox>
+https://github.com/whatwg/html/pull/4354#issuecomment-463693419 My brain is on fire so I'll do something else for the rest of the day.
+
+[08:30:35.0000] <Ms2ger>
+nox, go home, eat a baguette
+
+[08:30:42.0000] <annevk>
+nox: heh
+
+[08:30:48.0000] <annevk>
+nox: so I think most of those are not a problem
+
+[08:30:52.0000] <annevk>
+nox: and done at insertion time
+
+[08:31:12.0000] <annevk>
+nox: except for those that depend on some external resource and are therefore done async
+
+[08:38:34.0000] <nox>
+annevk: You mean before scripts run then, right?
+
+[08:38:51.0000] <nox>
+annevk: But I think Gecko uses their AddScriptRunner stuff for some of them, hence why I listed them.
+
+[08:39:00.0000] <annevk>
+nox: aye
+
+[08:39:03.0000] <annevk>
+nox: interesting
+
+[08:39:27.0000] <nox>
+annevk: See bz's link https://searchfox.org/mozilla-central/search?q=AddScriptRunner&case=true
+
+[08:39:37.0000] <nox>
+(Cursed link tbh)
+
+[08:40:39.0000] <annevk>
+Hmm yeah, maybe I need to reread the thread at some point
+
+[08:40:57.0000] <annevk>
+But I'm pretty sure I tested <iframe> at least
+
+[08:41:05.0000] <nox>
+annevk: At the very least,
+
+[08:41:16.0000] <nox>
+I'm pretty confident that the DOM part of my set of PRs is solid.
+
+[08:41:39.0000] <nox>
+As in, it is enough to encode whatever way Firefox uses their script runner stuff.
+
+[09:07:26.0000] <Domenic>
+annevk: stupid question, how can a Window not have a browsing context?
+
+[09:07:56.0000] <annevk>
+Domenic: see test, hold ref, remove iframe
+
+[09:09:03.0000] <Domenic>
+annevk: that discards the BC, but doesn't remove the reference from Window -> BC
+
+[09:09:56.0000] <Domenic>
+Discarding only removes the reference from UA -> BC, but if there's a JS -> Window -> BC reference, the BC still exists
+
+[09:10:07.0000] <annevk>
+Domenic: hmm I thought it removed all refs as we don’t really deal with such a bc
+
+[09:10:55.0000] <annevk>
+Domenic: so we’d need discarded checks instead? Seems worse, but maybe this is indeed not clear currently
+
+[09:11:17.0000] <Domenic>
+I guess per the tests UAs clear out the name, instead of keeping it?
+
+[09:12:03.0000] <Domenic>
+I'm just a little worried about how much else might assume that every Window has a BC. But those things might be broken in other ways, indeed.
+
+[09:12:08.0000] <annevk>
+Domenic: i think the tests support the notion of the bc not being there, if you look at the setter
+
+[09:12:45.0000] <Domenic>
+Sigh, fractal brokenness.
+
+[09:12:53.0000] <annevk>
+Domenic: stuff either needs to branch on it being there or it being discarded; everything that doesn’t is broken
+
+[09:13:27.0000] <Domenic>
+Well, "being discarded" isn't a well-defined concept (there's no discarded boolean), so removing the reference makes some sense. I'll comment and solicit bz's opinion.
+
+[09:14:01.0000] <annevk>
+closed branch on discarded, but I agree that nulling is our normal way
+
+[09:14:12.0000] <annevk>
+branches*
+
+[09:14:35.0000] <annevk>
+And also agree that branching on discarded is rather silly
+
+[09:14:43.0000] <Domenic>
+annevk: I assume the tests passed in all browsers?
+
+[09:15:21.0000] <annevk>
+Domenic: yeah, though initially I set name after insertion, which explains the other PR 😊
+
+[09:35:35.0000] <annevk>
+Domenic: if we agree on the null model I can add that concept to the spec inc a red box and then we slowly fix it over time and rebase this PR on top of that
+
+[10:36:25.0000] <annevk>
+Domenic: spec has “Lose the strong reference from document's browsing context to document.” already
+
+[10:36:46.0000] <annevk>
+Domenic: this should all be much more explicit though
+
+[10:38:09.0000] <annevk>
+I might work on that a bit as it’ll prolly keep coming up and seems good to rectify as tighten other lifetime behavior too
+
+[10:38:19.0000] <annevk>
+as we*
+
+[11:31:17.0000] <Domenic>
+annevk: I agree with the null model but would feel more comfortable if jdm and bz signed off.
+
+[11:31:57.0000] <Domenic>
+The spec does indeed sever the BC -> document, but it doesn't say much about the Window -> BC. Even if we define Window -> BC as a macro for Window -> associated Document -> BC, severing BC -> document does not impact that.
+
+[11:38:38.0000] <annevk>
+Domenic: ah yes
+
+[11:38:55.0000] <annevk>
+I wonder if that connection was even considered
+
+[11:39:17.0000] <Domenic>
+This whole mess would benefit from some pictures
+
+[11:39:33.0000] <Domenic>
+Tangentially, it looks like from your tests <embed>s have name="" attributes!?!
+
+[11:40:02.0000] <annevk>
+Yeah, though poorly defined
+
+[11:40:24.0000] <annevk>
+Initially embed did not have nested bcs…
+
+[11:40:32.0000] <annevk>
+In the spec
+
+[11:40:34.0000] <Domenic>
+Yeah it appears to not exist in the spec at all
+
+[11:40:39.0000] <Domenic>
+I'll file a separate bug...
+
+[11:40:57.0000] <Domenic>
+I think the plan for <object> and <embed> is to wait for Flash to die then re-do everything
+
+[11:41:01.0000] <annevk>
+We did add support when we centralized creation of nbcs
+
+[11:41:07.0000] <Domenic>
+Oh
+
+[11:41:25.0000] <Domenic>
+I was Ctrl+Fing "name" and looking at the highlighted instances, but you're right
+
+[11:45:43.0000] <Domenic>
+As jdm mentions, the fact that #concept-document-bc indirects through session history, and session history is impacted by discarding, means... something is happening here.
+
+[12:00:40.0000] <annevk>
+Uhuh, I wonder if we’re still on track for 2022 or whatever it was
+
+[12:08:20.0000] <Domenic>
+Are you talking about Flash's death or REC-worthy test coverage?
+
+[12:09:51.0000] <Domenic>
+Oh, we got actions access somehow. I never got an email.
+
+[12:30:04.0000] <annevk>
+HTML5 being Hixie-perfect
+
+[12:59:36.0000] <eightfold>
+hi. should i put my sitewide navigation <nav> in a <section> if it containers anything more than a heading (h1) and <ul> list of links?
+
+[13:04:48.0000] <annevk>
+eightfold: no hard-and-fast rule, afaik
+
+[13:05:56.0000] <eightfold>
+thanks. as it looks now there’s only a h1 and ul, so sidewide nav should be directly below body it seems.
+
+[13:06:59.0000] <annevk>
+eightfold: sounds fine
+
+[13:12:15.0000] <eightfold>
+any wrapper divs should not affect structural outline, right?
+
+[13:27:07.0000] <Domenic>
+Correct
+
+[13:29:20.0000] <eightfold>
+and (last question i hope), body > main > article > header > 1makes sense even if there’s only one article in main?
+
+[13:29:46.0000] <eightfold>
+i meant: body > main > article > header > h1
+
+[13:30:16.0000] <eightfold>
+just wondering if i should ditch either main or article in that outline
+
+[13:30:36.0000] <eightfold>
+content in article is blog posts
+
+[13:30:45.0000] <eightfold>
+blog post, singular :)
+
+[13:33:06.0000] <annevk>
+eightfold: either ok
+
+[13:34:33.0000] <eightfold>
+so all of these are ok: 1. main only. 2. article only. 3. article inside main
+
+[13:34:35.0000] <eightfold>
+for my use?
+
+[14:01:45.0000] <eightfold>
+shouldn’t the second example here: https://html.spec.whatwg.org/multipage/sections.html#the-header-element
+
+[14:02:08.0000] <eightfold>
+have a </header> directly after the </nav>?
+
+[14:02:24.0000] <eightfold>
+or is the </header> below ...
+
+[14:02:26.0000] <eightfold>
+?
+
+[14:24:29.0000] <MikeSmith>
+it’s all up to you
+
+[14:25:05.0000] <MikeSmith>
+none of those elements have any specific presentational effects
+
+[14:25:48.0000] <MikeSmith>
+so you could also just as well use <div>s
+
+
+2019-02-15
+[04:27:36.0000] <Ms2ger>
+/me curses lxml
+
+[04:34:38.0000] <MikeSmith>
+/me curses absurdly poor performance of parsing HTML in python no matter what python HTML parser you use
+
+[04:35:16.0000] <MikeSmith>
+lxml works really great as long as you’re not in a hurry
+
+[04:40:28.0000] <ato>
+kuchiki by SimonSapin is great if you can use Rust.
+
+[06:40:11.0000] <Ms2ger>
+ato, indeed it is, but I doubt TabAtkins wants to integrate rust into bikeshed :(
+
+[06:41:20.0000] <ato>
+Ah, context is king! (-:
+
+[06:55:17.0000] <SimonSapin>
+TabAtkins and I actually talked about moving bikeshed to rust before, but that’s a larger project
+
+[06:58:07.0000] <smcgruer>
+annevk: If you feel like musing about data URLs, I would be interested in your comments on crbug.com/807562#c9 - thanks! :)
+
+[07:00:47.0000] <annevk>
+smcgruer: so the whitespace change earlier seems concerning as the data URL processor can only see U+0020 when I last checked
+
+[07:02:47.0000] <annevk>
+smcgruer: data://test:test should fail in the URL parser due to incorrect port
+
+[07:04:08.0000] <annevk>
+smcgruer: base64 was done per RFC and matches Safari at least?
+
+[07:04:53.0000] <annevk>
+smcgruer: doing it differently would end up quite involved as the MIME type parser drops it, iirc
+
+[07:42:03.0000] <nox>
+Wow Safari matching something! :P
+
+[07:42:13.0000] <nox>
+SimonSapin, TabAtkins: If you ever work on that, count me in.
+
+[07:42:42.0000] <TabAtkins>
+Def still my plan at some point
+
+[07:42:46.0000] <nox>
+MikeSmith, Ms2ger: Fun that you are cursing Python,
+
+[07:42:53.0000] <Ms2ger>
+/me curses nox
+
+[07:43:07.0000] <nox>
+some Mozilla people were just today cursing Python because it coordinates invoking clang-format in mozilla-central,
+
+[07:43:17.0000] <nox>
+and apparently it causes a huge overhead just existing.
+
+[07:43:55.0000] <TabAtkins>
+Tho this year I'm gonna drop lxml and integrate Markdown parsing directly into HTML parsing, so using kuchiki to parse prob isn't gonna work
+
+[07:44:03.0000] <annevk>
+nox: Safari matches a lot of things
+
+[07:44:14.0000] <annevk>
+nox: eg, URL parser
+
+[07:44:39.0000] <nox>
+TabAtkins: Using Kuchiki no, but using html5ever's tokenizer could maybe work.
+
+[07:44:49.0000] <Ms2ger>
+TabAtkins, please do, it's segfaulting
+
+[07:45:07.0000] <TabAtkins>
+I need to look into that
+
+[07:45:32.0000] <TabAtkins>
+Ms2ger: yeah, I saw. Haven't been able to dig in yet, but wtf
+
+[07:45:43.0000] <TabAtkins>
+Is it for all Travis?
+
+[07:45:57.0000] <Ms2ger>
+I dunno, it was locally for me
+
+[07:47:12.0000] <TabAtkins>
+Woah!
+
+[07:47:47.0000] <TabAtkins>
+Fresh install or something, or out of nowhere?
+
+[07:47:55.0000] <Ms2ger>
+Oddly, it seems to be installing 4.3.1 while your requirements.txt has lxml>=4.2.5<4.3
+
+[07:48:08.0000] <Ms2ger>
+Yeah, fresh
+
+[07:53:11.0000] <TabAtkins>
+That's a good hint, thanks. Will dig in today
+
+[07:56:11.0000] <Ms2ger>
+TabAtkins, https://github.com/tabatkins/bikeshed/pull/1433 ; seems to help locally, at least
+
+[07:56:36.0000] <TabAtkins>
+you're great, merging
+
+[07:56:50.0000] <TabAtkins>
+we'll see if this fixes the travis failures
+
+[08:22:41.0000] <Ms2ger>
+TabAtkins, btw, is there a way to silence "WARNING: This specification has neither a 'Security Considerations' nor a 'Privacy Considerations' section."?
+
+[08:22:53.0000] <TabAtkins>
+Yes, put that section in.
+
+[08:23:07.0000] <nox>
+😂
+
+[08:23:32.0000] <Ms2ger>
+/me gives TabAtkins a smartass cookie
+
+[08:24:04.0000] <TabAtkins>
+I mean, why does your W3C-group spec not have one? It's required for publication.
+
+[08:24:56.0000] <Ms2ger>
+WebIDL doesn't get published, afaik :)
+
+[08:25:06.0000] <TabAtkins>
+TECHNICALLY true
+
+[08:25:54.0000] <TabAtkins>
+But still, just drop in a "This spec introduces no privacy or security considerations, as it is defining a meta-language that actually-useful specs use to write themselves."
+
+[08:26:15.0000] <TabAtkins>
+...in a section titled "Privacy & Security Considerations"
+
+[08:27:15.0000] <Ms2ger>
+Well, that's an easy way to finish the week
+
+[08:34:03.0000] <annevk>
+I’m not sure that should pass review though
+
+[08:34:31.0000] <annevk>
+If not implemented carefully there would be a number of security issues
+
+[08:37:49.0000] <TabAtkins>
+That's a line that could be added to literally every specification, tho.
+
+[08:43:27.0000] <TabAtkins>
+Expanding: I think that the P&S section is for things to be careful about or consider *due to the feature itself*. Mis-implementing a feature is always a possible source of problems, "be sure not to mess up when implementing this" doesn't need to be added.
+
+[09:07:00.0000] <TabAtkins>
+...that's not true, tho; some features are *really* sensitive to being misimplemented in ways that totally ruin them. They're a rarity, tho. I suppose WebIDL might qualify for that, for some of the stuff specifying realms and such.
+
+[09:31:36.0000] <annevk>
+Right, I think the binding layer qualifies, as it’s a security boundary of sorts
+
+[09:56:34.0000] <TabAtkins>
+All right, so it sounds like an S&P section would actually be *useful* to write. As a side-effect it will then silence the warning. ^_^
+
+[10:05:39.0000] <annevk>
+smcgruer: hope that helped btw?
+
+[10:38:07.0000] <smcgruer>
+annevk: It did, thanks. Sorry for not being around, was in meetings all morning. I believe this is quite late for you so happy to punt discussing further till Monday (also feel free to comment on the Chrome issue)
+
+[10:51:47.0000] <smcgruer>
+annevk: For the whitespace question, my gut feeling is that Chrome's URL parser is probably allowing non-U+0020 whitespace characters in general, but when checking the spec (https://url.spec.whatwg.org/#concept-basic-url-parser) I do only see a step to remove TAB, LF and CR but not FF. (steps 2, 3). It's possible I missed a step that would remove FF.
+
+[10:53:29.0000] <smcgruer>
+annevk: The port point is a good one, I will make a note of that in the bug.
+
+[10:54:14.0000] <smcgruer>
+annevk: And finally for base64, it's a reasonable argument. You would have to search for all occurrences in mimeType, remove them, and then pass the remaining content to the MIME type parser. I was just responding my best guess to foolip's question :)
+
+[12:19:17.0000] <annevk>
+smcgruer: thanks, I’ll investigate Monday
+
+[13:24:29.0000] <annevk>
+By the way, Bikeshed in Rust would be amazing
+
+[13:24:44.0000] <annevk>
+We could maybe switch HTML then
+
+[13:25:10.0000] <annevk>
+Would love to help if I can
+
+[13:41:47.0000] <TabAtkins>
+After I do the parser rewrite, I can consider it. It's already going to be such a huge change to the internals, I'd like to get it done in a language I"m familiar with first.
+
+
+2019-02-16
+[16:00:40.0000] <cvazac>
+should a cross-origin request (that happens to be for an IFRAME) be visible by a service worker?
+
+[23:38:52.0000] <annevk>
+Nope
+
+[05:34:46.0000] <Nepose>
+Hello :)
+
+[05:35:35.0000] <Nepose>
+Let me please know, I have one idea about HTML standard and I wanted to ask other people if it's not too stupid, where could I put it?
+
+[06:11:36.0000] <Nepose>
+And are we able to suggest new standards? I mean completely new, like XML that you don't have ;)
+
+[07:17:07.0000] <annevk>
+Nepose: https://whatwg.org/faq might help
+
+[07:21:15.0000] <Nepose>
+annevk: thanks, this helped me :) but not fully, the problem is that my idea is connected both to XML and HTML and I see that you don't maintain XML standard, are you going to do anything with it?
+
+[07:25:15.0000] <annevk>
+Nepose: extensions to XML seem unlikely, though I hold out some hope for XML5
+
+[07:26:15.0000] <annevk>
+Nepose: note that the HTML Standard does say a few things about XML and has made some changes
+
+[07:34:00.0000] <Nepose>
+annevk: honestly I've never heard about XML5, but now found and it seems to be a great thing, I wanted to suggest possibility to use boolean attributes like in HTML5
+
+[07:35:44.0000] <annevk>
+Ah, that would indeed enable that
+
+[07:35:55.0000] <Nepose>
+about XHTML: now we have HTML (5?) and XHTML, my idea is to use only XHTML and enhance XML to allow stuff from HTML5 like boolean attributes, document.write(), noscript tag
+
+[07:36:18.0000] <Nepose>
+for example as XML 2.0 or XML5 as you sent me
+
+[07:36:37.0000] <annevk>
+I don’t think we want to spread document.write() any further
+
+[07:38:13.0000] <Nepose>
+And this thing I wrote here would also bring to HTML namespaces, self-closed script tag, XSL Transformations if someone wants to use it
+
+[07:38:25.0000] <Nepose>
+Of course it is available now but not common
+
+[07:39:01.0000] <Nepose>
+And in current XML serialization of HTML5 named character entities can't be used unfortunately
+
+[07:42:57.0000] <Nepose>
+Oh and the thing I've forgotten to: allowing <?xml-model href="..." schematypens="..." (...) ?> instruction from current working group note would be also great in XML5 / XML 2.0
+
+[07:46:34.0000] <Nepose>
+In my opinion proposing one language as living standard is just easier and less complicated instead having two ones, but one of it almost not known. HTML as XML application for XML5 would in my idea allow everything which exists now in HTML5 and enhance it with possibility to use other XML applications and XSL stylesheets inside document if someone wants
+
+[07:46:43.0000] <Nepose>
+Let me please know, does it have any sense for you?
+
+[09:55:39.0000] <Domenic>
+I think generally the community is not in favor of evolving XML much further. We're instead doing our best to limit its spread and eventually remove it from browsers by merging it with the HTML parser, if at all possible. It's not clear that'll ever work out, but maintaining two separate formats for documents on the web is a large maintenance burden, and the most common libraries for parsing and manipulating XML
+
+[09:55:39.0000] <Domenic>
+(libxml/libxslt) are bug-ridden and full of security holes.
+
+[10:54:06.0000] <Nepose>
+@Domenic: thanks for response (found in the channel log) :) but anyway, do you consider any future for HTML5 as XML application?
+
+[10:54:24.0000] <Nepose>
+and does XML5 have any chances to be done?
+
+[10:57:10.0000] <Domenic>
+Nepose: I don't know what "any future for HTML as XML application" means.
+
+[10:58:20.0000] <Domenic>
+As for XML5, that's part of the plan to get rid of XML, so maybe it will happen, but I haven't seen much movement so far.
+
+[10:59:53.0000] <Nepose>
+By this phrase I meant if WHATWG is going to develop this later together with "normal", non-XML-based version of HTML LS
+
+[11:00:32.0000] <Nepose>
+XHTML was before (when 1.0 / 1.1) an XML application, but I'm not sure if this phrase is actual now
+
+[11:24:37.0000] <Domenic>
+These days we just have to support a way of parsing XML into a DOM tree for backward compatibility, basically. I don't know much about XML applications.
+
+[12:40:17.0000] <Nepose>
+Domenic: okay, I'll try to ask also other people and show them example of what I mean, thanks
+
+
+2019-02-17
+[01:04:52.0000] <annevk>
+littledan: let me know at what point https://github.com/whatwg/html/pull/4372 is ready for nits
+
+[01:05:09.0000] <annevk>
+littledan: and thanks for writing it up!
+
+[01:14:13.0000] <annevk>
+TimothyGu: I'll leave https://github.com/whatwg/html/pull/4368 open until you can verify my analysis, but I think it's good still
+
+[01:16:05.0000] <littledan>
+Annevk, never too early for a review, but it will be some months or maybe a year. I will note in the PR thread when ready.
+
+[01:17:03.0000] <littledan>
+How would folks feel if I proposed some of the HTML job queue to be part of JS semantics? No normative changes, but maybe this could clear up the willful violation in this area.
+
+[01:17:12.0000] <littledan>
+Domenic: ^
+
+[01:17:48.0000] <littledan>
+This willful violation is causing extra complexity for several JS specs
+
+[01:19:03.0000] <annevk>
+littledan: so the last time we looked into this the simplest setup would be for JS to queue (perhaps annotated) things and let the host take care of organizing where to put those
+
+[01:19:32.0000] <annevk>
+littledan: I suppose we could move more of HTML into ES, but that seems really tricky to get right
+
+[01:19:50.0000] <littledan>
+I see. Where does the complexity come in?
+
+[01:20:09.0000] <littledan>
+(oh sorry rereading your above question, the PR is already ready for nits)
+
+[01:21:01.0000] <annevk>
+littledan: I mean, HTML's event loop algorithm is not simple
+
+[01:21:05.0000] <littledan>
+In particular, there was interest in TC39 in standardizing microtask queue semantics across JS environments to make things more predictable, which seems like a nice goal to me
+
+[01:21:44.0000] <littledan>
+The event loop would be in HTML still... OK, sounds like I should read more details and I will probably see where it doesn't work for myself
+
+[01:21:47.0000] <annevk>
+littledan: and afaik ES only queues what HTML calls microtasks and those only happen in special places and even those also have their own HTML-specific logic surrounding them
+
+[01:22:31.0000] <littledan>
+What's HTML -specific about that logic?
+
+[01:22:50.0000] <annevk>
+littledan: https://html.spec.whatwg.org/#perform-a-microtask-checkpoint
+
+[01:23:49.0000] <littledan>
+Oh, that's the thing, I think we will need to perform microtask checkpoints from the JS spec
+
+[01:23:54.0000] <annevk>
+littledan: promise rejection notification, database cleanup, the manipulation of the event loop (I'm not sure what that does)
+
+[01:24:06.0000] <littledan>
+Well, at least Step 2
+
+[01:24:11.0000] <littledan>
+Of that algorithm
+
+[01:24:35.0000] <annevk>
+littledan: interesting
+
+[01:24:57.0000] <littledan>
+Maybe we should just make a host hook for microtask checkpoints
+
+[01:26:14.0000] <annevk>
+"just" 😃
+
+[01:26:14.0000] <littledan>
+But, I think we might need to at least run through the microtask queue between sibling modules as part of the top-level await proposal
+
+[01:26:28.0000] <littledan>
+I will have to think more about whether the other parts are required
+
+[01:27:34.0000] <annevk>
+I think it would help a lot to look at existing software architectures here and base the standard on those
+
+[01:27:53.0000] <littledan>
+What's an example?
+
+[01:28:02.0000] <annevk>
+E.g., SpiderMonkey <> Gecko
+
+[01:28:11.0000] <annevk>
+Or V8 <> Chromium
+
+[01:28:18.0000] <annevk>
+Or V8 <> Node
+
+[01:28:19.0000] <littledan>
+Oh, for the layering?
+
+[01:28:23.0000] <annevk>
+Yeah
+
+[01:28:44.0000] <littledan>
+We are already well past that! JS engines include lots of things from HTML and WebIDL
+
+[01:28:51.0000] <annevk>
+ES could still impose restrictions on hosts to make them consistent somehow
+
+[01:29:22.0000] <littledan>
+Well, lots is an exaggeration
+
+[01:29:48.0000] <annevk>
+And for some of those things it would indeed make sense to define them in ES, as we previously discussed 😃
+
+[01:29:57.0000] <annevk>
+I'm pretty sure the event loop is not in V8 or SpiderMonkey though
+
+[01:30:15.0000] <littledan>
+But, at the same time, V8 includes (or at one point included) step 2 of the perform a microtask checkpoint algorithm (which is what I think I need)
+
+[01:30:33.0000] <littledan>
+V8 definitely doesn't include the broader event loop
+
+[01:31:21.0000] <annevk>
+So step 2 is basically an agent having a microtask queue and some abstract operation iterating over it and draining it?
+
+[01:31:49.0000] <annevk>
+Well, except for "Set the event loop's currently running task to oldestMicrotask."
+
+[01:31:50.0000] <littledan>
+Right... I will have to look into how the currently running task is maintained
+
+[01:35:22.0000] <annevk>
+Seems to be mostly for compound microtasks, i.e., mutation observers, but Domenic investigated all this last
+
+[01:42:59.0000] <littledan>
+Thanks for the pointer; that is an area I don't understand as well
+
+[01:47:37.0000] <annevk>
+Looking at https://dom.spec.whatwg.org/#notify-mutation-observers I guess there's a bug there in that the slotchange event also needs to be dispatched from a compound microtask subtask...
+
+[01:49:34.0000] <annevk>
+Hmm, how does that work at all, since an event can result in multiple callbacks...
+
+[01:49:45.0000] <annevk>
+Time to file an issue I guess
+
+[01:53:01.0000] <annevk>
+https://github.com/whatwg/dom/issues/734 for those curious
+
+[02:04:59.0000] <MikeSmith>
+annevk: about https://github.com/whatwg/fetch/issues/871 it seems somebody should have thought to take time to confirm with you first
+
+[02:05:10.0000] <MikeSmith>
+I mean about https://bugzilla.mozilla.org/show_bug.cgi?id=1508661
+
+[02:05:21.0000] <MikeSmith>
+at least Cc you
+
+[02:06:21.0000] <annevk>
+MikeSmith: I dunno, given that Chrome and Safari were already passing those tests there was really no indication (other than misreading of the spec text) that suggested that needed to be done
+
+[02:07:11.0000] <annevk>
+MikeSmith: I suspect I made a mistake by assuming fetch()'s default was "no-cors" or some such
+
+[02:07:40.0000] <annevk>
+MikeSmith: I'm somewhat surprised it took until Firefox changed for this to be found out however, that makes little sense
+
+[02:07:49.0000] <MikeSmith>
+yeah
+
+[02:12:03.0000] <MikeSmith>
+I also don’t understand how, given the browsers passing those tests, server systems could work as expected if they rely on taking the value of the Origin header and using it to set the value of the Access-Control-Allow-Origin header
+
+[02:12:36.0000] <MikeSmith>
+there must be a lot of servers and server CORS libraries which do that
+
+[02:12:38.0000] <annevk>
+MikeSmith: yeah that doesn't make any sense, maybe nobody is using fetch()
+
+[02:13:58.0000] <MikeSmith>
+I think Adam Rice said at the TAG f2f that Chrome use counters show usage of fetch() is around 9% of pages
+
+[02:15:45.0000] <annevk>
+MikeSmith: maybe it's only same-origin
+
+[02:16:06.0000] <MikeSmith>
+ah yeah maybe so
+
+[02:18:02.0000] <MikeSmith>
+annevk: yeah another data point is that I’ve never seen and question posted to Stack Overflow from somebody indicating that their browser wasn’t sending the Origin header for GET requests
+
+[02:18:35.0000] <MikeSmith>
+(and I pretty much read every single CORS-tagged question posted to SO, for the last 2 years or so)
+
+[02:19:34.0000] <annevk>
+MikeSmith: so also, if it's just same-origin the specification wasn't misread, because the CORS flag is only set once cross-origin
+
+[02:19:48.0000] <annevk>
+MikeSmith: so maybe the spec has a bug here after all
+
+[02:19:59.0000] <annevk>
+MikeSmith: I guess I need to do some more digging
+
+[02:20:13.0000] <annevk>
+but maybe not today
+
+
+2019-02-18
+[17:15:03.0000] <littledan>
+annevk: well, if Chrome uses V8's microtask queue, at least it seems like that would make it the odd one out: Both WebKit and Gecko seem to include microtask queues in their JS engines just for testing kinds of purposes, and swap that out for something provided by the renderer when it's there. (I hope this doesn't cause problems for people who hope that tests run in the JS shells match how things would work on the web! A lot
+
+[17:15:03.0000] <littledan>
+of testing is done in JS shells)
+
+[00:17:20.0000] <annevk>
+littledan: maybe that shows either setup can work
+
+[02:00:19.0000] <jochen__>
+how would you implement microtasks in a spec compliant fashion if you don't share the queue with the ecmascript engine?
+
+[02:03:53.0000] <annevk>
+jochen__: the engine could call something in the host and let the host deal with the queue
+
+[02:09:45.0000] <jochen__>
+yeah, but you still need one central queue
+
+[02:09:49.0000] <jochen__>
+doesn't really matter where it lives
+
+[02:10:25.0000] <annevk>
+jochen__: sure, as long as it meets the needs of both sides all is good
+
+[02:10:42.0000] <annevk>
+jochen__: the main issue is that the current spec setup between ES and HTML is broken (or at least not great)
+
+[02:10:57.0000] <jochen__>
+/me is shocked
+
+[02:11:33.0000] <annevk>
+Uhuh, film at 11
+
+[02:58:19.0000] <nox>
+Can we go to the premiere?
+
+[02:58:47.0000] <nox>
+Doing some HTML tests this morning.
+
+[03:25:04.0000] <nox>
+annevk: Hah!
+
+[03:25:42.0000] <nox>
+annevk: <script></script><iframe> <- Neither Safari nor Chrome can observe the iframe's content window when running the script.
+
+[03:25:45.0000] <nox>
+Only Firefox does that.
+
+[04:36:58.0000] <annevk>
+wat
+
+[04:37:21.0000] <annevk>
+They actually create it from this queue? Madness
+
+[04:39:07.0000] <annevk>
+I wonder if that can be used somehow where something assumes that a frame being in the tree assumes that it has a bc
+
+[04:39:26.0000] <annevk>
+The various window getters for instance
+
+[04:45:45.0000] <nox>
+annevk: Don't know
+
+[04:46:46.0000] <nox>
+https://twitter.com/nokusu/status/1097477426995695616 🤡
+
+[04:47:03.0000] <nox>
+annevk: The maddest part of it all,
+
+[04:47:15.0000] <nox>
+annevk: is that jdm added the queue in Servo specifically for script/iframe issues.
+
+[07:17:15.0000] <annevk>
+nox: we could probably create the nested browsing context from this queue, but it would require further tests
+
+[07:17:30.0000] <annevk>
+nox: would also be nice to understand why Chrome does that
+
+[07:17:50.0000] <annevk>
+nox: thanks for going down the rabbit hole though
+
+[07:18:16.0000] <annevk>
+nox: making a lot of progress over where we got to last time around
+
+[07:18:56.0000] <gsnedders>
+♥️ yu guys for working on this
+
+[07:51:37.0000] <nox>
+annevk: You are welcome! I just don’t want Servo to introduce yet another different behaviour. :)
+
+[07:53:00.0000] <nox>
+annevk: I meant that Servo introduced the queue to run scripts *because* it was causing issues that iframes could have their contentWindow be null
+
+[07:53:18.0000] <nox>
+That’s why Chrome not initialising they beforehand either surprised me.
+
+[07:53:31.0000] <nox>
+Them* sorry currently on my phone
+
+[07:54:58.0000] <annevk>
+nox: did you run blame on that change and does it have any useful data?
+
+[07:55:17.0000] <annevk>
+nox: e.g., the code that somehow worked in Chrome yet did not in Servo
+
+[07:56:00.0000] <nox>
+annevk: So I was on the Servo channel and I saw an issue about a refactoring for the "deferred scripts" in Servo,
+
+[07:56:19.0000] <nox>
+I didn't know "deferred scripts" were a thing because that was introduced last year when I was kidnapped to work on WebGL,
+
+[07:56:43.0000] <nox>
+I just assumed that the change was made to follow the behaviour of both Firefox and Chrome but clearly I was wrong about that.
+
+[07:56:51.0000] <nox>
+I'll look up into it and ask jdm more details.
+
+[07:58:57.0000] <annevk>
+I forgot who pointed me to Mode::Rfc2045 in WebKit's new MIME type parser (maybe Domenic?) but it seems like this is mostly harmless. It's considered deprecated and a way to find old callers that need yet to be migrated. Time will tell I suppose.
+
+[09:00:55.0000] <nox>
+annevk: I can't observe referrer policy without doing a request, right?
+
+[09:02:22.0000] <Domenic>
+annevk: on vacation until Thursday, FYI. I'll merge the review draft things though.
+
+[09:11:19.0000] <annevk>
+nox: think so
+
+[09:11:30.0000] <annevk>
+Domenic: thanks and good to know
+
+[09:12:13.0000] <nox>
+annevk: So I can insert a script and a meta, and make a request from that script to observe referrer policy changes then.
+
+[09:12:44.0000] <annevk>
+I think so
+
+[09:29:06.0000] <annevk>
+nox: you might be able to reuse logic from referrer-policy/ tests btw
+
+[09:29:21.0000] <nox>
+annevk: Ok!
+
+[12:19:18.0000] <nox>
+annevk: Found a bug in the spec I think.
+
+[12:19:21.0000] <nox>
+annevk: "If a source element is inserted as a child of a media element that has no src attribute and whose networkState has the value NETWORK_EMPTY, the user agent must invoke the media element's resource selection algorithm."
+
+[12:19:34.0000] <nox>
+"The resource selection algorithm for a media element is as follows. This algorithm is always invoked as part of a task,"
+
+[12:19:49.0000] <nox>
+First quote is not part of a task right?
+
+[12:26:54.0000] <annevk>
+nox: it is
+
+[12:27:14.0000] <nox>
+annevk: Oh ok
+
+[12:27:18.0000] <annevk>
+nox: queued by the parser or a task that runs some script
+
+[12:27:56.0000] <nox>
+Oh right.
+
+[12:27:58.0000] <nox>
+annevk: And should media.networkState ever be undefined?
+
+[12:28:03.0000] <annevk>
+nox: perhaps we should remove that though as everything on the main thread is part of a task pretty much
+
+[12:28:29.0000] <annevk>
+nox: not sure, foolip would know
+
+[12:31:14.0000] <nox>
+http://software.hixie.ch/utilities/js/live-dom-viewer/?saved=6629
+
+[12:31:21.0000] <foolip>
+nox: It'ss never the value undefined, always one of the enum integer values. But there may be cases where the spec doesn't make things unambiguously clear
+
+[12:32:06.0000] <nox>
+foolip: http://software.hixie.ch/utilities/js/live-dom-viewer/?saved=6630 What am I doing wrong then?
+
+[12:32:35.0000] <nox>
+Err, without the confusing window named getter usage: http://software.hixie.ch/utilities/js/live-dom-viewer/saved/6631
+
+[12:32:40.0000] <innovati>
+When working with HTML, it's easy to convert from HTML syntax to XML syntax by using DOMParser and XMLSerializer…but going from XML syntax to HTML syntax doesn't seem as straightforward. What's the correct way go about that? What should happen to namespaces?
+
+[14:08:58.0000] <foolip>
+nox: there is no <media> element, just <audio> and <video>
+
+[14:45:39.0000] <nox>
+foolip: I knew the explanation would be me extremely clueless about something 😂
+
+
+2019-02-19
+[22:18:11.0000] <domfarolino>
+annevk: Often I slowly click "resolve conversation" as I knock out individual review items on a PR locally. This is staggered due to interrupting homework or other things. If that ends up kicking off like 20 emails/notifs, lmk and I won't do that lol
+
+[00:47:27.0000] <annevk>
+domfarolino: I don't get email from GitHub, I only see it if it's reflected in /notifications
+
+[00:51:34.0000] <annevk>
+Domenic: I published Quirks as it seems you forgot that
+
+[00:56:36.0000] <nox>
+annevk: I think Chrome and the spec disagree about <link rel="modulepreload">, and they are the only major browser to implement that right?
+
+[00:58:12.0000] <nox>
+When inserting <link rel="modulepreload" href="data:text/html,"> in a document, shouldn't step 12 of https://html.spec.whatwg.org/multipage/links.html#link-type-modulepreload%3Afetch-and-process-the-linked-resource-2 immediately fire an error event?
+
+[00:58:56.0000] <nox>
+Is it just a case of the spec being wrong? Step 3 fires an error event too but it does so by queuing a task, is it just missing that piece in step 12 and 13?
+
+[01:00:00.0000] <annevk>
+nox: fetch a module script is a weird in parallel-like algorithm
+
+[01:00:10.0000] <annevk>
+nox: step 12 happens from a task
+
+[01:00:24.0000] <annevk>
+nox: it's on the list of things Domenic wants to refactor
+
+[01:00:28.0000] <nox>
+annevk: I feel like the weirdness sho-- ok
+
+[01:00:52.0000] <nox>
+If that's something to refactor I have nothing more to say then. :)
+
+[01:01:17.0000] <annevk>
+nox: Firefox might also support that btw
+
+[01:01:32.0000] <annevk>
+nox: but load/error events should never be sync ideally
+
+[01:02:38.0000] <nox>
+annevk: MDN said it doesn't but the support table was gigantic so maybe I didn't read it correctly, shrug anyway, if the events are not sync I can't observe them from a script being inserted at the same time so I don't care.
+
+[01:02:43.0000] <nox>
+annevk: FYI https://github.com/whatwg/html/pull/4354#issuecomment-463693419 :)
+
+[01:06:43.0000] <nox>
+annevk: "<meta http-equiv> — How do I even observe those from JS?" I should be able to observe http-equiv="default-style" right?
+
+[01:09:29.0000] <annevk>
+nox: yeah, I guess that should flip the disabled nature of a style sheet which you can observe synchronously
+
+[01:09:36.0000] <nox>
+Nice
+
+[01:10:46.0000] <annevk>
+nox: I guess modulepreload you could detect in theory if the script removes it? Unless removing is specified to have an effect as well
+
+[01:11:28.0000] <nox>
+annevk: Ah right, if it's removed before it's handled, no event should be fired?
+
+[01:13:16.0000] <nox>
+annevk: Nah the event should still be fired I think.
+
+[01:13:49.0000] <nox>
+It's not like the spec says "if it's not connected anymore by this point, just don't do anything anymore".
+
+[01:14:42.0000] <annevk>
+nox: yeah, but if they use some common code path and nobody tested for it, but I'm not going to block your stuff on testing for this
+
+[01:15:37.0000] <nox>
+annevk: Thanks. 😂
+
+[01:16:09.0000] <nox>
+How come there is no emoji for "wipe sweat off forehead"
+
+[02:06:43.0000] <zcorpan>
+annevk: loading the quirks spec RD fails to load the stylesheet...
+
+[02:06:47.0000] <zcorpan>
+The FetchEvent for "https://resources.whatwg.org/spec.css" resulted in a network error response: an "opaque" response was used for a request whose type is not no-cors
+
+[02:06:48.0000] <zcorpan>
+spec.css:1 Failed to load resource: net::ERR_FAILED
+
+[02:07:27.0000] <annevk>
+zcorpan: I thought RDs did not have style sheets
+
+[02:07:57.0000] <annevk>
+I guess it does
+
+[02:08:07.0000] <zcorpan>
+  <link crossorigin href="https://resources.whatwg.org/spec.css" rel="stylesheet">
+
+[02:08:07.0000] <zcorpan>
+  <link crossorigin href="https://resources.whatwg.org/review-draft.css" rel="stylesheet">
+
+[02:09:48.0000] <annevk>
+zcorpan: ah, if you clear the service worker it'll work
+
+[02:10:09.0000] <annevk>
+zcorpan: it seems we forgot to clear the cache when we updated the service worker to use CORS for all the things
+
+[02:11:04.0000] <annevk>
+Caching is hard...
+
+[02:11:16.0000] <annevk>
+Or cache invalidation, rather
+
+[02:12:17.0000] <zcorpan>
+annevk: hmm ok. does the serviceworker need a new version or something?
+
+[02:14:58.0000] <annevk>
+zcorpan: maybe, it does seem like the cache key was updated since this change, not sure what's going on
+
+[02:15:48.0000] <annevk>
+zcorpan: no, that seems to be automatically generated based on whatever the latest version of the backing script is
+
+[02:19:32.0000] <annevk>
+zcorpan: I see what the problem is, we match() against all caches, including prior caches
+
+[02:20:50.0000] <annevk>
+I am surprised Mr. Service Worker didn't notice that!
+
+[02:21:00.0000] <annevk>
+/me attempts to write a patch
+
+[02:29:55.0000] <nox>
+annevk: All browsers handle meta after script, good thing I tested for that.
+
+[02:31:36.0000] <annevk>
+zcorpan: https://github.com/whatwg/whatwg.org/pull/239
+
+[02:44:05.0000] <annevk>
+foolip: zcorpan: if around, could you stamp https://github.com/whatwg/html/pull/4366?
+
+[02:44:17.0000] <annevk>
+foolip: zcorpan: (I'll merge)
+
+[02:48:13.0000] <zcorpan>
+annevk: reviewed
+
+[02:49:33.0000] <zcorpan>
+annevk: this is supposed to prune old cache entries, right?
+
+[02:49:35.0000] <zcorpan>
+    return Promise.all(keys.filter(key => key !== cacheKey).map(key => caches.delete(key)));
+
+[02:50:07.0000] <annevk>
+zcorpan: yes and it will, but it races with returning a response I think
+
+[02:50:22.0000] <zcorpan>
+ok
+
+[03:21:33.0000] <bblfish>
+Hi, I am doing research on languages and semantics. I noticed that the HTML5 standard speaks about meaning, and was wondering if there was some kind of formal semantics for it that I could refer to...
+
+[03:30:11.0000] <annevk>
+bblfish: example of formal semantics?
+
+[03:32:08.0000] <bblfish>
+annevk: I guess it could be something topological. I thought I had seen something about areas of rectangles somewhere...
+
+[03:32:46.0000] <bblfish>
+perhaps it is just informal, which is also fine for my needs
+
+[03:39:53.0000] <bblfish>
+"Because HTML conveys meaning, rather than presentation, the same page can also be used by a small browser on a mobile phone, without any change to the page. Instead of headings being in large letters as on the desktop, for example, the browser on the mobile phone might use the same size text for the whole page, but with the headings in bold."
+
+[03:41:07.0000] <bblfish>
+That passage is quite nice.
+
+[03:42:25.0000] <bblfish>
+It looks like it is quite recent, as I don't see that passage in the html5.3 on w3c
+
+[03:43:59.0000] <bblfish>
+I got the passage from https://html.spec.whatwg.org/#semantics-2
+
+[03:44:41.0000] <bblfish>
+btw, I have to write my thesis in LaTeX, and was wondering how I could site that in bibtex... (academia stuff ...)
+
+[03:46:42.0000] <nox>
+annevk: I think I found yet another edge case.
+
+[03:48:05.0000] <nox>
+annevk: Make an empty script. Insert a script and two text nodes in empty script. Make the inserted script replace the second text node by itself.
+
+[03:48:20.0000] <nox>
+(or a different text node, that's not important here)
+
+[03:49:05.0000] <nox>
+Wait no, it's not a problem anymore with deferredStepsQueue, nice.
+
+[03:49:38.0000] <nox>
+And the HTML spec does absolutely nothing when nodes are removed from a script element, so it's doubly not a problem, disregard me.
+
+[04:02:01.0000] <annevk>
+bblfish: I don’t really know, sorry
+
+[04:02:34.0000] <annevk>
+nox: 👍🏻🎉
+
+[04:15:01.0000] <annevk>
+nox: so <meta http-equiv=default-style> is queued as well? I guess we need to test removal then?
+
+[04:18:32.0000] <nox>
+Mmh?
+
+[04:18:55.0000] <nox>
+annevk: Damn my comment is confusing.
+
+[04:20:17.0000] <nox>
+annevk: No the test passes everywhere it seems.
+
+[04:20:30.0000] <nox>
+I just wrote the opposite of what I wanted to say, I think.
+
+[04:21:32.0000] <nox>
+annevk: I will double check when I’m back from lunch.
+
+[04:22:16.0000] <nox>
+Just realised I didn’t even push the damn test ugh
+
+[05:57:19.0000] <nox>
+annevk: So yes, it's queued.
+
+[05:58:14.0000] <nox>
+annevk: Fixed my comment https://github.com/whatwg/html/pull/4354#issuecomment-465078124
+
+[05:58:34.0000] <nox>
+Safari obviously handles it after script, given it inserts nodes from fragments one by one.
+
+[05:58:48.0000] <nox>
+And I pushed the WPT test.
+
+[05:58:59.0000] <annevk>
+nox: but if you have a script after the meta it'll execute after the style sheet change?
+
+[05:59:17.0000] <nox>
+annevk: Let me quickly check that.
+
+[06:00:15.0000] <nox>
+annevk: …no except in Safari, omg this is so bad
+
+[06:01:05.0000] <annevk>
+so it's from a task, possibly async in some browsers
+
+[06:01:17.0000] <nox>
+annevk: Not exactly.
+
+[06:01:43.0000] <annevk>
+It has to be one or the other, no?
+
+[06:01:47.0000] <nox>
+annevk: If I comment https://github.com/web-platform-tests/wpt/blob/9c8d1abc1f409bd01799cac2409367f5a5a4248c/dom/nodes/Node-appendChild-script-and-default-style-meta-from-fragment.html#L25
+
+[06:02:19.0000] <nox>
+Never mind I checked the wrong thing when I commented that.
+
+[06:02:31.0000] <nox>
+Let me check what .display says after the entire appendChild call.
+
+[06:03:17.0000] <nox>
+annevk: Ok yes, it's a queued task in Firefox
+
+[06:03:20.0000] <nox>
+and in Chrome too.
+
+[06:12:32.0000] <nox>
+annevk: Wait no,
+
+[06:12:45.0000] <nox>
+annevk: I'm not even sure Firefox supports http-equiv="default-style" now…
+
+[06:15:28.0000] <bblfish>
+Ah yes, I was thinking that the css box model could be thought of as a model for html.
+
+[06:17:21.0000] <annevk>
+nox: hmm https://software.hixie.ch/utilities/js/live-dom-viewer/saved/6654 and https://software.hixie.ch/utilities/js/live-dom-viewer/saved/6655 suggest it does to me
+
+[06:17:55.0000] <nox>
+Mmh…
+
+[06:18:08.0000] <nox>
+Wtf am I doing wrong then…
+
+[06:18:19.0000] <annevk>
+nox: contrast with https://software.hixie.ch/utilities/js/live-dom-viewer/saved/6657
+
+[06:18:34.0000] <annevk>
+nox: there might be some issues here with dynamic updates
+
+[06:19:01.0000] <annevk>
+nox: if I start playing with the <meta> element in that textarea some browsers persist the http-equiv stuff (though maybe that's how it should be)
+
+[06:19:44.0000] <annevk>
+zcorpan: testing blur() does nothing means something else has to do something
+
+[06:19:57.0000] <annevk>
+zcorpan: it means focus() has to result in something being focused
+
+[06:21:00.0000] <nox>
+annevk: That's so weird.
+
+[06:21:11.0000] <nox>
+annevk: If I open my test in Firefox, I can read "hello".
+
+[06:22:19.0000] <nox>
+annevk: Oh. I have a clue.
+
+[06:23:22.0000] <nox>
+Or not.
+
+[06:24:44.0000] <nox>
+annevk: "data:text/css,#div{display:none}" 😂
+
+[06:26:15.0000] <annevk>
+nox: that # wants to be escaped
+
+[06:26:17.0000] <nox>
+Yep
+
+[06:26:28.0000] <nox>
+annevk: That's a bug in Safari too.
+
+[06:27:03.0000] <annevk>
+Oh, I thought only Chrome had that bug
+
+[06:27:14.0000] <annevk>
+That's too bad, though Chrome is close with regards to fixing it
+
+[06:27:21.0000] <nox>
+annevk: Chrome doesn't have that bug anymore AFAICT.
+
+[06:28:02.0000] <nox>
+annevk: I.e. if I don't escape '#', the div is never display:none.
+
+[06:28:58.0000] <nox>
+annevk: Next problem,
+
+[06:29:00.0000] <annevk>
+ok
+
+[06:29:02.0000] <nox>
+https://irccloud.mozilla.com/pastebin/v4cya5CY/
+
+[06:29:22.0000] <nox>
+if it's a queued task, shouldn't the task run between the two tests, and my last assertion about .display be ok?
+
+[06:29:30.0000] <nox>
+s/the two tests/the two scripts/
+
+[06:29:44.0000] <annevk>
+nox: script's are not queued as tasks
+
+[06:30:10.0000] <nox>
+annevk: I know that, but doesn't the loop run queued tasks between scripts or whatever?
+
+[06:30:11.0000] <annevk>
+nox: well, I guess the parser queues, but the priority could be different
+
+[06:30:17.0000] <nox>
+Ok
+
+[06:31:12.0000] <annevk>
+nox: not sure what a reliable signal would be tbh
+
+[06:31:17.0000] <nox>
+annevk: So, should I file a different HTML issue about making <meta http-equiv=default-style> queue a task?
+
+[06:32:36.0000] <annevk>
+nox: yeah, though maybe not be that certain about the solution, since the queueing might have to be in whatever it calls
+
+[06:32:58.0000] <annevk>
+(thanks!)
+
+[06:33:34.0000] <nox>
+annevk: I will file one about how the change doesn't happen immediately and the spec implies it does, that's enough right?
+
+[06:34:41.0000] <annevk>
+nox: aye
+
+[06:35:02.0000] <nox>
+I removed the test from my PR, and will file the issue and add a link to it to my summarising comment.
+
+[06:35:11.0000] <annevk>
+tusen takk
+
+[06:40:29.0000] <nox>
+annevk: MFW I try to reproduce our discovery in Live DOM Viewer but the last browser I tested it is Safari and I keep tweaking my sample in it, the only browser which does observe the change immediately…
+
+[06:41:04.0000] <annevk>
+nox: sorry, I should have given you glitch.com examples
+
+[06:41:20.0000] <nox>
+Nah it's ok.
+
+[06:41:42.0000] <nox>
+Now my changes don't apply anymore at all in Firefox when I add the meta element, this is confusing.
+
+[06:41:47.0000] <annevk>
+nox: I think glitch.com is the way forward as there are far fewer surprises there; Live DOM Viewer has quite a few downsides
+
+[06:42:18.0000] <annevk>
+Only downside with Glitch I've run into is that it creates a named window if you click on the preview link (for arguably good reasons)
+
+[06:43:49.0000] <nox>
+annevk: http://software.hixie.ch/utilities/js/live-dom-viewer/?saved=6660
+
+[06:43:55.0000] <nox>
+Am I going crazy?
+
+[06:44:31.0000] <Ms2ger>
+Probs
+
+[06:45:22.0000] <nox>
+I made a standalone HTML file and the background never goes green.
+
+[06:48:18.0000] <nox>
+https://irccloud.mozilla.com/pastebin/SWQcGNQX/annevk.html
+
+[06:49:03.0000] <nox>
+This writes rgb green in Safari and Chrome, so the thing doesn't actually happen through a queued task AFAICT.
+
+[06:50:56.0000] <annevk>
+nox: sounds correct
+
+[06:51:07.0000] <annevk>
+nox: perhaps Firefox only supports this if it comes from the parser?
+
+[06:51:08.0000] <nox>
+annevk: Which is the worst.
+
+[06:51:42.0000] <nox>
+annevk: Yeah probs.
+
+[06:51:52.0000] <nox>
+annevk: Ok, I checked the thing I was scared of, and it doesn't happen, yay.
+
+[06:52:22.0000] <nox>
+https://irccloud.mozilla.com/pastebin/sodX8QU2/chrome.html
+
+[06:52:28.0000] <nox>
+I thought this was failing in Chrome,
+
+[06:52:44.0000] <nox>
+which would mean the switch happened after all scripts, which would mean we would need a second queue somehow.
+
+[06:52:45.0000] <annevk>
+nox: filing follow-ups on these seems fine, since I think the general model for <script>, <style>, and <iframe> et al is sound and it seems like the remainder can be slotted into that if needed
+
+[06:52:49.0000] <nox>
+But it passes, so just disregard that.
+
+[06:53:01.0000] <annevk>
+nox: though focus handling might be good to test
+
+[06:53:22.0000] <nox>
+annevk: I didn't find any behaviour to observe for focus.
+
+[06:56:25.0000] <nox>
+annevk: I'm still quite confident you can merge the DOM part, all the different behaviours I found can be implemented in terms of deferredStepsQueue.
+
+[06:58:39.0000] <zcorpan>
+annevk: you can test win.onblur = t.unreached_func(); win.blur(); frame.remove(); win.blur();
+
+[07:00:14.0000] <annevk>
+nox: I can get Chrome to fire onblur while a script invokes remove() on a focused element, but no other browser
+
+[07:00:18.0000] <annevk>
+fire blur*
+
+[07:00:57.0000] <annevk>
+nox: FWIW, the reason I haven't merged that is because it seems cleaner to also fix dependencies at the same time
+
+[07:01:07.0000] <annevk>
+nox: not because I think it's wrong or some such
+
+[07:01:58.0000] <nox>
+annevk: Ack
+
+[07:02:00.0000] <nox>
+annevk: https://bugzilla.mozilla.org/show_bug.cgi?id=1528982
+
+[07:06:47.0000] <nox>
+annevk: Link me to your onblur sample please.
+
+[07:06:53.0000] <nox>
+I will try to make it a WPT test.
+
+[07:07:18.0000] <annevk>
+nox: https://wistful-notify.glitch.me/
+
+[07:07:25.0000] <nox>
+zcorpan: We are trying to test focus/blur as part of insertions with scripts.
+
+[07:07:31.0000] <annevk>
+nox: I'm not sure what we want to do here though
+
+[07:07:39.0000] <annevk>
+nox: not firing blur at all might be great?
+
+[07:07:55.0000] <annevk>
+nox: zcorpan's comment was about some unrelated changes I'm making
+
+[07:07:57.0000] <nox>
+annevk: No clue. :D
+
+[07:08:00.0000] <nox>
+annevk: Hah, ok.
+
+[07:10:28.0000] <annevk>
+zcorpan: so my main problem is that it's not sufficient to make the feature a no-op
+
+[07:10:42.0000] <annevk>
+zcorpan: since a browser could bail out if it's not focused
+
+[07:11:00.0000] <annevk>
+zcorpan: then if we start testing focusing it, it'll turn out that that doesn't work in all browsers, at which point...
+
+[07:11:13.0000] <annevk>
+zcorpan: seems good for a follow-up?
+
+[07:12:02.0000] <zcorpan>
+annevk: i don't understand what "a browser could bail out if it's not focused" means, but follow-up sounds good
+
+[07:12:23.0000] <nox>
+annevk: Why would blur not be emitted in Firefox?
+
+[07:12:28.0000] <nox>
+fired*
+
+[07:12:51.0000] <annevk>
+zcorpan: I mean that unless there's a reliable way to focus a window and we use that way before invoking blur(), we might well end up testing only a very early return in the blur() implementation
+
+[07:13:17.0000] <annevk>
+nox: I'm not very familiar with focus/blur
+
+[07:13:32.0000] <annevk>
+nox: and even less with edge case focus/blur
+
+[07:13:39.0000] <nox>
+:D
+
+[07:16:26.0000] <zcorpan>
+annevk: i see. yeah, if firefox or some other browser does something it would be good to exercise that something. as far as i can tell from chromium it's literally no-op
+
+[07:18:07.0000] <nox>
+annevk: Re: filing follow-ups: it's not like my PR can be merged until someone from Chrome chimes in and discusses with bz about which behaviour should be specified.
+
+[07:18:28.0000] <nox>
+So far, no one on the Chrome side of things commented in any of the three PRs. :(
+
+[07:21:58.0000] <annevk>
+nox: did I copy tkent?
+
+[07:22:10.0000] <nox>
+I don't think so.
+
+[07:22:18.0000] <nox>
+bz may have. Let me find his comment.
+
+[07:24:28.0000] <annevk>
+nox: you did
+
+[07:24:39.0000] <nox>
+Hah!
+
+[07:40:03.0000] <nox>
+annevk: Fun for the whole family https://bugzilla.mozilla.org/show_bug.cgi?id=1528982#c1
+
+[07:42:23.0000] <annevk>
+nox: if it involved dinosaurs, maybe
+
+[07:42:28.0000] <nox>
+Hah
+
+[08:43:23.0000] <domfarolino>
+annevk: I believe everything has now been addressed for image{srcset,sizes} PR. Thanks for the reviews
+
+[10:52:00.0000] <annevk>
+domfarolino: I can look tomorrow I suspect
+
+[10:52:33.0000] <annevk>
+domfarolino: feel free to ping me again if I don’t
+
+[10:55:15.0000] <domfarolino>
+👍
+
+[15:33:06.0000] <Nepose>
+Hi, if I can ask (and if there is anyone at this hour ;) ) because I'm just thinking now about it - what does W3C specifications and namespaces actually mean, especially for HTML5.x when you are making a web standard in fact?
+
+
+2019-02-20
+[18:39:03.0000] <MikeSmith>
+https://stackoverflow.com/questions/54777993/set-cookie-from-a-server-to-an-xhr-client-in-a-different-domain-setting-the-dom
+
+[23:47:49.0000] <Nepose>
+Sorry for it, network problems...
+
+[23:57:18.0000] <annevk>
+Nepose: not sure what you’re asking
+
+[23:59:07.0000] <annevk>
+MikeSmith: I guess I can answer that
+
+[00:06:33.0000] <Nepose>
+annevk: I mean that if you now do some of Web standards like HTML or XMLHttpRequest and still W3C "do" (copy-paste your work) the same standards (like now, "developing" HTML 5.3), then why they do it and for who?
+
+[00:19:12.0000] <annevk>
+Nepose: I think there was a disagreement over control, but we're pretty close to a partnership of sorts, as some W3C blog posts have reported on
+
+[00:55:18.0000] <Nepose>
+annevk: okay, did you develop together any standard?
+
+[01:00:00.0000] <annevk>
+Nepose: most WHATWG standards are in some sense derived from work earlier done at the W3C and IETF and continue to get feedback from those communities
+
+[04:05:52.0000] <annevk>
+MikeSmith: replied
+
+[04:10:52.0000] <MikeSmith>
+/me looks
+
+[04:15:12.0000] <MikeSmith>
+annevk: thanks!
+
+[04:31:50.0000] <nox>
+annevk: Do you have a link to said blog posts?
+
+[04:33:19.0000] <annevk>
+nox: https://www.w3.org/blog/2018/06/w3c-strategic-highlights-for-spring-2018-and-advisory-committee-meeting/ and https://www.w3.org/blog/2019/02/w3c-strategic-highlights-strengthening-the-core-of-the-web-html/
+
+[04:33:42.0000] <annevk>
+(awesome bar is awesome)
+
+[04:34:19.0000] <ondras>
+so, window.open is limited to calls from a user-interaction event handler?
+
+[04:34:26.0000] <nox>
+Thanks!
+
+[04:35:58.0000] <annevk>
+ondras: depends, I suspect
+
+[04:36:40.0000] <annevk>
+(I'd imagine navigating an existing browsing context to always work.)
+
+[04:36:45.0000] <ondras>
+annevk: I see. I was about to ask "what if the user-interaction event handler sends a message to a different context (iframe) and *that* context wants to window.open as a result"
+
+[04:37:07.0000] <ondras>
+so, basically, "it the user-interaction-based flag propagated far enough?"
+
+[04:37:10.0000] <ondras>
+*is
+
+[04:37:12.0000] <annevk>
+ondras: see recent HTML issue
+
+[04:37:38.0000] <annevk>
+ondras: that's all a bit muddy still
+
+[04:37:59.0000] <ondras>
+ah, my bad, should've specified that I am explicitly looking for the target=_blank scenario
+
+[04:38:39.0000] <ondras>
+which I would guess is more restricted with respect to the origin of the call
+
+[04:45:14.0000] <annevk>
+ondras: origin doesn't matter much, but that gets "new window" protection
+
+[04:45:24.0000] <annevk>
+ondras: or popup protection, I guess
+
+[04:49:03.0000] <ondras>
+"origin" as in "was it invoked from a user-interaction event handler", not "origin" in the DOM Origin sense
+
+[04:49:08.0000] <ondras>
+sorry, wrong terminology
+
+[04:49:33.0000] <ondras>
+but yeah, the newwindow/popup protection, that is what I am talking about -- would that work if the open() call came from an onmessage event?
+
+[04:50:11.0000] <annevk>
+CSS folks are like why does (0, 0) matter here
+
+[04:50:24.0000] <ondras>
+ha, *trusted* is apparently the proper name for this
+
+[04:50:50.0000] <annevk>
+ondras: "user activation"
+
+[04:50:52.0000] <annevk>
+ondras: https://github.com/whatwg/html/issues/4364
+
+[04:51:16.0000] <annevk>
+(tl;dr: no)
+
+[04:51:23.0000] <ondras>
+a-ha! thanks
+
+[04:51:34.0000] <ondras>
+that is what I thought.
+
+[04:55:52.0000] <domfarolino>
+annevk: So in the usage of the `as` attribute here (https://html.spec.whatwg.org/multipage/semantics.html#fetching-and-processing-a-resource-from-a-link-element:attr-link-as), we check for "no state", (which I think includes missing/invalid value default), but based on your latest review, wouldn'
+
+[04:56:06.0000] <domfarolino>
+wouldn't that sort of break that usage?
+
+[04:56:25.0000] <domfarolino>
+(since missing/invalid value defaults are I guess valid states?)
+
+[04:56:26.0000] <annevk>
+domfarolino: I guess that's wrong
+
+[04:56:57.0000] <annevk>
+domfarolino: as is an enumerated attribute afaik and per the enumerated attribute definition "no state" and "valid state" are not things it knows about
+
+[04:57:39.0000] <domfarolino>
+Makes more sense now. That usage of `as` is sorta what I was basing mind off of. I guess I can file an issue for that
+
+[04:57:44.0000] <annevk>
+domfarolino: sorry, I'm wrong, "no state" is a thing
+
+[04:57:52.0000] <domfarolino>
+oh
+
+[04:57:56.0000] <domfarolino>
+np
+
+[04:58:18.0000] <annevk>
+domfarolino: so instead of valid state, you can assert that it has a state
+
+[04:59:00.0000] <annevk>
+domfarolino: or rather, that it represents a state, perhaps?
+
+[04:59:03.0000] <domfarolino>
+annevk: so "has a state" excludes missing/invalid value defaults then?
+
+[04:59:13.0000] <annevk>
+domfarolino: enumerated attribute could use some refining at some point
+
+[04:59:48.0000] <annevk>
+domfarolino: aye, though I think I'd go with "represents a state" given that's what the prose uses
+
+[05:00:47.0000] <domfarolino>
+annevk: Ok I'll do that ('tis what I was going for anyways, but ty for the clarification)
+
+[05:01:53.0000] <annevk>
+domfarolino: Domenic is back later this week and I'll let him do a final pass since he had at least one remaining comment too
+
+[05:02:11.0000] <domfarolino>
+SGTM
+
+[05:15:12.0000] <domfarolino>
+annevk: Ok, latest commit should address the comments, will wait for domenic's pass. thanks again
+
+[05:16:18.0000] <annevk>
+\o/
+
+[10:04:09.0000] <cvazac>
+annevk: i believe you said (https://freenode.logbot.info/whatwg/20190216#c1999445) that cross origin IFRAME requests should not emit fetch events to the service worker in the base page. i assume that means that a fetch event *should* be emitted to a service worker installed on the other domain. which makes the offline story of the base page more complicated. i couldn't find anything in the service worker spec about IFRAMEs, do you know
+
+[10:04:09.0000] <cvazac>
+if this behavior is specced somewhere else?
+
+[10:31:02.0000] <annevk>
+cvazac: it's specified between HTML, SW, and Fetch
+
+[10:31:42.0000] <annevk>
+cvazac: but effectively, as with the top-level browsing context, an iframe element's nested browsing context navigates, and interception for navigation (as well as workers) works differently
+
+[10:32:22.0000] <annevk>
+cvazac: there's further complications here in browsers that do third-party isolation (Safari) and plan to do more third-party isolation (Firefox)
+
+[10:33:53.0000] <cvazac>
+annevk: thx!
+
+[11:41:52.0000] <lgrahl>
+o/ Hello everyone, long time no chat
+
+[11:44:26.0000] <lgrahl>
+Someone asked (regarding RTCDataCHannel but it's the same for WebSocket): If you create a WebSocket and then bind the open event, wouldn't there be a small time period where open could fire before it's being bound?
+
+[11:46:39.0000] <lgrahl>
+My thoughts: The event would have to be enqueued pm the event loop and since the task creating the WebSocket itself is already running, the bind happens before the event can fire. Is that assumption correct?
+
+[11:46:46.0000] <lgrahl>
+*on
+
+[11:48:51.0000] <annevk>
+lgrahl: aye
+
+[11:48:56.0000] <lgrahl>
+Cheers!
+
+
+2019-02-21
+[20:40:07.0000] <Domenic>
+I ... I think whatwg.org is blocked in Russia? https://mobile.twitter.com/serj_zavolzhski/status/1098394001554788353
+
+[21:06:23.0000] <MikeSmith>
+Domenic: would be fun to know why
+
+[02:17:12.0000] <annevk>
+MikeSmith: my current theory is that they block HSTS preloaded domains
+
+[02:17:51.0000] <annevk>
+That makes it sound like I'm actively investigating, I'm not
+
+[02:29:28.0000] <annevk>
+gsnedders: surprisingly relevant RT there
+
+[03:08:53.0000] <gsnedders>
+annevk: I've seen other things suggesting that too, fwiw
+
+[03:10:15.0000] <MikeSmith>
+annevk: I wonder what the rationale would be for doing that
+
+[04:11:44.0000] <annevk>
+MikeSmith: I can think of a reason
+
+[04:15:52.0000] <gsnedders>
+MikeSmith: they strip HSTS headers, AFAIK
+
+[04:16:10.0000] <gsnedders>
+MikeSmith: and obviously that doesn't work if it's preloaded
+
+[06:04:35.0000] <gsnedders>
+there's no way to get the used value of a CSS property, is there?
+
+[06:05:17.0000] <MikeSmith>
+you mean no way exposed to web content?
+
+[06:05:31.0000] <gsnedders>
+yeah
+
+[06:06:51.0000] <MikeSmith>
+isn’t that what getComputedStyle is for?
+
+[06:07:25.0000] <gsnedders>
+that returns the resolved value, which is either the used value (for CSS 2.0 properties) or the computed value (for anything newer)
+
+[06:41:03.0000] <annevk>
+gsnedders: stripping HSTS headers on HTTPS responses? (Note that HSTS is meaningless on HTTP responses.)
+
+[07:30:00.0000] <annevk>
+hsivonen: https://github.com/lemire/simdjson/blob/master/README.md might be of interest (SIMD, UTF-8, JSON, null-terminated C strings, claims of being the fastest)
+
+[07:59:01.0000] <gsnedders>
+annevk: uh, good question; avoiding redirects to HTTPS, probably intercepting it all somewhere?
+
+[08:12:00.0000] <hsivonen>
+annevk: thanks. (It seems to use AVX2, which we can't use unconditionally in Gecko. We could use it behind cpuid sniffing, though.)
+
+[10:57:25.0000] <TabAtkins>
+gsnedders: Nope, no way to do so unless gCS returns it already.
+
+[10:57:54.0000] <TabAtkins>
+(And note that the definition of "resolved value" is more complex than just being time-based; some Grid properties return the used value, for example.)
+
+[11:37:56.0000] <gsnedders>
+TabAtkins: and that's still true with Houdini, right? Typed OM is purely computed, right?
+
+[11:38:21.0000] <TabAtkins>
+Yes. We do plan to add a used value map, but it's a bunch more work
+
+[11:38:29.0000] <TabAtkins>
+Because used values don't exist all the time
+
+[11:39:35.0000] <gsnedders>
+Sure.
+
+
+2019-02-22
+[20:19:43.0000] <rniwa>
+annevk: yt?
+
+[20:19:55.0000] <rniwa>
+oh perhaps it's too early
+
+[20:26:05.0000] <domfarolino>
+Hmm, whatwg.dev sounds kinda cool https://domains.google.com/m/registrar/search?searchTerm=whatwg.dev
+
+[22:00:07.0000] <annevk>
+Ideally 5AM is too early, yes 😊
+
+[00:22:38.0000] <Ms2ger>
+Domenic, do you want to do another review on https://github.com/heycam/webidl/pull/635 or should I land?
+
+[00:57:34.0000] <annevk>
+"I guess I was never bothered by it because I see a return statement as a thing that returns the control back to the caller, not a thing that returns a value." I have questions rniwa 😃
+
+[01:25:18.0000] <annevk>
+Update on WHATWG being blocked in Russia: https://twitter.com/serj_zavolzhski/status/1098762533924716544
+
+[01:50:34.0000] <annevk>
+Reviews from Domenic \o/
+
+[01:53:31.0000] <MikeSmith>
+annevk: I think that kind of brute-force hosting-service-based blocking goes beyond even what China does
+
+[01:53:53.0000] <MikeSmith>
+it gives a big F U to all users of the web there I guess
+
+[01:54:24.0000] <annevk>
+Russia's government is generally known for giving a big F U to its citizens
+
+[01:54:58.0000] <MikeSmith>
+yeah but the citizens are also good about giving a pretty good F U right back
+
+[01:55:23.0000] <MikeSmith>
+and they are way smarter and more resourceful than the bureaucrats
+
+[01:55:57.0000] <MikeSmith>
+anyway we really need to someday have a system that makes it impossible for state bad actors to do this kind of stuff
+
+[01:56:50.0000] <MikeSmith>
+some kind of truly decentralized hosting on scale
+
+[01:57:29.0000] <MikeSmith>
+some kind of magic to automatically (re)route around it all
+
+[01:58:12.0000] <MikeSmith>
+or maybe just IPFS on real scale
+
+[01:59:48.0000] <annevk>
+I dunno, completely unchecked systems have led to plenty of abuse too
+
+[02:02:05.0000] <MikeSmith>
+true
+
+[02:02:15.0000] <MikeSmith>
+can’t have everything
+
+[02:04:03.0000] <MikeSmith>
+annevk: in other news, about the issues filed around the integrity attribute and SRI supposedly working for inline scripts, I very much doubt what’s happening is what the OP claims
+
+[02:04:26.0000] <MikeSmith>
+I tried some tests and have not be able to reproduce that in any browser
+
+[02:04:38.0000] <annevk>
+MikeSmith: ah good
+
+[02:04:53.0000] <annevk>
+MikeSmith: thanks for looking into that
+
+[02:05:09.0000] <MikeSmith>
+yeah I could be wrong but I don’t think so
+
+[02:05:28.0000] <MikeSmith>
+but I guess will wait for mkwst to reply on that
+
+[02:06:02.0000] <MikeSmith>
+don’t want to get into an unproductive back-and-forth with the OP there
+
+[02:07:47.0000] <annevk>
+Next time I'm going to ask for a reduced test first
+
+[02:09:45.0000] <MikeSmith>
+yeah that would save some time
+
+[05:15:27.0000] <annevk>
+foolip: I assume you'll review and take care of https://github.com/whatwg/fullscreen/pull/145 mostly btw
+
+[05:15:51.0000] <foolip>
+annevk: yep
+
+[05:15:51.0000] <annevk>
+foolip: I'll take care of the build errors though as they're my fault
+
+[05:16:33.0000] <annevk>
+foolip: which I guess means this cannot be merged today, but hopefully the HTML PR gets merged later so it can be done on Monday or so
+
+[06:08:21.0000] <Domenic>
+annevk: I don't really understand "But in general, they need to remain in the group they were in when they were created."
+
+[06:08:51.0000] <Domenic>
+Once discarded, they should be in no group, right?
+
+[06:09:49.0000] <annevk>
+Domenic: when the bc is discarded, the Window object needs to remain in the same agent, is what I was trying to say
+
+[06:10:28.0000] <Domenic>
+They do?? Hmm, thinking...
+
+[06:10:41.0000] <annevk>
+Domenic: so if you have a bc and a nested bc, and each has a document and those are same-origin with each other, there's 1 agent with 2 globals
+
+[06:10:51.0000] <annevk>
+Domenic: if I then discard the nested bc, the agent still has 2 globals
+
+[06:11:04.0000] <annevk>
+Domenic: but the second global's browsing context is now null
+
+[06:11:37.0000] <annevk>
+Domenic: the UA might be able to collect the second global, if nobody holds a ref to it though
+
+[06:12:10.0000] <Domenic>
+Yeah, I think I see...
+
+[06:12:25.0000] <annevk>
+Domenic: I'm not sure if that means it should be removed from the agent's realms though
+
+[06:12:47.0000] <Domenic>
+Right, the question is whether can-share-memory-with should work...
+
+[06:13:02.0000] <Domenic>
+Which in turn impacts postMessaging
+
+[06:13:18.0000] <Domenic>
+This might be moot because I'm not sure you can postMessage from a discarded BC's Window
+
+[06:14:33.0000] <Domenic>
+It seems like removing might be better if we can get away with it because otherwise we're saying there's a strong reference UA -> Agent cluster -> Agent -> Realms -> Window which can't be cut
+
+[06:15:06.0000] <annevk>
+Domenic: yeah, I'm coming around to that as well
+
+[06:15:28.0000] <Domenic>
+I agree conceptually that the realm still "can share memory with" others
+
+[06:15:38.0000] <Domenic>
+But holding it in the realms set seems unfortunate
+
+[06:15:44.0000] <annevk>
+Domenic: can-share-memory shouldn't be relevant within an agent
+
+[06:15:52.0000] <Domenic>
+Oh, that'd be good
+
+[06:16:32.0000] <annevk>
+Domenic: ah I see, it's because of how we define that
+
+[06:17:09.0000] <annevk>
+Domenic: yeah, so imperative allocation of agents would take care of that too
+
+[06:17:31.0000] <Domenic>
+It seems like adding null checks at this stage would also work though
+
+[06:17:35.0000] <annevk>
+Domenic: whenever we create an agent, it'd become part of some existing agent cluster
+
+[06:18:49.0000] <annevk>
+Domenic: the null checks end up being weird because it would mean the Window is in a different agent, no? One with all the windows that don't have a bc
+
+[06:18:52.0000] <Domenic>
+Like I'm not sure how much you're planning on changing "If A's relevant settings object's responsible browsing context's top-level browsing context's group is not B's relevant settings object's responsible browsing context's top-level browsing context's group, then return false." but it seems likely to me the end state will be similar.
+
+[06:19:01.0000] <Domenic>
+I think the Window is in no agent
+
+[06:19:11.0000] <Domenic>
+That's the point, because then no agent is holding a reference to it
+
+[06:19:20.0000] <Domenic>
+Which allows it to be GCed
+
+[06:19:27.0000] <annevk>
+Domenic: but that's not what that ends up meaning?
+
+[06:19:38.0000] <annevk>
+/me rereads
+
+[06:20:17.0000] <Domenic>
+I guess without explicit agent allocation it's pretty unclear what would happen to Windows that are not same-agent Window objects with any other window object.
+
+[06:20:40.0000] <Domenic>
+But I think the end state should be that discarded BC's Windows are in no agent. Agree?
+
+[06:21:06.0000] <annevk>
+Well, I agree that the agent shouldn't hold a pointer to them
+
+[06:22:41.0000] <Domenic>
+I think I would be happy if we just amended the XXX box to say something like "We're headed toward having discarded BC's Windows not be in the same agent as they originally were in." (OK that phrasing was terrible, but you get the idea.)
+
+[06:23:20.0000] <Domenic>
+Right now I interpret the XXX is saying "we wish these pointers weren't null and these windows could just stay in their agent"
+
+[06:24:53.0000] <annevk>
+I see an agent as some kind of container and the Window would still be in that container, but the container itself would no longer keep it there
+
+[06:25:09.0000] <annevk>
+Meaning that the Window can be GC'd if nothing holds a ref to it
+
+[06:25:18.0000] <annevk>
+But it wouldn't end up in its own container
+
+[06:25:21.0000] <Domenic>
+So an Agent's [[Realms]] internal slot should be a weak set?
+
+[06:26:02.0000] <Domenic>
+Or alternately, you could have a realm -> agent pointer but no [[Realms]] list.
+
+[06:26:26.0000] <Domenic>
+Operationally I think this only affects whether discarded BC's windows can postMessage SABs around
+
+[06:27:34.0000] <Domenic>
+I think that's impossible anyway because the queued task is associated with a Document that will never be fully active.
+
+[06:27:42.0000] <annevk>
+Yeah, agreed
+
+[06:27:58.0000] <annevk>
+With that last bit, but isn't an Agent also the container for all objects that can access each other?
+
+[06:28:13.0000] <annevk>
+I guess it's all a bit vague in ECMAScript
+
+[06:28:26.0000] <Domenic>
+I think conceptually that's probably true, but the only spec consequence it has is when we check the agent cluster in structured serialize
+
+[06:28:39.0000] <Domenic>
+(And event loop association?)
+
+[06:28:47.0000] <annevk>
+But I tend to agree that Window can be removed from Agent's [[Realms]] when it's discarded
+
+[06:29:14.0000] <Domenic>
+Hmm I think ES might crash if we said a global had no agent
+
+[06:29:27.0000] <annevk>
+Well yeah, that was the other thing I was wondering about
+
+[06:29:34.0000] <Domenic>
+creating SABs looks up things on the surrounding agent
+
+[06:29:50.0000] <Domenic>
+OK so you're probably right, they need to stay with the agent
+
+[06:29:59.0000] <Domenic>
+I am coming around to keeping the XXX as-is
+
+[06:30:06.0000] <Domenic>
+But I am glad we talked it through
+
+[06:30:15.0000] <annevk>
+So then [[Realms]] ends up a Weakmap I guess?
+
+[06:30:26.0000] <Domenic>
+Either that or we only do a realm -> agent pointer and no agent -> realm pointer
+
+[06:30:28.0000] <annevk>
+Or would globals point to Agents?
+
+[06:30:41.0000] <Domenic>
+I am not sure what we actually would use [[Realms]] for
+
+[06:30:49.0000] <annevk>
+good point
+
+[06:31:01.0000] <annevk>
+ES does use agent cluster -> agent mapping
+
+[06:31:10.0000] <annevk>
+With the signifier thingie
+
+[06:31:25.0000] <annevk>
+But that makes sense and we (need to) do similar things
+
+[06:31:34.0000] <annevk>
+To find other event loops for postMessage()
+
+[06:32:14.0000] <annevk>
+Domenic: will you update the ES issue on clarifying agents with this point?
+
+[06:32:37.0000] <annevk>
+(the global -> agent pointer)
+
+[06:33:02.0000] <Domenic>
+Can do
+
+[06:40:02.0000] <Ms2ger>
+Domenic / annevk: either of you have (more) thoughts on https://github.com/heycam/webidl/pull/647 ?
+
+[06:40:23.0000] <annevk>
+/me looks
+
+[06:41:28.0000] <annevk>
+Ms2ger: that looks great, thanks
+
+[06:41:55.0000] <annevk>
+Ms2ger: I don't get a notification when you force push, FWIW
+
+[06:42:11.0000] <annevk>
+(at least, I think I don't)
+
+[06:42:13.0000] <Ms2ger>
+annevk, oh, that's good to know
+
+[10:41:40.0000] <Domenic>
+https://github.com/whatwg/html/issues/4175#issuecomment-466047231 about a no-credentials mode instead of CORS is so weird to me.
+
+[10:41:54.0000] <Domenic>
+If we thought intranets didn't matter, we would've just made no-credentials a requirement for outgoing requests long ago and never bothered inventing CORS.
+
+[11:01:16.0000] <annevk>
+That is exactly my feeling
+
+
+2019-02-25
+[06:01:56.0000] <Ms2ger>
+annevk, https://github.com/heycam/webidl/pull/652 is ready now, I think
+
+[06:03:42.0000] <annevk>
+Ms2ger: r+
+
+[06:03:49.0000] <nox>
+annevk: Still no answer from anyone from Chrome or Edge :(
+
+[06:06:00.0000] <annevk>
+nox: I don't care much for Edge
+
+[06:06:18.0000] <nox>
+annevk: I pinged tkent again.
+
+[06:06:23.0000] <annevk>
+nox: perhaps there should be a summary comment or some such? What do we expect someone new coming into https://github.com/whatwg/html/pull/4354 to look at?
+
+[06:06:43.0000] <nox>
+annevk: Everything.
+
+[06:07:03.0000] <nox>
+I mean, I pinged them in https://github.com/whatwg/html/pull/4354#issuecomment-462792225, they can start from that.
+
+[06:08:22.0000] <annevk>
+nox: I suspect that if I reread that thread there'll be lots that's no longer relevant
+
+[06:09:04.0000] <nox>
+I'll link to important comments, I guess. Too bad no one chimed in 13 days ago when the thread was fresh.
+
+[06:10:20.0000] <annevk>
+nox: given all the developments that might have been better for them 😃
+
+[06:10:31.0000] <nox>
+annevk: What do you mean?
+
+[06:11:38.0000] <annevk>
+nox: it's less to work to catch up with something after the exploring has been done
+
+[06:12:37.0000] <nox>
+I'm just pissed that a Google-sized company can't reply in time on a ticket when other people from smaller companies did.
+
+[07:00:16.0000] <hsivonen>
+annevk: fwiw, it looks like at least a third of Firefox 66 beta (beta population not necessarily reprsentative of release users, very short time window, etc.) Text Encoding menu invocations are on labeled pages, i.e. ones that Chrome and EdgeHTML neither use heuristics for nor offer menu override
+
+[07:00:31.0000] <hsivonen>
+(not sure this means anything in particular)
+
+[07:51:34.0000] <annevk>
+Domenic: any chance you can ping someone internally for https://github.com/whatwg/html/pull/4354 to help nox out?
+
+[07:51:47.0000] <nox>
+<3
+
+[07:52:26.0000] <Domenic>
+Sure
+
+[07:52:28.0000] <annevk>
+hsivonen: that means that 2/3 are for the heuristics-requiring pages?
+
+[07:52:55.0000] <Domenic>
+nox: annevk: is there any summary, not necessarily of everything that's gone on, but of what problem or interop issue this is even solving?
+
+[07:53:31.0000] <hsivonen>
+annevk: some of it is also re-overriding already overridden, but yes
+
+[07:53:50.0000] <nox>
+Domenic: Basically every Live DOM Viewer link from that thread.
+
+[07:54:00.0000] <nox>
+I can't even write docs for my own code, let alone summary comments.
+
+[07:54:09.0000] <Domenic>
+nox: If I'm going to get folks involved, I'll need a bit more than that :-/
+
+[07:54:13.0000] <nox>
+Domenic: https://github.com/whatwg/html/pull/4354#issuecomment-462813946
+
+[07:54:23.0000] <nox>
+Domenic: https://github.com/whatwg/html/pull/4354#issuecomment-463693419
+
+[07:54:31.0000] <annevk>
+Domenic: it's attempting to properly define when we execute scripts upon insertion and various related matters
+
+[07:54:42.0000] <annevk>
+Domenic: in particular the spec assumes a single queue, but implementations have two
+
+[07:54:51.0000] <Domenic>
+OK, maybe annevk could write the summary comment? :)
+
+[07:55:16.0000] <nox>
+Do you just ignore PRs without summary comments? That seems pretty bad to me.
+
+[07:57:10.0000] <Domenic>
+Yes, pretty much, if someone doesn't say what problem they're solving and just proposes a bunch of changes, it's not really a quality contribution.
+
+[07:57:28.0000] <annevk>
+Domenic: that's the summary you could pass along when requesting input, the PR is analysis of impls
+
+[07:57:38.0000] <Domenic>
+Like, I could change a ton of things in Servo with no commit message, and I'm sure that would not be welcomed.
+
+[07:57:51.0000] <nox>
+Domenic: We would definitely chime in the PR thread.
+
+[07:58:53.0000] <nox>
+I don't think Googlers are any more busy than people at Mozilla who did chime in, but ok.
+
+[08:10:26.0000] <Ms2ger>
+Domenic, is there any spec that says to treat WindowProxy objects as Windows?
+
+[08:11:13.0000] <Domenic>
+I don't remember reading any spec, but I remember a long argument where Hixie said "look, my spec just says to treat them the same, it's fine"... Let me check, but my current guess is that we used to have something hand-wavey, and in the course of making WindowProxy rigorous we lost that particular piece of hand-waving.
+
+[08:14:20.0000] <Domenic>
+https://www.w3.org/Bugs/Public/show_bug.cgi?id=27128 is what I'm remembering
+
+[08:14:30.0000] <Domenic>
+> I don't understand what there is to define. It's just an object that forwards all operations to the underlying object. Or, as the spec puts it, "all operations that would be performed on it must be performed on the Window object of the browsing context's active document instead".
+
+[08:15:18.0000] <Domenic>
+BTW we should probably mass-move from Bugzilla soon (for both Web IDL and HTML) since it's shutting down
+
+[08:29:16.0000] <Ms2ger>
+Oh right, I thought I mentioned that to MikeSmith, but I'm not sure if he was planning to do it
+
+[08:42:16.0000] <MikeSmith>
+I am not planning to do it
+
+[08:42:46.0000] <MikeSmith>
+I’m happy to if someone tells me that’s what we actually want
+
+[08:43:52.0000] <MikeSmith>
+but the bugs we still have open there are ones we so far have intentionally not moved
+
+[08:44:01.0000] <MikeSmith>
+we moved many others but not those
+
+[08:44:18.0000] <gsnedders>
+MikeSmith: do we have any way to at least save them somehow if we want to move later?
+
+[08:44:25.0000] <Domenic>
+It does seem like a hand-curated pass would work better. E.g. closing all the HTML feature requests that haven't bubbled up in the years since GitHub.
+
+[08:44:48.0000] <MikeSmith>
+the bugs will remain there as far as I understand
+
+[08:44:55.0000] <MikeSmith>
+the URLs will continue to work
+
+[08:45:06.0000] <MikeSmith>
+for the individual bugs
+
+[08:45:32.0000] <MikeSmith>
+though the search feature and other features will quit working
+
+[08:48:27.0000] <Domenic>
+Yeah, the search which lets us filter by component is kind of important, so ideally we should move before then.
+
+[08:48:59.0000] <Domenic>
+Although I guess we could re-build a filtered list from a .csv export or something
+
+[08:50:03.0000] <MikeSmith>
+yeah but if we’re gonna do something it would be best to do it before they flip the switch
+
+[09:23:26.0000] <annevk>
+Oooh, platform brands are defined now
+
+[11:27:06.0000] <TimothyGu>
+Domenic: is the plan to not use Web IDL for built-in modules like kv-storage?
+
+[11:27:35.0000] <Domenic>
+TimothyGu: it was originally but I changed my mind. https://github.com/WICG/kv-storage/issues/46
+
+[11:30:16.0000] <TimothyGu>
+Domenic: Ah got it.
+
+[11:34:50.0000] <TabAtkins>
+Domenic: nice
+
+[11:35:01.0000] <TabAtkins>
+I knew that "by-hand crap" would convince you eventually ^_^
+
+[12:42:50.0000] <domfarolino>
+Domenic: ahh, thanks, feels good to finally get that merged. (oh and thanks for your commit too!)
+
+[12:42:56.0000] <Domenic>
+:)
+
+
+2019-02-26
+[03:23:46.0000] <annevk>
+Domenic: https://github.com/whatwg/html/pull/4354#issuecomment-467401550 has a summary now
+
+[03:23:52.0000] <annevk>
+Domenic: hope that helps
+
+[05:16:39.0000] <annevk>
+Ms2ger: ah, so if something takes a WindowProxy we want to validate it's a WindowProxy
+
+[05:17:06.0000] <annevk>
+Ms2ger: I guess in a way its brand is that it has this [[Window]] slot
+
+[05:17:49.0000] <Ms2ger>
+annevk, yeah, we'll need to check something, at least :)
+
+[05:18:23.0000] <annevk>
+Ms2ger: ok yeah, that makes sense
+
+[05:18:33.0000] <annevk>
+Ms2ger: so yeah, that's another thing that needs to be done somehow then
+
+[05:18:44.0000] <Ms2ger>
+I'll wait for bz's thoughts in any case :)
+
+[05:18:51.0000] <annevk>
+sg
+
+[05:32:41.0000] <annevk>
+Ms2ger: so I think the simple solution is for WindowProxy to define [[PrimaryInterface]] as being << "WindowProxy" >> or whatever it needs to be
+
+[05:33:01.0000] <annevk>
+Ms2ger: unless that has weird side effects...
+
+[05:33:29.0000] <annevk>
+good times in exotic objects land
+
+[05:33:50.0000] <Ms2ger>
+That sounds like a reasonable option, but I'd need to think through the consequences
+
+[06:26:25.0000] <coreyfarrell>
+https://html.spec.whatwg.org/multipage/custom-elements.html#concept-custom-element-definition-observed-attributes says that observed attributes are a `sequence<DOMString>`.  Can anyone point me to the actual definition of `sequence`?  specifically I want to know if a JavaScript `Set` object qualifies (all examples I've seen use `Array` objects).
+
+[06:27:58.0000] <annevk>
+coreyfarrell: https://heycam.github.io/webidl/#sequence-to-es
+
+[06:28:44.0000] <annevk>
+coreyfarrell: sorry, you want https://heycam.github.io/webidl/#es-to-sequence
+
+[06:29:08.0000] <annevk>
+coreyfarrell: so Set ought to work I think as it has Symbol.iterator
+
+[06:30:01.0000] <coreyfarrell>
+annevk: great, thanks for the link.  I had already verified it works in current Firefox and Chrome, I just wanted to make sure I wasn't relying on some undefined behavior or bug.
+
+[06:31:40.0000] <annevk>
+coreyfarrell: the simple explanation is that sequence converts an iterable to a list on input, and converts that list to an Array on output
+
+[06:36:08.0000] <coreyfarrell>
+I'm guessing that providing an Array in the first place wouldn't allow any optimization of that process since creating a shallow clone of the original iterator is intentional?
+
+[06:37:30.0000] <annevk>
+coreyfarrell: something something sufficiently smart compiler
+
+[06:38:52.0000] <annevk>
+coreyfarrell: engines have options and I've definitely heard of "nobody touched Array.prototype" as a thing that might create different code paths
+
+[06:39:54.0000] <annevk>
+coreyfarrell: in this case though I wouldn't worry about that too much as this is a one-time conversion that the browser then caches for the lifetime of the object
+
+[06:41:34.0000] <Ms2ger>
+coreyfarrell, there's the conversion to a DOMString in-between as well, so I doubt there's much room for optimization like that
+
+[06:43:35.0000] <coreyfarrell>
+ahhh good point, I can actually see that from my coverage report that the `observedAttributes` property is only read once per instance.  I guess that makes sense reading it on every attribute write would be bad.
+
+[07:46:50.0000] <annevk>
+Domenic: https://github.com/whatwg/html/issues/4335#issuecomment-467485655 if whatever's shorter is better, surely we should just copy all pointers?
+
+[07:48:44.0000] <Domenic>
+annevk: well, I guess my point was more that each should have a distinct set of things accessible from it, and then you should prefer taking as an argument whatever has that thing, instead of e.g. taking a Window and doing window's environment settings object's X.
+
+[07:53:03.0000] <annevk>
+Domenic: okay, so deduplication is a goal, good
+
+[09:12:07.0000] <Domenic>
+annevk: rniwa: hober: can we make sure that the web components F2F is not pay to play this time? Some folks from GitHub (the company) would like to attend, and I want to avoid a repeat of last time.
+
+[09:15:23.0000] <annevk>
+Domenic: maybe email? I lack context I think
+
+[09:15:40.0000] <Domenic>
+Sure, probably best.
+
+[09:29:20.0000] <hober>
+i don't think i understand the question
+
+[09:34:13.0000] <hober>
+do they want people to pay for their flights & hotel rooms?
+
+[09:36:44.0000] <TabAtkins>
+I presume they're referring to the fact that TPAC requires a company to have paid dues for individuals to attend
+
+[09:37:27.0000] <gsnedders>
+and Membership dues
+
+[09:38:22.0000] <gsnedders>
+you can be *personally* invited to TPAC while not an employee of a W3C Member or an IE in any group, but AFAICT the W3C is loath to invite anyone (and especially people working for major companies who presumably could in principle be paying Membership fees)
+
+[09:39:07.0000] <hober>
+but the spring components f2f isn't tpac?
+
+[09:39:19.0000] <hober>
+isn't even a w3c meeting AFAIU
+
+[09:39:31.0000] <hober>
+not that i'm hosting or planning, so i don't know the details
+
+[09:39:51.0000] <TabAtkins>
+If it's not a W3C meeting at all, then more than likely Domenic's concern is satisfied?
+
+[09:39:58.0000] <hober>
+ but, like, unless mozilla is charging an entrance fee to the toronto office i think they should be fine, right?
+
+[09:40:53.0000] <Domenic>
+Yeah, ok, I guess tpac was a special case. But e.g. we've had W3C chairs run previous meetings too, in Tokyo for example.
+
+[09:41:04.0000] <Domenic>
+If this is not such a meeting then we're indeed fine.
+
+[09:41:55.0000] <gsnedders>
+aside from TPAC, external people can be invited at the chairs' discression, IIRC; obviously they might be subject to pressure from W3M, but in principle the decision is the chairs'
+
+[09:42:15.0000] <hober>
+i think annevk's hosting so maybe he can answer that
+
+[09:42:28.0000] <gsnedders>
+(and obviously if one of the chairs is Team then W3M have more influence)
+
+[09:47:07.0000] <annevk>
+hober: am I? Would be nice to have that confirmed somehow
+
+[09:48:05.0000] <hober>
+annevk: i'm not in the loop here besides that github issue...
+
+[09:48:27.0000] <annevk>
+I guess the question is if it’s a W3C meeting? I don’t really know why it has to be one.
+
+[09:48:44.0000] <hober>
+yeah, neither do i
+
+[09:54:16.0000] <gsnedders>
+i.e., whether or not it's officially a WG meeting?
+
+[09:55:51.0000] <hober>
+isn't this the wg
+
+[09:58:02.0000] <hober>
+i guess some components work ends up in other specs, but the vast majority of it is in html, which is here
+
+[09:58:31.0000] <gsnedders>
+Yeah, I guess now custom elements is merged it's basically all WHATWG
+
+[10:00:31.0000] <annevk>
+There’s new stuff coming, but all of it are PR-sized additions in my mind
+
+[10:00:59.0000] <annevk>
+But yeah, I guess if Mozilla hosts I’ll clarify that all are welcome
+
+[10:01:43.0000] <annevk>
+And those that have a problem with that are not 😊
+
+[10:02:13.0000] <annevk>
+Up to whatever cap we have on the space
+
+[14:58:10.0000] <Domenic>
+annevk: after https://github.com/whatwg/html/pull/4397 I am pretty convinced it's not much work to create Window/WindowProxy before creating Document.
+
+[14:59:03.0000] <Domenic>
+We just have to pass a URL to "Set up a window environment settings object" and then we can change "Initialize a new Document object" to a "create a new Window and then Document object and then initialize the Document" with a couple extra steps.
+
+[14:59:47.0000] <Domenic>
+Well, no, I guess a bit more refactoring of all the "Page load processing model for X files" is needed, since those often follow the pattern "create a Document, do a few things to the Document, initialize the Document"
+
+[15:00:19.0000] <Domenic>
+So I guess maybe we need a separate "create a Window and environment settings object" or something, and then we refactor all of those into (numbered) "create a Window, create a Document, do a few things to Document, initialize the Document"
+
+[15:00:24.0000] <Domenic>
+Basically, it seems close.
+
+
+2019-02-27
+[01:58:30.0000] <MikeSmith>
+annevk: so the person who filed the issues about the integrity attribute with inline script elements seems to have deleted their GitHub account
+
+[02:00:23.0000] <MikeSmith>
+but looking again at https://after-dark.habd.as/ I think the claim that integrity works for inline scripts may not be wrong after all
+
+[02:02:57.0000] <MikeSmith>
+I couldn’t reproduce it when I tested, yet if I look at the source of that document, I don’t see how the inline scripts there could actually be working unless the browser is allowing it based on checking the hashes
+
+[02:03:56.0000] <MikeSmith>
+the policy does specify 'unsafe-inline' but that should be getting ignored since the policy also specifies a hash
+
+[02:36:51.0000] <annevk>
+MikeSmith: it also specifies hashes in the CSP though
+
+[02:37:09.0000] <annevk>
+MikeSmith: so it's not clear to me if it's that or the integrity attribute
+
+[05:45:40.0000] <Ms2ger>
+annevk, what kind of changes in DOM do you expect in https://github.com/heycam/webidl/issues/540#issuecomment-467841401 , besides updating the constructor to look more like https://heycam.github.io/webidl/#dom-domexception-domexception ?
+
+[05:50:44.0000] <annevk>
+Ms2ger: I think there's some stuff I'm missing; where does [[Realm]] come from?
+
+[05:50:53.0000] <annevk>
+Ms2ger: and how is that determined for a subclass?
+
+[05:51:16.0000] <Ms2ger>
+annevk, 1.8 in https://heycam.github.io/webidl/#create-an-interface-object
+
+[05:51:20.0000] <annevk>
+Ms2ger: is there a bug against Chrome for the difference I mentioned?
+
+[05:51:33.0000] <annevk>
+Ms2ger: (or Firefox, if wrong)
+
+[05:51:43.0000] <annevk>
+Ms2ger: and can we use "this" now? 😃
+
+[05:51:44.0000] <Ms2ger>
+I haven't filed a but yet, but there's a test in wpt
+
+[05:53:13.0000] <Ms2ger>
+I'm working on a PR to make "this" more explicitly available
+
+[05:53:29.0000] <annevk>
+Ms2ger: so create an interface object takes a realm, it doesn't see how it obtains it
+
+[05:54:59.0000] <nox>
+annevk: Would it be useful to make 2 patches against HTML: one describing Chrome, the other Firefox? I mean for the insertion steps changes.
+
+[05:56:57.0000] <annevk>
+nox: do Chrome and Firefox agree on <script>?
+
+[05:57:29.0000] <Ms2ger>
+From https://heycam.github.io/webidl/#define-the-global-property-references , which gets it from https://heycam.github.io/webidl/#new , which gets it from... https://html.spec.whatwg.org/multipage/browsers.html#creating-browsing-contexts:creating-a-new-javascript-realm I guess
+
+[06:00:28.0000] <annevk>
+Ms2ger: the idea was that "create a new object implementing the interface" is used by others, right? So they'd always have to supply a Realm?
+
+[06:00:40.0000] <Ms2ger>
+Yes
+
+[06:01:41.0000] <annevk>
+Ms2ger: so what's the recommendation for that? E.g., https://url.spec.whatwg.org/#dom-url-url creates URLSearchParams in which Realm?
+
+[06:02:11.0000] <annevk>
+/me was hoping there could be a default for IDL-algorithms
+
+[06:02:12.0000] <Ms2ger>
+annevk, this.[[Realm]]
+
+[06:02:46.0000] <annevk>
+and that's 1:1 with this's relevant realm?
+
+[06:03:47.0000] <nox>
+annevk: No they don’t.
+
+[06:04:15.0000] <Ms2ger>
+annevk, I need to double-check if "relevant realm" is defined properly yet, but that's the idea
+
+[06:04:38.0000] <annevk>
+Ms2ger: we might as well stop using relevant realm I guess
+
+[06:04:47.0000] <annevk>
+(iirc it's only defined for platform objects)
+
+[06:04:49.0000] <Domenic>
+Noooo
+
+[06:04:54.0000] <annevk>
+heh
+
+[06:04:55.0000] <Domenic>
+We've done so much work to educate people
+
+[06:05:31.0000] <Domenic>
+Also I think eventually it will be a useful abstraction around both ES and platform objects
+
+[06:05:59.0000] <annevk>
+if ES objects will also get [[Realm]] it seems like that's the abstraction
+
+[06:06:09.0000] <annevk>
+but I guess that's unclear as of yet
+
+[06:06:36.0000] <Domenic>
+As for a default, that was debated in https://github.com/heycam/webidl/issues/135
+
+[06:07:50.0000] <Domenic>
+Note that now that we have something set up "this" before calling constructor steps, relevant realm of "this" does exist in the constructor.
+
+[06:08:14.0000] <Domenic>
+With the previous setup it didn't so we suggested current realm
+
+[06:08:44.0000] <Domenic>
+Although I guess there's still debate in https://github.com/heycam/webidl/issues/135#issuecomment-411109348
+
+[06:09:24.0000] <annevk>
+hmm
+
+[06:09:47.0000] <annevk>
+I'd like to see https://heycam.github.io/webidl/#dom-domexception-domexception for something more complex, such as URL
+
+[06:10:14.0000] <annevk>
+nox: sorry, I'm beginning to lose track given the longish timespan
+
+[06:10:33.0000] <Domenic>
+I mean, the only complexity with URL is that it creates a new platform object, right?
+
+[06:10:37.0000] <annevk>
+nox: I suspect two PRs doesn't make it easier for other folks to know what's going on
+
+[06:10:41.0000] <nox>
+annevk: That's fine. That's why maybe I should just describe both for all the cases I described and then we can pick which one we want.
+
+[06:11:02.0000] <Domenic>
+So it's a question as to whether when creating the URLSearchParams you do "new URLSearchParams" and it picks a right default, or you do "new URLSearchParams in the current realm/relevant realm of this"
+
+[06:11:06.0000] <annevk>
+nox: if there's a way to describe both abstractly in a comment that might be easier
+
+[06:11:16.0000] <nox>
+annevk: Ok, then I'll make the changes for each thing I found with the behaviour I prefer, and I guess I can describe the other possible behaviours in a comment.
+
+[06:11:23.0000] <annevk>
+Domenic: or do you use this's [[Realm]]
+
+[06:11:30.0000] <Domenic>
+All three are equivalent
+
+[06:11:34.0000] <annevk>
+or this.[[Realm]]!
+
+[06:11:41.0000] <nox>
+annevk: That's kinda what I did in https://github.com/whatwg/html/pull/4354#issuecomment-463566900
+
+[06:11:48.0000] <Domenic>
+Well, this's [[Realm]] is just an awkward way of writing this.[[Realm]], I guess.
+
+[06:11:51.0000] <annevk>
+Domenic: I'm not a big fan of not having canonical answers
+
+[06:12:05.0000] <Domenic>
+Use relevant realm then
+
+[06:12:17.0000] <Domenic>
+That's been our canonical answer up until now and I don't see a reason to churn all that
+
+[06:12:23.0000] <Domenic>
+Or, wait for a default. That's the real debate.
+
+[06:12:27.0000] <Ms2ger>
+annevk, I can probably write a pr for url today or tomorrow
+
+[06:14:19.0000] <annevk>
+Ms2ger: no need, I think I sorta got where things are at now based on this discussion
+
+[06:14:30.0000] <Domenic>
+Probably we should add a default. Even if relevant is "wrong" in methods, and we eventually decide to change it (very unlikely it seems given bz's preferences), for constructors there wouldn't be any switch. And, by having a default, spec-writers would be abstracted away from the mess.
+
+[06:14:32.0000] <Ms2ger>
+Ok, cc me?
+
+[06:14:35.0000] <annevk>
+Ms2ger: I'll wait and see a bit before cleaning things up
+
+[06:15:12.0000] <annevk>
+nox: so that only describes Firefox and not Chrome and doesn't go into tradeoffs
+
+[06:15:36.0000] <nox>
+annevk: Yeah, that's not clear expect in my head.
+
+[06:15:41.0000] <annevk>
+nox: ideally, it's something like Firefox does A, Chrome does B, A is nice because C, B is nice because D
+
+[06:15:50.0000] <nox>
+annevk: I described Firefox because Chrome does what is in the PR.
+
+[06:16:08.0000] <nox>
+annevk: Ok, I'll think about describing things that way.
+
+[06:16:48.0000] <annevk>
+nox: for a higher-level discussion you want everything in a single place so folks can quickly grasp what's going on
+
+[06:16:58.0000] <annevk>
+nox: ta!
+
+[07:12:11.0000] <annevk>
+I still quite like https://www.w3.org/Bugs/Public/show_bug.cgi?id=27301#c2
+
+[07:12:20.0000] <annevk>
+Maybe I'll file an issue later
+
+[07:52:32.0000] <Ms2ger>
+annevk, do we have/want something in infra to concatenate two lists?
+
+[08:04:44.0000] <annevk>
+Ms2ger: an open issue perhaps?
+
+[08:05:12.0000] <annevk>
+Ms2ger: do not recall that happening anywhere
+
+[09:05:29.0000] <Domenic>
+annevk: should all instances of <span>Content-Type</span> become `<code>Content-Type</code>`? I only changed the one that was already backticked from <span> to <code>.
+
+[09:09:06.0000] <annevk>
+Domenic: I guess not then
+
+[09:09:15.0000] <annevk>
+Domenic: a lot of that needs modernizing anyway
+
+[09:09:22.0000] <Domenic>
+OK, I'll make a note and leave the rest
+
+
+2019-02-28
+[05:00:22.0000] <annevk>
+littledan: what are the phases a module goes through again? There's loading, constructing, and evaluation apparently?
+
+[05:01:40.0000] <littledan>
+annevk: well, in the JS spec, they are called ParseModule, Instantiation (now being renamed to Linking), and Evaluation
+
+[05:01:51.0000] <littledan>
+Evaluation is where you actually execute the statements in the module
+
+[05:02:21.0000] <littledan>
+ParseModule is where you create a module record, and Instantiation is where the named exports and imports get associated with each other
+
+[05:03:04.0000] <annevk>
+littledan: I guess it'd make sense to parse HTML/CSS during ParseModule then
+
+[05:03:30.0000] <annevk>
+littledan: their parse operation just doesn't fail
+
+[05:03:31.0000] <littledan>
+that was my expectation as well. Domenic points out that this is a bit more spec bookkeeping, but it's parallel to the JS one.
+
+[05:03:38.0000] <littledan>
+right
+
+[05:03:39.0000] <annevk>
+littledan: I see
+
+[05:04:01.0000] <annevk>
+If it's not observable it doesn't matter perhaps how we do it
+
+[05:04:18.0000] <annevk>
+Guess it depends on if there's stuff planned that would make it observable somehow
+
+[05:05:08.0000] <littledan>
+It's observable, but in a way that doesn't matter much
+
+[05:05:43.0000] <littledan>
+Siblings in the module tree may execute first
+
+[05:06:53.0000] <littledan>
+A related question is, how should [SecureContext] work for modules: should it make the module not exist, or throw when executed? It's observable in the same sort of way (plus through import-maps)
+
+[05:10:08.0000] <annevk>
+IDL makes interfaces not exist, so I guess we should follow that precedent
+
+[05:18:43.0000] <nox>
+How can we observe anything if our eyes aren’t real anyway
+
+[05:19:29.0000] <Ms2ger>
+Through the magic of all-observing baguettes
+
+[05:19:57.0000] <Ms2ger>
+annevk, do we have a policy about acknowedgements if someone files a bug and it's already fixed independently?
+
+[05:20:07.0000] <annevk>
+and an additional glass of wine during lunch
+
+[05:20:35.0000] <littledan>
+annevk: if this is fun for you: the big question we are working through for top-level await is, should we keep the Evaluate phase synchronous when there is no TLA, or should we do a microtask checkpoint after loading each module? https://github.com/tc39/proposal-top-level-await/issues/47#issuecomment-467898555
+
+[05:20:42.0000] <annevk>
+Ms2ger: not that I know of
+
+[06:22:37.0000] <annevk>
+littledan: I tried wrapping my head around it, but other than "consistency would make sense" I don't have much to contribute
+
+[06:23:14.0000] <littledan>
+annevk: Well, thanks for taking a look. The "problem" is that both options have consistency arguments
+
+[06:23:52.0000] <littledan>
+I guess my feeling is, all else being equal, I'd prefer to leave module semantics in place with respect to what has been shipped in multiple browsers for years (i.e., #49)
+
+[06:24:15.0000] <littledan>
+I don't know how to assess the compatibility risk and upgrade cost of adding the checkpoints
+
+[06:24:16.0000] <annevk>
+littledan: I guess the advantages listed for 49 don't feel like strong advantages to me
+
+[06:24:28.0000] <littledan>
+hmm
+
+[06:24:49.0000] <annevk>
+littledan: whereas the advantages for 51 seem to offer consistency
+
+[06:24:53.0000] <littledan>
+I see
+
+[06:27:19.0000] <annevk>
+I mean, browser status quo is important, but it's not great and can be fixed, let's fix it; and ease-of-polyfilling I'm generally meh on, long term is more important
+
+[06:27:30.0000] <annevk>
+if it's not great*
+
+[06:27:49.0000] <annevk>
+Disadvantages might be interesting
+
+[06:28:01.0000] <littledan>
+yeah, i guess it's mostly about "this feels weird as a synchronization primitive"
+
+[06:28:05.0000] <littledan>
+that's sort of the objection I heard the most
+
+[06:28:21.0000] <littledan>
+I don't feel like the existing microtask checkpoints are serving this sort of purpose
+
+[06:28:32.0000] <littledan>
+I was wondering, should HTML have a way to do a microtask checkpoint without yielding to the event loop? (Or does it?) Would this be useful for people in other cases?
+
+[06:29:11.0000] <littledan>
+or, to be concrete, a way to call a callback after the next microtask checkpoint, and before the event loop
+
+[06:31:08.0000] <annevk>
+littledan: I think HTML already has that, when there's multiple mouse event listeners and the user triggers the listeners
+
+[06:32:03.0000] <annevk>
+littledan: promises are drained at the end of each callback; reading the the issue more attentively Domenic is on point I think and he also knows this area the best among WHATWG folks
+
+[06:32:42.0000] <littledan>
+I see, OK, thanks
+
+[06:34:46.0000] <littledan>
+(I got pushback from someone in V8 about #51, but I'm not sure how strongly held it was; this is part of why I remained uncertain)
+
+[06:35:05.0000] <annevk>
+littledan: actually, JakeA might also be interested, he loves promise-gotchas
+
+[06:35:48.0000] <JakeA>
+/me reads back
+
+[06:36:20.0000] <annevk>
+JakeA: https://github.com/tc39/proposal-top-level-await/issues/47#issuecomment-464488593
+
+[08:39:02.0000] <Domenic>
+zcorpan or anyone: I hear the term "reparenting" a lot for rearranging the DOM tree while we parse, but I Ctrl+F for "reparent" and don't find that in the spec. Is there a centralized description of that somewhere I can point a questioning web developer too?
+
+[08:49:50.0000] <Ms2ger>
+Possibly https://html.spec.whatwg.org/multipage/parsing.html#foster-parent
+
+[09:33:01.0000] <annevk>
+that's it
+
+[12:09:56.0000] <Domenic>
+I guess that's only for tabley stuff
+
+[12:10:04.0000] <Domenic>
+But e.g. nested forms are handled with a separate mechanism
+
+[12:29:04.0000] <Domenic>
+OK, so, this is a cut-down version of GitHub's user profile page. http://software.hixie.ch/utilities/js/live-dom-viewer/?saved=6728
+
+[12:29:11.0000] <Domenic>
+It demonstrates an amazing fact
+
+[12:29:37.0000] <Domenic>
+</form> will, under some circumstances, reset the form element pointer. Thus allowing nested forms. But, once it resets the pointer, we do nothing else, and discard the token.
+
+[12:29:52.0000] <Domenic>
+🤯
+
+[12:30:02.0000] <Domenic>
+I can only assume this was important for legacy compat
+
+[12:30:27.0000] <Domenic>
+Reference: https://html.spec.whatwg.org/multipage/parsing.html#insertion-mode 'An end tag whose tag name is "form"'
+
+[12:36:58.0000] <annevk>
+Domenic: form is great
+
+[12:49:45.0000] <annevk>
+Domenic: there is also reparenting with misnested inlines
+

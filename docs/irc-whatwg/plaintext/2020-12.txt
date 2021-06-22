@@ -1,0 +1,1474 @@
+2020-12-01
+[03:50:40.0000] <jkt_>
+Hi, I thought I would ask my dumb questions here rather than pestering Anne directly. In Firefox we had a concept of inheriting the Principal and I wondered where it was in the HTML/fetch standard
+
+[03:51:18.0000] <jkt_>
+Aka where an origin would come from a parent in certain situations. javascript: iframes inherit unless they have an opaque sandbox origin.
+
+[03:51:26.0000] <annevk>
+jkt_: https://html.spec.whatwg.org/#determining-the-origin is an attempt
+
+[03:51:51.0000] <annevk>
+jkt_: https://github.com/whatwg/html/issues/4926 is what would be ideal
+
+[03:52:25.0000] <annevk>
+(not dumb btw and I don't mind)
+
+[03:52:43.0000] <jkt_>
+:)
+
+[03:52:51.0000] <jkt_>
+Ah the PR certainly makes the concept cleaner
+
+[03:55:36.0000] <jkt_>
+s/pr/issue/
+
+[04:00:07.0000] <jkt_>
+Yeah I think that's probably the issue I'm having with Servo is this isn't utilised properly
+
+[04:10:18.0000] <jkt_>
+Ah yeah it seems like the places in the spec that call into this part are what I was after. Like passing null when creating a new document.
+
+
+2020-12-03
+[01:25:28.0000] <annevk>
+benjamingr__: are you around? Do you want your name in the Acknowledgments section?
+
+[03:29:09.0000] <jgraham>
+annevk: What's the COOP scenario, exactly? (my initial reaction is "you get a contextDestroyed event for the old context and a contextCreated event for the new one, even if they're the same 'tab' from the point of view of the user")
+
+[03:30:59.0000] <annevk>
+jgraham: that is correct; I guess I'm mainly wondering if you know they relate to the same tab
+
+[03:31:30.0000] <annevk>
+jgraham: HTML still needs to describe something called browsing session, which will provide some coherence for this
+
+[03:31:59.0000] <annevk>
+(a browsing session is a tab, I guess)
+
+[03:32:10.0000] <jgraham>
+Yeah, I guess that's an interesting point. For WebDriver/HTTP we have window handles that are supposed to be for the user-percieved windows
+
+[03:32:23.0000] <jgraham>
+And these things are supposed to be compatible
+
+[03:33:22.0000] <annevk>
+jgraham: and we might not discard in the future, but freeze the browsing context somehow so you can do fastback
+
+[03:35:28.0000] <jgraham>
+Yeah, I assume that navigation can not discard nested contexts even in the no-COOP case, and it's not super clear if users will be confused by not getting events in that case
+
+[03:39:25.0000] <andreubotella>
+I was under the impression that a top-level browsing context was a tab
+
+[03:40:33.0000] <annevk>
+andreubotella: that was the case until we changed that with COOP
+
+[03:40:57.0000] <annevk>
+andreubotella: now it's N:1
+
+[03:41:55.0000] <andreubotella>
+I see
+
+[03:49:05.0000] <andreubotella>
+annevk: btw, playing around with file inputs and urlencoded I found more newline normalization bugs
+
+[03:50:03.0000] <annevk>
+Cool, did you file bugs?
+
+[03:51:06.0000] <andreubotella>
+it's actually something all browsers share, even if imo it should count as a bug in the browsers, so I was gonna file a bug on the url standard when I had the tests on wpt
+
+[03:52:06.0000] <andreubotella>
+but I got slightly tripped by the fact that webkit somehow doesn't percent-encode \x00 on urlencode over POST, leading to the same nonsense with the page being detected as a download
+
+[03:52:32.0000] <andreubotella>
+I'll file a bug for that one
+
+[04:08:57.0000] <annevk>
+That sounds like a fun, thanks for testing 🙂
+
+[04:23:59.0000] <annevk>
+andreubotella: that fileInput creation technique (with Object.assign) is rather clever
+
+[04:24:48.0000] <andreubotella>
+I saw bsittler use it in the original multipart/form-data PR that got closed downstream
+
+[04:25:56.0000] <annevk>
+Heh, must have missed that cause I don't remember seeing this before
+
+[04:28:26.0000] <annevk>
+andreubotella: let me know if you want it to be boilerplate-free and I'll wait a bit with merging
+
+[04:28:39.0000] <andreubotella>
+sure, I'll make it window.js
+
+[04:44:05.0000] <annevk>
+andreubotella: so I realized something since you filed that issue
+
+[04:44:24.0000] <annevk>
+andreubotella: this is testing form submission, and that is doing the newline normalization, and only after that is it testing urlencoding
+
+[04:45:19.0000] <andreubotella>
+annevk: in multipart/form-data, newlines in filenames aren't touched
+
+[04:45:22.0000] <annevk>
+andreubotella: I see that you are suggesting that newline normalization should only happen for urlencoding and not multipart, but I'm not sure if that's correct as it also happens when creating a FormData from a <form> (or perhaps only in Chrome)
+
+[04:47:08.0000] <annevk>
+I guess I should look up when we defined "append an entry" as I'm pretty sure we considered at least some of this
+
+[04:49:24.0000] <andreubotella>
+when I tested the newline normalization when creating a FormData from a form, I forgot to test filenames
+
+[04:50:37.0000] <andreubotella>
+I'll open a wpt PR for that later today
+
+[04:51:27.0000] <annevk>
+https://github.com/whatwg/html/commit/a1e8b1a9725dc716326f564b91a29aca19daf2f2 does seem to preserve intent in that it only happens for value if it's not a File, but maybe it could be read some other way that name should also not be affected?
+
+[04:51:33.0000] <annevk>
+/me will go further back in blame
+
+[04:55:23.0000] <annevk>
+I found something
+
+[04:55:24.0000] <annevk>
+https://github.com/whatwg/html/commit/d9fa54d643a7cd041ce31766f1ba5848cd76d18f
+
+[04:55:47.0000] <annevk>
+https://www.w3.org/Bugs/Public/show_bug.cgi?id=17460
+
+[04:55:50.0000] <annevk>
+zcorpan_ is to blame
+
+[04:56:00.0000] <zcorpan_>
+wat
+
+[04:56:11.0000] <andreubotella>
+I'll look at it later, g2g
+
+[04:56:19.0000] <annevk>
+And as was tradition back then there are no tests, links to implementation bugs, or anything 🙂
+
+[05:01:45.0000] <zcorpan_>
+ah I remember that issue. I was going to say it predated testharness.js, but that wasn't the case. https://github.com/w3c/testharness.js/commit/1780607fc4582b65b7fcdded3e39e79e95c8d915
+
+[05:04:14.0000] <zcorpan_>
+Has anyone written about the history of web-platform-tests?
+
+[05:04:42.0000] <annevk>
+I don't think jgraham has a blog or it must be very well hidden
+
+[05:30:53.0000] <jgraham>
+If I do I also hid it from myself
+
+[05:53:35.0000] <jkt_>
+:')
+
+[06:02:06.0000] <andreubotella>
+so apparently filenames just fell through the cracks?
+
+[06:02:25.0000] <zcorpan_>
+andreubotella: yeah
+
+[06:03:03.0000] <zcorpan_>
+I'd guess there are a lot of old spec changes like this
+
+[07:30:52.0000] <smaug____>
+Now it escapes my mind... what is the name for the proposal to add some new/better widgets/controls to the web
+
+[07:32:55.0000] <zcorpan_>
+smaug____: open ui
+
+[07:33:14.0000] <smaug____>
+thanks
+
+[07:43:29.0000] <MikeSmith>
+https://lists.w3.org/Archives/Public/public-html/2007Apr/0564.html from Maciej is arguably where the history of web-platform-tests started (to trace it all the way back)
+
+[07:44:16.0000] <MikeSmith>
+or from the same thread, https://lists.w3.org/Archives/Public/public-html/2007Apr/0532.html from DanC
+
+[07:46:08.0000] <jgraham>
+Well like with all history there are a number of different threads you can pull to unravel different parts of the story
+
+[07:46:31.0000] <annevk>
+/me finds https://lists.w3.org/Archives/Public/public-test-infra/2013JanMar/0052.html
+
+[07:47:02.0000] <annevk>
+I'm curious about the Opera side of the story
+
+[07:48:13.0000] <jgraham>
+Right, I think there's an intesting part that happened before I was involved where Opera ended up having a QA department with Hixie writing tests for web standards
+
+[07:48:20.0000] <MikeSmith>
+https://krijnhoetmer.nl/irc-logs/html-wg/20090127
+
+[07:48:51.0000] <MikeSmith>
+https://wiki.whatwg.org/index.php?title=Testsuite
+
+[07:48:58.0000] <MikeSmith>
+https://lists.w3.org/Archives/Public/public-html/2009Jan/0471.html
+
+[07:49:14.0000] <jgraham>
+And the way that interacted with the Acid tests for CSS
+
+[07:49:41.0000] <annevk>
+jgraham: I think Hixie was the department (at least the automated part of it) and he got Kam hired to replace him at some point
+
+[07:50:41.0000] <annevk>
+But yeah, that's 2003-2005 or so
+
+[07:55:27.0000] <jgraham>
+Good thing we fixed all the problems we discussed in 2009 about how to get tests reviewed and how to link tests to the spec in a reliable way.
+
+[07:55:48.0000] <jgraham>
+Otherwise it might look like we hadn't achieved much in the last decade or so :p
+
+[07:58:19.0000] <jgraham>
+On the other hand I guess these days we don't bother with an email every time a browser vendor contributes 43 tests.
+
+[08:17:41.0000] <gsnedders>
+jgraham: also where Hixie wrote tests while a student ;P
+
+[08:18:16.0000] <gsnedders>
+MikeSmith: I forget the exact year when it was decided that CSS 3 should pretty much all be automated tests
+
+[08:19:19.0000] <gsnedders>
+annevk, jgraham: Hixie was an instrumental part of getting the tooling to run automated tests working within Opera, and it was that role which Kam was hired to take over, allowing Hixie to focus on the actual testing side of things
+
+[08:21:56.0000] <MikeSmith>
+gsnedders: was before 2007 maybe?
+
+[08:22:44.0000] <MikeSmith>
+at least I think the CSS test suite work started quite early
+
+[08:23:53.0000] <MikeSmith>
+Tantek would remember I guess
+
+[08:36:17.0000] <MikeSmith>
+annevk: in the general case where some server-side application code for CORS handling throws for some reason, can you think of an HTTP status code that can be used to convey it?
+
+[08:36:30.0000] <MikeSmith>
+context is https://stackoverflow.com/questions/42755131/enabling-cors-in-cloud-functions-for-firebase/65127649#65127649
+
+[08:37:13.0000] <MikeSmith>
+... where the person has the applicaion code intentionally written to send a 500 response
+
+[08:37:22.0000] <annevk>
+MikeSmith: 403 per https://fetch.spec.whatwg.org/#http-responses
+
+[08:37:48.0000] <MikeSmith>
+/me looks
+
+[08:37:54.0000] <annevk>
+(last paragraph)
+
+[08:38:40.0000] <MikeSmith>
+ok yeah but that says “In case a server does not wish to participate in the CORS protocol”
+
+[08:38:47.0000] <MikeSmith>
+which makes sense
+
+[08:40:25.0000] <MikeSmith>
+but I often see people having application code written to send 500 responses in code that’s intended to participate in the CORS protocol but that throws due to some unexpected thing
+
+[08:40:59.0000] <MikeSmith>
+to me, in general, it seems not optimal to send a 500 from application code — because that’s gonna make it harder for you to distinguish cases of your application code throwing an intended error from cases of the server/runtime code hitting some other kind of internal failure (maybe even before it ever executes your application code)
+
+[08:42:07.0000] <MikeSmith>
+(but maybe that’s just me, and sending a 500 in such cases is actually a normal best practice)
+
+[08:42:20.0000] <annevk>
+MikeSmith: we could clarify that line I suppose as it's a little vague
+
+[08:42:32.0000] <MikeSmith>
+OK
+
+[08:42:47.0000] <annevk>
+MikeSmith: what it really means is that if the server doesn't want to allow the particular request (or participate in the CORS protocol at all), do this
+
+[08:43:01.0000] <annevk>
+but it's still a suggestion since servers can do whatever
+
+[08:43:07.0000] <MikeSmith>
+sure
+
+[08:49:11.0000] <Domenic>
+MikeSmith: 500 makes sense for me in cases like that. E.g. in all my Node servers, if an exception gets thrown while processing a request/preparing to create a response, we turn it into a 500 response. That code snippet just looks like someone manually doing the try/catch, instead of letting it bubble to their server-level error handler, which is somewhat understandable since I'm not sure how well generic server
+
+[08:49:11.0000] <Domenic>
+request/response handling deals with preflight-type things.
+
+[08:50:09.0000] <Domenic>
+(But, the OP's code for that question makes no sense, where they're always sending a 500.)
+
+[08:57:19.0000] <MikeSmith>
+Domenic: ah yeah, good point about this case — about just letting the exception bubble rather than catching it
+
+[08:59:23.0000] <MikeSmith>
+but otherwise yeah I guess if there’s nothing more specific that the application code can determine, then 500 works
+
+[09:30:24.0000] <gsnedders>
+MikeSmith: pre-CSS3 it was all manual stuff though, that's the thing
+
+[09:30:38.0000] <gsnedders>
+well "manual", it was all screenshot based
+
+[09:37:02.0000] <gsnedders>
+MikeSmith: https://www.w3.org/blog/CSS/2009/06/23/resolutions_69/ seems like it was only June 2009 that reftests were officially adopted for CSS
+
+[09:53:50.0000] <andreubotella>
+is there an issue open anywhere for wpt.fyi trying to link to the nonexistent html source in github rather than to an .any.js?
+
+[09:55:45.0000] <andreubotella>
+nevermind, found it
+
+[09:55:51.0000] <andreubotella>
+https://github.com/web-platform-tests/wpt.fyi/issues/1476
+
+[12:04:57.0000] <andreubotella>
+annevk: I misinterpreted your earlier comment about FormData in Chrome
+
+[12:05:22.0000] <andreubotella>
+I wrote down the whole story about why this is a urlencoded-only thing in https://github.com/whatwg/url/issues/562#issuecomment-738276174
+
+
+2020-12-04
+[00:25:02.0000] <annevk>
+andreubotella: I think I understand now
+
+[00:26:16.0000] <annevk>
+andreubotella: well hmm, maybe not
+
+[00:30:46.0000] <annevk>
+andreubotella: what happens for text/plain?
+
+[00:31:31.0000] <annevk>
+andreubotella: it seems to me that HTML should maybe be modified, that it flattens the File into its filename if the encoding is not multipart/form-data
+
+[00:32:19.0000] <annevk>
+andreubotella: and then we can modify urlencoding by asserting that value is always a string
+
+[02:11:42.0000] <andreubotella>
+annevk: that's right, I hadn't considered text/plain
+
+[02:12:10.0000] <andreubotella>
+annevk: but I'm not sure about having to depend on the enctype when constructing the entry list
+
+[02:14:20.0000] <andreubotella>
+s/enctype/method
+
+[02:14:38.0000] <andreubotella>
+it means you couldn't do this even when the enctype is UTF-8:
+
+[02:14:45.0000] <andreubotella>
+const formdata = new FormData(formElement); fetch("https://example.com", {method: "POST", body: formdata});
+
+[02:17:50.0000] <andreubotella>
+then again, I don't think you can currently convert from a FormData into a urlencoded or text/plain representation, so maybe that can work
+
+[02:22:31.0000] <annevk>
+andreubotella: constructing the <form> entry list has access to enctype, I agree it's not ideal, but it seems better than to normalize in two completely different places to me
+
+[02:22:59.0000] <annevk>
+andreubotella: and yeah, FormData can only be serialized as multipart/form-data and I'd prefer keeping it that way
+
+[02:24:12.0000] <andreubotella>
+annevk: so we'd be going the safari way in these tests, I guess: https://wpt.fyi/results/FileAPI/file/send-file-formdata-controls.tentative.html?label=experimental&label=master&aligned
+
+[02:25:04.0000] <andreubotella>
+https://wpt.fyi/results/html/semantics/forms/form-submission-0/newline-normalization.html?label=pr_head&max-count=1&pr=26747 too
+
+[02:32:00.0000] <annevk>
+andreubotella: I thought we generally wanted to follow Chrome as it is closest to the spec?
+
+[02:32:26.0000] <annevk>
+It's hard to go from those results to the actual tests so I'm not sure
+
+[02:33:42.0000] <andreubotella>
+annevk: here Chrome does everything by the spec except that it also normalizes newlines for urlencoded (haven't checked text/plain though)
+
+[02:34:43.0000] <andreubotella>
+hm, I might be confusing things
+
+[02:34:46.0000] <annevk>
+andreubotella: yeah, and urlencoded / text/plain we'd make a change in HTML for to flatten a File to a string; I think that makes the most sense to me
+
+[02:39:58.0000] <andreubotella>
+annevk: my bad, I was thinking that there would be some change in behavior when creating a multipart entry list, when it wouldn't be the case
+
+[02:40:05.0000] <andreubotella>
+so yeah, FormData wouldn't be affected at all
+
+[03:16:14.0000] <jkt_>
+annevk: rfc1918 should probably follow the naming convention of COR* :D
+
+[03:16:46.0000] <annevk>
+jkt_: that's a great suggestion for that issue
+
+[03:17:08.0000] <annevk>
+COIAP
+
+[03:17:23.0000] <annevk>
+Cross-origin IP address preflights
+
+[03:17:52.0000] <jkt_>
+Please don't take me seriously :D
+
+[03:18:15.0000] <annevk>
+don't say things you'll regret :p
+
+[03:19:40.0000] <jkt_>
+The joke would be on you having to explain it to browser devs :D. No CORB with a B for Boy.... etc
+
+[03:22:50.0000] <jgraham>
+I'm awaiting CORBLIMEY with a Dick van Dyke logo
+
+[03:37:20.0000] <jkt_>
+WhatWG swag right there
+
+[14:37:06.0000] <saber1>
+Domenic: if I read this correctly https://github.com/whatwg/html/pull/4184#issuecomment-739054218, do you mean that we should only try to move it forward after Firefox also has <dialog> shipped in release?
+
+[14:37:58.0000] <Domenic>
+saber1: no, I'm saying that we require multiple implementers interested to move the change forward, and although Firefox is interested, you need to recruit a second one.
+
+[14:38:50.0000] <saber1>
+Domenic: ah okay, sorry about that, I thought Chrome had the interests
+
+[14:39:23.0000] <Domenic>
+Nah, see https://github.com/whatwg/html/pull/4184#issuecomment-440326010
+
+[14:45:00.0000] <saber1>
+gotcha, I misread
+
+
+2020-12-05
+[22:40:16.0000] <annevk>
+Domenic: saber1: I think what is missing there is that what’s in the spec doesn’t meet the requirements either. So to play that game we’d remove this from the spec and thrn find agreement on what to add back, no?
+
+[07:34:03.0000] <Domenic>
+What'd we remove? All of dialog? I've been advocating that for some time.
+
+[07:43:17.0000] <domfarolino>
+Huh, I just realized that the domintro title boxes are not searchable I think bc of css ::before https://usercontent.irccloud-cdn.com/file/UNoTGbLt/Screen%20Shot%202020-12-05%20at%2010.41.58.png
+
+[07:47:17.0000] <domfarolino>
+History question: The history handling behaviors #hh-entry-update and #hh-reload are handled by the same spec code in #update-the-session-history-with-the-new-page. However the former says we navigate to an existing entry but replace it's document, and the latter says we should replace the "current session history entry" altogether. Is this inconsistent?
+
+[09:22:09.0000] <Domenic>
+domfarolino: yeah, although the descriptions under the <dfn> for each of them is informal, it's still normative text, so it's wrong. It'd be good to unify them somehow
+
+[09:23:45.0000] <Domenic>
+But first we fix the spec text, then we backport that to the descriptions under the <dfn>
+
+[09:59:59.0000] <croraf>
+Hi. I'm checking a behavior of image "src" replacing.
+
+[10:01:16.0000] <croraf>
+When I have an image loaded, and I replace its "src" attribute, the image stays loaded for some time, until the new image gets loaded from the network. Can this behavior be somehow modified, as in many cases it is not wanted.
+
+[10:02:36.0000] <croraf>
+Chrome waits for the new src to get fully loaded, and then replaces the image at once
+
+[15:38:23.0000] <domfarolino>
+Domenic: Thanks, I filed https://github.com/whatwg/html/issues/6197 for my "full" analysis
+
+[15:38:48.0000] <domfarolino>
+croraf: What is the unwanted behavior. Keeping the old image around for awhile?
+
+[15:39:02.0000] <croraf>
+yes
+
+[15:39:07.0000] <croraf>
+domfarolino,
+
+[15:48:36.0000] <domfarolino>
+croraf: I vaguely remember setting the src to empty string should remove the picture I believe after a queued microtask. So if you src=“”;src=“something” I don’t think that will do what you want. But if you separated the two src mutations by e.g., a setTimeout(... 0) that should work? Sorry not in front of my computer now to test
+
+[15:49:07.0000] <domfarolino>
+croraf: I should also say that our interoperability is OK but not great around image attribute mutations. Chrome adheres pretty well these days though.
+
+
+2020-12-06
+[05:46:11.0000] <croraf>
+domfarolino, Actually, that was my first idea also :). But when I tried to implement it some related issue occupied me that much that I spent the entire day on it
+
+[05:46:52.0000] <croraf>
+The first implementation didn't achieve what I wanted, but perhaps the image clearing did work. I have to try it again to remember.
+
+[05:48:11.0000] <croraf>
+But yet another (third) related issue occupies me. When I traverse the images, I see that Chrome doesn't cache them :|. That is, images from <img> are fetched using "no-cache" policy :| . Is there a way to manipulate image caching on <img> tag.
+
+[05:57:37.0000] <croraf>
+domfarolino, yes, src='' inbetween the src replacement does work. I did that yesterday, and indeed I concluded that doing it in the same thread might not do it, so I did set it up on the promise.
+
+[06:00:10.0000] <croraf>
+Surprisingly, even if done in the same thread it does clear the image first :O
+
+[06:00:22.0000] <croraf>
+So no setTimout or Promise are needed.
+
+
+2020-12-07
+[23:59:23.0000] <annevk>
+mkwst: "I think that it's reasonable that the capture-ability of videos and images is controlled by the document that embeds them." you might wanna chime in at https://github.com/w3c/mediacapture-screen-share/pull/148
+
+[03:33:55.0000] <croraf>
+Anyone can point me to the chapter how image_element.src and image_element in general works. I was checking HTML spec about <img> tag but does not contain what I need. Is there any other chapter?
+
+[03:34:24.0000] <croraf>
+Specifically I don't know how does image.src=""; image.src=newSource;
+
+[03:34:47.0000] <croraf>
+clear the image source inbetween, even though this is done in a single thread.
+
+[03:46:04.0000] <annevk>
+croraf: did you find "update the image data" and callers?
+
+[03:46:17.0000] <annevk>
+croraf: that's basically it, going from memory
+
+[03:55:53.0000] <croraf>
+I don't see that string "update the image data"
+
+[03:55:56.0000] <croraf>
+annevk,
+
+[04:06:49.0000] <annevk>
+croraf: it's in the single-page version for sure
+
+[04:22:03.0000] <croraf>
+I see. Indeed. When checking the multipage version, you have 4.8 as one page
+
+[04:22:14.0000] <croraf>
+* 4.7 as one page, then you go to 4.8 page
+
+[04:22:28.0000] <croraf>
+But it holds only 4.8.1, 4.8.2 and 4.8.3
+
+[04:22:42.0000] <croraf>
+4.8.4 Images is a separate page
+
+[07:13:40.0000] <croraf>
+I notice two things in chrome's behavior. First, when I move through the links on the same site (I'm modifying the history) that sometimes Chrome caches some images and just shows them, doesn't even try to make the request. While most of the time it does the request (but just returns it from its cache immediately).
+
+[07:13:52.0000] <croraf>
+I'm not sure what is this behavior.
+
+
+2020-12-08
+[17:18:57.0000] <derpadmin>
+anyone had success with service workers + push notifications ?
+
+[17:19:26.0000] <derpadmin>
+my service worker register on chrome desktop but not firefox
+
+[17:19:33.0000] <derpadmin>
+unsure about mobile yet
+
+[18:44:17.0000] <MikeSmith>
+Domenic: I notice the Motivation section of for the the Origin isolation feature at https://www.chromestatus.com/feature/5683766104162304 was changed to drop mention of “side-channel protection (e.g. against Spectre)”
+
+[19:27:25.0000] <Domenic>
+MikeSmith: indeed. See https://github.com/whatwg/html/issues/6192 for some discussion about why including that in the messaging could be bad.
+
+[19:27:41.0000] <MikeSmith>
+/me looks
+
+[19:30:59.0000] <MikeSmith>
+I see
+
+[19:31:54.0000] <MikeSmith>
+Origin-Agent-Cluster does seem good
+
+[19:32:42.0000] <MikeSmith>
+Domenic: but I guess my next question would be, is the feature now also going to be renamed? I mean, not just the header
+
+[23:17:41.0000] <annevk>
+MikeSmith: the feature is the header, no?
+
+[05:12:49.0000] <croraf>
+When you navigate to a new history item, shouldn't the browser try to set the scrollTop position of the html element to 0?
+
+[07:01:34.0000] <MikeSmith>
+annevk: well in the spec, the title of the feature is “Origin isolation”
+
+[07:01:45.0000] <MikeSmith>
+would that not need to be renamed?
+
+[07:03:13.0000] <MikeSmith>
+and also window.originIsolated
+
+[08:59:06.0000] <annevk>
+MikeSmith: I guess so, Domenic is driving that
+
+[08:59:17.0000] <annevk>
+MikeSmith: maybe ask in the issue?
+
+[08:59:34.0000] <annevk>
+MikeSmith: seems like we should make a decision about that 🙂
+
+[09:01:33.0000] <MikeSmith>
+OK
+
+[09:05:18.0000] <MikeSmith>
+annevk: about the “Track the incumbent settings and active script in Promise callbacks” thing, I notice that patch never actually uses the term “incumbent realm”
+
+[09:06:28.0000] <MikeSmith>
+and I notice that while “incumbent Realm” is defined in the spec at https://html.spec.whatwg.org/multipage/webappapis.html#concept-incumbent-realm, the term is never actually normatively referenced in the spec
+
+[09:07:07.0000] <MikeSmith>
+it’s referenced only once, at https://html.spec.whatwg.org/multipage/webappapis.html#realms-settings-objects-global-objects:concept-incumbent-realm, in a non-normative example
+
+[09:07:26.0000] <annevk>
+MikeSmith: I guess we use the settings object instead that it is 1:1 with? It's just a convenience thing in the end
+
+[09:08:38.0000] <MikeSmith>
+yeah I figured that is why, but it’s still a bit confusing
+
+[09:09:06.0000] <MikeSmith>
+especially since MDN is using the term now, in https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise#Incumbent_realm_tracking
+
+[09:09:55.0000] <MikeSmith>
+so maybe I should just get that MDN article rewritten to align with the actual language in the spec
+
+[09:10:27.0000] <annevk>
+MikeSmith: well, hmm, does MDN distinguish between realms and globals?
+
+[09:10:54.0000] <annevk>
+MikeSmith: I guess I would kinda expect MDN to only talk about global objects as web developers don't really have to know the distinction most of the time, but it depends...
+
+[09:11:25.0000] <MikeSmith>
+yeah I think it’s a bit more than web developers need to know
+
+[09:11:50.0000] <MikeSmith>
+anyway, the first sentence of that MDN article section is this:
+
+[09:11:52.0000] <MikeSmith>
+> JavaScript code has a concept of a realm — this can be roughly thought of as the global object.
+
+[09:12:51.0000] <MikeSmith>
+anyway I guess I’ll raise an MDN issue for it
+
+[10:24:21.0000] <Mek>
+hmm, https://github.com/whatwg/html/pull/5305 made normative changes to BroadcastChannel behavior, it included tests that showed chrome was failing those tests, yet it landed without implementation bugs filed afaict... Isn't the reason to have checkboxes in the PR template so somebody can make sure the checkboxes are checked?
+
+[10:26:11.0000] <Mek>
+(to be clear, I agree with the changes, the PR was fixing a spec issue I originally filed many years ago. But a implementation bug would have been nice to make sure our implementation was actually updated to the newly changed spec)
+
+[10:54:51.0000] <annevk>
+Mek: I just left a comment, afaict the test failing in Chrome wasn't modified
+
+[10:55:27.0000] <Mek>
+both the name and expectations of the test were changed in the wpt PR as far as I can tell?
+
+[10:56:05.0000] <annevk>
+Mek: sigh, right you are
+
+[10:56:13.0000] <annevk>
+Mek: would it help if I filed a bug at this point?
+
+[10:56:36.0000] <Mek>
+I just filed one myself, so no longer needed
+
+[10:58:05.0000] <annevk>
+Mek: great, I updated my comment; hopefully this won't happen again
+
+[10:58:42.0000] <Mek>
+annevk: Thanks!
+
+
+2020-12-09
+[20:44:23.0000] <MikeSmith>
+annevk: I’m confused how an ShadowRoot.prototype.delegatesFocus property ends up being exposed in UAs despite no such property being defined in the IDL at https://dom.spec.whatwg.org/#interface-shadowroot for ShadowRoot, nor being defined for any interface ShadowRoot inherits from
+
+[20:46:28.0000] <MikeSmith>
+I realize there’s an abstract “delegates focus” defined at https://dom.spec.whatwg.org/#shadowroot-delegates-focus but I don’t see how that translates into an explicit exposed property of the object
+
+[20:47:50.0000] <MikeSmith>
+and I realize that there is an explicit delegatesFocus member defined for the ShadowRootInit dictionary, but again I don’t see how that translates into an exposed property of the ShadowRoot object
+
+[20:53:34.0000] <MikeSmith>
+as far as implementations, at https://chromium.googlesource.com/chromium/src/+/refs/heads/master/third_party/blink/renderer/core/dom/shadow_root.idl#36 I see that the ShadowRoot IDL in Blink has a delegatesFocus property
+
+[20:54:04.0000] <MikeSmith>
+... but I don’t understand why it’s there, since the spec doesn’t seem to define it
+
+[21:31:15.0000] <annevk>
+MikeSmith: in HTML? I thought that got added recently
+
+[21:37:21.0000] <MikeSmith>
+annevk: I am looking at the DOM spec
+
+[21:38:00.0000] <MikeSmith>
+/me looks in HTML
+
+[21:38:52.0000] <MikeSmith>
+yeah, I don’t see it HTML
+
+[22:16:42.0000] <annevk>
+MikeSmith: thanks, file an issue? I guess some git log grepping is in order
+
+[22:17:20.0000] <MikeSmith>
+annevk: OK, will raise an issue
+
+[22:17:50.0000] <MikeSmith>
+I did a lot of grepping already, but maybe I’m not looking in the right place
+
+[22:18:23.0000] <MikeSmith>
+but thing is, do we actually need an expsed delegatesFocus property?
+
+[22:18:45.0000] <MikeSmith>
+WebKit implements the requirements in the spec, without exposing any such property
+
+[22:19:28.0000] <MikeSmith>
+but instead just as internal flag, all in the C++ code, without anything in their IDL
+
+[22:21:11.0000] <MikeSmith>
+well they implement the IDL for the dictionary member for the constructor
+
+[22:21:40.0000] <MikeSmith>
+but that just has the effect of setting the internal flag, which is all that the spec requires
+
+[22:22:36.0000] <MikeSmith>
+so given that, I don’t understand what need there is for Blink to expose an explicit property to web content
+
+[22:58:12.0000] <MikeSmith>
+annevk: raised https://github.com/mdn/browser-compat-data/pull/7620 for BCD
+
+[23:02:04.0000] <annevk>
+MikeSmith: I mainly wonder if we discussed it when delegates focus was added
+
+[23:03:14.0000] <MikeSmith>
+ah OK
+
+[23:03:41.0000] <MikeSmith>
+Krinkle: thanks for weighing in on that sendBeacon issue
+
+[23:05:27.0000] <Krinkle>
+I hope I captured it more or less correctly :/
+
+[23:05:36.0000] <Krinkle>
+starting to doubt myself...
+
+[23:05:43.0000] <MikeSmith>
+heh
+
+[23:06:06.0000] <MikeSmith>
+unrelated general question about the https://github.com/notifications UI: There’s no way to get a view of just the PRs/issues that have been merged or closed, right?
+
+[23:07:03.0000] <MikeSmith>
+I basically would most of the time just want to ignore closed/merged PRs/issues
+
+[23:07:39.0000] <MikeSmith>
+but the way that UI is now, they just get mixed in with everything else, and there’s no option to filter them
+
+[23:08:23.0000] <MikeSmith>
+I tried searching to see if somebody had come up with a browser extension or userscript to add that capability, but I find nothing
+
+[23:09:06.0000] <MikeSmith>
+it’s hard for me to believe there aren’t a lot of people like me who would like to filter those
+
+[23:10:45.0000] <annevk>
+MikeSmith: marking them read or unfollowing them is too much work you mean?
+
+[23:12:07.0000] <annevk>
+It doesn't seem like is:open is an available filter, which is somewhat disappointing
+
+[23:22:59.0000] <annevk>
+MikeSmith: as far as I can tell none of the delegates focus PRs talked about exposing a new member on ShadowRoot
+
+[23:24:34.0000] <MikeSmith>
+annevk: OK, thanks (about the delegates focus PRs)
+
+[23:24:54.0000] <annevk>
+MikeSmith: even in early drafts such as https://www.w3.org/TR/2016/WD-shadow-dom-20161128/ there's no member on ShadowRoot
+
+[23:25:16.0000] <MikeSmith>
+did the blink implementation precede the spec?
+
+[23:25:22.0000] <MikeSmith>
+is that maybe what happened?
+
+[23:25:41.0000] <MikeSmith>
+the spec reverse-engineered the blink implementation?
+
+[23:26:40.0000] <annevk>
+Even in the dglazkov-era it was not there: https://www.w3.org/TR/2015/WD-shadow-dom-20151215/#the-shadowroot-interface
+
+[23:26:47.0000] <annevk>
+No idea
+
+[23:27:35.0000] <MikeSmith>
+OK
+
+[23:27:54.0000] <MikeSmith>
+it needles me to not know how it appeared
+
+[23:28:09.0000] <MikeSmith>
+but I guess I should just let the mystery be
+
+[23:28:35.0000] <MikeSmith>
+... and get back to slogging through github notifications 😱
+
+[23:28:50.0000] <MikeSmith>
+and yeah as far as the github notifications thing, manually marking them all read is significant work for me after mostly being away for two weeks and ending up with a giant backlog
+
+[23:30:43.0000] <annevk>
+MikeSmith: I guess you can go through the commit log of Chromium
+
+[23:33:45.0000] <annevk>
+MikeSmith: https://github.com/whatwg/dom/issues/931
+
+[23:34:01.0000] <annevk>
+(if you click that link you'll have one less notification)
+
+[23:41:13.0000] <MikeSmith>
+heh
+
+[23:41:15.0000] <MikeSmith>
+thanks
+
+[23:41:23.0000] <MikeSmith>
+thanks for raising that
+
+[05:34:58.0000] <croraf>
+I'm checking https://html.spec.whatwg.org/multipage/history.html#the-session-history-of-browsing-contexts and I think it is kind of confusing. In the 3 sentences it of gives two different definitions of the session history. First it says it is a sequence of Documents, then in the third sentence it says it is a flat list of session history entries.
+
+[05:35:15.0000] <croraf>
+Am I right that this should be reworded?
+
+[07:24:19.0000] <annevk>
+croraf: see "topic: history" issues against whatwg/html
+
+[08:11:37.0000] <hsivonen>
+I'm looking at the case where focus is in an iframe and the iframe is navigated. Where does focus go? Firefox says that the newly-loaded document in the iframe takes focus and experiences a `focus` event.
+
+[08:11:56.0000] <hsivonen>
+I don't see Chrome firing the event. Unclear to me so far where focus actually goes in Chrome.
+
+[08:12:29.0000] <hsivonen>
+I don't see spec text covering this. Am I missing something? Does the spec cover this case?
+
+[08:13:49.0000] <annevk>
+hsivonen: I don't recall reading about that case, could well be overlooked
+
+[08:14:00.0000] <hsivonen>
+annevk: OK.
+
+[09:10:10.0000] <croraf>
+annevk, I cannot find the related issue
+
+[09:10:21.0000] <croraf>
+There are 60 history issues
+
+[09:16:50.0000] <annevk>
+croraf: there's a high-level one about redesigning it
+
+[09:20:27.0000] <andreubotella>
+in any case, that specific difference doesn't seem like a bug
+
+[09:21:06.0000] <andreubotella>
+a "sequence of Documents" is the conceptual overview, but in order to formalize it you need metadata associated with the Documents, which is why you have session history entries
+
+[09:21:09.0000] <croraf>
+https://github.com/whatwg/html/issues/2566 this one of yours?
+
+[09:21:14.0000] <croraf>
+annevk, ?
+
+[09:21:56.0000] <annevk>
+croraf: https://github.com/whatwg/html/issues/1454
+
+[09:21:58.0000] <croraf>
+andreubotella, this conceptual overview is just confusing.
+
+[09:23:53.0000] <croraf>
+annevk, this bug of yours that I linked can be closed I think. To me it seems clear that History is associated with the document, and window.history returns the associated History of its associated Document.
+
+[09:25:00.0000] <croraf>
+DIdnt read the full discussion though, but for the original question it is welldefined (a bit complicated, but I think consistent and)
+
+[09:27:24.0000] <annevk>
+croraf: I recommend reading the issue first then
+
+[09:28:03.0000] <croraf>
+andreubotella, If I go to learn and read the spec, I cannot know if the first sentence is the conceptual overview or the specification, or if the third is an overview or what. It needs to be uniquely well defined.
+
+[09:31:37.0000] <andreubotella>
+annevk: while I was working on the spec changes for the newline normalization in forms, I realized that things were more complicated than we thought
+
+[09:32:02.0000] <annevk>
+andreubotella: oh, what's the thing we forgot about?
+
+[09:32:13.0000] <andreubotella>
+we were assuming there was no way to serialize a FormData object into urlencoded or text/plain, but FACEs let you embed a FormData in a form's entry list as it's being constructed
+
+[09:33:18.0000] <andreubotella>
+and we were assuming there was no way to get a FormData object from a form's entry list in the form submission process, but the formdata event gives you one and lets you modify it
+
+[09:34:53.0000] <annevk>
+Ah, and so then the question is whether the normalization happens or not
+
+[09:34:55.0000] <annevk>
+Hmm
+
+[09:36:14.0000] <annevk>
+That's too much for tonight, but I'm happy to help tomorrow; I guess it might also be worth asking tkent about making changes to how this all interacts, if that would be helpful
+
+[09:36:44.0000] <andreubotella>
+right
+
+[09:37:45.0000] <andreubotella>
+I have tests for how both of those things interact with the changes to the form construction algorithm, should I push them into the wpt PR?
+
+[09:38:21.0000] <andreubotella>
+I assume we're not merging it until the spec changes are merged, so there's no need to mark them tentative
+
+[09:44:53.0000] <annevk>
+andreubotella: sounds good
+
+
+2020-12-10
+[00:05:58.0000] <annevk>
+andreubotella: nice find on the top-level await PR
+
+[00:51:43.0000] <annevk>
+littledan: so to be clear, I was mainly wondering about the principle that would expose encodeURI and not atob
+
+[00:52:11.0000] <annevk>
+littledan: my preference is to have a smaller starting point as that is what Worklets wanted but didn't get
+
+[00:52:15.0000] <littledan>
+oh, sorry if citing you is inaccurate there
+
+[00:53:15.0000] <littledan>
+hmm, I'll raise the smaller starting point in the next SES call
+
+[00:53:50.0000] <annevk>
+littledan: it's not a big deal, to be clear, and that's appreciated
+
+[00:54:30.0000] <littledan>
+I do think there is something to "the JS spec has been a line for a long time, which has some reality to it". but I understand if this is not a desirable thing to make even more visible.
+
+[00:56:44.0000] <annevk>
+I don't think that's really true for web developers, though maybe Node.js made it more apparent
+
+[02:09:47.0000] <littledan>
+I think it's true in the JS ecosystem of today in general, and web developers participate in that. It bleeds out already. It's legitimate to want to reduce it, but i would say it's already "a thing"
+
+[02:10:55.0000] <annevk>
+littledan: You think most web developers will be able to tell where encodeURI and atob sit?
+
+[02:13:20.0000] <littledan>
+I don't think there are many things that we can say most web developers know
+
+[02:14:36.0000] <annevk>
+Agreed, and they shouldn't have to 😊
+
+[06:04:33.0000] <hsivonen>
+AFAICT, when focus in in an iframe and the iframe navigates, the new document in the iframe gets focus. Firefox fires a focus event on the newly-loaded doc (roughly when requestAnimationFrame starts firing?). However, Chrome doesn't. However, clicking the iframe fires the focus event in Chrome, which suggests that in Chrome the new doc is in some weird state.
+
+[06:04:58.0000] <hsivonen>
+Demo: https://hsivonen.com/test/moz/navigation-focus/
+
+[06:16:02.0000] <hsivonen>
+Safari also doesn't fire the event in the iframe but also doesn't fire the event if the iframe is clicked, which suggests that Safari actually considers the navigated iframe properly focused (but without event upon loading)
+
+[06:16:37.0000] <annevk>
+hsivonen: in Different-Site I also have to click in Fx it seems
+
+[06:17:12.0000] <hsivonen>
+annevk: You have Fission enabled, right?
+
+[06:17:15.0000] <annevk>
+hsivonen: yes
+
+[06:17:29.0000] <hsivonen>
+annevk: That's the bug I'm investigating. :-)
+
+[06:18:10.0000] <annevk>
+It seems Chrome somehow does that "weird state" consistently
+
+[06:18:12.0000] <hsivonen>
+annevk: Note how in Firefox with Fission without my patch the focus moves out of the iframe
+
+[06:18:34.0000] <hsivonen>
+That is, in Fission, the outer document changes `activeElement` away from the iframe
+
+[06:19:39.0000] <hsivonen>
+I think both the non-Fission Firefox and Safari behavior are defensible, but the Chrome behavior is weird.
+
+[06:30:29.0000] <annevk>
+hsivonen: Safari TP does the same as Chrome for me
+
+[06:31:00.0000] <annevk>
+hsivonen: Safari non-TP too, for that matter
+
+[06:31:42.0000] <hsivonen>
+annevk: Which OS? I tested release version on Mojave and the latest iPadOS.
+
+[06:31:47.0000] <annevk>
+hsivonen: wait, Safari seems weird, if I alt+tab it does fire
+
+[06:31:58.0000] <hsivonen>
+annevk: I guess I should boot up Big Sur.
+
+[06:32:05.0000] <annevk>
+hsivonen: 10.15.7 (19H2)
+
+[06:32:20.0000] <annevk>
+hsivonen: which is Catalina
+
+[06:33:03.0000] <annevk>
+hsivonen: yeah for both versions of Safari I have to alt+tab away and back for onfocus to say has fired
+
+[06:33:14.0000] <annevk>
+hsivonen: and it doesn't say it has fired for the earlier documents
+
+[06:33:17.0000] <hsivonen>
+That makes sense.
+
+[06:33:46.0000] <hsivonen>
+Let's see what Chrome does on alt-tab.
+
+[06:33:47.0000] <annevk>
+hmm actually, for the first document it has, but then the second one it has not
+
+[06:34:08.0000] <annevk>
+Chrome also seems to react to it
+
+[06:34:14.0000] <hsivonen>
+Yeah
+
+[06:34:32.0000] <hsivonen>
+So the iframe is focused enough for Chrome that alt-tabbing back restores focus.
+
+[06:35:34.0000] <hsivonen>
+I think the non-Fission Firefox behavior makes the most sense for Web devs but I could see the argument why the Safari behavior could be defended.
+
+[06:36:22.0000] <hsivonen>
+Maybe I should make the demo log blur and the number of times focus has fired.
+
+[06:41:43.0000] <andreubotella>
+so apparently Chrome's implementation of FACEs also gets newlines wrong
+
+[06:41:51.0000] <andreubotella>
+hopefully that's not something people already depend on
+
+[06:42:31.0000] <annevk>
+Seems very doubtful
+
+[09:07:03.0000] <hsivonen>
+Filed https://github.com/whatwg/html/issues/6209 about the focus thing.
+
+
+2020-12-11
+[08:17:48.0000] <MikeSmith>
+Mek: FYI https://github.com/mdn/browser-compat-data/pull/7660 “Mark FileSystem*Handle APIs as non-standard”
+
+[08:18:00.0000] <MikeSmith>
+> Since the APIs are a part of a WICG spec, they are currently non-standard.
+
+[08:19:31.0000] <MikeSmith>
+If it’s actually not appropriate to mark those as “not standards-track” in MDN, please consider weighing in on that issue to say so
+
+[08:20:38.0000] <MikeSmith>
+hmm well foolip just now already merged that PR
+
+[08:59:53.0000] <Mek>
+MikeSmith: I think that is consistent with other wicg specs (even ones all browsers implement like https://wicg.github.io/entries-api/ seem to be marked that way)
+
+[09:28:09.0000] <MikeSmith>
+Mek: yeah some are, some aren’t
+
+[09:29:11.0000] <MikeSmith>
+I personally wish we would just get rid of that standards_track flag completely from BCD and MDN
+
+[09:29:31.0000] <Domenic>
++1... browser support data is way more useful
+
+[09:29:36.0000] <MikeSmith>
+yup
+
+[09:29:59.0000] <MikeSmith>
+...since whether a particular feature is “standard” is not something web developers actually care about
+
+[09:30:16.0000] <MikeSmith>
+they care which browsers support it
+
+[09:30:27.0000] <Domenic>
+Like the warning at the top of https://developer.mozilla.org/en-US/docs/Web/API/File/webkitRelativePath is kind of silly, and not really accurate...
+
+[09:31:26.0000] <Domenic>
+If there is going to be a warning at the top, I'd rather it be something like "Be careful using this on production sites; it is only implemented in 97% of browsers weighted by usage." (caniuse style)
+
+[09:34:12.0000] <MikeSmith>
+yeah the corresponding wording that is used on the MDN articles is another problem
+
+[09:35:01.0000] <MikeSmith>
+the core problem is really that “standard” and “standards_track” are subjective
+
+[09:35:21.0000] <MikeSmith>
+and we should not be trying to record subjective data
+
+[09:35:54.0000] <MikeSmith>
+we can instead just generate actually-useful indicators like the caniuse style, based on the objective data we already have
+
+[09:37:23.0000] <MikeSmith>
+what we rightly should have in place of “standards_track” is just a clear indicator of whether a feature actually has a spec at all. Any spec, any where
+
+[09:37:38.0000] <MikeSmith>
+there are features in MDN that are not part of any current spec
+
+[09:38:25.0000] <MikeSmith>
+window.applicationCache, for example
+
+[09:40:25.0000] <MikeSmith>
+https://github.com/mdn/browser-compat-data/issues/6905#issuecomment-709047817
+
+[10:24:33.0000] <annevk>
+Well, Chrome wants to get rid of file entries, no? So trying to get people to not rely on it seems worthwhile
+
+[10:27:02.0000] <annevk>
+I do think it makes sense to signal standards track in some way as they are much more likely to be long term relevant
+
+[10:31:11.0000] <Domenic>
+I don't believe there are any plans to get rid of file entries.
+
+[10:31:28.0000] <Domenic>
+Just the opposite, we wrote a spec so that it could be more widely and interoperably implemented
+
+[10:50:17.0000] <annevk>
+See the upstream to HTML issue
+
+[10:54:01.0000] <Mek>
+I think we would like to get rid of file entries, yes. Even before we wrote the spec we would have prefered something better to replace it, but when everybody else started implementing it that ship kind of sailed. But certainly now I'd love to get rid of file entries eventually (rather than largely duplicate functionality with two different APIs). Realistically I don't see that happening for a very long time though, certainly not for the cross browser
+
+[10:54:01.0000] <Mek>
+bits of file entries.
+
+
+2020-12-12
+[23:15:04.0000] <timwis>
+Hey all, does anyone know of plans or discussion to add cookie preference management as a native browser feature? I assume it’s come up before just can’t seem to find anything on it.
+
+[00:27:50.0000] <annevk>
+timwis: what does that mean?
+
+[00:29:13.0000] <timwis>
+annevk: a native UI instead of the various GDPR cookie consent/customise modals, similar to (I imagine) native payment UI
+
+[04:38:41.0000] <annevk>
+I see, there’s some discussion in the Privacy CG, but you already left…
+
+
+2020-12-15
+[15:52:44.0000] <MikeSmith>
+does Chrome Canary/89 have MathML support enabled that the current stable version of Chrome does not?
+
+[15:53:08.0000] <MikeSmith>
+context is https://github.com/mdn/content/issues/253
+
+
+2020-12-16
+[16:39:37.0000] <Domenic>
+I haven't seen an Intent to Ship, so if it is, that's a mistake...
+
+[16:39:55.0000] <Domenic>
+Maybe you have a flag flipped
+
+[17:41:22.0000] <MikeSmith>
+Domenic: I reckon I must
+
+[17:41:26.0000] <MikeSmith>
+/me looks
+
+[17:41:49.0000] <MikeSmith>
+I know there’s an implementation in Blink now at least
+
+[17:42:00.0000] <MikeSmith>
+from discussion at TPAC
+
+[17:44:38.0000] <MikeSmith>
+hmm I find nothing in chrome://flags/
+
+[17:55:17.0000] <MikeSmith>
+well according to https://momdo.hatenablog.jp/entry/20200706/1594040656 it’s just controlled by enable-experimental-web-platform-features
+
+[17:55:20.0000] <MikeSmith>
+/me tries
+
+[17:56:45.0000] <MikeSmith>
+OK, yup
+
+[17:56:55.0000] <MikeSmith>
+that’s it
+
+[09:12:43.0000] <gsnedders>
+ping for r? https://github.com/whatwg/compat/pull/134
+
+[09:15:31.0000] <Domenic>
+judging by open issues, perhaps gsnedders wants to edit Compat :)
+
+[09:16:14.0000] <gsnedders>
+Domenic: hah, I just spent a small amount of time looking at WebKit-prefixed stuff in October
+
+
+2020-12-17
+[06:31:43.0000] <andreubotella>
+annevk: I think https://github.com/whatwg/url/issues/562 should probably be moved to HTML
+
+[06:34:08.0000] <annevk>
+andreubotella: I could move it, or maybe open a new issue with a summary of the situation?
+
+[06:34:29.0000] <annevk>
+andreubotella: as reported the issue is about urlencoded, which HTML only lightly touches
+
+[06:35:39.0000] <andreubotella>
+annevk: I was thinking of moving and renaming it to include text/plain, which is in scope
+
+[06:36:03.0000] <andreubotella>
+but I guess I could open a new issue
+
+[06:39:58.0000] <andreubotella>
+btw, I filed a Chrome bug because using FormData in a FACE isn't normalized in urlencoded per the spec, but it's now looking like it should
+
+[09:28:22.0000] <jgraham>
+Is there some set of places in spec land that correspond to a js realm being destroyed?
+
+[09:43:14.0000] <jgraham>
+Something like discard a document/terminate a worker/when the event loop of a worker/shared worker/service worker agent is destroyed
+
+[09:43:35.0000] <jgraham>
+(but that last one seems pretty sketchy to me)
+
+[09:43:51.0000] <jgraham>
+(well they all seem a bit sketchy but the last one especially so)
+
+
+2020-12-18
+[00:06:41.0000] <annevk>
+jgraham: those would be the places, yes
+
+[00:06:57.0000] <annevk>
+jgraham: there's no actual destroy hook as that would expose GC
+
+[00:47:50.0000] <jgraham>
+annevk: Yeah, turns out that it's exposed in e.g. CDP where clients want to keep an up to date list of usable scripting contexts, so there's a request to add it to webdriver-bidi. And I think we're less worried by exposing GC in that case
+
+[00:48:42.0000] <annevk>
+jgraham: it's not web-exposed so I don't really care, might still be worth checking with the WebVM team to be sure
+
+[07:14:24.0000] <jgraham>
+Is infra.spec.whatwg.org loading for others?
+
+[07:19:45.0000] <andreubotella>
+it's loading for me
+
+[07:22:37.0000] <jgraham>
+OK thanks
+
+[10:02:36.0000] <smaug____>
+does blink have max length for session history?
+
+[10:02:44.0000] <smaug____>
+I assume yes
+
+[10:03:05.0000] <smaug____>
+and I assume entries will be cleared from the beginning when needed
+
+[10:03:44.0000] <smaug____>
+/me just wonders how history.length should happen after pushState in this case
+
+[10:04:21.0000] <smaug____>
+s/blink/blink or webkit/
+
+[10:05:12.0000] <smaug____>
+I guess this is a case where var len = history.length; history.pushState("", "", ""); alert(len == history.length); says true
+
+[10:06:10.0000] <smaug____>
+/me tests
+
+[10:10:48.0000] <smaug____>
+blink and gecko have maxlength 50
+
+[15:24:42.0000] <reza>
+Hello, can anyone help me with the reasons of not working of  transform: rotate(90deg) in video:fullscreen?   I hope here is the right place to ask
+
+
+2020-12-19
+[17:45:04.0000] <smaug____>
+reza: perhaps because of https://fullscreen.spec.whatwg.org/#user-agent-level-style-sheet-defaults
+
+[18:35:22.0000] <reza>
+smaug____ so no way? what if user is ok with this transformation? I mean can we ask for permission?
+
+[10:55:53.0000] <annevk>
+reza: currently not I think, though there was some discussion about combining orientation and fullscreen
+
+[10:56:09.0000] <annevk>
+reza: I suggest looking at the open issues
+
+[15:12:25.0000] <reza>
+https://www.irccloud.com/pastebin/3ZbL9tcq/
+
+[15:12:52.0000] <reza>
+thanks, I opened an issue hope it ends up something
+
+[15:12:52.0000] <reza>
+https://github.com/whatwg/fullscreen/issues/188
+
+
+2020-12-21
+[11:47:38.0000] <MikeSmith>
+it’s not possible to use a custom element in the head, right?
+
+[11:53:50.0000] <Domenic>
+MikeSmith: not via the parser, but you could always insert it with the DOM APIs
+
+[12:05:54.0000] <MikeSmith>
+Domenic: ah OK yeah — thanks
+
+[12:05:58.0000] <MikeSmith>
+context is https://github.com/w3c/markup-validator/issues/49
+
+[12:16:45.0000] <Domenic>
+MikeSmith: yeah so I think that person is in the wrong and the validator is right. What's actually happening on their page is their custom element is inserting an implicit </head> before itself and that's probably not what they intended
+
+[12:16:51.0000] <Domenic>
+You can test this with live dom viewer
+
+[12:17:07.0000] <MikeSmith>
+right
+
+[12:17:30.0000] <Domenic>
+Also just from a validity perspective <head>'s content model is metadata elements only which does not include custom ones
+
+[12:17:44.0000] <MikeSmith>
+oh good point
+
+[12:18:31.0000] <MikeSmith>
+but anyway yeah, in other words, what the HTML parser in the validator is doing is he same thing that browser parsers are doing; the OP just doesn’t realize that browsers are doing it too
+
+[12:18:35.0000] <MikeSmith>
+will comment there
+
+
+2020-12-22
+[05:34:47.0000] <holst>
+I was reading on W3Schools.com that for HTML5 "UTF-8 is the default"; I also saw in the https://encoding.spec.whatwg.org/#encodings site that all non-unicode encodings are "legacy". How should I interpret W3Schools.com - Are they simply wrong?
+
+[05:35:26.0000] <holst>
+or is UTF-8 the "default" in the sense that it is strongly recommended?
+
+[05:46:47.0000] <holst>
+https://www.w3schools.com/tags/ref_charactersets.asp
+
+[06:07:57.0000] <andreubotella>
+holst: due to backwards compatibility issues, websites without a meta charset tag can'
+
+[06:08:06.0000] <andreubotella>
+can't be interpreted as UTF-8
+
+[06:08:28.0000] <andreubotella>
+but it very much is the default in the sense that the overwhelming majority of new sites use it
+
+[06:28:02.0000] <andreubotella>
+that link from w3schools with a mapping across the "character sets" is confusing and wrong, though
+
+[12:11:03.0000] <domfarolino>
+What in the spec corresponds to the user directly typing in a new URL in the URL bar to navigate to? Just the #navigate algorithm where the resource is the URL? It doesn't seem like any other algorithms capture this process earlier, but I wanted to ask around
+
+[12:18:33.0000] <domfarolino>
+I guess we'd need something to define that we reuse the existing browsing context though. This would seemingly go through "The rules for choosing a browsing context" and land in the "If the user agent has been configured such that in this instance it will reuse current", but nothing seems to specify that we invoke the "rules for choosing ..." algorithm in the scenario I describe
+
+[13:07:02.0000] <Domenic>
+domfarolino: not really specified, indeed. https://github.com/whatwg/html/issues/5381
+
+[13:08:04.0000] <Domenic>
+All we've got is "A user agent may provide various ways for the user to explicitly cause a browsing context to navigate, in addition to those defined in this specification."
+
+[13:12:29.0000] <domfarolino>
+Domenic: Hah, I saw that too. Ok got it
+
+
+2020-12-23
+[02:14:39.0000] <jgraham>
+Is it specified anywhere how to parse a host header? In particular I wonder if it can contain a : other than as the prefix to a port (e.g. from an ipv6 address)
+
+[04:08:51.0000] <annevk>
+jgraham: I’m not aware of tests; I wanted to figure this out but got stuck on having to configure DNS
+
+[04:10:11.0000] <annevk>
+jgraham: might be worth checking if the host parser in the URL standard disallows :
+
+[04:34:02.0000] <jgraham>
+It seems to assume that any ipv6 address can contain : but has to be surrounded by []
+
+
+2020-12-24
+[20:50:16.0000] <MikeSmith>
+Are there APIs other than the Notifications API that have been restricted to top-level browsing contexts or same-origin iframes?
+
+[20:50:40.0000] <MikeSmith>
+the https://www.chromestatus.com/feature/6451284559265792 thing, I mean
+
+[22:05:41.0000] <annevk>
+MikeSmith: persistent storage, I need to file an issue to specify that
+
+[22:06:18.0000] <annevk>
+I guess notifications isn’t specified either
+
+[23:58:27.0000] <MikeSmith>
+annevk: thanks
+
+[23:59:03.0000] <MikeSmith>
+abou notifications, I vaguely recall an open issue for it
+
+[00:46:16.0000] <annevk>
+MikeSmith: yeah, it has one
+
+[00:47:05.0000] <annevk>
+MikeSmith: Storage has one too: https://github.com/whatwg/storage/issues/87
+
+[00:47:35.0000] <annevk>
+I'll look into fixing that when back, should be easier now environment has top-level origin
+
+
+2020-12-26
+[08:25:38.0000] <MikeSmith>
+annevk: deviceorientation too, it seems
+
+[08:25:55.0000] <MikeSmith>
+at least it is as implemented
+
+[08:26:14.0000] <MikeSmith>
+haven’t checked to see what the spec says
+
+[08:27:00.0000] <MikeSmith>
+https://w3c.github.io/deviceorientation/#security-and-privacy
+
+[08:27:14.0000] <MikeSmith>
+> to minimize privacy risks, the chance of fingerprinting and other attacks the implementations must:
+
+[08:27:28.0000] <MikeSmith>
+…
+
+[08:27:32.0000] <MikeSmith>
+>
+
+[08:27:32.0000] <MikeSmith>
+fire events only on the top-level browsing context and same-origin nested browsing contexts,
+
+[11:59:41.0000] <annevk>
+Well that is not an accurate check, but it does seem they were going for it, yeah
+
+
+2020-12-28
+[01:39:08.0000] <PiersW>
+I know it's not spec-related, but if anyone here'd like to try Flow, it can be downloaded for the Raspberry Pi 400 (or 4) from http://support.ekioh.com/download/ . I'll tweet the link, and make it public on our website, tomorrow.
+

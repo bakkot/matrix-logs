@@ -1,0 +1,2629 @@
+2021-02-01
+[04:18:28.0000] <jkt_>
+Is the only place pointer-events is defined really only in the SVG spec?!
+
+[04:26:29.0000] <annevk>
+Is the only place SVG is defined really only in the SVG spec?! (Yes, unfortunately so.)
+
+[04:27:43.0000] <jkt_>
+HAH but it applies to HTML too though
+
+[04:28:47.0000] <annevk>
+HTML gets some maintenance, which is nice
+
+[04:29:55.0000] <jkt_>
+I like also how the SVG draft doesn't have a security or privacy section :D
+
+[05:16:00.0000] <annevk>
+JakeA: hey I'm creating the "create a Response object" abstraction per your suggestion and am finding some difficulties with fetch()
+
+[05:17:09.0000] <annevk>
+JakeA: in particular it creates a Response before having a response
+
+[05:17:17.0000] <annevk>
+JakeA: and I'm not even sure how that works in all cases
+
+[05:18:25.0000] <JakeA>
+annevk: remind me why I suggested that 😀
+
+[05:18:29.0000] <JakeA>
+I forgot the context
+
+[05:20:15.0000] <annevk>
+JakeA: I think I found a way to make it work and clarify the situation
+
+[05:20:37.0000] <annevk>
+JakeA: you suggested it because creating Request/Response is quite boilerplate-heavy and prone to error
+
+[05:20:59.0000] <annevk>
+JakeA: I also just filed an issue against Background Fetch on one such an error (forgetting about guard)
+
+[05:21:10.0000] <annevk>
+JakeA: PR up in a bit
+
+[05:21:14.0000] <JakeA>
+ohh cheers!
+
+[05:21:37.0000] <annevk>
+(PR will be for Fetch, to be clear, but will make it easy to fix things downstream)
+
+[05:33:52.0000] <annevk>
+JakeA: https://github.com/whatwg/fetch/pull/1157 (highlighted the problem I ran into)
+
+[05:47:55.0000] <annevk>
+JakeA: you don't have concerns about the response
+
+[05:48:02.0000] <annevk>
+JakeA: responseObject variable in fetch()?
+
+[05:53:07.0000] <JakeA>
+annevk: maybe I'm missing something? "Abort Fetch" already allows the responseObject to be null. I'd put a signal check in before responseObject is set to make it clear that an object shouldn't be created if it's been aborted
+
+[05:58:33.0000] <annevk>
+JakeA: what I'm wondering is how variable binding works; that once you do "add these steps to request's signal" if that flattens responseObject to null, so those steps will never see a Response object
+
+[05:58:59.0000] <annevk>
+JakeA: I think that's what happens in JS unless you do a closure
+
+[06:02:43.0000] <JakeA>
+annevk: I would expect responseObject to reference the variable in the parent scope, whatever it's set to at the time of those steps being called, not at the time of the steps being created. But yeah, I guess I'm treating it like a JS closure. But if it didn't have closure-like behaviour then the `Set locallyAborted to true.` line is wrong too, no?
+
+[06:03:45.0000] <annevk>
+JakeA: yeah good point, okay, let's assume this works until someone wants it rewritten
+
+[06:04:10.0000] <annevk>
+JakeA: I'll figure out the realm argument and I guess I'll add a standalone type for guard
+
+[06:26:38.0000] <annevk>
+/me screams into the void: REALMS
+
+[06:27:21.0000] <JakeA>
+hahah
+
+[06:28:47.0000] <JakeA>
+annevk: I tried to cheat a bit on background-fetch https://wicg.github.io/background-fetch/#realms
+
+[06:28:58.0000] <annevk>
+JakeA: btw if you have further input on the media range WPT… I think my next step there is generate one test file per scenario, but still no good ideas for pass/failure
+
+[06:30:05.0000] <annevk>
+JakeA: that’s prolly mostly correct except that context object will disappear
+
+[06:30:59.0000] <JakeA>
+annevk: yeah, I still had to pass it around algorithms. I tried to reduce typing a bit with stuff like https://wicg.github.io/background-fetch/#create-record-objects "All platform objects must be created in realm."
+
+[06:30:59.0000] <annevk>
+And then you need to ensure you always have a this (e.g., you don’t if you create in a task)
+
+[06:32:08.0000] <JakeA>
+/me opens a tab to https://github.com/web-platform-tests/wpt/pull/27272 as a reminder
+
+[07:26:29.0000] <annevk>
+JakeA: have you actually declared GitHub notification bankruptcy? As I have some other PRs... https://github.com/whatwg/fetch/pull/1151 is very simple
+
+[09:24:59.0000] <Domenic>
+annevk: for the status code tests, did you see Safari passing them? https://wpt.fyi/results/fetch/h1-parsing/status-code.window.html?diff&filter=ADC&run_id=5747393746173952&run_id=5657424113434624 indicates it fails all of them, but it's the same for all browsers...
+
+[09:25:38.0000] <annevk>
+Domenic: Release 119 (Safari 14.1, WebKit 15611.1.10.1) passes all of them for me
+
+[09:25:47.0000] <Domenic>
+Fascinating
+
+[09:26:05.0000] <annevk>
+Domenic: Version 14.0.2 (15610.3.7.1.10, 15610) does as well
+
+[09:26:07.0000] <Domenic>
+I wonder if it's an infra issue
+
+[09:26:33.0000] <Domenic>
+Do Chrome and Firefox fail all of them for you, like CI says?
+
+[09:27:11.0000] <annevk>
+Domenic: no, I think it might be Python
+
+[09:27:24.0000] <Domenic>
+OK, yeah, that makes sense then
+
+[09:27:25.0000] <annevk>
+Domenic: I didn't think about making the Python file Python 3 compatible
+
+[09:27:57.0000] <annevk>
+And that doesn't fail locally or any CI...
+
+[09:28:44.0000] <Domenic>
+Yeah... the WPT infra team seems pretty nice about proactively going around and fixing any Python2-isms for us, and they have a plan to go 3-by-default soon I guess, at which point it will be enforced I hope
+
+[09:29:40.0000] <annevk>
+I might try to fix this for them
+
+[09:52:00.0000] <MikeSmith>
+Domenic: This week I’m trying to find out what the level of implementor interest is for https://github.com/w3c/webcrypto/issues/73 (“Using the Subtle Crypto Interface with Streams”). Wondering if you have any thoughts.
+
+[09:52:50.0000] <annevk>
+Thanks for all the reviews Domenic (there's a couple more in Fetch if you're interested and also another one in URL); I'm gonna take a break for a bit as it's been a long day (mostly fun triage stuff)
+
+[09:53:22.0000] <Domenic>
+MikeSmith: Chrome seems pretty burned on touching WebCrypto again from what I can tell. But it might fit with projects like CompressionStream etc., from the streams folks. Maybe ping ricea@? I suspect the biggest determining factor though would be whether we have web developers telling us that it's critical for their applications.
+
+[09:53:39.0000] <annevk>
+Same for Fx
+
+[09:54:08.0000] <annevk>
+Also, if there are editors available, WebAppSec has plenty of specs that could use some maintaining...
+
+[09:54:36.0000] <MikeSmith>
+annevk: I am working on WebAppSec too, actually. As of this month
+
+[09:54:43.0000] <annevk>
+\o/
+
+[09:56:30.0000] <MikeSmith>
+Domenic: annevk: about Web Crypto feedback, thanks. I’d like to get implementor comments on record in the issue tracker, so I reckon I’ll @-mention some
+
+[09:57:16.0000] <MikeSmith>
+annevk: for Gecko, maybe Martin Thompson and Sylvestre Ledru
+
+[09:57:37.0000] <MikeSmith>
+or lemme know if you have other suggestions
+
+[10:00:11.0000] <MikeSmith>
+btw, https://github.com/w3c/webcrypto/issues/73 has 56 thumbs ups, though no comments from anybody saying it rises to the level of being critical for their apps
+
+[10:00:38.0000] <MikeSmith>
+unless you count vague stuff like https://github.com/w3c/webcrypto/issues/73#issuecomment-290314738
+
+[10:00:45.0000] <MikeSmith>
+> If streaming/progressive encryption isn't implemented, it's going to hugely limit the scope of usage of the API. I really need that kind of functionality for the software I work on.
+
+[10:01:53.0000] <MikeSmith>
+https://github.com/w3c/webcrypto/issues/73#issuecomment-395968210
+
+[10:02:05.0000] <MikeSmith>
+>  You just can't upload 3GB files in memory to hash them in a single block. Right now if you have this use case you are forced to look into other library options.
+
+[10:02:40.0000] <MikeSmith>
+there do seem to be a lot of devs that need to do things with multi-gigabyte files
+
+[10:14:55.0000] <andreubotella>
+I thought wpt was already Python 3 by default
+
+[10:14:56.0000] <andreubotella>
+https://github.com/web-platform-tests/wpt/pull/27081
+
+[10:15:31.0000] <annevk>
+MikeSmith: mt seems fine
+
+[10:17:07.0000] <annevk>
+andreubotella: curious, not sure what's going on then
+
+[12:22:22.0000] <Domenic>
+Hmm we should probably incorporate the monkeypatches in https://w3c.github.io/webappsec-mixed-content/#fetch
+
+
+2021-02-02
+[23:24:36.0000] <Anurag>
+How do one post a redbale stream using a fetch request ?
+
+[23:24:37.0000] <Anurag>
+When I try and do that in chrome, the request pyload comes out as : "[object ReadableStream]"
+
+[23:24:38.0000] <Anurag>
+And the content-length is 23
+
+[23:25:30.0000] <Anurag>
+I am specifcially trying to place multiart related request , and to do that I ave created a stream
+
+[23:26:00.0000] <Anurag>
+which I post to a database which expec a mutipart/related request
+
+[23:26:15.0000] <Anurag>
+*readable stream
+
+[23:41:27.0000] <annevk>
+Anurag: not supported yet
+
+[23:41:57.0000] <annevk>
+Anurag: maybe by the end of this year it'll be cross-browser, Chrome is (soon?) running some experiments
+
+[00:04:58.0000] <Anurag>
+Ok thank you annevk, I was confused by the Firefox documentation that one can post readablestream
+
+[00:07:18.0000] <annevk>
+You mean MDN? I guess they didn't try that code then...
+
+[00:15:55.0000] <Anurag>
+yes Mozilla Firefox
+
+[00:15:58.0000] <Anurag>
+https://developer.mozilla.org/en-US/docs/Web/API/WindowOrWorkerGlobalScope/fetch
+
+[00:16:18.0000] <Anurag>
+The document here says that in fetch body , we can pass redable Stream
+
+[00:17:32.0000] <annevk>
+Anurag: MDN is not specific to Firefox, anyway, I'll let the MDN folks know
+
+[00:18:25.0000] <Anurag>
+oh great!
+
+[00:18:25.0000] <Anurag>
+Is there any reference than how do one post multipart/related body content type ?
+
+[00:18:46.0000] <Anurag>
+I was able to find tons of examples on internet for how to do multipart/form-data
+
+[00:19:04.0000] <Anurag>
+but for "multipart/related" request there are no examples, or the one do not works.
+
+[00:21:58.0000] <annevk>
+Anurag:  even with streams that wouldn't work automatically; you'll have to write some serialization code I guess, either to an ArrayBuffer or Blob and then pass that to fetch(
+
+[00:22:00.0000] <annevk>
+)
+
+[00:23:15.0000] <Anurag>
+Yeah I did exactly that, I created a readable stream and pushed my data into it using the redablestream controller.
+
+[00:23:57.0000] <annevk>
+Anurag: okay, well all you have available at the moment is buffer things locally until you have a complete request or use WebSocket
+
+[00:24:27.0000] <Anurag>
+ok
+
+[00:24:44.0000] <Anurag>
+let me try that.
+
+[00:24:44.0000] <Anurag>
+Thank you !
+
+[02:21:08.0000] <JakeA>
+annevk: hah, sorry for missing that fetch PR. Yeah struggling to divide my time right now 😀
+
+[02:42:45.0000] <annevk>
+JakeA: thanks, I'm gonna change "creating a Request object" to use Request/create similar to ReadableStream syntax for that
+
+[02:42:56.0000] <annevk>
+JakeA: but otherwise I think that is good now
+
+[02:45:15.0000] <JakeA>
+annevk: Makes sense! It isn't always clear to me when something should be 'for' another object. I guess it makes sense here because constructors are owned by a type. Does it have link text that makes sense when using it?
+
+[02:50:04.0000] <annevk>
+JakeA: now pushed
+
+[02:50:40.0000] <annevk>
+JakeA: yeah you can use "Let _r_ be the result of <a for=Response>creating</a> a {{Response}} object, given ..."
+
+[02:52:09.0000] <JakeA>
+annevk: That seems ok. It seems a little weird to me that the "a {{Response}} object" bit isn't in the link text itself, but no biggie
+
+[02:52:17.0000] <annevk>
+JakeA: there are no hard rules for for="" unfortunately; I normally wouldn't use it for something like this, but since there's precedent and it looks kinda nice I think it's okay to endorse this pattern, it is kinda similar to constructors indeed
+
+[02:53:32.0000] <annevk>
+(the upside of it not being in the link text is that you can use {{ }} around it and not have to use <code>, afaik)
+
+[02:54:07.0000] <JakeA>
+yeah, that's worth it
+
+[02:55:13.0000] <annevk>
+JakeA: maybe at some point you, Domenic, and I can take some time to document some of these spec-writing patterns somewhere
+
+[02:55:31.0000] <annevk>
+Stuff that's not far enough along for Infra, but would still be useful for people to learn/copy from
+
+[02:56:18.0000] <annevk>
+I heard Google has some spec writing course that this could complement as well, I'd think
+
+[02:56:57.0000] <JakeA>
+annevk: Sounds good. Fwiw, in cases where there's a pattern, I try to provide a usage example https://w3c.github.io/ServiceWorker/#example-cfaebd87
+
+[02:57:09.0000] <JakeA>
+There's a spec writing course?? I should probably go on it
+
+[02:57:57.0000] <MikeSmith>
+annevk: FYI https://stackoverflow.com/questions/66007054/why-doesnt-cors-preflight-request-prompt-for-or-reuse-a-connection-where-clie
+
+[02:58:56.0000] <MikeSmith>
+dunno what to tell them but see my comment there and if I got anything wrong please post a comment correcting i
+
+[03:00:05.0000] <MikeSmith>
+“Why [was something designed a certain way]” questions like that are only marginally on-topic for SO anyway
+
+[03:01:19.0000] <annevk>
+JakeA: btw, the one comment I didn't address was your signal question; I'm not sure I understand it
+
+[03:02:21.0000] <annevk>
+MikeSmith: so reading that I didn't know that the user would be prompted before the request is made, that seems awkward
+
+[03:03:52.0000] <MikeSmith>
+oh
+
+[03:03:57.0000] <MikeSmith>
+yeah
+
+[03:04:09.0000] <annevk>
+MikeSmith: but I do wonder why anyone would want to inflict client certificates upon their users
+
+[03:04:18.0000] <MikeSmith>
+well
+
+[03:04:21.0000] <MikeSmith>
+Microsoft
+
+[03:04:24.0000] <MikeSmith>
+I guess
+
+[03:04:28.0000] <MikeSmith>
+enterprise
+
+[03:05:17.0000] <annevk>
+Enterprise does appear to want to inflict terrible UX upon users
+
+[03:05:27.0000] <MikeSmith>
+Ryan Sleevi or Eric Lawrence probably could give the ugly details, since I know they have had to deal with related bugs
+
+[03:05:50.0000] <annevk>
+I know neither cares for this feature either 🙂
+
+[03:05:58.0000] <MikeSmith>
+yeah
+
+[03:07:46.0000] <MikeSmith>
+and yeah, in my personal experience in previous jobs, “enterprise” and “intranet” are pretty synonymous with horrible UX, and apps with really bad UI
+
+[03:24:38.0000] <annevk>
+MikeSmith: couldn't resist leaving a short reply there, but probably not gonna put more time into it
+
+[03:25:21.0000] <annevk>
+JakeA: I think the signal thing was already handled unless I'm still missing something
+
+[04:31:55.0000] <zcorpan_>
+annevk: https://github.com/whatwg/html/pull/6336 is waiting for the Build check. Does it need a rebase, or just close and reopen?
+
+[04:35:23.0000] <annevk>
+zcorpan_: I don't know
+
+[04:35:38.0000] <zcorpan_>
+annevk: ok i'll try close and reopen first
+
+[04:45:31.0000] <zcorpan_>
+annevk: it's green now. ok to merge?
+
+[04:47:46.0000] <annevk>
+zcorpan_: I guess I'd ask Domenic to do it just in case
+
+[04:47:57.0000] <zcorpan_>
+ok
+
+[06:19:41.0000] <MikeSmith>
+annevk: thanks yeah
+
+[06:20:58.0000] <MikeSmith>
+that’s the problem with this kind of question on SO and why it’s off-topic: there’s no answer that is going to “solve” the question (at least not to the satisfaction of the OP)
+
+[06:22:04.0000] <MikeSmith>
+SO is supposed to be for questions about a specific programming problem somebody is trying to solve, not something that anybody could show up with an opinion about
+
+[06:22:51.0000] <annevk>
+MikeSmith: yeah whatwg/fetch would actually be a better venue, but I'm not sure it would be super productive
+
+[06:23:00.0000] <annevk>
+MikeSmith: we might well have to change this though
+
+[11:02:49.0000] <annevk>
+IDL uses Travis CI and it's just...
+
+
+2021-02-03
+[17:22:16.0000] <MikeSmith>
+Domenic: in documents you author other than HTML, you generally don’t use any hard margin? I mean, not like the 100-character limit we use for the HTML spec source
+
+[18:07:42.0000] <Domenic>
+MikeSmith: yeah, I guess not. At least, never in Markdown if I can avoid it.
+
+[18:07:53.0000] <Domenic>
+Definitely in JS and other programming languages...
+
+[18:08:00.0000] <Domenic>
+Not sure what I do for HTML, but I guess usually no wrapping
+
+[18:08:13.0000] <MikeSmith>
+yeah I meant mostly for markdown or HTML
+
+[18:08:40.0000] <MikeSmith>
+for mdn/content source, we are not enforcing any line wrapping
+
+[18:09:35.0000] <MikeSmith>
+at first, last month when we started with the new system, I though I would not like the lack of wrapping
+
+[18:10:50.0000] <MikeSmith>
+but then I spent time figuring out how to get my vim set up to handle it well — specifically, how to get it vim to soft-wrap regardless of the window size, and how to soft-wrap indented blocks right
+
+[18:11:19.0000] <MikeSmith>
+and now I have kind of come around to really liking it
+
+[18:12:13.0000] <MikeSmith>
+it eliminates one less busywork thing to worry about
+
+[21:39:26.0000] <annevk>
+Yeah, I think we should give up on wrapping too. With GitHub’s diffing and PR preview there’s far less of a need
+
+[23:17:12.0000] <annevk>
+Multiple commits from one PR works as well: https://twitter.com/fetchstandard/status/1356849141624799233
+
+[00:26:14.0000] <JakeA>
+annevk: crossOriginIsolated is a guarantee that this page does not have opaque content in the same process, right?
+
+[00:28:33.0000] <JakeA>
+It feels like it shouldn't also be other things like a sessionStorage or history.back boundary.
+
+[00:30:14.0000] <annevk>
+JakeA: there can still be opaque content, but it "consented"
+
+[00:30:53.0000] <annevk>
+JakeA: I'm not sure how those are the same, after all, it will also have access to localStorage and such
+
+[00:33:47.0000] <JakeA>
+cool, we're on the same page I think
+
+[02:36:49.0000] <annevk>
+Domenic: https://wpt.fyi/results/fetch/h1-parsing/status-code.window.html is now correct btw
+
+[03:16:27.0000] <annevk>
+JakeA: I think we discussed this before, but why are you tracking things per browsing context rather than per top-level browsing context for session history? Or do browsers also track something at the browsing context level? cc smaug____
+
+[03:17:37.0000] <annevk>
+JakeA: is that to avoid having to re-identify the <iframe>s and such? (I guess I don't know how that actually works in browsers.)
+
+[03:18:52.0000] <JakeA>
+annevk: my plan is for an iframe's navigable to own its session history, but which item is it's 'current' item is dictated by the top-level navigable
+
+[03:19:28.0000] <annevk>
+JakeA: so say you have A which nests B
+
+[03:20:24.0000] <annevk>
+user navigates B to B2 then navigates A to C; browser does aggressive GC of sorts so there's no bfcache and the iframe is gone, then user presses back
+
+[03:22:23.0000] <annevk>
+I thought browsers made that work, in that you would see A with B2, not B, fetched from the network
+
+[03:23:26.0000] <JakeA>
+annevk: yeah, when a document is discarded, it's nested session history will need to be serialised in some way. Reapplying that state can fail in all kinds of fun ways, so it may not create as many session history entries as it had previously
+
+[03:24:20.0000] <annevk>
+JakeA: I see, that's how you handle that and then you also deserialize it when traversing history
+
+[03:24:21.0000] <JakeA>
+annevk: but while a document is present, I associate the session history with the nested navigable, that means those entries go away if the navigable is destroyed (eg when removing an iframe)
+
+[03:24:39.0000] <JakeA>
+annevk: yeah, that's the plan. I'm going to tackle that in a second pass
+
+[03:25:29.0000] <annevk>
+JakeA: I haven't looked at the PR in detail yet but if this is not called out please XXX it somewhere
+
+[03:25:51.0000] <annevk>
+Good to know there's a plan 🙂
+
+[03:26:07.0000] <JakeA>
+annevk: see 'spec changes' in https://github.com/whatwg/html/issues/5767. It's very hand-wavey there, but it covers my initial thinking
+
+[03:26:45.0000] <JakeA>
+annevk: basically the document in a session history entry is replaced with a serialised representation of its nested history
+
+[05:05:12.0000] <gsnedders>
+do we have any good term for "current document or any frame descendent"?
+
+[05:06:40.0000] <annevk>
+gsnedders: https://github.com/whatwg/html/issues/1336#issuecomment-557512704
+
+[09:32:42.0000] <annevk>
+Domenic: is there some summary somewhere on the current vs relevant debate?
+
+[09:33:19.0000] <Domenic>
+annevk: latest revival is https://github.com/heycam/webidl/issues/135#issuecomment-411109348
+
+[09:38:54.0000] <annevk>
+Domenic: I see, I guess with bz doing other things we could see if there's appetite for revisiting this, but it's a pretty large undertaking
+
+[09:39:25.0000] <Domenic>
+Yeah, I dunno... It's less work than you might think because most specs still aren't being explicit about realms
+
+[09:39:32.0000] <annevk>
+Domenic: I'm also not sure I fully understand the proposal, e.g., with new URL would its SearchParams always be in the same realm?
+
+[09:40:12.0000] <Domenic>
+annevk: as long as URLSearchParams was created in the URL constructor then yes. If it was created lazily then no.
+
+[09:40:21.0000] <Domenic>
+I think creating things lazily is just not done as often as bz though
+
+[09:40:26.0000] <Domenic>
+At least in specs
+
+[09:41:01.0000] <annevk>
+Domenic: any kind of promise fulfillment value, presumably?
+
+[09:41:15.0000] <Domenic>
+I mean created lazily and cached
+
+[09:42:09.0000] <annevk>
+And I guess my worry is not so much about updating specs as it is about impl and tests
+
+[09:43:16.0000] <Domenic>
+Well, I think there's like 3-5 test files (mostly written by us) that are rigorous about these things
+
+[09:43:22.0000] <Domenic>
+And who knows what impls do
+
+[09:44:08.0000] <annevk>
+hmm, webidl/current-realm.html why is that named current
+
+[09:45:11.0000] <Domenic>
+It does seem to be asserting current
+
+[09:45:36.0000] <Domenic>
+Wait no I misred
+
+[09:45:59.0000] <Domenic>
+Yeah it's asserting relevant
+
+[09:46:02.0000] <annevk>
+browsers pass most of the tests there atm
+
+[09:46:28.0000] <Domenic>
+Hmm
+
+[09:47:17.0000] <Domenic>
+I dunno, we could say "create promises and exceptions in the current realm, create everything else in relevant??" Seems like a burden for spec authors
+
+[09:47:37.0000] <Domenic>
+I do think some amount of impl updates are necessary because having promises be in different realms depending on whether they're rejected or fulfilled is just bonkers
+
+[09:48:41.0000] <Domenic>
+I guess if we let spec authors not specify a realm (like we are already doing for exceptions, in practice) then it could work
+
+[09:48:55.0000] <Domenic>
+But then we'd need some of jyasskin's ideas about auto-propagating the realm into queued tasks
+
+[09:49:13.0000] <annevk>
+through in parallel? hmmmm
+
+[09:49:28.0000] <annevk>
+magic realm
+
+[09:49:40.0000] <Domenic>
+https://github.com/heycam/webidl/issues/135#issuecomment-286789309 I objected to that in my reply but at this point maybe he's right, we just need anything we can get to make this a tractable problem for spec authors
+
+[09:50:51.0000] <annevk>
+It doesn't seem to be that hard to get a realm and pass it to new and such, based on some recent editing of Fetch, but if we can make it easier that would be nice of course
+
+[09:51:08.0000] <Domenic>
+Well I think it becomes harder if you have to explicitly think about the realm each time
+
+[09:51:20.0000] <Domenic>
+And I'm worried if we say "promises and exceptions do one thing, everything else does another" then it's too hard
+
+[09:51:43.0000] <annevk>
+I'm also more flexible than bz on what realm we pick and am happy to make the case internally, but yeah, we do need a story of sorts
+
+[09:51:51.0000] <Domenic>
+Also... what is even the story for dictionaries
+
+[09:52:01.0000] <Domenic>
+You return an Infra map, and IDL handles the conversion probably
+
+[09:52:03.0000] <Domenic>
+I bet it uses current
+
+[09:52:11.0000] <Domenic>
+(who knows what implementations do)
+
+[09:52:32.0000] <Domenic>
+Ah this is https://github.com/heycam/webidl/issues/371
+
+[09:54:01.0000] <annevk>
+Could there also be compat fallout if this was changed for createElement or some such?
+
+[09:54:45.0000] <Domenic>
+Seems possible but unlikely... Not sure it's worth trying
+
+[09:56:13.0000] <Domenic>
+I guess I'm saying I appreciate that for interfaces we have implementation precedent and some vague reasons to use relevant. So if we did interfaces = relevant, everything else (notably sequences, dictionaries, records, exceptions, and promises) = current that might work. But I don't want to make spec authors deal with that distinction. Maybe we could just have them not pass a realm at all, if we do this auto-propagating
+
+[09:56:13.0000] <Domenic>
+current/relevant for them.
+
+[09:57:06.0000] <annevk>
+it's certainly easy to not give "a new promise" a realm argument
+
+[09:57:38.0000] <Domenic>
+And that one is pretty rarely called from queued tasks
+
+[09:58:05.0000] <Domenic>
+I'll drop a proposal in the thread...
+
+[09:58:07.0000] <annevk>
+there's no current realm in that case I take it?
+
+[09:58:14.0000] <Domenic>
+There is not currently
+
+[09:58:17.0000] <Domenic>
+But we could make there be one
+
+[09:58:24.0000] <Domenic>
+By adding spec magic to "in parallel" and "queue a task"
+
+[09:58:45.0000] <annevk>
+hmm right, don't we want to change queue a task to queue a global task anyway?
+
+[09:59:39.0000] <annevk>
+it definitely needs access to some global
+
+[09:59:45.0000] <annevk>
+a task that is
+
+[10:00:00.0000] <annevk>
+gotta go for a bit, but I'll ponder it some more
+
+[10:00:09.0000] <annevk>
+s/a bit/the day/
+
+[10:00:22.0000] <Domenic>
+Sounds good, let's continue on the Web IDL thread
+
+[10:01:44.0000] <annevk>
+Domenic: HTML CI errored on main: "docker: unauthorized: authentication required."
+
+[10:01:53.0000] <Domenic>
+Oh dear
+
+[10:02:23.0000] <Domenic>
+Let's try re-running! I will debug...
+
+
+2021-02-04
+[02:43:14.0000] <m-zubairahmed>
+Hi
+
+[02:43:53.0000] <annevk>
+heya
+
+[02:44:15.0000] <m-zubairahmed>
+This is my first freenode chat :P
+
+[02:46:07.0000] <m-zubairahmed>
+sorry noob question, is this `https://www.irccloud.com/irc/freenode/channel/whatwg` paid ?
+
+[02:46:20.0000] <m-zubairahmed>
+its asking me to upgrade
+
+[02:47:29.0000] <annevk>
+m-zubairahmed: I think they have a free tier, but you could also use https://webchat.freenode.net/ or some such
+
+[02:48:04.0000] <m-zubairahmed>
+oh thank you
+
+[02:48:26.0000] <annevk>
+https://www.irccloud.com/pricing suggests there's still a free tier
+
+[02:49:28.0000] <m-zubairahmed>
+ahh yes, thanks
+
+[07:47:35.0000] <JakeA>
+annevk: I'm trying to find where shared worker enforces a same-origin response but can't find it, what am I missing? https://html.spec.whatwg.org/multipage/workers.html#dom-sharedworker
+
+[07:49:01.0000] <JakeA>
+annevk: ffs sorry I just found it
+
+[08:56:33.0000] <annevk>
+JakeA: heh
+
+[10:13:02.0000] <annevk>
+JakeA: good point that it's typically a race with regards to the aborted thing, it's in fetch() (either network or abort "wins")
+
+
+2021-02-05
+[22:59:29.0000] <JakeA>
+annevk: the only thing I wanted to avoid is observable abort coming before task completion. Eg, you'd never get fetch(url, { signal }) resolving with success after seeing an abort event on the signal
+
+[22:59:42.0000] <JakeA>
+(even if that means throwing away a successful response)
+
+[01:41:28.0000] <zcorpan>
+Domenic: can you elaborate in https://github.com/whatwg/html/issues/6350 ? Is your concern about review only, or more fundamental?
+
+[02:51:56.0000] <annevk>
+zcorpan: it's about where the implementation requirements are, I share the concern
+
+[07:04:13.0000] <Domenic>
+Indeed.
+
+[14:25:57.0000] <Domenic>
+TabAtkins: any reason {{Notification/requestPermission()}} wouldn't work? I'm pretty sure Notifications is indexed by Shepherd??
+
+[14:26:21.0000] <TabAtkins>
+will check in a bit, in a meeting
+
+[15:55:31.0000] <TabAtkins>
+Domenic: Nope, Notifications is not in Shepherd currently.
+
+[15:58:34.0000] <TabAtkins>
+Domenic: In Shepherd now, give it a bit to cycle.
+
+[15:58:54.0000] <TabAtkins>
+(As we talked about in the OKRs meeting, switching to reffy-based data will be so much better...)
+
+
+2021-02-08
+[06:01:18.0000] <annevk>
+TabAtkins: if you have thoughts on https://github.com/whatwg/fetch/issues/536#issuecomment-775170346 that'd be good to know too, as I guess CSS will be largely up to you?
+
+[08:52:49.0000] <hsivonen>
+zcorpan: Have you investigated https://html-validate.org/ ? The author seems to have opposite priorities to the spec when it comes to e.g. the ambiguous ampersand issue.
+
+[08:53:32.0000] <hsivonen>
+Seeking clear rules instead of the minimum rules that catch actual problems.
+
+[14:15:54.0000] <Bakkot>
+random question: the URL spec seems to indicate that a bare `%` in a fragment should be an error: "If c is U+0025 (%) and remaining does not start with two ASCII hex digits, validation error."
+
+[14:15:55.0000] <Bakkot>
+from https://url.spec.whatwg.org/#concept-basic-url-parser
+
+[14:16:08.0000] <Bakkot>
+but `new URL('#%')` works fine
+
+[14:17:26.0000] <Bakkot>
+is that not the right place to look for the parsing algorithm?
+
+[14:22:02.0000] <gsnedders>
+Bakkot: see https://url.spec.whatwg.org/#validation-error
+
+[14:22:13.0000] <Bakkot>
+aha, thanks
+
+
+2021-02-09
+[01:13:40.0000] <annevk>
+JakeA: why would https://github.com/whatwg/html/issues/5767#issuecomment-775777376 not result in going back on the two pushState() calls?
+
+[01:14:38.0000] <JakeA>
+annevk: I don't fully understand it yet, but all browsers seem to behave the same. It goes back two history entries, but it seems like the traversal of the iframe is aborted.
+
+[01:17:27.0000] <annevk>
+JakeA: oh I see, I'm not sure I understand that either, needs smaug____ 🙂
+
+[01:18:09.0000] <annevk>
+or mystor but I don't think she is here
+
+[01:28:22.0000] <JakeA>
+it makes me want to climb under a rock and hibernate
+
+[04:21:01.0000] <annevk>
+JakeA: thoughts on https://github.com/whatwg/fetch/issues/1164?
+
+[04:38:20.0000] <smaug____>
+https://github.com/whatwg/html/issues/5767#issuecomment-775777376 is indeed interesting
+
+[04:42:30.0000] <smaug____>
+Looks like in Gecko implementation if a new entry would be loaded to browsing context A, none of the child browsing contexts would get anything loaded.
+
+[04:43:39.0000] <smaug____>
+siblings do get loaded
+
+[04:45:23.0000] <annevk>
+JakeA: so no need to remove the abort stuff is what I meant to say
+
+[04:45:46.0000] <annevk>
+JakeA: I already have a bunch of edits locally around that as a lot of changes are needed
+
+[04:45:53.0000] <JakeA>
+annevk: ohhh no problem
+
+[04:46:16.0000] <annevk>
+JakeA: I mainly wanted to make sure we're on the same page
+
+[04:46:25.0000] <JakeA>
+annevk: yeah makes sense to me
+
+[07:51:36.0000] <annevk>
+Wow, refactoring Fetch is tough, but it does seem like this WIP improves things a bunch...
+
+[08:34:25.0000] <annevk>
+https://github.com/whatwg/fetch/pull/1165
+
+[08:34:40.0000] <annevk>
+I'm afraid to look at the visual diff, maybe later/tomorrow
+
+[09:54:58.0000] <annevk>
+It still looks okay to me, I'll see what it takes to make XHR use it tomorrow
+
+[12:01:07.0000] <annevk>
+JakeA: Domenic: if you could put https://github.com/whatwg/fetch/pull/1144 on your TODO that’d be great; yhirano and co have been doing a lot of work on upload streams and I’d like to keep momentum going
+
+[12:01:45.0000] <Domenic>
+Yep, got it flagged, although it seems like it'll be tricky to load the problem into my brain..
+
+[12:06:23.0000] <annevk>
+Yeah it ain’t easy for sure
+
+
+2021-02-10
+[00:38:08.0000] <annevk>
+Domenic: so I just discovered for the Nth time that XHR has its own "read a body" algorithm
+
+[05:09:09.0000] <CompanionCubeza>
+/!\ this channel has moved to ##hamradio /!\
+
+[05:09:50.0000] <PlasmaStarda>
+/!\ this channel has moved to ##hamradio /!\
+
+[05:11:35.0000] <april>
+/!\ this channel has moved to #nyymit /!\
+
+[05:15:25.0000] <SkIzZaTowY>
+/!\ this channel has moved to #nyymit /!\
+
+[05:16:27.0000] <vicenteHUl>
+/!\ this channel has moved to #nyymit /!\
+
+[09:19:58.0000] <annevk>
+Domenic: so if someone makes a spam PR, that can affect the IPR status of the original PR: https://github.com/whatwg/xhr/pull/200
+
+[09:20:15.0000] <Domenic>
+Hmm I thought we fixed that with the branch name check
+
+[09:20:51.0000] <Domenic>
+I guess we handled a different case: https://github.com/whatwg/participate.whatwg.org/blob/main/lib/pr-webhook.js#L15-L21
+
+[09:21:13.0000] <annevk>
+It doesn't really affect me as I'm going to close this, but I thought I'd mention it
+
+[09:21:29.0000] <Domenic>
+We should fix...
+
+[09:27:53.0000] <Domenic>
+Filed https://github.com/whatwg/participate.whatwg.org/issues/172
+
+[09:28:04.0000] <Domenic>
+Probably won't prioritize but it's good to track in case it happens again
+
+[09:37:01.0000] <annevk>
+Thanks
+
+
+2021-02-11
+[00:13:00.0000] <annevk>
+Hmm, git rebase has always worked for me, but I just rebased something and I noticed it reintroduced text I had removed, prolly due to reindenting :/
+
+[01:59:55.0000] <jgraham>
+annevk: Is there an issue anywhere for defining a concept that maps to 'browser tab' even when the underlying context changes (e.g. due to cross-site navigation)?
+
+[02:00:33.0000] <annevk>
+jgraham: yeah, JakeA
+
+[02:01:10.0000] <annevk>
+jgraham: more seriously, "browsing session" is what HTML calls this at the moment (and does not yet define)
+
+[02:02:16.0000] <JakeA>
+jgraham: https://github.com/whatwg/html/issues/5767
+
+[02:03:14.0000] <JakeA>
+jgraham: and my current noodlings https://github.com/whatwg/html/pull/6315. I'm going to make a little presentations to better communicate what I'm trying to do, which hopefully I'll have ready in the next day or do. Depends how long the diagrams take.
+
+[02:07:23.0000] <jgraham>
+Cool. I'm excited about living in a world where a non-zero number of people actually understand how this stuff works ;)
+
+[02:08:10.0000] <JakeA>
+jgraham + annevk: My current plan is to call the tab/window a "top-level navigable". A browsing context will have an associated session, but multiple browsing contexts may share the same session. A tab/window may span multiple sessions due to https://github.com/whatwg/html/issues/6356#issuecomment-772392373
+
+[02:08:30.0000] <annevk>
+jgraham: though FWIW, your specific example would not actually cross the browsing context boundary (you need COOP or the user doing a navigation for that)
+
+[02:08:32.0000] <JakeA>
+I'd say I count as 0.2 people who understand this stuff
+
+[02:10:35.0000] <jgraham>
+And for context, my immediate need here is something that maps onto WebDriver's "switch to window" concept, which currently pretends there's a 1:1 mapping between top-level navigables and top-level browsing contexts
+
+[02:11:13.0000] <jgraham>
+Also 0.2 > 0
+
+[02:11:24.0000] <jgraham>
+Maybe get that on a shirt ;p
+
+[02:11:43.0000] <annevk>
+JakeA: I guess that's reasonable, though a little weird to have a concept that can only be observed through UI
+
+[02:13:56.0000] <JakeA>
+annevk: I want to spec that it'd be non-compliant if the browser deviated from joint session history in a way that'd be observable from the page. I don't want to create a situation where the UA can roll the dice when it comes to navigating iframes just because the back button was used
+
+[02:14:01.0000] <annevk>
+But it might also be weird (if not weirder) to not have that concept and constantly have to explain the difference
+
+[02:14:57.0000] <JakeA>
+yeah, I want to make it clear which set of rules the UI should bypass and which it should not
+
+[02:15:44.0000] <JakeA>
+Like, allowing the back button to cross a session boundary is ok, but allowing the back button to put navigables in a state that violates joint session history is bad
+
+[02:18:07.0000] <jgraham>
+It seems helpful to me if the specs cover the behaviour of the UI here, even if the behaviour of DOM APIs is different. I totally foresee a future where people are filing bugs on browser automation tools asking why the back() method doesn't work like the browser UI (currently that's specified to basically call history.back())
+
+[02:18:07.0000] <JakeA>
+I think Domenic would like a way to make iframes get out of sync with joint session history (as part of making a better history API), but it isn't yet clear to me how that would work alongside other things that _do_ follow joint session history. Maybe a better model would be an attribute on iframes that excludes them from joint session history, and a meta tag that makes all iframes on the page behave like that by default.
+
+[02:19:06.0000] <annevk>
+JakeA: we need that for shadow trees, if we can still do it retroactively
+
+[02:19:24.0000] <JakeA>
+ohhh interesting!!
+
+[02:19:27.0000] <annevk>
+JakeA: it's kind of a bad encapsulation leak currently
+
+[02:20:29.0000] <annevk>
+JakeA: https://github.com/whatwg/html/issues/763
+
+[02:20:55.0000] <annevk>
+(I guess that talks about some other issues as well, but the biggest is session history)
+
+[02:23:19.0000] <JakeA>
+"the biggest issue is session history" is now tattoo'd across my belly
+
+[02:34:06.0000] <jgraham>
+I've seen a lot of browser developers dashed on the rocks of session history, so good luck ;)
+
+[04:15:24.0000] <annevk>
+JakeA: wanderview: https://github.com/whatwg/fetch/issues/505#issuecomment-777409833
+
+[08:19:50.0000] <annevk>
+Domenic: HTML's navigate algorithm would only ever invoke Fetch's redirect algorithm while in parallel, right? If I make that algorithm return a response HTML won't have to pass any additional parameters at all and we'd fix the bug where Fetch's redirect algorithm can return a network error
+
+[08:20:39.0000] <Domenic>
+Yes to the first part, certainly...
+
+[08:21:52.0000] <annevk>
+HTML also waits for the response (from a task source though which makes no sense) while in parallel so as far as I can tell it's a no-op change that is more correct
+
+[08:23:03.0000] <annevk>
+I wanted to get to looking at HTML fetch invocations today, but the day wasn't long enough and also URL fragments in Fetch took longer than anticipated
+
+[08:23:06.0000] <Domenic>
+Ah, I see, yeah, cleaning up those two steps would be nice
+
+[08:23:43.0000] <annevk>
+Hopefully tomorrow, but I will ready the Fetch side for this redirect thing now
+
+[08:38:37.0000] <annevk>
+Domenic: so what I meant is that even if you fetch things from in parallel, you don't need the awkward waiting thing with the new callbacks since you can just do your thing from the parallel queue callbacks directly
+
+[08:39:01.0000] <Domenic>
+Oh... I don't really understand the parallel queue stuff, I was hoping we could continue just waiting
+
+[08:40:37.0000] <annevk>
+Domenic: if you want to wait you'd have to do something like XHR does, but I'm not sure why you would, but if HTML doesn't have any such callers maybe it doesn't matter
+
+[08:40:55.0000] <Domenic>
+I thought it was just going to return us a response, so we didn't even have to wait
+
+[08:41:22.0000] <annevk>
+Domenic: for navigate-redirect, yes
+
+[08:41:31.0000] <Domenic>
+Oh I see
+
+[08:41:55.0000] <Domenic>
+Well, it sounds like we won't need the parallel-queue stuff very much, is my takeaway
+
+[08:42:01.0000] <annevk>
+that's a very special entry point 🙂
+
+[08:42:13.0000] <Domenic>
+The only case where we fetch in parallel, at least that Ctrl+F "Fetch request" can find, is from within navigate
+
+[08:42:21.0000] <annevk>
+maybe it's just background fetch
+
+[08:42:41.0000] <annevk>
+and I needed it for WebSockets
+
+[08:43:29.0000] <annevk>
+Domenic: hmm, if I search for synchronous flag in HTML there's a fair number of hits
+
+[08:43:46.0000] <Domenic>
+Oh, that's a better search term...
+
+[08:44:09.0000] <Domenic>
+Ah, "fetching request"
+
+[08:44:28.0000] <Domenic>
+A lot can be restructured though I think
+
+[08:44:30.0000] <annevk>
+But they seem mostly easy to refactor and will improve as a result
+
+[08:44:32.0000] <Domenic>
+E.g. <link> and <a download>
+
+[08:44:37.0000] <annevk>
+hai
+
+[08:45:34.0000] <annevk>
+I'm really glad that thanks to JakeA I found a way to solve that issue as I haven't found a case yet that isn't improved with this new setup
+
+[08:46:12.0000] <annevk>
+And then what remains is better terminate / better body read / better documentation, which all seem within reach
+
+[08:46:13.0000] <JakeA>
+\o/
+
+[08:48:31.0000] <Domenic>
+I'm really really looking forward to better body read
+
+[08:52:13.0000] <annevk>
+Domenic: it's basically the last set of steps of https://xhr.spec.whatwg.org/#dom-xmlhttprequest-send, right? With some hand-waving about the realms of promises and whether there's even JavaScript on the thread...
+
+[08:53:13.0000] <annevk>
+(better body should shorten xhr and ideally remove all stream incantations from it, but maybe that's not feasible for some of it)
+
+[08:54:18.0000] <Domenic>
+You mean the sync version? Well, that's a bit un-good for cases like fetching scripts...
+
+[08:55:01.0000] <Domenic>
+What I'd like for fetching scripts is something like my end-of-body callback just having access to a byte sequence with a single sync call, somehow
+
+[09:05:27.0000] <annevk>
+Domenic: yeah, I just mean as the low-level stuff around which we'd wrap a sync version for in parallel and a callback that we hand the bytes + networking task source
+
+[09:06:10.0000] <annevk>
+Perhaps we should even get rid of response end-of-body if we have that...
+
+[10:12:02.0000] <annevk>
+Domenic: if I don't see any major problems with HTML tomorrow, is it fine if I merge the Fetch stuff? I worry about bitrot a bit
+
+[10:15:43.0000] <Domenic>
+annevk: sure, Fetch is looking good to me, and I'm pretty reassured on HTML integration being reasonable.
+
+[11:36:55.0000] <annevk>
+Ooh, maybe if you pass in end-of-body we’ll call it with a response and bytes; will sleep on this
+
+
+2021-02-12
+[20:50:20.0000] <MikeSmith>
+TabAtkins: when running the index.bs from https://github.com/w3c/webappsec-fetch-metadata through Bikeshed, I get the following warning:
+
+[20:50:23.0000] <MikeSmith>
+> /usr/local/lib/python3.9/site-packages/html5lib/_ihatexml.py:266: DataLossWarning: Coercing non-XML name: https: warnings.warn("Coercing non-XML name: %s" % name, DataLossWarning)
+
+[20:50:42.0000] <MikeSmith>
+...never seen that before, as far as I can recall
+
+[20:52:34.0000] <MikeSmith>
+gsnedders: jgraham ⬆
+
+[21:20:04.0000] <MikeSmith>
+TabAtkins: gsnedders: jgraham: nevermind — I see now the cause was fixed by a PR that hadn’t been merged yet
+
+[21:20:09.0000] <MikeSmith>
+https://github.com/w3c/webappsec-fetch-metadata/pull/61
+
+[21:20:31.0000] <MikeSmith>
+the index.bs source had this:
+
+[21:20:32.0000] <MikeSmith>
+!Explainer: <https://github.com/w3c/webappsec-fetch-metadata>
+
+[23:05:37.0000] <MikeSmith>
+annevk: so I am looking at the “Revamp the user activation model” change at https://github.com/whatwg/html/commit/8f8c1f50158736b3cf16188377a0974a20367c8b and I can see how “triggered by user activation” was replaced by “has transient activation”
+
+[23:07:23.0000] <MikeSmith>
+but in applying that change to https://w3c.github.io/webappsec-fetch-metadata/, I guess I can’t get away with just trivially replacing instances of “triggered by user activation” with “triggered by transient activation”
+
+[23:08:23.0000] <MikeSmith>
+the references in the Fetch Metadata Request Headers follow this kind of form:
+
+[23:08:30.0000] <MikeSmith>
+> requests which were triggered by user activation
+
+[23:08:59.0000] <MikeSmith>
+> If this algorithm was triggered by user activation
+
+[23:10:54.0000] <MikeSmith>
+but I that the references in the (updated) HTML spec itself are to objects having transient activation — not requests
+
+[23:11:30.0000] <MikeSmith>
+for example:
+
+[23:11:32.0000] <MikeSmith>
+> when the <span>media element</span>'s <code>Window</code> object has <span>transient activation</span>
+
+[23:14:02.0000] <annevk>
+MikeSmith: see https://w3c.github.io/webappsec-fetch-metadata/#fetch-integration
+
+[23:14:17.0000] <MikeSmith>
+so rightly, I guess to make the corresponding updates to the Fetch Metadata spec, I would need to rewrite the references to be about particular objects having transient activation, rather than requests or algorithms having transient activation
+
+[23:14:23.0000] <annevk>
+MikeSmith: it's trying to propagate a user activation signal through to fetch
+
+[23:14:27.0000] <MikeSmith>
+annevk: ah OK, looking now
+
+[23:14:59.0000] <MikeSmith>
+oh
+
+[23:15:04.0000] <MikeSmith>
+moneky patching
+
+[23:16:18.0000] <MikeSmith>
+as far as the instances of the references in that section, isn’t the better solution to upstream those changes to Fetch and HTML?
+
+[23:16:33.0000] <MikeSmith>
+ah, open PRs already
+
+[23:17:35.0000] <MikeSmith>
+OK, will talk to Mike West about it
+
+[23:18:07.0000] <annevk>
+MikeSmith: there's a number of open issues that prevent it from being merged
+
+[23:18:08.0000] <MikeSmith>
+I has just been hoping for a quick fix to make Bikeshed happy
+
+[23:18:28.0000] <MikeSmith>
+annevk: yah I was just reading through the comments for both PRs
+
+[23:19:09.0000] <annevk>
+MikeSmith: I think you should be able to replace the triggered by user activation once quite easily, just take care not to reply the ones that Fetch Metadata is defining itself for requests
+
+[23:19:19.0000] <MikeSmith>
+oh
+
+[23:19:24.0000] <MikeSmith>
+OK
+
+[23:19:40.0000] <annevk>
+I should probably not have said easily there 🙂
+
+[23:19:47.0000] <MikeSmith>
+haha
+
+[23:21:04.0000] <MikeSmith>
+Florian Scholz recently did a change across all of MDN that eradicated every instance of the word “simply”
+
+[23:21:15.0000] <MikeSmith>
+that was a fun one to review
+
+[23:22:29.0000] <MikeSmith>
+the summary line for the commit was, “Nothing is simple”
+
+[23:22:43.0000] <MikeSmith>
+https://github.com/mdn/content/commit/423ae587ef6e934d8c1313780ff1bd8552b91a8a
+
+[23:22:59.0000] <MikeSmith>
+annevk: any, thanks, will follow up with Mike
+
+[04:28:09.0000] <annevk>
+Fetch + Streams + SW + XHR is headache-inducing
+
+[04:29:31.0000] <annevk>
+Sometimes I'm close with 3, but then I realize I need to consider 4 and it all falls apart
+
+[05:48:52.0000] <jgraham>
+Where is the current iteration of the work to standardise web extensions happening?
+
+[05:55:55.0000] <jgraham>
+(I suppose it's also possible I totally imagined this work?)
+
+[06:25:11.0000] <MikeSmith>
+jgraham: https://browserext.github.io/browserext/ I think
+
+[06:33:02.0000] <jgraham>
+The latest commit there specifically seems to suggest it's dormant
+
+[06:33:57.0000] <jgraham>
+Also it doesn't quite help since the spec doesn't really explain where the data in the various API endpoints comes from
+
+[06:34:10.0000] <jgraham>
+s/ endpoints/s/
+
+[06:36:32.0000] <jgraham>
+My *actual* questions is "WebDriver-BiDi wants to allow automation clients to track progress of specific navigations and to track and intercept network requests. Is there any prior art for exposing this stuff" I know that the WebExtensions APIs also have the same kind of requirements, so it makes sense to share a solution there; I was hoping there would be some existing work to form the basis for this.
+
+[06:37:21.0000] <jgraham>
+Otherwise I fear I'm going to be the one trying to figure out where exactly one has to patch HTML and fetch to provide the relevant hooks. And that doesn't seem like a small amount of work :/
+
+[06:38:16.0000] <jgraham>
+(and even if I do it, we should make sure the solution also works for WebExtensions if they are indeed being standardised, which maybe they aren't idk)
+
+[08:30:35.0000] <annevk>
+wanderview: in fetch(req) the request ends up setting the fragment, no? The only case where a response can influence it is a redirect
+
+[09:03:46.0000] <Domenic>
+annevk: in our earliest commit snapshot "responsible document" was only for windows... https://html.spec.whatwg.org/commit-snapshots/c9e804f04d03a0658bfa689cb0f368a4d2e37936/#responsible-document
+
+[09:08:31.0000] <annevk>
+Domenic: oh, maybe I was thinking of responsible browsing context
+
+[09:09:13.0000] <Domenic>
+Ah yeah, that does exist, hmm I wonder what it was for these situations...
+
+[09:09:14.0000] <annevk>
+There was some weird connection it had for checking script execution ability or some such
+
+[09:13:28.0000] <Domenic>
+"Let inherited responsible browsing context be the responsible browsing context specified by the incumbent settings object."
+
+
+2021-02-14
+[12:05:24.0000] <Krinkle>
+I'm 99% sure the answer is "No", but... I was just noticing some short-lived cookies might be lasting longer or shorter than they should due to them not yet using "Max-Age", which with client clocks not perfectly in sync means when setting "Expires"  to (now+ 10 seconds) on the server quite probably results in cookies being expired on arrival or lasting minutes/hours longer than they should.
+
+[12:06:19.0000] <Krinkle>
+My question is: Was it ever considered to "fix" this by interpreting "Set-Cookie: Expires" in relation to the "Date" response header? There may be compat concerns which is why I think "No", but it seems like a neat way to e.g. improve modern browsers for web apps that never adopted Max-Age.
+
+[12:08:05.0000] <Krinkle>
+I looked for the original RFC and could not find any clear definition of what the expires date is interpreted in relation to, I'm guessing local device time. And didn't find relevant errattas or newer whatwg/w3c specs that would alter this for web browsers specifically, so I'm guessing it's still that way. I also couldn't find anything obvious in gecko/chromium/webkit tests that suggest the Date header is in any way considered today.
+
+
+2021-02-15
+[17:43:34.0000] <MikeSmith>
+in https://tc39.es/ecma262/#sec-abstract-equality-comparison I’m confused by step 8
+
+[17:45:42.0000] <MikeSmith>
+step 7 basically says, for comparing x == y, If Type(x) is BigInt and Type(y) is String, then compare x == StringToBigInt(y)
+
+[17:46:27.0000] <MikeSmith>
+step 8 however says, If Type(x) is String and Type(y) is BigInt, return the result of the comparison y == x
+
+[17:56:29.0000] <MikeSmith>
+d’oh, nevermind, I realize now the algorithm just recurses
+
+[21:39:45.0000] <annevk>
+Krinkle: why not migrate to max-age?
+
+[21:43:12.0000] <Krinkle>
+annevk: no reason not to Wikipedia and/or me personally, I'm wondering more widely whether standards and implementations agree that it should be based on device time and whether it would have or could still make sense as an improvement/stabler approach to base it on the Date header. It seems like an obvious thing to consider, so I wonder if it was ever considered or whether there are compat concerns, but I can't think of any off hand.
+
+[21:43:39.0000] <Krinkle>
+same for cache-control actually
+
+[21:44:01.0000] <Krinkle>
+although max-age is much much more widely adopted there
+
+[21:44:52.0000] <Krinkle>
+it'll likely take years to catch all the cases for cookies
+
+[23:14:21.0000] <annevk>
+Krinkle: I think the wider agreement is that mag-age is the better pattern
+
+[23:14:29.0000] <annevk>
+max-age*
+
+[23:42:08.0000] <annevk>
+Can x in https://heycam.github.io/webidl/#resolve not be a promise?
+
+[06:26:30.0000] <rakuco>
+annevk: thanks for the all the screen wake lock comments so far, they've been really informative
+
+[08:11:49.0000] <annevk>
+rakuco: no problem, and to be clear other specs have made a mess of this as well, e.g., some parts of HTML
+
+[08:11:57.0000] <annevk>
+rakuco: slowly fixing that now
+
+[08:17:29.0000] <rakuco>
+let me know if I can lend a hand. I think I'll at least start filing some issues in other specs I'm familiar with once I finally manage to understand and fix everything in the screen wake lock spec
+
+[09:49:48.0000] <annevk>
+rakuco: if you have time working on https://github.com/heycam/webidl/issues/135#issuecomment-772716243 would be great; I have the feeling that once we have an ambient realm floating around many things will be easier
+
+[09:55:03.0000] <Domenic>
+annevk: re "Can x in https://heycam.github.io/webidl/#resolve not be a promise?" I guess it cannot, but in practice we use promises a good amount there... we should probably update IDL. IMO more evidence that Promise<T> should just become Promise
+
+[10:00:30.0000] <annevk>
+I wouldn't go that far, we need it for various APIs, including those in service workers
+
+[10:00:57.0000] <annevk>
+It also seems strange if you could return a byte sequence or a list from a method, but you cannot fulfill a promise with one
+
+[10:21:29.0000] <Domenic>
+Wow JakeA https://www.youtube.com/watch?v=nZb0U3rFQXw is amazing :D
+
+[10:22:28.0000] <JakeA>
+Cheers! I kinda just needed to visualise it for myself more than anything, but I think I was struggling to explain to others what I was _trying_ to do, so hopefully that helps
+
+[15:03:24.0000] <EveryOS>
+Yesterday I was looking at the DOM spec. Somewhere in there it mentioned getting the root of a variable which I believe is an EventTarget. It says "if parent’s root is a shadow root whose mode is "closed", then set slot-in-closed-tree to true." This confuses me, because you can only get the root of a node? Is an EventTarget a node?
+
+[15:29:27.0000] <EveryOS>
+It looks like Node *extends* EventTarget. So when it refers to parent's root, would you check if it is a Node and then get the root if it is a node? And then ignore this line otherwise.
+
+
+2021-02-16
+[16:27:01.0000] <Domenic>
+EveryOS: note the "Assert: parent is a slot." a couple steps earlier
+
+[16:27:19.0000] <Domenic>
+So we only get to that step if parent is a slot, and all slots do indeed have roots.
+
+[16:36:39.0000] <EveryOS>
+Domenic: Oh, thanks. I didn't realize that.
+
+[20:42:03.0000] <Domenic>
+Folks in this channel may enjoy: https://github.com/domenic/specgo
+
+[22:50:41.0000] <annevk>
+Domenic: how do you get single-page HTML?
+
+[05:46:02.0000] <annevk>
+JakeA: the diagrams in that video are great too, if we can have those in the spec...
+
+[05:46:14.0000] <annevk>
+(it also seems more than 3 people might have watched it)
+
+[05:47:19.0000] <JakeA>
+annevk: yeah I should be able to put something like that in the spec, the slides are HTML
+
+[05:47:29.0000] <JakeA>
+yeah it got more interest than I thought!
+
+[06:21:45.0000] <gsnedders>
+I guess with something like https://github.com/whatwg/url/issues/559#issuecomment-763938749 we couldn't have the WPT test change automatically exported, given there's no associated spec change, and at least in some sense it's just experimental to see if it sticks? slightly annoying having tests that fail in WebKit :)
+
+[06:31:03.0000] <Domenic>
+gsnedders: seems like a good use case for .tentative, but I guess you'd need to create a separate test file and data file.
+
+[06:31:35.0000] <Domenic>
+Or we can just try to get consensus on the change; for a reparse bug that should be pretty quick
+
+[06:35:44.0000] <annevk>
+Yeah, I suspect if you pinged valenting he'd support banning | in hosts
+
+[08:18:39.0000] <annevk>
+Domenic: this read body incrementally is also what we should use for uploads I think
+
+[08:18:53.0000] <annevk>
+Domenic: instead of the current setup
+
+[08:19:29.0000] <annevk>
+Domenic: and I agree that impl are not teeing for integrity, but I'm not sure how to make the spec work
+
+[08:19:48.0000] <Domenic>
+annevk: well I think it's pretty easy for the non-fetch() case
+
+[08:20:11.0000] <Domenic>
+Just have a wrapper algorithm that checks the integrity and calls caller-supplied processBody if it passes, or caller-supplied processBodyError if it doesn't
+
+[08:20:21.0000] <Domenic>
+For fetch() I'm less sure
+
+[08:20:50.0000] <annevk>
+Domenic: but that means we'd have to duplicate the security check all over?
+
+[08:21:02.0000] <Domenic>
+No the wrapper lives in fetch
+
+[08:21:32.0000] <Domenic>
+In particular the read body algorithm you're proposing
+
+[08:22:01.0000] <annevk>
+Domenic: it seems bad for the network to return a response to the caller if there's an integrity mismatch
+
+[08:22:07.0000] <Domenic>
+Hmm I see
+
+[08:22:41.0000] <Domenic>
+I suspect we should do it anyway if that's what implementations do but I want stronger confirmation that's what implementations do then...
+
+[08:22:55.0000] <Domenic>
+And that'd require a lot of specs to update to have processBodyError, which don't today
+
+[08:23:36.0000] <annevk>
+I'm pretty sure that implementations treat it equivalent to a network error today
+
+[08:23:44.0000] <Domenic>
+Sure but how do they implement it
+
+[08:25:07.0000] <annevk>
+Domenic: I think what you are suggesting ends up extremely inelegant, which might be what implementations are doing today, but I wouldn't want to commit the spec to such a design
+
+[08:25:15.0000] <annevk>
+Domenic: unless you can show it's observable of course
+
+[08:25:51.0000] <Domenic>
+I think it's more elegant than teeing the stream, personally.
+
+[08:26:47.0000] <Domenic>
+I asked on networking team chat what they do but they're probably all asleep in Tokyo
+
+[08:26:49.0000] <annevk>
+Domenic: well we could also pass the bytes to some callback, e.g., processEndOfBody (if you supply that callback you cannot read body yourself maybe?)
+
+[08:27:19.0000] <Domenic>
+How does that solve the problem? Who checks integrity then?
+
+[08:27:24.0000] <annevk>
+and maybe if you supply integrity you can only use that callback as you don't get anything before that anyway
+
+[08:27:33.0000] <annevk>
+Fetch does, on the bytes, before passing the bytes on
+
+[08:27:36.0000] <Domenic>
+Ah hmm
+
+[08:27:46.0000] <Domenic>
+OK this sounds like what I was proposing, what is the difference...
+
+[08:27:58.0000] <Domenic>
+Ah you're using a fetch callback instead of a read body algorithm
+
+[08:28:00.0000] <annevk>
+Domenic: I think what you were proposing was some operation on body
+
+[08:28:05.0000] <annevk>
+right
+
+[08:28:18.0000] <Domenic>
+Why does that help?
+
+[08:28:39.0000] <Domenic>
+Oh you're not allowed to use processResponse if you use processEndOfBody?
+
+[08:28:59.0000] <annevk>
+yeah, that's what I'm thinking now, making them mutually exclusive
+
+[08:29:09.0000] <annevk>
+it doesn't fire any quicker with integrity anyway
+
+[08:29:31.0000] <Domenic>
+I guess that's equivalent to (but more elegant than) allowing both processResponse plus processEndOfBody but disallowing access to body.
+
+[08:29:56.0000] <Domenic>
+So processEndOfBody would get (response, byte sequence-or-null) I guess. Because callers still need to do network error checks, OK status checks, etc.
+
+[08:29:58.0000] <annevk>
+I think that's also still okay, but if you supply integrity processResponse makes no sense as it would fire at the same time as the latter
+
+[08:30:18.0000] <annevk>
+yeah
+
+[08:30:29.0000] <Domenic>
+This seems good
+
+[08:30:50.0000] <Domenic>
+I still don't know how fetch() works with integrity but that's probably just me
+
+[08:32:00.0000] <annevk>
+Domenic: I don't think it's just you, did we consider it with response streams? Seems like something to test...
+
+[08:32:54.0000] <annevk>
+Domenic: I think you really need a tee or a buffering proxy for that (which I guess is what processResponseEndOfBody is in a way)
+
+[08:33:32.0000] <Domenic>
+Yeah. I suspect implementations do buffering
+
+[08:35:57.0000] <annevk>
+And once done pass along a giant chunk?
+
+[08:36:49.0000] <Domenic>
+_that_ varies, I bet
+
+[08:37:29.0000] <Domenic>
+But yeah probably within one tick all the bytes are delivered into the ReadableStream, in some variable number of chunks
+
+[08:37:48.0000] <Domenic>
+Safari was doing one chunk for responses from the cache for a while (maybe still) so I'd imagine they do one chunk
+
+[08:39:09.0000] <annevk>
+So maybe that's what we should do as that works for all callers, but I guess I first want to see if there's a test
+
+[08:39:42.0000] <annevk>
+(and I guess we might still want to do processResponseEndOfBody in some fashion as it's just convenient to have)
+
+[08:41:08.0000] <Domenic>
+Yeah HTML really wants that
+
+[08:43:20.0000] <annevk>
+Domenic: so a buffering proxy is essentially doing a read request on body's stream and then setting body's stream to a new stream that you put things in when you're ready, right?
+
+[08:43:56.0000] <Domenic>
+Hmm yeah I guess so
+
+[08:44:07.0000] <Domenic>
+Although... you could also handle this at a lower layer
+
+[08:44:15.0000] <Domenic>
+Before putting any bytes into the stream in the first place
+
+[08:44:55.0000] <Domenic>
+https://fetch.spec.whatwg.org/#concept-http-network-fetch step 16
+
+[08:45:03.0000] <annevk>
+At least as things are defined a service worker could be putting in the bytes
+
+[08:45:12.0000] <annevk>
+And handling it there wouldn't catch that
+
+[08:46:01.0000] <Domenic>
+Ah cool OK
+
+
+2021-02-17
+[02:02:35.0000] <annevk>
+MikeSmith: https://w3c.github.io/webappsec-mixed-content/ is offline, maybe due to branch renaming?
+
+[02:42:49.0000] <MikeSmith>
+annevk: oh
+
+[02:43:00.0000] <MikeSmith>
+whatever it is, will fix it now
+
+[06:11:48.0000] <JakeA>
+annevk: do we still say "abort these steps" in parallel steps, or is it something different now?
+
+[06:12:57.0000] <Domenic>
+I still say that... we had a recent discussion in https://github.com/whatwg/xhr/pull/311#discussion_r574067070
+
+[06:14:18.0000] <JakeA>
+Cheers!
+
+[06:31:51.0000] <annevk>
+yeah that
+
+[06:33:33.0000] <annevk>
+Building Streams abstractions is kinda tough, so many callbacks and dealing with the event loop correctly is just...
+
+[06:53:27.0000] <Domenic>
+Yeah :(
+
+[06:54:06.0000] <Domenic>
+Not sure what could be done better; I was hopeful yesterday we could intervene in concept-http-network-fetch step 16 but the service worker issue makes it tricky.
+
+[07:02:16.0000] <annevk>
+Domenic: the buffering proxy is fine, I have most of that logic
+
+[07:02:56.0000] <annevk>
+Domenic: what I have a hard time wrapping my head around is when the read request callbacks fire and whether I need to queue tasks from them or not and how the read request callbacks even work without some event loop
+
+[07:03:50.0000] <annevk>
+(that is, I have most of that logic in my head, I prolly won't get to it today)
+
+[07:12:36.0000] <annevk>
+Domenic: I'll upload my WIP so you can have a look at that
+
+[07:18:33.0000] <annevk>
+Domenic: https://github.com/whatwg/fetch/pull/1172#discussion_r577697608
+
+[07:33:15.0000] <Domenic>
+annevk: streams can only be manipulated from an event loop, indeed. The read request steps run during promise fulfillment, so, in a microtask.
+
+[07:35:47.0000] <annevk>
+Domenic: so I guess the problem is that we want to read from things while in parallel
+
+[07:36:31.0000] <Domenic>
+Do you really need to though?
+
+[07:37:05.0000] <Domenic>
+It seems like you could do it all on the stream's event loop and, if necessary, queue a task once you have realm-independent bytes to send them over to another realm.
+
+[07:37:13.0000] <annevk>
+Domenic: so like, upload streams, the moment we finally want to transmit stuff is deeply in parallel land
+
+[07:37:41.0000] <Domenic>
+But you have to get those bytes out of user-supplied JS code / streams machinery running the main thread
+
+[07:37:54.0000] <Domenic>
+So you could do that by posting a task back to the stream's event loop to ask for the bytes
+
+[07:38:55.0000] <annevk>
+And response bodies?
+
+[07:39:32.0000] <Domenic>
+The question is how to read them for e.g. json()?
+
+[07:39:43.0000] <annevk>
+or sync xhr
+
+[07:39:52.0000] <Domenic>
+Oh yeah you're screwed for sync XHR
+
+[07:40:16.0000] <Domenic>
+json() is pretty easy though since it's async I think
+
+[07:40:33.0000] <Domenic>
+But sync XHR needs some sort of magical "pump the event loop the stream is using but only for the stream's tasks and not for anything else"
+
+[07:40:55.0000] <annevk>
+Well but also https://fetch.spec.whatwg.org/#concept-http-network-fetch just creates a ReadableStream while in parallel
+
+[07:41:53.0000] <Domenic>
+I'm not sure that's terrible (as long as you specify a realm); you just need to post a task when you observably associate that stream with the JS Request object.
+
+[07:42:05.0000] <Domenic>
+I guess it's not how implementations work though
+
+[07:42:09.0000] <annevk>
+If we also had underlying C++/Rust streams this wouldn't be a problem
+
+[07:42:27.0000] <annevk>
+Domenic: but we also read from it while in parallel and there's no event loop or microtasks there
+
+[07:42:43.0000] <annevk>
+Domenic: and enqueue onto it, I dunno
+
+[07:42:54.0000] <Domenic>
+Reading from it's a problem but enqueuing is slightly less problematic
+
+[07:42:56.0000] <annevk>
+I can see salvaging some of this though
+
+[07:43:12.0000] <Domenic>
+Enqueuing is just synchronously pushing into an Infra list
+
+[07:43:25.0000] <Domenic>
+Granted that Infra list lives inside a realm-bound JS object (the ReadableStream)
+
+[07:44:29.0000] <Domenic>
+It does seem like the spec isn't very clear on when implementations should actually create the ReadableStream object on the main thread. They must post a task to do so at some point, but the spec just does so in parallel.
+
+[07:45:20.0000] <annevk>
+Yeah, I didn't pay close enough attention I think when all the initial stream stuff happened
+
+[07:45:38.0000] <Domenic>
+I was still pretty confused about realms and promises and stuff at the time
+
+[07:46:20.0000] <Domenic>
+How this works in Chrome I believe is that we have C++ streams (Mojo data pipes) (probably similar to encoding's I/O queues?) which periodically queue a task to transfer bytes via shared memory from the C++ stream into the JS stream.
+
+[07:46:23.0000] <annevk>
+I vaguely recall pushing for some better abstractions, but also not wanting to block without having more concrete suggestions
+
+[07:46:42.0000] <annevk>
+Yeah, I definitely argued for that, but you didn't want that
+
+[07:46:49.0000] <Domenic>
+I think that would be doable as a spec architecture but it might be a lot of work, I'm not sure.
+
+[07:47:06.0000] <Domenic>
+Yeah I was pretty firmly in the "everything is JavaScript and should be implemented as if in JavaScript" camp back then
+
+[07:47:13.0000] <Domenic>
+Cf. Streams being written in complete ECMAspeak
+
+[07:47:44.0000] <Domenic>
+It's possible I/O queues might actually do what we want...
+
+[07:50:44.0000] <annevk>
+Yeah, hmm
+
+[07:53:58.0000] <annevk>
+I suspect it needs to be a bit more complex to account for errors and such
+
+[07:55:00.0000] <annevk>
+I think I'll continue with what I have for now to at least find all the places that need updating and also redefine the processResponseEndOfBody callback accordingly
+
+[07:55:25.0000] <annevk>
+At least that'll centralize the issues a bit better
+
+[07:55:41.0000] <Domenic>
+Yeah that sounds good
+
+[10:12:51.0000] <MikeSmith>
+Bikeshed question: https://github.com/w3c/webappsec-upgrade-insecure-requests/blob/main/index.src.html#L64 has some outdated references to HTML dfns that no longer exist
+
+[10:13:18.0000] <MikeSmith>
+for example, “responsible browsing context”
+
+[10:13:24.0000] <MikeSmith>
+https://github.com/w3c/webappsec-upgrade-insecure-requests/blob/main/index.src.html#L64
+
+[10:13:44.0000] <MikeSmith>
+but when I run Bikeshed, no warnings are reported for those
+
+[10:14:20.0000] <MikeSmith>
+is there some way I can get Bikeshed to audit those and report warnings for them?
+
+[10:49:40.0000] <annevk>
+Domenic: when did async/await happen?
+
+[10:49:53.0000] <Domenic>
+Hmm good question in this context
+
+[10:49:55.0000] <annevk>
+Domenic: I don't think it was really considered as it probably happened after
+
+[10:50:01.0000] <Domenic>
+ES2016 or 2017 I guess
+
+[10:50:18.0000] <Domenic>
+2017
+
+[10:50:20.0000] <Domenic>
+So sometime in 2016
+
+[10:50:22.0000] <annevk>
+I tried to find out but I couldn't get the right query; promises was 2016 I think
+
+[10:50:37.0000] <Domenic>
+Nah promises was ES2015 so during 2013-2014
+
+[10:50:53.0000] <annevk>
+Ah right okay, so yeah, it probably wasn't really considered
+
+[10:51:02.0000] <Domenic>
+That makes sense
+
+[10:52:01.0000] <annevk>
+Domenic: I like it though, prolly an IDL feature if we wanted to do it
+
+[10:52:20.0000] <Domenic>
+Yeah expressing that in IDL + prose today would be kind of annoying
+
+[10:52:21.0000] <annevk>
+And then it'd work everywhere that takes a promise
+
+[10:52:29.0000] <Domenic>
+Oh interesting
+
+[10:52:35.0000] <Domenic>
+I was thinking opt-in
+
+[10:52:47.0000] <Domenic>
+But there probably aren't that many promise-accepting APIs and the ones that exist would probably like this
+
+[10:53:41.0000] <annevk>
+If someone can come up with an example where new Promise is okay but async/await is not that'd be interesting for sure, but that seems like a stretch?
+
+[10:57:28.0000] <Domenic>
+I doubt it'd be possible to come up with one where it's bad but it seems plausible there's cases where you're mostly passing promises from somewhere already existing
+
+[10:57:44.0000] <Domenic>
+where writing the work inline would be weird for that use case
+
+[11:12:50.0000] <MikeSmith>
+annevk: Domenic: among any issues you’ve raised against WebAppSec specs, if there are particular ones that you hope to have considered higher priority, please let me know
+
+[11:13:26.0000] <MikeSmith>
+especially issues that might be blocking any HTML changes
+
+[11:13:57.0000] <MikeSmith>
+Domenic: as far as I have found so far, https://github.com/w3c/webappsec-permissions-policy/issues/390 may be the only WebAppSec spec issue you have open
+
+[11:14:45.0000] <MikeSmith>
+(or else maybe I’m not using the right search params)
+
+[11:29:51.0000] <andreubotella>
+> It's possible I/O queues might actually do what we want...
+
+[11:30:08.0000] <andreubotella>
+That would've been confusing as hell just 8 months ago 😁
+
+[11:30:56.0000] <andreubotella>
+I'm not sure I/O queues as they are right now are a good fit, but I can see them becoming a good infrastructure for both encoding and streams
+
+[11:31:32.0000] <Domenic>
+MikeSmith: thanks for asking; I think there are probably a number of open issues that we didn't open ourselves which are relatively high priority. Will do a look.
+
+[11:32:00.0000] <andreubotella>
+For example, right now empty I/O queues (without end-of-queue) block on reading, but adding a "read if not empty" method would also help with the HTML parser, I guess
+
+[11:32:34.0000] <MikeSmith>
+Domenic: thanks
+
+[12:15:58.0000] <annevk>
+andreubotella: they would need to support cancel/abort
+
+[12:17:31.0000] <andreubotella>
+annevk: hm, right
+
+[12:17:45.0000] <annevk>
+MikeSmith: having someone go through existing issues and fixing Bikeshed warnings and rely on the Bikeshed db more would all be good
+
+[12:18:24.0000] <annevk>
+MikeSmith: I’ll likely patch SRI as part of Fetch read body changes
+
+[12:23:38.0000] <Domenic>
+https://github.com/w3c/webappsec-permissions-policy/issues/396 would be nice
+
+[12:33:59.0000] <EveryOS>
+Thank ya'll for your hard works on the specs (:
+
+[12:41:28.0000] <Domenic>
+https://github.com/w3c/webappsec-subresource-integrity/issues/92 and https://github.com/w3c/webappsec-subresource-integrity/issues/41
+
+[12:41:36.0000] <Domenic>
+You're welcome, EveryOS!
+
+[12:42:52.0000] <Domenic>
+Oh https://github.com/w3c/webappsec-fetch-metadata/issues/58 being dropped seems bad
+
+[15:57:51.0000] <MikeSmith>
+Domenic: thanks
+
+
+2021-02-18
+[16:00:57.0000] <MikeSmith>
+annevk: OK yeah the Bikeshed stuff is something I’ve started doing already. As far issues go, given the number of specs and open issues, I’ve been hoping to try to figure out some prioritization approach rather than just going through them all one by one for every spec
+
+[16:02:43.0000] <MikeSmith>
+and “prioritize issues that the HTML editors say are blocking or problematic or particularly bad” seems like one reasonable way
+
+[20:59:26.0000] <annevk>
+Fair! It’s really great you get to work on this 😊
+
+[21:24:17.0000] <MikeSmith>
+annevk: thanks for taking time to point out the problems
+
+[21:24:36.0000] <MikeSmith>
+I have been looking through the CSP issue you raised
+
+[21:26:05.0000] <MikeSmith>
+for a number of reasons, for triage, it seems I should prioritize CSP higher relative to other webappsec specs
+
+[21:27:06.0000] <MikeSmith>
+one big reason being that for web developers, CSP is something they use much more than features in the other specs
+
+[21:27:47.0000] <MikeSmith>
+and for web developers, CSP is inherently confusing and problematic to get right
+
+[21:28:55.0000] <MikeSmith>
+at least I can say in looking at CSP issues at Stack Overflow every day, there are a lot of developers confused by it and who have a hard time getting the details right
+
+[21:29:32.0000] <MikeSmith>
+similar to the level of developer confusion with CORS
+
+[21:30:10.0000] <MikeSmith>
+and anyway, the CSP issue tracker also has a lot more open issues than any other webappsec spec
+
+[00:09:09.0000] <annevk>
+MikeSmith: FWIW, what I care about with a clean log is how https://github.com/w3c/webappsec-subresource-integrity/commits looks
+
+[00:10:07.0000] <annevk>
+And that's currently rather messy due to it not using linear history
+
+[00:14:26.0000] <MikeSmith>
+annevk: ah yeah I will fix that too, for going forward
+
+[00:14:29.0000] <MikeSmith>
+right now
+
+[00:14:52.0000] <MikeSmith>
+OK, done
+
+[00:15:04.0000] <MikeSmith>
+disabled merge commits for that repo
+
+[00:24:55.0000] <MikeSmith>
+annevk: so the CSP spec has many instances of “<a>case-sensitive</a> match”
+
+[00:25:19.0000] <MikeSmith>
+which all cause Bikeshed warnings since there is no such dfn anywhere, right?
+
+[00:25:39.0000] <MikeSmith>
+so, what should I replace it with in that PR you reviewed?
+
+[00:27:06.0000] <MikeSmith>
+oh
+
+[00:27:24.0000] <MikeSmith>
+looking a relevant part of Infra now
+
+[00:27:29.0000] <annevk>
+MikeSmith: so you could either use <a>is</a> iirc or you can just drop it
+
+[00:27:37.0000] <MikeSmith>
+OK
+
+[00:27:47.0000] <annevk>
+MikeSmith: and say if |a| is |b|, hurray
+
+[00:28:30.0000] <annevk>
+since we mostly stopped being sloppy, things are now assumed to be literal comparisons unless stated otherwise
+
+[00:28:45.0000] <MikeSmith>
+ok hurray indeed, that’s easy
+
+[01:51:33.0000] <MikeSmith>
+annevk: is https://github.com/mdn/content/issues/2409 actually an issue with the fetch API, or is it instead maybe something specific to the github-fetch thing?
+
+[01:52:27.0000] <MikeSmith>
+see also https://github.com/github/fetch/issues/386#issuecomment-243223273
+
+[01:52:38.0000] <annevk>
+MikeSmith: if credentials is omit, the server is meant to not be able to set cookies
+
+[04:54:37.0000] <EveryOS>
+This IRC channel doesn't use NickServ. I'm worried about the potential of somebody stealing a username.
+
+[04:55:32.0000] <annevk>
+EveryOS: you can register your username, no? I think I have
+
+[04:56:49.0000] <EveryOS>
+Oh, you can?
+
+[04:56:49.0000] <EveryOS>
+I have NickServ set up, but I thought that only worked on certain channels,
+
+[04:56:49.0000] <EveryOS>
+Let me check this out
+
+[04:59:18.0000] <EveryOS>
+Yea, I still have access to this channel, https://usercontent.irccloud-cdn.com/file/bqZ0Ix6T/image.png
+
+[05:00:58.0000] <EveryOS>
+NickServ does not seem to work on this channel, unless there is some other method
+
+[05:01:35.0000] <annevk>
+Oh if the user isn't logged in, I see; it hasn't been a problem that I can remember and we've been here for at least 15y
+
+[05:02:02.0000] <EveryOS>
+Oh, cool, thanks
+
+[05:02:03.0000] <annevk>
+If we changed that setting it might end up removing people from the channel I suppose?
+
+[05:02:11.0000] <EveryOS>
+Probably
+
+[05:02:32.0000] <annevk>
+I guess I rather not rock the boat for now 😊
+
+[05:03:05.0000] <EveryOS>
+Yea
+
+[05:11:03.0000] <andreubotella>
+how do browsers implement non-byte streams across realms?
+
+[05:11:08.0000] <andreubotella>
+do they use structured clone?
+
+[05:27:29.0000] <annevk>
+andreubotella: for the Streams API that is defined, if you mean internal streams I suspect it's all bytes
+
+[05:30:51.0000] <annevk>
+Domenic: I don't know about you, but I have to look up all the time which data structure uses size and which uses length
+
+[05:31:38.0000] <annevk>
+Although I shouldn't really have to look it up, I just need to flip it since it's one or the other
+
+[05:34:23.0000] <andreubotella>
+annevk: I think I probably understand less about both streams and realms than I thought
+
+[05:35:06.0000] <annevk>
+andreubotella: you're not alone 😊
+
+[05:35:51.0000] <annevk>
+andreubotella: I'm happy to try answer questions though if you have any
+
+[05:37:36.0000] <annevk>
+JakeA: are you also gonna review https://github.com/web-platform-tests/wpt/pull/27325?
+
+[06:23:42.0000] <Domenic>
+andreubotella: "across realms" only occurs with transferable streams, which use pipeTo, which uses structured clone
+
+[06:25:34.0000] <Domenic>
+MikeSmith: that github/node-fetch comment was from the era when we defaulted fetch() to credentials: "none" instead of credentials: "same-origin", I think.
+
+[06:26:03.0000] <Domenic>
+Also later on in the thread someone does the `credentials: "same-origin"` dance and they get confused why it's not working cross-origin... https://github.com/github/fetch/issues/386#issuecomment-305505899 so I guess this is a real potential developer pain point in not understanding the credentials option.
+
+[06:26:53.0000] <annevk>
+Domenic: the MDN report specifically talks about it also impacting Set-Cookie and that not being called out
+
+[06:27:09.0000] <annevk>
+so somewhat different issue I think
+
+[06:27:38.0000] <Domenic>
+Yeah I'm just saying at least the github/node-fetch people probably wouldn't have been so confused (which is cited as evidence of the confusion) in the modern era of same-origin being the default.
+
+[07:31:37.0000] <JakeA>
+annevk: done!
+
+[08:59:03.0000] <annevk>
+Hmm, shouldn't FakeWorkletGlobalScope extend WorketGlobalScope?
+
+[09:03:30.0000] <annevk>
+https://github.com/whatwg/html/pull/6396
+
+[11:51:23.0000] <annevk>
+JakeA: forgot to reply with 🎉, ta
+
+[12:31:57.0000] <EveryOS>
+Earlier IRCCloud went down, immediately followed by my internet. So I wasn't able to stay connected to IRC https://usercontent.irccloud-cdn.com/file/SeW3W6Vg/Screenshot%202021-02-18%20143612.png
+
+
+2021-02-19
+[17:07:32.0000] <MikeSmith>
+or https://www.bleepingcomputer.com/news/security/hackers-abuse-google-apps-script-to-steal-credit-cards-bypass-csp/amp/
+
+[17:07:52.0000] <MikeSmith>
+> They are using the script.google.com domain to successfully hide their malicious activity from malware scan engines and bypass Content Security Policy (CSP) controls.
+
+[00:44:18.0000] <annevk>
+script.google.com hosting untrusted content is like wat
+
+[01:56:22.0000] <annevk>
+Such a missed opportunity that our topic labels don't use WHATWG green
+
+[02:08:31.0000] <MikeSmith>
+yeah hasn’t there been discussion of the script.google.com case is some of the spec issue trackers?
+
+[02:09:24.0000] <MikeSmith>
+it makes me wonder why CSP has no host-source negation operator
+
+[02:09:52.0000] <MikeSmith>
+*.google.com !script.google.com
+
+[02:12:57.0000] <annevk>
+Trusting entire domains or registrable domains is the real culprit here. Folks should adopt the hashes and stuff
+
+[02:13:08.0000] <MikeSmith>
+sur
+
+[02:13:12.0000] <MikeSmith>
+ideally
+
+[02:14:12.0000] <MikeSmith>
+but of course in practice, on scale, a pretty big number of web developers are gonna do the naive/easiest thing
+
+[02:19:00.0000] <annevk>
+Right, not using CSP at all 🙂
+
+[02:19:19.0000] <MikeSmith>
+well
+
+[02:19:56.0000] <MikeSmith>
+half the CSP policies posted to Stack Overflow questions have unsafe-inline in them..
+
+[02:21:25.0000] <JakeA>
+Is there a `wpt run` command that just starts the server and launches the browser with the correct flags?
+
+[02:22:31.0000] <MikeSmith>
+JakeA: you mean without executing any tests?
+
+[02:22:53.0000] <JakeA>
+MikeSmith: yeah, I'd navigate the browser to the URL myself
+
+[02:23:07.0000] <annevk>
+JakeA: wpt serve
+
+[02:23:18.0000] <JakeA>
+annevk: that doesn't launch the browser with the correct flags
+
+[02:23:23.0000] <annevk>
+/me exclusively uses that, but it's kinda bad with HTTPS
+
+[02:23:41.0000] <JakeA>
+yeah
+
+[02:23:45.0000] <annevk>
+Ask in #testing on irc.w3.org? I should probably learn this too
+
+[02:23:52.0000] <JakeA>
+Shall do
+
+[02:24:34.0000] <annevk>
+I also get exceptions when I do wpt run, fun times
+
+[02:25:31.0000] <MikeSmith>
+annevk: on macOS? it works for me
+
+[02:25:38.0000] <MikeSmith>
+annevk: another thing I see from SO CSP questions is that many JavaScript libraries are still doing (unsafe) inline stuff, and eval(ish) stuff
+
+[02:29:01.0000] <annevk>
+Yeah, macOS, I don't have virtualenv (this is prolly bad, but I sorta resigned to the fact that every now and then I just get a new computer and start from scratch with command-line stuff)
+
+[02:29:54.0000] <annevk>
+MikeSmith: makes sense, Wasm might be a reason as we don't have good CSP rules for Wasm (maybe being changed now, but it's soo slow progress)
+
+[02:55:41.0000] <MikeSmith>
+it now only takes 15 seconds to publish the CSP spec on push to main, using Github Actions to call remote Bikeshed
+
+[02:56:15.0000] <MikeSmith>
+bravo Domenic for https://gist.github.com/domenic/ec8b0fc8ab45f39403dd#auto-deploying-built-products-to-gh-pages-with-github-actions
+
+[05:00:00.0000] <annevk>
+/me drowns in streams tech debt
+
+[05:13:05.0000] <MikeSmith>
+annevk: FYI new thing https://github.com/w3c/spec-prod
+
+[05:13:21.0000] <MikeSmith>
+> GitHub Action to build ReSpec/Bikeshed specs, validate output and publish to GitHub pages or W3C
+
+[06:36:13.0000] <annevk>
+JakeA: I'll occasionally forget arrow functions return things in that matter, despite often relying on it myself
+
+[06:37:17.0000] <JakeA>
+annevk: it didn't help that it was on another line. It's on the same line now. I've been trying to get into the habit of running code through Prettier even if the the project doesn't have a formatting guide
+
+[06:37:33.0000] <JakeA>
+(it was prettier that put it on a different line)
+
+[06:39:39.0000] <JakeA>
+annevk: Sorry for the obvious errors in that pr, I got a bit distracted moving the code around, figuring out how to make it work with the infrastructure. That's my excuse anyway.
+
+[06:40:39.0000] <annevk>
+JakeA: don't worry about it, it's also a good check to see if the reviewer is paying attention :p
+
+
+2021-02-22
+[23:57:52.0000] <annevk>
+I actually managed to forget the number of RFC2119. There's hope
+
+
+2021-02-23
+[09:34:43.0000] <devsnek>
+has adding an offset and length to TextDecoder#decode ever been suggested?
+
+[09:34:52.0000] <devsnek>
+to get rid of needing an intermediate typed array
+
+[09:37:13.0000] <annevk>
+devsnek: yeah, it would require some data to show that it's needed
+
+[09:37:47.0000] <devsnek>
+like perf data?
+
+[09:37:48.0000] <annevk>
+devsnek: discussed in https://github.com/whatwg/encoding/issues/172
+
+[09:37:53.0000] <annevk>
+devsnek: hai
+
+[09:37:57.0000] <devsnek>
+ah ok
+
+[09:39:13.0000] <devsnek>
+i guess interface types are a better approach overall 🥲
+
+[14:32:19.0000] <Guest49762>
+/!\ this chat has moved to irc.crimeircd.net #pp /!\
+
+[14:32:34.0000] <PolarizedIonszd>
+/!\ this chat has moved to irc.crimeircd.net #pp /!\
+
+[14:33:15.0000] <MoystBA>
+/!\ this chat has moved to irc.crimeircd.net #0 /!\
+
+[14:39:28.0000] <NightMonkeyTp>
+/!\ this chat has moved to irc.crimeircd.net #0 /!\
+
+[14:39:32.0000] <NightMonkeyTp>
+/!\ this chat has moved to irc.crimeircd.net #0 /!\
+
+[14:47:58.0000] <EveryOS>
+These spambots are so annoying
+
+
+2021-02-24
+[15:23:00.0000] <Bakkot>
+randomly, is there is a reason the multipage version of the spec doesn't have `link rel=canonical`?
+
+[15:23:21.0000] <Bakkot>
+we're making a multipage version of the 262 spec and are considering adding it, but maybe there is a good reason not to we're not aware of
+
+[15:33:04.0000] <Domenic>
+Bakkot: what would such a link point to?
+
+[15:35:41.0000] <Bakkot>
+Domenic the single-page version
+
+[15:36:12.0000] <Bakkot>
+that's a use case called out in the RFC: "As an example, each component page (e.g., page-1.html, page-2.html) of a multi-page article MAY specify the "view-all" version (e.g., page-all.html), the superset of their content, as the target IRI."
+
+[15:36:43.0000] <Domenic>
+Bakkot: I don't think that the single-page version is the "preferred URL" for the multipage version, or certainly not for the individual sub-pages of the multi-page version. They don't contain the same content. And we certainly don't want to noindex the multipage version from search engines!
+
+[15:36:49.0000] <Domenic>
+Very interesting RFC example...
+
+[15:37:24.0000] <Domenic>
+I guess "no content will have been lost" is the test the RFC is using, interesting
+
+[15:37:50.0000] <Domenic>
+Whereas I usually apply canonical to mean "the content is exactly the same, just don't search-engine-index this duplicate"
+
+[15:38:11.0000] <Bakkot>
+Yeah, that's also what the google devrel page implies: https://developers.google.com/search/docs/advanced/crawling/consolidate-duplicate-urls
+
+[15:38:14.0000] <Bakkot>
+no mention of supersets
+
+[15:38:51.0000] <Domenic>
+Maybe this has evolved in practice, since the RFC was published...
+
+[15:39:44.0000] <Bakkot>
+Seems plausible, yeah
+
+
+2021-02-25
+[17:31:25.0000] <EveryOS>
+Domenic: "They don't contain the same content." I was not aware of this. Is there any significant deviation between the single-page and multi-page versions? Or am I free to use either?
+
+[18:32:58.0000] <Domenic>
+EveryOS: I meant that in the stricter sense. E.g. https://html.spec.whatwg.org/multipage/xhtml.html does not contain the same content as https://html.spec.whatwg.org/ since it only contains a subset of it.
+
+[18:33:21.0000] <EveryOS>
+Oh, ok, thanks!
+
+[23:23:29.0000] <annevk>
+TabAtkins: when does Shepherd do its indexing? I thought it was at least overnight (for me), but it seems to be different now
+
+[05:47:45.0000] <annevk>
+I wonder if the people that insist on braces everywhere else put them around if in an else if
+
+[07:00:31.0000] <JakeA>
+heh
+
+[07:12:37.0000] <TabAtkins>
+annevk: Normally  yes, it's every few hours, but it looks like the indexing operation was hanging from yesterday. I've killed it and it's started a fresh one that was pending, so hopefully it'll be done in a bit.
+
+[07:13:25.0000] <annevk>
+TabAtkins: I see, I think I ran into that last week as well as it took several days before something started working
+
+[07:13:44.0000] <TabAtkins>
+yup
+
+[07:44:04.0000] <TabAtkins>
+annevk: I don't know what context you were talking about `else if` from, but no, `else if` is usually treated as a syntax construct in its own right, like Python's `elif`, even if it's actually just an unbraced `else` followed by an `if` block. There is no chance of confusion or misparsing for it, so there would be no reason to agitate for additional braces there.
+
+[07:45:36.0000] <annevk>
+TabAtkins: I mean, I know, but it's also a fun edge case
+
+[07:46:21.0000] <annevk>
+(There was this Twitter discussion some days ago about braces that I remembered while writing else if)
+
+[07:47:34.0000] <TabAtkins>
+Sure, but it's an edge case where it's literally impossible to make a mistake and cause a misparse. You can leave off the braces around the following `if` block and run into problems, but braces around the `else` body would gain absolutely nothing, so no, no one would insist on that.
+
+[07:47:34.0000] <TabAtkins>
+Same as people who use semicolons in their JS not putting them after their function declarations.
+
+[07:47:39.0000] <TabAtkins>
+(It just sounds like you're attempting a "gotcha" for some reason.)
+
+[07:48:29.0000] <Rik`>
+annevk: not this one? https://twitter.com/lizardbill/status/1364578611009904644 😉
+
+[07:48:39.0000] <annevk>
+Rik`: heh
+
+[07:49:10.0000] <annevk>
+TabAtkins: I thought it was fun, you do you
+
+[07:49:36.0000] <TabAtkins>
+Rik`: omg
+
+[08:28:47.0000] <JakeA>
+Domenic: is it possible to queue a task that works with multiple documents, or is that not ok?
+
+[08:29:46.0000] <Domenic>
+JakeA: seems ok-ish if they're same agent. The caveat there is that the task might not run if its associated document becomes inactive.
+
+[08:30:28.0000] <JakeA>
+Gotcha
+
+[08:30:51.0000] <annevk>
+I'm pretty sure there's a lot of that, especially with multi-process, but yeah, only one document is in control
+
+[08:50:32.0000] <JakeA>
+Domenic: Does "same agent" mean same thread?
+
+[08:51:03.0000] <JakeA>
+Or, at least, synchronous observable
+
+[08:51:18.0000] <JakeA>
+Like a document and a same-origin iframe
+
+[08:51:41.0000] <annevk>
+JakeA: yes
+
+[08:51:55.0000] <JakeA>
+ta!
+
+[08:51:59.0000] <annevk>
+JakeA: all globals that can access each other directly form an agent
+
+[08:52:07.0000] <annevk>
+JakeA: all agents that can share memory an agent cluster
+
+[08:53:03.0000] <annevk>
+JakeA: all agents clusters (that don't have a worker as the main agent) that can postMessage a browsing context group
+
+[08:53:04.0000] <JakeA>
+annevk: Right, so a cross origin iframe would be a different agent but might be in the same cluster?
+
+[08:53:24.0000] <annevk>
+JakeA: no, you cannot share memory across origins
+
+[08:53:53.0000] <annevk>
+JakeA: unless it's cross-origin-but-same-site, but that also doesn't work because the keying is different with COOP+COEP (origin-keyed)
+
+[08:54:02.0000] <annevk>
+(we made it complex, sorry)
+
+[08:54:43.0000] <JakeA>
+Ok, I think I get it
+
+
+2021-02-26
+[04:14:07.0000] <JakeA>
+annevk: Found a couple of execution order issues with module scripts, but couldn't figure out the right component https://bugzilla.mozilla.org/show_bug.cgi?id=1695192
+
+[04:14:22.0000] <JakeA>
+Don't suppose you'd assign it the right component?
+
+[04:17:35.0000] <annevk>
+JakeA: I did a thing, script loading is kinda unowned
+
+[04:19:04.0000] <JakeA>
+taaaa
+
+[05:53:54.0000] <smaug____>
+jgraham: how does wpt.fyi get the links to the implementation bugs? For example in https://wpt.fyi/results/html/semantics/forms/form-submission-0?label=experimental&label=master&aligned
+
+[06:05:42.0000] <jgraham>
+smaug____: They're stored in https://github.com/web-platform-tests/wpt-metadata
+
+[06:05:51.0000] <jgraham>
+That one was set by the wpt-sync bot
+
+[06:06:35.0000] <smaug____>
+jgraham: so when wpt-sync bot creates a new bug, it updates the meta data?
+
+[06:06:48.0000] <jgraham>
+Yes
+
+[06:07:27.0000] <jgraham>
+It only creates bugs when there aren't existing bugs associated with that failure
+
+[06:08:00.0000] <jgraham>
+The idea is that these bugs are actionable and so should be triaged like other bugs (unlike the bugs that track the actual sync)
+
+[06:08:08.0000] <smaug____>
+jgraham: can I somehow do something in mozilla-central to create association between bugzilla and wpt.fyi?
+
+[06:08:21.0000] <jgraham>
+smaug____: Not in mozilla-central
+
+[06:08:25.0000] <smaug____>
+ok
+
+[06:08:48.0000] <jgraham>
+smaug____: You should be able to sign in to wpt.fyi with GH and add bug links there
+
+[06:08:57.0000] <smaug____>
+aha
+
+[06:09:07.0000] <smaug____>
+that is handy
+
+[06:09:08.0000] <jgraham>
+But also having links in m-c would be too many sources of data
+
+[06:09:51.0000] <JakeA>
+I've typo'd "session history" a lot recently, but "session shitory" is my favourite
+
+[06:10:19.0000] <EveryOS>
+That is too funny
+
+[06:29:24.0000] <annevk>
+jgraham: interesting, I wish we could integrate that with WHATWG's bug filing process somehow to avoid automated duplicate filing
+
+[06:30:10.0000] <annevk>
+I guess we could ask editors to also add stuff to fyi
+
+[06:31:26.0000] <jgraham>
+annevk: What's the WHATWG bug filing thing?
+
+[06:31:40.0000] <annevk>
+jgraham: it's mainly that we file bugs when making a change to a spec
+
+[06:31:59.0000] <annevk>
+jgraham: see OP of https://github.com/whatwg/xhr/pull/315 for instance
+
+[06:32:01.0000] <jgraham>
+annevk: In the vendor bug trackers?
+
+[06:32:05.0000] <jgraham>
+Is there tooling?
+
+[06:32:11.0000] <annevk>
+no tooling
+
+[06:33:17.0000] <annevk>
+Maybe there could be, but thus far it has seemed that would actually be more work than filing 3+ bugs (+ is for Servo/Node.js occasionally)
+
+[06:33:48.0000] <jgraham>
+Ah, yeah. Getting people to add those bugs as annotations on whatever failing tests would be good. I don't know that the process would be very smooth right now, but maybe it's not worse than filing the bugs by hand
+
+[06:34:05.0000] <jgraham>
+I mean I agree that writing tooling is not entirely trivial ;)
+
+[10:23:09.0000] <MikeSmith>
+I’m trying to understand the lastIndex property of RegExp instances
+
+[10:23:18.0000] <MikeSmith>
+https://tc39.es/ecma262/#sec-lastindex
+
+[10:23:50.0000] <MikeSmith>
+if I look at RegExp.prototype I find no lastIndex property
+
+[10:23:57.0000] <MikeSmith>
+so where does it come from?
+
+[10:24:29.0000] <MikeSmith>
+context is that I’m trying to figure out how to document it in MDN
+
+[10:24:43.0000] <MikeSmith>
+see https://github.com/mdn/content/issues/2708
+
+[10:26:11.0000] <MikeSmith>
+all the other MDN articles for instance members of RegExp are titled, e.g., RegExp.prototype.flags
+
+[10:26:42.0000] <MikeSmith>
+so, wondering how to title the lastIndex article
+
+[10:28:38.0000] <andreubotella>
+MikeSmith: https://tc39.es/ecma262/#sec-regexpalloc
+
+[10:28:45.0000] <andreubotella>
+it's a property of RegExp instances
+
+[10:29:30.0000] <andreubotella>
+not defined on the prototype
+
+[10:30:49.0000] <MikeSmith>
+/me looks at https://tc39.es/ecma262/#sec-regexpalloc
+
+[10:31:32.0000] <MikeSmith>
+andreubotella: are there other instance properties like this in JavaScript, for other objects?
+
+[10:32:12.0000] <MikeSmith>
+why isn’t it just part of the prototype?
+
+[10:32:53.0000] <andreubotella>
+I have no clue
+
+[10:34:13.0000] <andreubotella>
+I suspect it's an instance property because users might need to set it, but I don't know why choose that over having getters and setters acting on an internal slot
+
+[11:23:06.0000] <jgraham>
+MikeSmith: e.g. length is a property of array instances, not a property of the prototype
+
+[11:24:38.0000] <jgraham>
+I think pure data properties have to be on the instance to make sense, the ones on the prototype are accessor properties
+
+[11:25:19.0000] <jgraham>
+And probably there's some hisorical reason why some things can be on the prototype and acting on an internal slot of the instance and others can't
+
+[11:25:27.0000] <jgraham>
+It's an observable difference
+
+[12:26:10.0000] <annevk>
+Yeah, I would expect these to be accidents of history, but I’d love to read more if anyone finds anything
+
+[13:15:54.0000] <annevk>
+Mek: so Fetch kinda reads blobs synchronously (not observably so)… it’s avoidable if we change multipart/form-data and such, but that’s a lot of work
+
+[13:16:24.0000] <annevk>
+Mek: https://github.com/whatwg/fetch/issues/604 has some context
+
+[13:17:20.0000] <annevk>
+Mek: once we define multipart/form-data in detail it would be straightforward to fix I think
+
+[13:21:40.0000] <Mek>
+Until I get around to (finishing up) actually formalizing how reading blobs works, I suppose it's all somewhat handwavy anyway? But it doesn't seem too problematic to me to pretend that blobs are kinda read synchronously...
+
+[13:22:16.0000] <Mek>
+Not entirely clear to me from that issue where the blob would actually need to be read synchronously though? Just getting the size is synchronous anyway
+
+[13:22:46.0000] <Mek>
+oh, I guess defining the size in terms of converting it to bytes...
+
+[13:24:05.0000] <Mek>
+I guess one concern would be that reading a blob can fail, while getting its size shouldn't fail
+
+[13:25:20.0000] <annevk>
+Mek: ooh good point
+
+[13:25:55.0000] <annevk>
+Ok, maybe I just need to use more prose then
+
+[13:43:16.0000] <andreubotella>
+annevk: I think the tricky part with multipart/form-data would be the boundary strings
+
+[13:43:34.0000] <andreubotella>
+since they're traditionally defined as being dependent on the form's payload
+
+[13:45:01.0000] <andreubotella>
+in practice, all browsers just generate a random number and hope the entropy works out, but I'm not sure if that should be a spec requirement
+
+[14:07:15.0000] <annevk>
+andreubotella: seems hard to improve on that if you don’t want to block on I/O
+
+[14:08:28.0000] <andreubotella>
+true
+
+[14:12:35.0000] <MikeSmith>
+jgraham: thanks, that makes sense
+
+
+2021-02-27
+[00:11:31.0000] <annevk>
+andreubotella: oh sorry, I don't know why I keep getting so confused about this
+
+[00:11:55.0000] <annevk>
+(https://github.com/whatwg/html/pull/6287 that is)
+
+[00:12:21.0000] <andreubotella>
+annevk: it's fine, it's a lot of details to keep track of
+
+[00:16:08.0000] <annevk>
+andreubotella: yeah, I guess my main concern was the double normalization, first during form submission and then during serialization
+
+[00:16:45.0000] <andreubotella>
+annevk: yeah, but newline conversion to CRLF is idempotent, so it's just an optimization issue
+
+[00:16:52.0000] <andreubotella>
+I added a few notes about that in the PR
+
+[00:21:30.0000] <annevk>
+andreubotella: I'll add the last two comments as resolved
+
+[00:29:00.0000] <annevk>
+andreubotella: new draft response
+
+[00:29:02.0000] <annevk>
+> I am mainly bothered by the inelegance of normalizing twice. Also, if you use `FormData` with `fetch()` today there is no normalization so it seems somewhat reasonable that if you use `FormData` here there is none either. I could see always normalizing when serializing too, but then ideally form submission itself would not do it (as it would happen later). In the end though, if we want to normalize in during form
+
+[00:29:02.0000] <annevk>
+submission and normalization, that is fine with me as well.
+
+[00:29:47.0000] <annevk>
+s/in//
+
+[00:47:53.0000] <andreubotella>
+annevk: the intention was to normalize also FormData with fetch
+
+[00:48:11.0000] <andreubotella>
+but let me check if the PR actually does that
+
+[00:53:24.0000] <andreubotella>
+right, the urlencoded and text/plain serializations aren't touched other than to make them work on name-value pairs
+
+[00:53:48.0000] <andreubotella>
+the normalization happens earlier in the form submission algorithm when it calls "convert an entry list to a list of name-value pairs"
+
+[00:54:24.0000] <andreubotella>
+for multipart/form-data, the conversion happens in the algorithm itself, and so it'll work when passing a FormData object to fetch
+
+[00:57:13.0000] <andreubotella>
+s/conversion/normalization/
+
+[04:05:30.0000] <andreubotella>
+annevk: would a PR to url to remove file handling in the urlencoded serializer be editorial?
+
+[04:30:16.0000] <annevk>
+andreubotella: yeah I guess so, if no entry point would ever hand it files
+
+[04:31:01.0000] <annevk>
+andreubotella: understood that it also affects FormData with fetch, I guess I should clarify that point
+
+[12:05:31.0000] <GPHemsley>
+annevk, Domenic: either of you around, perchance?
+
+[12:43:51.0000] <annevk>
+GPHemsley: I can reply tomorrow if you leave something in a DM or equivalent
+
+[12:44:06.0000] <GPHemsley>
+k
+

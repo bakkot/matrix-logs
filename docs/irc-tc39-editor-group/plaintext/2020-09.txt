@@ -1,0 +1,826 @@
+2020-09-02
+[20:44:45.0000] <Bakkot>
+ljharb: https://github.com/tc39/ecma262/pull/2152 is good to go
+
+[20:44:54.0000] <Bakkot>
+need another review but it's just editorial style
+
+[20:45:06.0000] <Bakkot>
+OP describes how I think it should be landed
+
+[22:29:11.0000] <ljharb>
+landed
+
+[12:20:59.0000] <shu>
+Bakkot: ljharb: sorry for the late notice, i'm OOO half day today and won't be coming to the editor's call
+
+[12:21:19.0000] <shu>
+ping me a list of reviews i should prioritize
+
+[12:22:58.0000] <ljharb>
+shu: https://github.com/tc39/ecma262/pull/2056 would be great
+
+[12:24:36.0000] <shu>
+ah excellent, we merged the toString PR
+
+[12:24:40.0000] <shu>
+can finally get back to this
+
+[12:25:11.0000] <ljharb>
+yup yup :-) also we merged the one that removes Generator
+
+[12:29:19.0000] <shu>
+what did we ever use %PromiseProto_then% for...
+
+[12:32:10.0000] <ljharb>
+HTML used it
+
+[12:32:24.0000] <ljharb>
+(and no longer does per my linked PRs)
+
+
+2020-09-03
+[11:31:40.0000] <ljharb>
+thoughts on a normative PR for https://github.com/tc39/ecma262/pull/2160#issuecomment-683926639 ?
+
+[11:47:25.0000] <Bakkot>
+Opposed
+
+[11:47:52.0000] <Bakkot>
+That has runtime cost and web-compat risk for no user benefit that I can see
+
+[11:48:10.0000] <ljharb>
+it'd only have runtime cost if a user directly called that method
+
+[11:48:29.0000] <Bakkot>
+assuming a sufficiently clever implementation, sure
+
+[11:48:30.0000] <ljharb>
+engines almost certainly don't actually invoke that method when it's unmodified and they're normally coercing a symbol to a primitive
+
+[11:48:40.0000] <ljharb>
+web compat risk, i suppose that's true
+
+[11:48:53.0000] <ljharb>
+but if we can ignore core-js, i'm pretty confident it's zero risk
+
+[12:59:08.0000] <shu>
+ljharb: i have no interest testing the hypothesis fwiw
+
+[12:59:14.0000] <shu>
+so agree with Bakkot here
+
+[13:00:26.0000] <ljharb>
+would you agree that for any new toPrimitive method, they should all check the hint and throw, even if this one isn't worth changing?
+
+[13:03:24.0000] <shu>
+not necessarily, the split seems to be whether or not the hint is actually used which seems reasonable to me
+
+[13:03:42.0000] <shu>
+that is, i see no principled reason to be restrictive in an argument that is unused
+
+[13:04:32.0000] <shu>
+we're not striving that these methods be given the same type where the argument must be statically knowable to "default"|"number"|"string"
+
+[13:04:50.0000] <ljharb>
+hm, ok
+
+[13:04:52.0000] <shu>
+though i'd need to figure out the history of why Symbol's @@toPrimitive takes an argument at all
+
+[13:04:59.0000] <shu>
+i suppose for .length consistency or something
+
+[13:05:11.0000] <ljharb>
+i can see if it didn't take any arg, then it wouldn't use it
+
+[13:05:20.0000] <ljharb>
+but if .length consistency matters then so should validation consistency
+
+[13:05:23.0000] <shu>
+yeah, the bigger question to me is why was it specced to take the arg
+
+[13:05:39.0000] <shu>
+.length consistency definitely doesn't imply validation consistency to me
+
+[13:05:45.0000] <shu>
+.length has *so much* less information than validation
+
+[13:06:49.0000] <ljharb>
+true
+
+[13:07:00.0000] <ljharb>
+lol what about a normative PR to make its length 0?
+
+[13:07:04.0000] <ljharb>
+and drop the arg, obv
+
+[13:07:21.0000] <shu>
+that is also a web compat question i have no interest in testing the hypothesis of
+
+[13:07:24.0000] <shu>
+though i suspect it's fine
+
+[13:07:36.0000] <shu>
+i don't see any impetus to change things here
+
+[13:08:28.0000] <ljharb>
+noted
+
+[13:09:00.0000] <shu>
+i see where you're coming from, since we're in this weird world where there's a weird middle ground
+
+[13:09:06.0000] <ljharb>
+(fwiw i would bet money that the only web compat risk would be that one of the two symbol polyfills patches the native method unnecessarily, but it'd still work the same)
+
+[13:09:06.0000] <shu>
+we're not as consistent as we would be if this were a typed language
+
+[13:09:13.0000] <shu>
+and we're not maximally flexible either because of .length
+
+[13:09:48.0000] <shu>
+i don't see a good design reason for this weird middle ground, but i don't see it even approaching the bar to do any work on
+
+[13:10:48.0000] <ljharb>
+fair
+
+[13:11:18.0000] <shu>
+a design question this raises is, how eagerly do we validate arguments?
+
+[13:11:26.0000] <shu>
+do we always eagerly validate them, or only when they're used?
+
+[13:11:54.0000] <ljharb>
+i'd say generally (and ideally) we always eagerly validate them
+
+[13:15:04.0000] <shu>
+yeah that must be generally true, because if nothing else we should very rarely spec unused parameters
+
+[13:15:24.0000] <ljharb>
+i also think we rarely do that and ideally should never
+
+[13:16:10.0000] <ljharb>
+i'd be willing to argue my case in plenary on "it's worth the time" grounds, but there's no point arguing it if browsers aren't willing to test the web compat risk for any reason :-) so, thanks, noted
+
+[13:16:55.0000] <shu>
+well, i wouldn't say *any* reason
+
+[13:17:02.0000] <shu>
+but usually, my litmus tests are like
+
+[13:17:15.0000] <shu>
+- does it improve maintainability, security, performance, etc
+
+[13:17:18.0000] <ljharb>
+i mean, we're all a bit hostage to browsers here
+
+[13:17:29.0000] <shu>
+- are there anecdotes of this actively confusing developers
+
+[13:17:34.0000] <ljharb>
+we have no way to force a browser to test compat of something short of all the other browsers pushing it
+
+[13:17:34.0000] <ljharb>
+nah
+
+[13:17:47.0000] <ljharb>
+someone just noticed the inconsistency
+
+[13:18:05.0000] <ljharb>
+(there's an editorial PR to fix a note; my alternative was to make a normative change and make the note true)
+
+[13:18:24.0000] <shu>
+right, and those usually aren't enough for me to find compelling to staff an effort
+
+[13:19:07.0000] <ljharb>
+understood
+
+[13:19:08.0000] <shu>
+though, i'd like some chance to defend my and chrome's viewpoint, i'm fairly open to even very risky compat changes if there's a material improvement
+
+[13:21:22.0000] <ljharb>
+oh sure, i realize that on the scale of "matters" this one's low
+
+[13:21:55.0000] <ljharb>
+inconsistencies are death by a thousand cuts tho, so i think it's worth exploring removing any we find
+
+[13:22:16.0000] <shu>
+i always bristle at the comparison of browsers holding folks hostage on this point -- we try pretty hard to serve the users here
+
+[13:30:15.0000] <ljharb>
+i didn't mean to imply hostility
+
+[13:30:40.0000] <ljharb>
+but given that implementors get to apply subjective "worth it" criteria, i'm not sure there's a better phrasing
+
+[13:31:21.0000] <ljharb>
+iow there's no way for any outsiders to make the validation happen if a browser doesn't think it's worth doing, even in the highly unlikely event that an outsider is capable of doing all the coding work
+
+[13:34:47.0000] <shu>
+i'm saying it's not purely subjective, i do think through the cost benefit
+
+[13:35:31.0000] <shu>
+and i've given you some litmus tests just now. thee test, at the most abstract, is if it improves the product
+
+[13:36:02.0000] <shu>
+whether through making the platform easier to use given demonstrated pain points, or a faster, more secure implementation, what have you
+
+[13:37:58.0000] <ljharb>
+sure
+
+[13:38:22.0000] <ljharb>
+the one i apply here tho is "consistency" and that alone is often deemed to not pass muster
+
+[13:39:12.0000] <shu>
+right, that alone isn't enough imo
+
+[13:39:52.0000] <ljharb>
+so even tho you/browsers are being fair and reasonable and communicating clearly what the rubric is, we're still held hostage to that rubric ¯\_(ツ)_/¯
+
+[13:41:35.0000] <shu>
+i... don't know what to say to that
+
+[13:41:51.0000] <ljharb>
+i'm not ascribing ill intent
+
+[13:42:00.0000] <shu>
+"held hostage" is pretty negative language?
+
+[13:42:19.0000] <ljharb>
+yeah true, i don't know of how to say it without a negative connotation :-/
+
+[13:42:57.0000] <ljharb>
+i mean, one side of the relationship has power the other doesn't
+
+[13:43:33.0000] <ljharb>
+but even tho i don't want to say something negative, i don't think it's reasonable to pretend the imbalance doesn't exist
+
+[13:45:23.0000] <ljharb>
+anyways i'm sorry that there's a negative connotation to that wording and that it makes you bristle :-( it's a reasonable position that this change isn't worth the effort obv
+
+[13:47:05.0000] <shu>
+i am certainly not disputing that browsers can make decisions about their products and may disreegard external requests
+
+[13:49:01.0000] <shu>
+the thing i am confused by is the implication that they... ought not to do that?
+
+[13:49:13.0000] <shu>
+like, that's a description of the reality of products
+
+[13:50:10.0000] <ljharb>
+ah ok, i'm not implying they shouldn't
+
+[13:50:16.0000] <ljharb>
+but i am saying it's unfortunate that that's the reality
+
+[13:51:55.0000] <shu>
+i see, what would you like the ideal to be?
+
+[13:54:45.0000] <ljharb>
+i guess it'd be great if there was a way for anyone to do web compat tests without adding to the burden on implementors. that way i'd just do the tests i wanted, and i'd only bring these kinds of things to the committee that i knew were likely to be compatible.
+
+[13:55:20.0000] <ljharb>
+altho it's not my personal beef, it'd also be great if feature/impl roadmaps were publicly influenceable, but i haven't thought enough about how that's practical
+
+[13:56:00.0000] <shu>
+to the first point, i'd like that too tbh
+
+[13:56:19.0000] <shu>
+but pretty hard without actually affecting millions+ of users
+
+[13:57:05.0000] <shu>
+to the second point, i only have philosophical musings
+
+[13:59:02.0000] <shu>
+on a macro (i.e. company) level, that's what shareholders are supposed to be, and it's fascinating how now, that power actually doesn't really exist that much anymore of activist hedge funds because of 1) the huge rise of index funds, where everybody owns everything and 2) the rise in tech specifically of shares that have no voting power
+
+[13:59:15.0000] <shu>
+on a micro level, i can only eenvision chaos
+
+[14:09:38.0000] <shu>
+in breaking changes *i'd* personally love to make but seems like we can't: https://chromestatus.com/metrics/feature/timeline/popularity/3304
+
+[14:16:21.0000] <ljharb>
+what's that one?
+
+[14:18:21.0000] <shu>
+`catch (e) { var e; }` is allowed
+
+[14:18:33.0000] <shu>
+and everyone has special handling of it in their parser and it's just gross
+
+[14:18:38.0000] <shu>
+but looks like a lot of pages use it :(
+
+[14:19:55.0000] <ljharb>
+by "use it" you mean rely on it being a noop?
+
+[14:21:25.0000] <shu>
+yeah, rely on its not being an early error
+
+[14:22:09.0000] <shu>
+well, "rely" is a strong word, but pages where we hit that path in the parser
+
+[14:22:25.0000] <shu>
+and did not throw an early error today, so assuming those pages don't have other broken JS, changing this behavior would break them
+
+[14:25:26.0000] <ljharb>
+right
+
+[14:25:43.0000] <ljharb>
+is that allowed only in sloppy mode?
+
+[14:26:05.0000] <shu>
+yeah
+
+[14:26:13.0000] <ljharb>
+ah k
+
+
+2020-09-04
+[21:22:12.0000] <Bakkot>
+ljharb your check failed for https://github.com/tc39/ecma262/pull/2015
+
+[21:22:57.0000] <Bakkot>
+(which is a branch on the main repo, which is presumably why it's confused)
+
+[21:23:16.0000] <Bakkot>
+Also I... got an email about it? which is weird.
+
+[22:10:30.0000] <ljharb>
+huh, the email is weird
+
+[22:10:52.0000] <ljharb>
+thanks, i'll look into it
+
+[22:11:02.0000] <ljharb>
+forgive the emails you will probably receive as i rerun
+
+[23:07:28.0000] <ljharb>
+k, figured it out - indeed, `maintainer_can_modify` is false on same-repo PRs, for no good reason (thanks github). all fixed locally; there might be an actions cache so it's taking a minute to fix on your pr
+
+[13:17:07.0000] <ljharb>
+i'm super confused :-/ my action fix works fine locally, but i can't get https://github.com/tc39/ecma262/pull/2015/checks?check_run_id=1073636956 to load the updated version, despite it pointing to the branch. it's definitely only same-repo PRs, so the options rn are to either remove the action entirely, or, ignore its failing on same-repo PRs, which are just from yall
+
+[13:17:27.0000] <ljharb>
+i posted https://twitter.com/ljharb/status/1301977136920551424 trying to get some tips
+
+[13:54:06.0000] <ljharb>
+nvm, i'm an idiot and didn't rerun my local build process. all fixed.
+
+[13:55:09.0000] <Bakkot>
+gotta get CI to enforce that for you
+
+[13:55:27.0000] <ljharb>
+lol yeah, i rarely use build processes
+
+[13:55:29.0000] <Bakkot>
+https://github.com/tc39/ecmarkup/blob/24313ffa23ea69c97ecaea062bee462455a522f3/.travis.yml#L4-L6
+
+[13:57:53.0000] <ljharb>
+in this case i'd pushed directly to master, so probably wouldn't have helped much, but better than nothing
+
+[14:05:20.0000] <Bakkot>
+ah, well, also gotta enforce that you can't push to master without checks passing
+
+[14:06:47.0000] <ljharb>
+yup troof
+
+
+2020-09-06
+[17:15:01.0000] <Bakkot>
+ljharb care to rubber-stamp https://github.com/tc39/ecmarkup/pull/246?
+
+[21:31:59.0000] <ljharb>
+Bakkot: sure but it's 100% not necessary, since package-lock is dev-only
+
+[21:32:00.0000] <ljharb>
+iow you can skip that and just do `npm update` in ecma262 and it'd work fine
+
+[23:25:36.0000] <Bakkot>
+ljharb grammarkdown is not a direct dependency of ecma262; I'm not sure how that would work
+
+[23:25:44.0000] <ljharb>
+it's a transitive dep
+
+[23:25:54.0000] <ljharb>
+`npm update` updates a package-lock including all transitive deps, to whatever the semver range allows
+
+[23:26:17.0000] <ljharb>
+you only need to do an intermediate update when you're not using ^, or when you're crossing a major
+
+[23:27:13.0000] <Bakkot>
+but this does not appear to be the case
+
+[23:27:50.0000] <Bakkot>
+`cd ecma262; git co master; git reset --hard; npm update; git status` reports no changes, even though ecma262  has package-lock committed
+
+[23:28:28.0000] <ljharb>
+hmm
+
+[23:30:36.0000] <ljharb>
+that … does not match my understanding of npm update, but i see the same thing as you
+
+[23:30:55.0000] <ljharb>
+certainly if you deleted the lockfile, ran `npm install`, you'd see the update, but that's a bit less precise than should be needed
+
+[23:31:09.0000] <Bakkot>
+that is also not true
+
+[23:31:11.0000] <Bakkot>
+run the experiment
+
+[23:31:27.0000] <Bakkot>
+(it does update if you also rm -rf node_modules)
+
+[23:31:31.0000] <ljharb>
+hm
+
+[23:31:43.0000] <ljharb>
+very strange
+
+[23:32:03.0000] <ljharb>
+needing to remove n_m seems like a bug
+
+[23:32:16.0000] <Bakkot>
+seems likely to be intentional
+
+[23:32:30.0000] <ljharb>
+maybe so
+
+[23:32:36.0000] <ljharb>
+i'd expect npm update in npm 7 to work better
+
+[23:32:38.0000] <ljharb>
+but that won't help us now
+
+[23:32:47.0000] <Bakkot>
+in any case, the point is to have version of ecmarkup which guarantees the right thing
+
+[23:33:20.0000] <ljharb>
+absent a lockfile, it would, since the next npm install would grab the latest :-/
+
+[23:33:27.0000] <Bakkot>
+so that if someone has a dependency on precisely grammarkdown 2.2.0, and also a dependency on ecmarkup, they can get the right behavior by updating their version of ecmarkup
+
+[23:33:29.0000] <ljharb>
+obv there's no harm in a release
+
+[23:33:46.0000] <Bakkot>
+npm inistall would only grab the latest if they did not also depend on the precise version 2.2.0
+
+[23:34:04.0000] <Bakkot>
+since 2.2.0 satisfies ecmarkup's requirement and npm tries to dedup
+
+[23:34:06.0000] <ljharb>
+true
+
+[23:34:21.0000] <ljharb>
+that's pretty unlikely tho
+
+[23:34:27.0000] <ljharb>
+(absent a lockfile)
+
+[23:35:59.0000] <Bakkot>
+for this particular set of packages, pretty unlikely, agreed
+
+[23:36:17.0000] <Bakkot>
+I just always do this since I don't want to have to figure out how likely the scenario is to arise
+
+[23:36:28.0000] <Bakkot>
+easiest to just arrange that there is a version which guarantees the right thing
+
+[00:13:31.0000] <Bakkot>
+ljharb https://github.com/tc39/ecma262/pull/2151 should be good to land
+
+
+2020-09-09
+[12:45:14.0000] <Bakkot>
+ljharb: https://github.com/tc39/ecma262/pull/2015 got another stamp from shu, should be good to merge
+
+[12:56:36.0000] <ljharb>
+cool, on it shortly
+
+
+2020-09-10
+[13:11:42.0000] <ljharb>
+i just added https://github.com/tc39/proposal-private-fields-in-in for stage 3 to the agenda, but it hasn't changed since yall reviewed it
+
+
+2020-09-12
+[21:38:01.0000] <ljharb>
+thoughts on my two comments on https://github.com/tc39/ecma262/pull/2122#pullrequestreview-487202021 ?
+
+[21:57:53.0000] <Bakkot>
+ljharb https://github.com/tc39/ecma262/pull/2172
+
+[21:58:24.0000] <Bakkot>
+on the first question, no, I don't think we should ever defer to other intrinsics
+
+[21:58:40.0000] <Bakkot>
+we can abstract common functionality out to a new AO if we really want but here I don't think it's worth it
+
+[22:00:20.0000] <ljharb>
+oh sure, either way would remove the need for the note
+
+[22:00:47.0000] <ljharb>
+i guess it's fine i just think it's weird to lay out all the algorithm steps but then say "it better match the negation of these other algorithm steps!"
+
+[22:02:13.0000] <ljharb>
+ftr, the Records and Tuple spec currently says something like "the steps of this algorithm are the same as in <other method> except for these changes"
+
+[22:02:38.0000] <Bakkot>
+we do that in a couple of places, though mostly annex b
+
+[22:02:40.0000] <Bakkot>
+I am not a fan
+
+[22:02:41.0000] <ljharb>
+which is ideologically deferring to other intrinsics, so if that's not kosher we should probably let them know
+
+[22:02:49.0000] <ljharb>
+i'm fine with either consistent approach
+
+[22:02:55.0000] <ljharb>
+and i love me some AOs
+
+[22:02:55.0000] <Bakkot>
+eh, it's fine while they're iterating in the proposal
+
+[22:03:00.0000] <ljharb>
+fair
+
+[22:03:01.0000] <Bakkot>
+will ask for it to be improved when landing
+
+[22:03:14.0000] <ljharb>
+100% ok with preferring AO usage over implicit deferring
+
+[22:03:22.0000] <ljharb>
+whether it's worth it in this case or not
+
+[22:27:17.0000] <ljharb>
+thoughts on expanding "forbidden extensions" to forbid implementations from adding additional arguments to builtin methods? (modulo the reserved ones in locale methods, for example)
+
+[22:55:31.0000] <Bakkot>
+prolly a question for the delegates channel
+
+[23:07:41.0000] <ljharb>
+fair
+
+[15:22:41.0000] <Bakkot>
+shu ljharb https://github.com/tc39/ecma262/pull/2085 needs a stamp from one of the two of you
+
+[15:36:07.0000] <Bakkot>
+also https://github.com/tc39/ecma262/pull/2172 should be prioritized
+
+[15:36:12.0000] <Bakkot>
+so math does not stay broken
+
+[15:36:25.0000] <Bakkot>
+ljharb I pushed two more commits to 2172 so you should re-review
+
+
+2020-09-13
+[19:24:06.0000] <ljharb>
+will do before Monday’s
+
+
+2020-09-14
+[09:21:42.0000] <shu>
+Bakkot: 2085 on the list for today
+
+[11:17:39.0000] <shu>
+reviewing it right now. for references the ideal type would be a discriminated union of records. the single record + predicates for checking for sentinels in certain fields approach smacks me too much of treating the spec like an imperative programming language
+
+[11:17:57.0000] <shu>
+that said i'm not sure where we else we'd like to union different records together with _different_ fields
+
+[11:19:25.0000] <shu>
+perhaps Completion Records
+
+[14:23:23.0000] <Bakkot>
+shu break the tie on https://github.com/tc39/ecma262/pull/2174#discussion_r487646583 ?
+
+[14:25:31.0000] <shu>
+reading
+
+[14:31:24.0000] <shu>
+Bakkot: i don't see a choice around making "length" explicit
+
+[14:32:17.0000] <shu>
+how is the length of Math.max and friends currently specified? is the idea that the line about built-in functions having a "length" equal to the number of required arguments is supposed to apply?
+
+[14:33:00.0000] <shu>
+if so, the spec as it stands says contradictory things: Math.max lists value1 and value2, and the prose then says given 0 or more arguments
+
+[14:33:15.0000] <shu>
+what does "required" mean, that they're rendered without [ ]?
+
+[14:33:38.0000] <shu>
+if so, then it's extra confusing for these, but well-defined, and still very much warrants an explicit length
+
+[14:34:31.0000] <Bakkot>
+that's what required means, yes
+
+[14:41:42.0000] <shu>
+commented
+
+[14:42:55.0000] <ljharb>
+we definitely never have an explicit length where the signature defines it
+
+[14:43:13.0000] <Bakkot>
+here the signature doesn't make sense
+
+[14:43:16.0000] <ljharb>
+i see the choices as what's in master, or, the "`...args` with explicit length prose" approach
+
+[14:43:27.0000] <ljharb>
+yes, i see that as the argument for the latter
+
+[14:43:32.0000] <Bakkot>
+yup, that's what I want
+
+[14:44:10.0000] <ljharb>
+but the existence of length prose imo is 100% dictated by whether the observable length differs from the signature, or not
+
+[14:45:03.0000] <shu>
+but the choice on master is also kind of confusing, in that we list 2 "required" parameters for Math.max but then the prose says "Given zero or more"
+
+[14:45:16.0000] <shu>
+and between the two i'd prefer jmdyck's PR form i think
+
+[14:45:33.0000] <ljharb>
+yeah, i agree the prose is inconsistent
+
+[14:48:54.0000] <Bakkot>
+cool, let's land the PR as-is then?
+
+[14:49:05.0000] <shu>
+i stamped it
+
+[14:49:33.0000] <shu>
+Bakkot: did you take over the Reference Record PR?
+
+[14:49:40.0000] <Bakkot>
+no, I just pushed some wording tweaks
+
+[14:49:51.0000] <shu>
+oh okay, then we'll wait for the author
+
+[14:50:07.0000] <ljharb>
+well, i don't like this solution
+
+[14:50:23.0000] <ljharb>
+but if shu and Bakkot prefer this one, and michael has no opinion, then i'm overruled
+
+[14:50:40.0000] <shu>
+what is your preferred solution if you think the current version is confusing, and dislike this one?
+
+[14:51:01.0000] <ljharb>
+i prefer maximally avoiding an explicit length, and keeping the signature as-is, and rewriting the prose to not say "zero or more"
+
+[14:51:11.0000] <ljharb>
+in particular, it's just not sensible to call Math.max with less than 2 args
+
+[14:51:17.0000] <ljharb>
+because what are you getting the max of
+
+[14:51:30.0000] <ljharb>
+(that it doesn't happen to throw when you do that, doesn't make it sensible, it just makes it defined)
+
+[14:51:57.0000] <shu>
+i see
+
+[14:52:18.0000] <Bakkot>
+you are getting the max of the list of arguments you passed
+
+[14:52:24.0000] <ljharb>
+but you didn't pass a list.
+
+[14:52:26.0000] <Bakkot>
+if the list is of length 1 you get the max of that 1 item
+
+[14:52:30.0000] <ljharb>
+the spec is treating it as a list, but that's not the same thing.
+
+[14:52:35.0000] <Bakkot>
+"the list of arguments you passed"
+
+[14:52:37.0000] <ljharb>
+if it took an array that'd be different
+
+[14:52:46.0000] <ljharb>
+right but users don't think of a list of arguments as a reified thing
+
+[14:52:46.0000] <Bakkot>
+it takes any number of parameters
+
+[14:54:44.0000] <shu>
+i understand that desire and disagree with it. feels to me like a recurring disagreement that the result i'd like a spec to maximally cater to is interoperable implementation, not "better" JS programs
+
+[14:56:39.0000] <shu>
+and readability for "length" i feel is definitely hurt without explicit repetition for the possibly confusing cases
+
+[14:57:23.0000] <shu>
+repetition where a single rule unconfusingly applies would argue for favoring minimizing explicit notes
+
+[14:59:17.0000] <shu>
+(also, for the specific case of "users don't think of a list of arguments as a reified thing" is more demonstrably false for JS than for other languages because of F.p.call)
+
+[14:59:34.0000] <ljharb>
+apply, i assume you mean
+
+[14:59:46.0000] <ljharb>
+or call with spread i suppose
+
+[15:01:01.0000] <shu>
+oops, yes, i mean apply
+
+[15:12:24.0000] <Bakkot>
+so, land it?
+
+[15:52:38.0000] <ljharb>
+yeah i'll land it tonight
+
+
+2020-09-15
+[20:25:44.0000] <Bakkot>
+btw I hope the two of you know that you signed up to let michael and I dictate editorial conventions for numbers when we took over 2007, because we sure aren't gonna redo it just for style nits
+
+[21:35:52.0000] <ljharb>
+lol
+
+[21:36:01.0000] <ljharb>
+what do you have in mind to dictate that we haven't already agreed to?
+
+[22:29:45.0000] <Bakkot>
+dunno, it
+
+[22:29:49.0000] <Bakkot>
+'s a giant pr
+
+[22:30:06.0000] <ljharb>
+lmk when it's ready for a fresh look
+
+[22:30:26.0000] <Bakkot>
+but e.g. we introduce a new "clamping" operation: https://github.com/tc39/ecma262/pull/2007/commits/6033d55f0d23d40068b60a711ad8a56f29019cd0
+
+[22:30:39.0000] <Bakkot>
+instead of having to do max(min(x, y), z)
+
+[22:32:03.0000] <ljharb>
+seems good. could that be done as a separate commit/PR, prior to 2007?
+
+[22:32:28.0000] <ljharb>
+even just to intro the concept and use it in one or three places
+
+[22:35:05.0000] <Bakkot>
+no
+
+[22:35:07.0000] <Bakkot>
+I mean, in principle
+
+[22:35:14.0000] <Bakkot>
+but I am not going to
+
+[22:39:40.0000] <ljharb>
+lol k
+
+[07:53:05.0000] <shu>
+Bakkot: i don't have time for it, so yes
+
+
+2020-09-16
+[14:33:00.0000] <Bakkot>
+shu editor call ping
+
+
+2020-09-23
+[12:32:31.0000] <ljharb>
+i assume we're cancelling the editor call today?
+
+[12:34:38.0000] <Bakkot>
+yes
+
+[12:35:47.0000] <ljharb>
+kk
+
+[13:30:27.0000] <shu>
+most definitely
+
+
+2020-09-30
+[16:03:10.0000] <shu>
+Bakkot: oops, looks like we forgot about https://github.com/tc39/ecma262/pull/1966 for a bit. this is gtg from me, is there anything remaining from you or michael?
+
+[16:26:08.0000] <Bakkot>
+think it's good
+
+[16:26:30.0000] <Bakkot>
+I didn't approve it myself because I authored some of t
+
+[16:27:49.0000] <ljharb>
+i'm not planning on reviewing it since i don't think i'm qualified to, so i'll land it as-is i guess
+

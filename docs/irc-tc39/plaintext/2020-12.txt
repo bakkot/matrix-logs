@@ -1,0 +1,1230 @@
+2020-12-01
+[17:40:17.0000] <jmdyck>
+Bakkot: I'm tweaking my static analysis to detect cases like #2238
+
+[17:40:27.0000] <Bakkot>
+jmdyck: sweet
+
+[17:49:51.0000] <jmdyck>
+found the cases in #2238, plus two more.
+
+[17:50:44.0000] <jmdyck>
+Also, getting a complaint that relates to PerformEval.
+
+[17:51:44.0000] <jmdyck>
+(which isn't a built-in, but `eval` directly returns whatever it returns, so it has similar return-type constraint)
+
+[17:53:17.0000] <jmdyck>
+but I've mostly convinced myself that it's not a problem
+
+[18:09:30.0000] <Bakkot>
+I think step 30, which returns Completion(result) instead of just result, is probably a bug - `result` is already going to be a completion
+
+[18:09:38.0000] <Bakkot>
+actually, "Completion()` as an AO doesn't... mean anything
+
+[18:09:53.0000] <Bakkot>
+oh, wait, yes it does
+
+[18:09:58.0000] <Bakkot>
+"The abstract operation Completion(completionRecord) is used to emphasize that a previously computed Completion Record is being returned"
+
+[18:10:01.0000] <Bakkot>
+ok, all is well
+
+[18:11:13.0000] <jmdyck>
+the complaint arose because "the result of evaluating X" can in general be a Reference Record; but presumably not when X is a ScriptBody, so PerformEval should be safe
+
+[18:12:09.0000] <Bakkot>
+yeah, makes sense
+
+[18:12:58.0000] <Bakkot>
+(I kind of want to change that, incidentally - it's conceptually pretty weird. but I need to think more about whether it's practical to have a separate path for evaluate-for-reference without adding a bunch of duplication.)
+
+[18:14:47.0000] <jmdyck>
+I'm also getting some complaints about functions possibly returning ~empty~, but they might be false positives, and they're not what 2238 is looking at, so I think I'll ignore them for now.
+
+[18:15:10.0000] <Bakkot>
+functions as in AOs, or es functions?
+
+[18:15:17.0000] <jmdyck>
+es functions
+
+[18:15:42.0000] <jmdyck>
+(no problem for an AO to return ~empty~, in general)
+
+[00:01:35.0000] <mathiasbynens>
+rkirsling: yes, it's a Hixie quote
+
+[00:02:01.0000] <mathiasbynens>
+rkirsling: https://lists.whatwg.org/pipermail/whatwg-whatwg.org/2009-August/063981.html is the true source, I think
+
+[00:02:55.0000] <mathiasbynens>
+ah no, the other link predates that, so never mind — the Smooshgate post points to the right place :)
+
+[06:30:33.0000] <bradleymeck>
+rkirsling: i usually hear "spec fiction" not "work of fiction"
+
+[07:04:33.0000] <jmdyck>
+There's also "specifiction": https://www.urbandictionary.com/define.php?term=specifiction
+
+
+2020-12-03
+[18:23:42.0000] <Bakkot>
+today I learned: the ES spec does not fully define the value of number literals
+
+[18:24:05.0000] <Bakkot>
+hosts are permitted two different interpretations of 111111111111111122949
+
+[18:26:28.0000] <Bakkot>
+(specifically, the exact float 111111111111111131136 and the exact float 111111111111111114752)
+
+[18:43:01.0000] <Bakkot>
+100000000000000008191 is the least such (non-negative integer) string with this property I think; implementations are allowed to interpret it as either 100000000000000000000 or 100000000000000016384
+
+[21:57:40.0000] <jmdyck>
+Bakkot: and even though 111111111111111114752 is exactly representable as a Number, implementations aren't obliged to give that Number as the value of that literal.
+
+[21:59:29.0000] <Bakkot>
+jmdyck hm, how not?
+
+[22:00:12.0000] <Bakkot>
+by my reading they can choose either the Number which represents the MV of `111111111111111114750` or the Number which represents the MV of `111111111111111114760`, but those are the same Number
+
+[22:02:36.0000] <jmdyck>
+oh right, i'm looking at the wrong thing.
+
+[00:39:13.0000] <gibson042>
+it also applies to DecimalLiteral productions with an ExponentPart, e.g. `1.86264514923095703125e-9`
+
+[00:43:08.0000] <gibson042>
+err, but I guess that example would also need to fall halfway between (negative) powers of 2
+
+[08:49:43.0000] <Bakkot>
+I wonder if there are actually implementation differences here or if we could nail this down
+
+[08:52:05.0000] <jmdyck>
+eshost on a few examples?
+
+[08:52:17.0000] <Bakkot>
+the ones I've tried have all had agreement
+
+[08:53:31.0000] <Bakkot>
+(it's a little harder to test in chakra because they have a bug with printing, but I am pretty sure)
+
+[08:55:37.0000] <jmdyck>
+but nailing it down would presumably be a normative change, so probably a separate PR?
+
+[08:57:36.0000] <Bakkot>
+indeed
+
+[08:58:43.0000] <Bakkot>
+for your PR I would like to answer the narrower question of whether number for the value of the literal itself is ever not among the two alternatives given
+
+[08:59:15.0000] <Bakkot>
+I have pretty much convinced myself it is not for integers, but still need to think about numbers with fractional parts
+
+[08:59:52.0000] <jmdyck>
+But if nail-down PR lands first, it's moot for my PR.
+
+[09:01:13.0000] <jmdyck>
+i.e., that narrower question is moot.
+
+[09:01:26.0000] <Bakkot>
+true! but that can't happen until Jan 25 at the earliest, and I was hoping to get yours in before then
+
+[09:01:32.0000] <jmdyck>
+k
+
+[09:02:02.0000] <Bakkot>
+(though admittedly we do often leave things open for well over two months)
+
+[09:02:31.0000] <jmdyck>
+it's already been around for 6 months, could wait longer.
+
+[14:04:00.0000] <rkirsling>
+wow, this "construct typed array from existing typed array with custom ArrayBuffer" thing is annoying
+
+[14:04:39.0000] <rkirsling>
+(https://tc39.es/ecma262/#sec-initializetypedarrayfromtypedarray)
+
+[14:50:32.0000] <shu>
+yes
+
+[15:16:36.0000] <shu>
+leobalter: ping, got a test262 harness question
+
+[15:17:21.0000] <leobalter>
+shu hi
+
+[15:18:03.0000] <shu>
+leobalter: what's the difference between this directory https://github.com/tc39/test262/tree/main/tools/packaging and this repo https://github.com/test262-utils/test262-harness-py?
+
+[15:18:09.0000] <shu>
+did the latter move into the former?
+
+[15:22:21.0000] <leobalter>
+some years ago we tried to move the python harness out of Test262
+
+[15:22:49.0000] <leobalter>
+in order to communicate the people involved directly on Test262 are not doing active maintenance to it
+
+[15:23:05.0000] <leobalter>
+I'm trying to find some issue/pr referencing this
+
+[15:23:19.0000] <shu>
+well, the two are currently out of sync
+
+[15:23:23.0000] <shu>
+which one should i be using?
+
+[15:23:32.0000] <shu>
+it seems like the in-tree one is more recent
+
+[15:24:23.0000] <leobalter>
+it's only more recent because there is a change related to the `main` branch
+
+[15:25:18.0000] <leobalter>
+https://github.com/tc39/test262/pull/748
+
+[15:25:59.0000] <shu>
+so... i should be using the one in test262-harness-py?
+
+[15:26:00.0000] <leobalter>
+the remaining parts in the Test262's packaging folder are to generate tests for the website, but it's not maintained anymore
+
+[15:26:18.0000] <shu>
+i see
+
+[15:26:21.0000] <shu>
+okay, thanks
+
+[15:26:42.0000] <leobalter>
+well, if you only have 2, yes, but I believe the proper python harness is on v8
+
+[15:27:09.0000] <shu>
+there's been some copyright header linting that started complaining recently, trying to track down what needs to be updated
+
+[15:28:42.0000] <shu>
+it'd be good to deduplicate this parseTestRecord thing, though
+
+[15:30:45.0000] <leobalter>
+yes, IIRC there is a parseTestRecord equivalent in V8, but I still need to find it
+
+[15:41:27.0000] <shu>
+we use the copy in test262-harness-py
+
+[15:42:00.0000] <shu>
+both the harness repo and the main test repo are cloned into the v8 tree, and the python stuff in the harness repo are used
+
+[15:43:20.0000] <leobalter>
+yes, and I remember that harness is the reason I stopped trying to remove the Copyright header requirement
+
+[15:44:25.0000] <leobalter>
+unfortunately there is a lot of legacy pieces there. I would need to dedicate a better time to refactor it without compromising v8's test262 execution
+
+
+2020-12-04
+[19:38:58.0000] <rkirsling>
+can anyone justify the behavior here?
+
+[19:38:58.0000] <rkirsling>
+https://github.com/tc39/test262/blob/main/test/built-ins/TypedArrayConstructors/ctors/typedarray-arg/same-ctor-buffer-ctor-species-custom.js
+
+[19:39:21.0000] <rkirsling>
+this is the "normal" case of this completely absurd path
+
+[19:39:54.0000] <rkirsling>
+(the docblock there is out of date but you can see https://tc39.es/ecma262/#sec-initializetypedarrayfromtypedarray)
+
+[19:40:49.0000] <rkirsling>
+my earlier "construct typed array from existing typed array with custom ArrayBuffer" is evidently a simplified description
+
+[19:41:41.0000] <rkirsling>
+what we actually do is create the typed array we meant to create with a normal ArrayBuffer...but ensure that that ArrayBuffer's prototype is set to inputTypedArray.constructor[@@species].prototype
+
+[19:42:08.0000] <rkirsling>
+I just made a patch to support this in JSC but I feel like I want to take a shower
+
+[19:43:01.0000] <rkirsling>
+is there a reason for this path to exist?
+
+[19:43:19.0000] <rkirsling>
+could we remove it if said patch is not landed?
+
+[19:51:38.0000] <Bakkot>
+rkirsling that test does not say `inputTypedArray.constructor[@@species].prototype`
+
+[19:51:50.0000] <Bakkot>
+it says `inputTypedArray.buffer.constructor[@@species].prototype`
+
+[19:51:59.0000] <rkirsling>
+aaaargh typos
+
+[19:52:02.0000] <rkirsling>
+thanks
+
+[19:52:02.0000] <Bakkot>
+which is marginally more reasonable
+
+[19:53:01.0000] <Bakkot>
+my position on this is that we should get rid of symbol.species in general but _especially_ for ArrayBuffers, which are intended to be low-level
+
+[19:53:05.0000] <Bakkot>
+cc shu ^
+
+[19:57:07.0000] <rkirsling>
+that would be amazing
+
+[19:57:21.0000] <rkirsling>
+and a natural next step in this long crusade lol
+
+[20:11:48.0000] <shu>
+Bakkot: definitely agreed
+
+[20:15:22.0000] <devsnek>
+we should add an api to convert between string and Uint16Array
+
+[20:27:04.0000] <rkirsling>
+Bakkot: shu: do we know about any web compat obstacles?
+
+[20:54:48.0000] <Bakkot>
+I'm not aware of any, and would be... pretty surprised to learn there were any (for ArrayBuffer in particular)
+
+[20:58:21.0000] <rkirsling>
+sweet
+
+[21:00:52.0000] <rkirsling>
+maybe we can hash out a plan
+
+[08:08:36.0000] <shu>
+rkirsling: Bakkot: i'm landing a flag in V8 that lets you toggle builtin subclassing
+
+[08:09:00.0000] <shu>
+waiting to see if we can get an intern to do it as an intern project before trying to staff it otherwise
+
+[08:09:16.0000] <shu>
+someone would need to modify all the built-ins to toggle behavior depending on the flag, then run it to see what breaks
+
+[08:09:45.0000] <shu>
+if the answer is "everything breaks", then i'm thinking we dial it back bit by bit to test the things we want to remove surgically, like ABs
+
+[08:33:55.0000] <devsnek>
+"Google Sending Wave Of Interns to Break The Web"
+
+[08:52:20.0000] <shu>
+are you a staff writer for The Register?
+
+[09:23:08.0000] <devsnek>
+shu: no but it seems i have potential 😄
+
+[12:54:36.0000] <rkirsling>
+shu: oh duh I totally spaced on that proposal
+
+[12:55:53.0000] <shu>
+rkirsling: no worries, i don't think it's very urgent
+
+[12:56:00.0000] <shu>
+another few months won't change the compat risk
+
+[12:58:53.0000] <rkirsling>
+sure
+
+[13:13:32.0000] <rkirsling>
+shu: do you think we should leave the relevant tests failing as web compat insurance?
+
+[13:14:03.0000] <rkirsling>
+I'm leaning toward yes myself
+
+[13:57:51.0000] <rkirsling>
+(or I guess a different phrasing is "does it make your case any easier to argue for?")
+
+[14:36:07.0000] <shu>
+rkirsling: sorry, which tets?
+
+[14:36:08.0000] <shu>
+tests*
+
+[14:36:51.0000] <rkirsling>
+the ones for "constructing a typed array from an existing typed array with a custom ArrayBuffer"
+
+[14:56:28.0000] <shu>
+i must've missed something, why would they start failing now?
+
+[14:56:31.0000] <shu>
+or have they always failed?
+
+[14:57:48.0000] <rkirsling>
+shu: they always have, I just wrote a patch to correct them last night
+
+[14:58:06.0000] <shu>
+ah ha
+
+[14:58:17.0000] <shu>
+yes, let's leave them in
+
+[15:00:52.0000] <rkirsling>
+I guess Yusuke thought by the look of the proposal that it might take quite a while and it would be easy to reverse the implementation part
+
+[15:00:55.0000] <rkirsling>
+but hmm
+
+
+2020-12-07
+[07:24:13.0000] <jmdyck>
+wrt #2219, is it possible to ascertain statically whether [[AlreadyCalled]] is a Boolean or a record?
+
+[11:33:10.0000] <jmdyck>
+Bakkot: At https://github.com/tc39/notes/blob/feature/2020-11/meetings/2020-11/nov-16.md#ecma262-status-update, the link for "slides" is wrong. Could you fix that?
+
+[11:34:01.0000] <Bakkot>
+will do
+
+[11:53:12.0000] <jmdyck>
+Bakkot: is anyone working on 1742 (Execution Context as a Record) yet?
+
+[12:07:42.0000] <Bakkot>
+jmdyck: not to my knoweldge
+
+[12:09:41.0000] <Bakkot>
+re 2219: technically, yes: it is a record on AllSettled resolve/reject functions, not on any other kind of functions
+
+[12:13:04.0000] <Bakkot>
+but I think the static analysis necessary to track that is probably overkill and were I doing it myself I'd just special-case those
+
+
+2020-12-09
+[08:00:51.0000] <jmdyck>
+re the PDF rendering of the ES spec: what do people not like about it? It seems mostly okay to me.
+
+[08:16:24.0000] <jackworks>
+Does it support links from the category to the content?
+
+
+2020-12-13
+[21:15:11.0000] <jmdyck>
+ljharb: after pushing, I realized that I forgot to add "(#1994)" to the commits. but i see you already took care of that.
+
+[21:15:33.0000] <ljharb>
+jmdyck: thanks, no worries :-) it wasn't rebased on latest master anyways; i took care of both
+
+[21:17:19.0000] <jmdyck>
+ah, i rebased it to master yesterday, so missed the latest merge.
+
+[22:46:57.0000] <Bakkot>
+devsnek: I had a couple editorial comments on #2216, but it mostly looks good
+
+[22:47:03.0000] <Bakkot>
+needs a rebase, also
+
+[22:53:45.0000] <devsnek>
+I'll take a look, thanks
+
+
+2020-12-16
+[21:54:00.0000] <Bakkot>
+I am not sure I could have told you what `[,0].reduce(() => console.log('called'))` does without looking it up or reading the algorithm
+
+[21:54:35.0000] <ljharb>
+off the top of my head, i'd assume either it was called once (with undefined and 0), or that it throws lacking an initial value
+
+[21:55:17.0000] <ljharb>
+knowing that it's ES5 would more strongly imply the latter, i guess
+
+[21:55:50.0000] <ljharb>
+lol seems like it does neither, fun
+
+[21:56:13.0000] <ljharb>
+`[undefined,0].reduce(() => console.log('called'))` seems to do the first thing tho
+
+[22:02:26.0000] <Bakkot>
+a fun consequence of `reduce` ignoring holes is that, unlike all the other functional array processing methods (map, filter, every, indexOf, find, etc) it is impossible to write `.join` in terms of `.reduce`
+
+[22:02:48.0000] <Bakkot>
+though I guess that would be better phrased as being a consequence of `join` _not_ ignoring holes, it being the odd one out
+
+[22:02:58.0000] <ljharb>
+all the ES6+ ones don't ignore holes tho, right?
+
+[22:03:02.0000] <ljharb>
+find, findIndex
+
+[22:03:22.0000] <ljharb>
+i'm pretty sure the ES6+ pattern is "pretend sparse arrays don't exist"
+
+[22:03:59.0000] <Bakkot>
+oh, yeah, `find` does get called for holes
+
+[22:04:11.0000] <Bakkot>
+`.includes` too
+
+[22:04:14.0000] <Bakkot>
+I forgot we did that
+
+[22:04:19.0000] <Bakkot>
+`flatMap` does its own thing
+
+[22:04:46.0000] <ljharb>
+does flatMap not call holes??
+
+[22:05:10.0000] <Bakkot>
+what would it call them with?
+
+[22:05:18.0000] <ljharb>
+undefined
+
+[22:05:27.0000] <Bakkot>
+anyway no, it does not
+
+[22:05:33.0000] <ljharb>
+ouch, that seems like an oversight
+
+[22:05:43.0000] <ljharb>
+not worth fixing ofc, but a pretty big mistake considering the post-ES6 pattern
+
+[22:05:56.0000] <Bakkot>
+it was intentional
+
+[22:06:00.0000] <Bakkot>
+https://github.com/tc39/proposal-flatMap/issues/29
+
+[22:06:46.0000] <ljharb>
+that issue doesn't imply it was intentional, it implies it should treat holes as undefineds :-/
+
+[22:06:58.0000] <ljharb>
+oh i guess your last comment does
+
+[22:07:12.0000] <ljharb>
+ok, symmetry with `map` does seem reasonable
+
+[22:07:18.0000] <ljharb>
+fair enough
+
+[22:08:30.0000] <ljharb>
+seems like a decent precedent then - new stuff treats holes as undefineds, but symmetry with old stuff wins
+
+[22:10:11.0000] <Bakkot>
+yeah
+
+[22:11:33.0000] <Bakkot>
+dunno how many new array methods like this there will be to add
+
+[22:11:54.0000] <Bakkot>
+`findLast` will get the new-semantics, fortunately, since `find` has them
+
+[22:12:34.0000] <Bakkot>
+I guess if we add a non-mutating `.reversed` it will probably have to preserve holes
+
+[22:12:41.0000] <ljharb>
+indeed
+
+[23:04:57.0000] <rkirsling>
+holes sure are weird
+
+[08:53:12.0000] <shu>
+ystartsev: have y'all shipped .at() yet and seen anything?
+
+[08:53:32.0000] <shu>
+ystartsev: i flipped the flag a little under 2 weeks ago and haven't seen any bug reports yet for Canary
+
+
+2020-12-17
+[19:09:24.0000] <Bakkot>
+I have a floating-point question:
+
+[19:09:33.0000] <Bakkot>
+Are there any strings of digits (maybe including a decimal point) with more than 20 significant digits such that the three algorithms "set everything after the 20th significant digit to a 0, then choose the nearest double", "set everything after the 20th significant digit to a 0, increment the digit in the 20th place, then choose the nearest double", and "choose the nearest double" produce three distinct values, rather than just two?
+
+[19:09:33.0000] <Bakkot>
+ (You can get two from e.g. "100000000000000008191".) Resolving ties with roundTiestToEven, though I don't think it matters.
+
+[19:09:59.0000] <Bakkot>
+I am _almost_ certain the answer is no but I would like to be more confident.
+
+[19:16:06.0000] <Bakkot>
+(it's mostly subnormals and stuff that I'm worried about; I've convinced myself of it for integers.)
+
+[13:40:29.0000] <jorendorff>
+function f() { throw "BAD"; }  null.name = f();
+
+[13:40:51.0000] <jorendorff>
+The standard seems to say this should throw a TypeError. Is that right?
+
+[13:41:06.0000] <jorendorff>
+We end up at: https://tc39.es/ecma262/#sec-evaluate-property-access-with-identifier-key
+
+[13:41:29.0000] <jorendorff>
+from: https://tc39.es/ecma262/#sec-property-accessors-runtime-semantics-evaluation
+
+[13:43:14.0000] <jorendorff>
+from step 1.a of: https://tc39.es/ecma262/#sec-assignment-operators-runtime-semantics-evaluation
+
+[13:43:36.0000] <jorendorff>
+It seems pretty clear f() should never be called. But it is called in V8 and SM
+
+[13:44:32.0000] <jorendorff>
+es6draft follows the spec. ugh
+
+[13:45:41.0000] <jorendorff>
+JSC throws "BAD" too
+
+[13:47:07.0000] <jorendorff>
+I'm asking because the Private Fields proposal quite naturally has the same language: https://tc39.es/proposal-class-fields/#sec-private-references-runtime-semantics-evaluation
+
+[13:49:44.0000] <jorendorff>
+and V8 has shipped a nonconforming implementation, such that `null.#f = f();` calls f
+
+[13:50:23.0000] <ljharb>
+if all the engines don't follow the spec, then it seems plausible that the spec might need to change to match
+
+[13:50:50.0000] <jorendorff>
+will file against ecma262
+
+[13:52:52.0000] <ljharb>
+i wonder if this is related to the thing where `(foo) = 42` doesn't throw a syntax error
+
+[14:09:16.0000] <jorendorff>
+well ... I think it's on purpose that in `f1().x = f2();`, f1 is called before f2
+
+[14:09:31.0000] <jorendorff>
+everyone gets that much right, at least
+
+[14:12:31.0000] <jorendorff>
+this was filed previously: https://github.com/tc39/ecma262/issues/1224
+
+[14:13:32.0000] <ljharb>
+ah ok great
+
+[15:17:11.0000] <shu>
+jorendorff: that reading seems right
+
+[15:19:39.0000] <shu>
+i'd imagine everyone gets the ordering wrong because our bytecodes are all "fat"
+
+[15:19:58.0000] <shu>
+and there's some StoreNamedProperty bytecode that encompasses the error checking
+
+
+2020-12-18
+[09:41:46.0000] <jorendorff>
+ok, well, commented on #1224, will try to remember to bump it in January
+
+[09:42:14.0000] <jorendorff>
+I think everyone gets the ordering wrong because it's just extra work to do it the standard way
+
+[09:43:45.0000] <jorendorff>
+you can skip the extra step if you know the RHS is effect-free and can't throw. don't know how typical that is
+
+
+2020-12-20
+[08:10:21.0000] <devsnek>
+have I brought up variable shadowing before? every time I use a language with that functionality I'm reminded how great it is
+
+[09:06:20.0000] <Bakkot>
+devsnek do you bring this up because you've been writing python recently
+
+[09:13:27.0000] <devsnek>
+Bakkot: I think python's variable semantics are a bit too crazy to be used as a valid comeback
+
+[09:14:01.0000] <Bakkot>
+that wasn't a comeback, I was just curious
+
+[09:14:20.0000] <devsnek>
+oh well no, I haven't been writing python recently
+
+[09:14:26.0000] <Bakkot>
+python is the only language I regularly write which doesn't have shadowing (without doing extra work) and it annoys me every time
+
+[09:14:42.0000] <devsnek>
+it has the weird global/local thing
+
+
+2020-12-24
+[12:40:53.0000] <croraf>
+"The String type is the set of all ordered sequences of zero or more 16-bit unsigned integer values." (spec)
+
+[12:41:11.0000] <Bakkot>
+yup
+
+[12:41:21.0000] <croraf>
+Why is it important to say "unsigned integer values"? What makes a difference from just "values".
+
+[12:42:11.0000] <Bakkot>
+They're treated as integers, not as bit sequences
+
+[12:42:32.0000] <croraf>
+Where exactly?
+
+[12:42:34.0000] <Bakkot>
+and, specifically, they're treated as unsigned integers, not two's complement signed integers or whatever
+
+[12:42:56.0000] <Bakkot>
+here, for example: https://tc39.es/ecma262/#sec-utf16encodecodepoint
+
+[12:43:02.0000] <Bakkot>
+"Let cu1 be the code unit whose value is floor((cp - 0x10000) / 0x400) + 0xD800."
+
+[12:43:15.0000] <Bakkot>
+`floor((cp - 0x10000) / 0x400) + 0xD800` produces an integer, not a bit sequence
+
+[12:43:49.0000] <croraf>
+OK, I thought of that.
+
+[12:46:03.0000] <croraf>
+The second sentence is evecn more confusing. "The String type is generally used to represent textual data in a running ECMAScript program, in which case each element in the String is treated as a UTF-16 code unit value."
+
+[12:46:16.0000] <croraf>
+https://tc39.es/ecma262/#sec-ecmascript-language-types-string-type
+
+[12:47:04.0000] <Bakkot>
+What's confusing about it?
+
+[12:47:18.0000] <Bakkot>
+UTF-16 code units are 16-bit unsigned integers, so that makes sense, I think
+
+[12:47:26.0000] <croraf>
+Am not sure what UTF-16 code unit value is
+
+[12:47:49.0000] <croraf>
+I mean I think I know what it is.
+
+[12:48:57.0000] <croraf>
+Again, I'm confused why is it important to mention UTF-16 here.
+
+[12:49:30.0000] <Bakkot>
+Because UTF-16 describes how to interpret these sequences of 16-bit unsigned integer values as text.
+
+[12:49:37.0000] <Bakkot>
+That's what UTF-16 does, basically
+
+[12:51:04.0000] <croraf>
+But I'm not sure ES dictates how will those be presented to the user.
+
+[12:51:11.0000] <croraf>
+That's the job of the console, or something.
+
+[12:51:58.0000] <croraf>
+The only thing where this is relevant might again come to some of these edge-case String methods
+
+[12:53:01.0000] <Bakkot>
+It is useful to a reader to know that the String type, which is _formally_ just sequences of 16-bit unsigned integers, generally represents textual data, and that the way that the formal definition relates to the thing it represents is UTF-16
+
+[12:54:07.0000] <croraf>
+But it doesnt mandate that String have to represent textual data, they can represent anything. It is up to the users to interpret that data as they wish.
+
+[12:54:47.0000] <Bakkot>
+there's lots of methods which produce Strings - `toString`, most notably. The sequences of integers they produce are chosen to make sense under utf-16, not any other relationship between integers and text.
+
+[12:55:25.0000] <Bakkot>
+similarly there's lots of methods which consume strings, and the strings they consume make sense as textual data under utf-16, not under other relationships between sequences of integers and text
+
+[12:55:27.0000] <croraf>
+And I check now, my source code encoding is UTF-8, I'm confused what are the implications of this then.
+
+[12:56:19.0000] <croraf>
+And also in node, writeableStream.write uses utf-8 by default.
+
+[12:56:41.0000] <Bakkot>
+those aren't really relevant to the spec
+
+[12:57:56.0000] <jmdyck>
+As far as the spec is concerned, source text is a sequence of Unicode code points.
+
+[12:58:20.0000] <croraf>
+So when I write code (I think the de facto source code standard is utf-8) and when I write a string literal. I guess the IDE still converts the characters into UTF 16?
+
+[12:58:28.0000] <Bakkot>
+(gotta run but I will try to answer further questions when I get back in a few hours)
+
+[12:58:47.0000] <croraf>
+ok, ty. I don't have my questions formulated nicely yet. I'm like poking :D
+
+[13:35:30.0000] <devsnek>
+croraf: in the context of the theoretical specification, the js engine is converting your utf8 source text to utf16
+
+[13:35:50.0000] <devsnek>
+as part of some mechanism not described in the spec
+
+[13:41:16.0000] <devsnek>
+(in reality engines try to use utf8 over utf16 as much as possible because it's generally half the size)
+
+[14:39:08.0000] <croraf>
+devsnek, how does the JS engine even know how is my source encoded?
+
+[15:40:48.0000] <devsnek>
+croraf: depends on the engine. in V8 for example, the api is Compile(String) and you have to create a String from one of these apis https://gc.gy/2c499887-8cd2-4c40-9f30-396b63c256ea.png
+
+[15:41:59.0000] <croraf>
+I don't understand
+
+[15:42:22.0000] <devsnek>
+ok
+
+[15:42:40.0000] <croraf>
+I input UTF-8 string into JS engine
+
+[15:42:46.0000] <devsnek>
+yes
+
+[15:42:58.0000] <croraf>
+That is I convert my source code string, into sequence of bytes
+
+[15:43:05.0000] <devsnek>
+sure
+
+[15:43:18.0000] <croraf>
+using UTF-8 encoding, how does V8 know to interpret that?
+
+[15:43:31.0000] <devsnek>
+i'm not sure what you're asking
+
+[15:43:45.0000] <croraf>
+how does it know that I inputed "const" and not somethim like "xyz" using some other encoding.
+
+[15:44:07.0000] <devsnek>
+it checks if string[0] is 'c' and string[1] is 'o' and etc
+
+[15:44:28.0000] <croraf>
+Because the JS engine sees   Byte8: 12, FA, 2F, 3C, 4D
+
+[15:44:41.0000] <devsnek>
+did you look at the screenshot i sent
+
+[15:44:48.0000] <croraf>
+Yes, I didnt get it
+
+[15:44:52.0000] <devsnek>
+like you would do
+
+[15:45:11.0000] <devsnek>
+`String::NewFromUtf8(some utf8 encoded data)`
+
+[15:45:23.0000] <devsnek>
+or `String::NewFromOneByte(some latin1 encoded data)`
+
+[15:45:35.0000] <croraf>
+OK, and you would get 3 strings
+
+[15:45:40.0000] <croraf>
+And which one would you pick?
+
+[15:45:42.0000] <devsnek>
+what
+
+[15:45:55.0000] <devsnek>
+i'm confused
+
+[15:46:29.0000] <croraf>
+If the JS engine sees only bytes of data:  Byte8: 12, FA, 2F, 3C, 4D
+
+[15:46:33.0000] <devsnek>
+right
+
+[15:46:47.0000] <croraf>
+how does it know with which encoding scheme to decode this into meaningful tokens.
+
+[15:46:53.0000] <devsnek>
+because you told it
+
+[15:47:10.0000] <devsnek>
+for example `String::NewFromUtf8([12, FA, 2F, 3C, 4D])`
+
+[15:47:16.0000] <devsnek>
+you're calling the `NewFromUtf8` api
+
+[15:47:20.0000] <devsnek>
+which tells it the data is utf8
+
+[15:47:30.0000] <croraf>
+But I'm just using "node my_source.js"
+
+[15:47:46.0000] <croraf>
+I'm not telling "node mySource.js --encoding utf-8"
+
+[15:47:48.0000] <devsnek>
+node assumes the input is utf8
+
+[15:47:56.0000] <croraf>
+And if it is not?
+
+[15:48:13.0000] <devsnek>
+it will be interpreted incorrectly
+
+[15:48:17.0000] <croraf>
+Can I add this --encoding flag?
+
+[15:48:19.0000] <devsnek>
+and probably throw a syntaxerror
+
+[15:48:22.0000] <devsnek>
+no
+
+[15:48:42.0000] <croraf>
+So I can use Node only with UTF-8 encoded source code?
+
+[15:48:53.0000] <devsnek>
+more or less
+
+[15:49:00.0000] <croraf>
+ok, thx :)
+
+[15:55:38.0000] <croraf>
+Now, in constructing the String from the string literal, the engine will interpret the utf-8 encoded bytes as Unicode symbols and will construct the string into memory (an array of 2byte pairs) where it will encode this Unicode symbols using utf-16?
+
+[15:57:35.0000] <devsnek>
+a real engine will probably use utf8 unless the characters are larger than that allows
+
+[15:57:54.0000] <devsnek>
+in the spec everything is just utf16 all the time so it doesn't matter
+
+[15:59:57.0000] <croraf>
+In JS string is immutable, so adding "asd" + "c" creates a new array in memory, right? Where the old "asd" array remains
+
+
+2020-12-25
+[16:00:07.0000] <croraf>
+separately existing.
+
+[16:01:09.0000] <devsnek>
+croraf: in the spec that is how that works, yes
+
+[16:01:43.0000] <devsnek>
+in engines they will do lots of optimizations with different string representations
+
+[16:02:08.0000] <devsnek>
+if you did "asd" + "c" you'd probably get a special placeholder value that just says "i am the result of asd plus c"
+
+[16:02:16.0000] <devsnek>
+instead of a new string containing asdc
+
+[16:03:30.0000] <croraf>
+OK. Without optimization (or if some chars require) the string will be allocated as "pairs of bytes filled with utf-16 encoded values for the string"
+
+[16:03:54.0000] <devsnek>
+i'd call it an array of u16 values
+
+[16:04:00.0000] <devsnek>
+but yeah you could say pairs of bytes
+
+[16:05:02.0000] <croraf>
+And here we come to these peculiarities of charAt, charCodeAt and codePointAt, and perhaps some more.
+
+[16:05:42.0000] <croraf>
+That is when the Unicode symbol requires 2 byte-pairs.
+
+[16:07:05.0000] <croraf>
+If you have for example "abX" where X requires 2 byte-pairs. Using "abX".charAt(2) and "abX".charAt(3) would both give something other than "X", right?
+
+[16:09:11.0000] <Bakkot>
+when you say "2 byte-pairs", are you talking about surrogate pairs?
+
+[16:09:33.0000] <Bakkot>
+if so, yes
+
+[16:10:06.0000] <croraf>
+I havent really read surrogate pairs description in the spec carefully. But I think these should be what I talk about.
+
+[16:10:39.0000] <Bakkot>
+the ES spec is not the right place to read about surrogate pairs; it is a Unicode thing, and you should read about it in that context
+
+[16:11:27.0000] <croraf>
+A pair of 2  16bit  allocations next to each other, that represent a utf-16 encoding of an Unicode symbol?
+
+[16:11:40.0000] <croraf>
+This is a surrogate pair?
+
+[16:11:50.0000] <Bakkot>
+roughly, yes
+
+[16:13:09.0000] <croraf>
+And every "regular" utf-16 symbol after this X cannot be accessed by the simple "charAt()" because the offset produced by X has to be accounted?
+
+[16:14:38.0000] <Bakkot>
+you have to take into account that "abX" in your example is four characters long, and so to access the "y" in "abXy" you would need to do `.charAt(4)` instead of (as you might expect) `.charAt(3)`, yes
+
+[16:14:56.0000] <croraf>
+Yes, cool, thanks!!!
+
+[16:15:29.0000] <croraf>
+And charCodeAt is the same think, just it returns the unsigned integer from the 16bits
+
+[16:15:40.0000] <Bakkot>
+yup
+
+[16:15:50.0000] <croraf>
+(this is where the unsigned integer note is relevant :) )
+
+[16:16:37.0000] <croraf>
+OK, fromCharCode seems intuitive now, String.fromCharCode(189, 43, 190, 61).
+
+[16:17:03.0000] <croraf>
+Although two arguments in fromCharCode might merge to create a surrogate pair, right?
+
+[16:20:01.0000] <Bakkot>
+they wouldn't really "merge", since the string itself would store both parts of the pair without knowing they have anything to do with each other, but yes, you could put a lead and trail surrogate into it and browsers would render that as the single code point represented by that pair
+
+[16:21:13.0000] <croraf>
+I see. I read MDN now, and the difference is better explained that you cannot put more than 16 bits in the one argument of fromCharCode
+
+[16:22:04.0000] <Bakkot>
+yeah
+
+[16:22:08.0000] <Bakkot>
+there is fromCodePoint if you want that
+
+[16:22:39.0000] <croraf>
+While in fromCodePoint() you can put a 32bit "supplementary character"
+
+[16:22:41.0000] <croraf>
+yes
+
+[16:23:25.0000] <croraf>
+OMG, I thoguht there is no codePointAt :|
+
+[16:23:28.0000] <croraf>
+but there is
+
+[16:23:50.0000] <Bakkot>
+yes, although it is slightly awkward to use
+
+[16:24:17.0000] <croraf>
+I see
+
+[16:24:38.0000] <croraf>
+It doesnt account the previous surrogate paris
+
+[16:24:38.0000] <Bakkot>
+because it still indexes the same way as charCodeAt, it's just that if you give it the index of a lead surrogate which is followed by a trail surrogate then it will give you the code point represented by the pair rather than just the value of the lead surrogate
+
+[16:24:43.0000] <croraf>
+Yes
+
+[16:24:56.0000] <croraf>
+exactly!
+
+[16:24:58.0000] <Bakkot>
+if you want to actually index by code points, you can spread the string and index that: `[...string][index]` will index by code points
+
+[16:25:28.0000] <croraf>
+wait what :O X_X
+
+[16:25:38.0000] <croraf>
+this is too much for my brain
+
+[16:25:53.0000] <Bakkot>
+spreading a string with `...` splits by code points, not by code units
+
+[16:25:59.0000] <croraf>
+Yes, thats what I wanted to ask but almost forgot, what agbout the indexing access
+
+[16:26:02.0000] <Bakkot>
+for some reason
+
+[16:26:07.0000] <croraf>
+"abXy"[3]
+
+[16:26:11.0000] <Bakkot>
+regular indexing is the same as charAt
+
+[16:26:21.0000] <croraf>
+:O
+
+[16:26:52.0000] <croraf>
+So many nice questions for a technical interview :D
+
+[16:27:23.0000] <croraf>
+OK, one last method "normalize"
+
+[16:27:56.0000] <Bakkot>
+(I would not ask someone this sorta stuff in a technical interview unless the job is actually going to involve worrying about unicode encodings, but that's beside the point)
+
+[16:28:24.0000] <croraf>
+I know, these are kind of stupid questions.
+
+[16:28:24.0000] <Bakkot>
+normalize implements the unicode normalization algorithm: https://unicode.org/reports/tr15/
+
+[16:29:31.0000] <croraf>
+I would say it is not a minus if the person does not know it but kind of is a big plus if a person knows.
+
+[16:29:34.0000] <croraf>
+At least the general idea.
+
+[16:29:48.0000] <croraf>
+Not all the differences and trickiness
+
+[16:32:37.0000] <croraf>
+I'm kind of confused about these normalization forms. Isn't a Unicode symbol uniquely represented by an integer.
+
+[16:32:57.0000] <croraf>
+(which can then be encoded differently)
+
+[16:33:39.0000] <croraf>
+but ok, if it is too complicated to explain in one sentence, we can skip.
+
+[16:33:43.0000] <Bakkot>
+yes, but not all characters are uniquely represented by a Unicode code point
+
+[16:34:37.0000] <croraf>
+How come? This seems silly.
+
+[16:34:48.0000] <croraf>
+Why not just take 1 char = 1 code point (integer)
+
+[16:34:54.0000] <Bakkot>
+the standard example is `é`: it can be written as either `\u00e9` or `\u0065\u00301`
+
+[16:35:15.0000] <Bakkot>
+uhhhh a mix of historical reasons plus complexity of language, is my understanding
+
+[16:35:37.0000] <croraf>
+Yes, I thought about these ă which are written as a combination of two.
+
+[16:35:40.0000] <Bakkot>
+(that `\u00301` should be `\u0301`)
+
+[16:36:17.0000] <Bakkot>
+there's also stuff like, emojis have modifiers like gender and skin tone, and you have to pick a canonical order for those things to appear in
+
+[16:36:18.0000] <croraf>
+I mean, it kind of gives you the flexibility in writing a terminal I guess.
+
+[16:36:41.0000] <croraf>
+Like you can just send two symbols
+
+[16:36:48.0000] <croraf>
+You dont have to implement buffer in the terminal
+
+[16:37:21.0000] <croraf>
+which will combine two sent chunks of data into one single integer
+
+[16:38:02.0000] <croraf>
+I mean it still buffers, but doesnt have to combine as per some table
+
+[16:38:54.0000] <croraf>
+OK, thank you very much, you clarified all my doubts :)
+
+[16:39:03.0000] <croraf>
+You guys have been very helpful!!
+
+[16:39:15.0000] <croraf>
+devsnek, Bakkot :)
+
+[16:42:23.0000] <Bakkot>
+glad to help
+
+
+2020-12-28
+[22:52:43.0000] <Bakkot>
+`eshost -x 'print(eval("0; foo: { if (true) break foo; }"))'`
+
+[22:52:47.0000] <Bakkot>
+#### Chakra, SpiderMonkey
+
+[22:52:47.0000] <Bakkot>
+0
+
+[22:52:48.0000] <Bakkot>
+#### JavaScriptCore, V8, XS
+
+[22:52:48.0000] <Bakkot>
+undefined
+
+[22:53:02.0000] <Bakkot>
+that means we can change that right
+
+[22:54:58.0000] <Bakkot>
+i maintain no one can possibly have an intuition for the "correct" semantics here
+
+[22:55:51.0000] <Bakkot>
+(spec says SpiderMonkey is right, I believe, though that runs contrary to the ES6 goal of having it be possible to statically determine where your completion value is going to come from)
+
+[22:57:34.0000] <Bakkot>
+actually, wait, maybe it says JSC and V8 are right
+
+[22:58:37.0000] <Bakkot>
+yeah I think JSC and V8 are right and SM is wrong
+
+[07:19:41.0000] <ljharb>
+Bakkot: seems pretty cut and dry that it can be changed
+
+[07:50:11.0000] <ljharb>
+interesting that microsoft spun out chakracore to the open source community
+
+
+2020-12-30
+[21:59:43.0000] <jackworks>
+why BigInt constructor doesn't support science notation? BigInt('1e200')
+
+[22:31:31.0000] <Bakkot>
+because bigint literals don't, presumably
+
+[22:33:50.0000] <ljharb>
+that also leads to the question, why not `1e200n`?
+
+[22:34:02.0000] <ljharb>
+i remember asking about that and don't recall why it was considered OK not to have it
+
+[22:35:04.0000] <Bakkot>
+I assume that the mixing of the `e` and the `n` was found unpalatable
+
+[22:36:29.0000] <Bakkot>
+though we did allow 0xen, hmm
+
+[22:37:34.0000] <Bakkot>
+https://github.com/tc39/proposal-bigint/issues/49 is the thread, looks like
+
+[22:37:36.0000] <ljharb>
+1_0xen, 2_0xen, lots of oxen
+
+[22:38:27.0000] <ljharb>
+seems like it'd be possible to add it, i guess
+
+[22:39:02.0000] <Bakkot>
+yeah
+
+[22:39:15.0000] <Bakkot>
+that said, underscore literals have made it a lot less necessary
+
+[22:39:23.0000] <Bakkot>
+er, underscores in numeric literals, that is
+
+[22:39:38.0000] <Bakkot>
+I write `1_000_000` instead of 1e6, etc
+
+[22:40:15.0000] <Bakkot>
+and there's no real reason to prioritize efficient representation of numbers which happen to be a power of ten, for BigInt
+
+[22:40:48.0000] <Bakkot>
+`10n ** 6n` seems not that much worse than `1e6n`
+
+[22:41:39.0000] <ljharb>
+true, but i think there's a lot of convenience in the exponential notation, i use it often with numbers, and i don't personally find separators cleaner
+
+[22:42:40.0000] <Bakkot>
+huh
+
+[22:42:45.0000] <Bakkot>
+what sort of numbers do you use it for?
+
+[22:43:47.0000] <ljharb>
+setTImeout delays, is the main one
+
+[22:43:56.0000] <ljharb>
+10e3 is 10 seconds, eg
+
+[22:44:06.0000] <ljharb>
+obv i can't use bigint for that
+
+[22:44:27.0000] <ljharb>
+but setTimeout's why i'm in the habit of always using it for powers of 10, and i find it's much easier to never have to count zeroes
+
+[22:51:28.0000] <Bakkot>
+ah, sure
+
+[22:51:49.0000] <Bakkot>
+I guess one might have a `nanoseconds` parameter or something
+
+[22:52:42.0000] <ljharb>
+Temporal has a bunch of those
+

@@ -1,0 +1,5290 @@
+2016-12-01
+[19:37:53.0000] <gsnedders>
+Can anyone remember where http://testthewebforward.org/docs/test-style-guidelines.html came from? Was it some internal Opera wiki page, or where?
+
+[19:38:42.0000] <gsnedders>
+oh, no, https://www.w3.org/Style/CSS/Test/guidelines.html
+
+[19:48:35.0000] <astearns>
+gsnedders: https://github.com/w3c/testtwf-website-src/commit/7af6bd8baa83f9498591aa60a06ce70822faf828#diff-0a2966d4916281397a795ab14e6ade3f
+
+[19:49:08.0000] <astearns>
+I expect it was Rebecca compiling from sources available at the time
+
+[20:01:59.0000] <gsnedders>
+astearns: I didn't even bother looking in the git history! It definitely long predates TTWF.
+
+[20:02:55.0000] <gsnedders>
+e.g., https://www.w3.org/Style/CSS/Test/guidelines.html is dated as 2003
+
+[20:03:40.0000] <gsnedders>
+that I have memories of it somewhere internal to Opera is likely just legacy of hixie being involved in writing it
+
+[00:31:27.0000] <zcorpan>
+maybe there should be an opt-in to https://github.com/whatwg/html/issues/2047 to prevent navigation but still allow postMessage?
+
+[02:44:08.0000] <Ms2ger>
+Hixie's back?
+
+[04:54:08.0000] <zcorpan>
+hsivonen: interesting read, pretty dramatic differences in both directions in some cases. the "<" at the end got me curious, https://checker.html5.org/?doc=https%3A%2F%2Fhsivonen.fi%2Fencoding-perf-2016-11%2F :-)
+
+[06:03:45.0000] <mkwst>
+Is there any precedent for some sort of async creation mechanism on a DOM object?
+
+[06:04:45.0000] <mkwst>
+That is, instead of `var x = new AmazingThing()`, something like `var x; AmazingThing.create().then(thing => { x = thing; });` (or something even prettier that I didn't think of)?
+
+[06:06:11.0000] <mkwst>
+`var x = await AmazingThing.create()` I suppose?
+
+[06:07:26.0000] <zcorpan>
+mkwst: search for "Promise<" in the html spec
+
+[06:08:28.0000] <zcorpan>
+convertToBlob, createImageBitmap
+
+[06:12:07.0000] <mkwst>
+Ok, great. Thanks. :)
+
+[06:48:35.0000] <wanderview>
+annevk: is there a way for a server or ServiceWorker to tell if a navigation network request was initiated with an opener or not?
+
+[06:48:48.0000] <wanderview>
+is there a header or something that is sent?
+
+[11:50:10.0000] <matt444>
+For <link rel=preload> the as attribute is used to set headers and for CSP, anything else?
+
+[11:50:29.0000] <matt444>
+If those are the only two things, what would be the difference between "script" and "worker"?
+
+[14:40:15.0000] <ajeffrey_>
+Another silly "should this be optional?" question...
+
+[14:40:44.0000] <ajeffrey_>
+https://html.spec.whatwg.org/multipage/browsers.html#dom-window says "The window, frames, and self IDL attributes, on getting, must all return this Window object's browsing context's WindowProxy object.".
+
+[14:41:06.0000] <ajeffrey_>
+what should they return if the Window has no browsing context?
+
+[14:42:19.0000] <ajeffrey_>
+annevk: Domenic: thoughts? ^
+
+[14:42:34.0000] <Domenic>
+ajeffrey_: how do you create a Window object without a browsing context?
+
+[14:43:03.0000] <ajeffrey_>
+create an iframe, stash away the contentDocument, then detatch the iframe.
+
+[14:43:26.0000] <Domenic>
+It still has a browsing context; the browsing context has just been discarded.
+
+[14:43:52.0000] <ajeffrey_>
+hmm, that's a subtle distinction :)
+
+[14:44:04.0000] <Domenic>
+indeed :-/
+
+[14:44:27.0000] <ajeffrey_>
+so when a document is discarded https://html.spec.whatwg.org/multipage/browsers.html#discard-a-document
+
+[14:44:49.0000] <caitp>
+"it still has a browsing context, it's just been discarded" doesn't make a whole lot of sense to an english speaker :l
+
+[14:44:49.0000] <ajeffrey_>
+we lose the reference from the browsing context to the document,
+
+[14:45:13.0000] <ajeffrey_>
+but not the reference from the document to the browsing context?
+
+[14:45:54.0000] <Domenic>
+That sounds right. https://html.spec.whatwg.org/multipage/browsers.html#garbage-collection-and-browsing-contexts may clarify.
+
+[14:46:29.0000] <Domenic>
+oh we were already in that section, nevermind, i am silly
+
+[14:48:05.0000] <ajeffrey_>
+OK, so the document should always keep the reference to its browsing context, even if that context has been discarded.
+
+[14:48:12.0000] <ajeffrey_>
+Domenic: thanks!
+
+[14:48:27.0000] <Domenic>
+I wish I could find somewhere that stated that clearly...
+
+[14:48:31.0000] <Domenic>
+At least Window should, I guess?
+
+[14:49:06.0000] <ajeffrey_>
+It's caught by the catch-all that if there's a field, then there's a strong reference.
+
+[14:49:50.0000] <Domenic>
+Yeah, to WindowProxy though, not necessarily the browsing context :-/
+
+[14:49:54.0000] <ajeffrey_>
+oh hang on a moment, that's a strong reference to the WindowProxy, not to the browsing context :/
+
+[14:50:00.0000] <ajeffrey_>
+Domenic: jinx
+
+[14:50:44.0000] <Domenic>
+It would probably be nicer if the graph here was purely between the objects (Document/Window/WindowProxy)
+
+[14:50:53.0000] <Domenic>
+Then had some additional edges for browsing context as necessary
+
+[14:51:01.0000] <Domenic>
+It's really unclear who owns what
+
+[14:51:16.0000] <Domenic>
+I feel like I already tried to fix this once :-/
+
+[14:52:00.0000] <ajeffrey_>
+it doesn't help matters that browsing context is a concept, not a WebIDL interface :/
+
+[14:52:53.0000] <Domenic>
+Yes, that's why it'd be nicer to shuffle it off to the side and minimize the number of edges into it
+
+[14:53:07.0000] <ajeffrey_>
+indeed.
+
+[14:54:40.0000] <Domenic>
+I'll file an issue on myself at least...
+
+[14:54:46.0000] <Domenic>
+What's your GitHub username again, ajeffrey_ ?
+
+[14:55:05.0000] <ajeffrey_>
+Domenic: asajeffrey
+
+[14:56:59.0000] <zcorpan>
+MikeSmith: yt?
+
+[15:03:00.0000] <ajeffrey_>
+Domenic: I filed a servo issue https://github.com/servo/servo/issues/14434.
+
+[15:06:56.0000] <Domenic>
+This will be a fun one
+
+[15:10:55.0000] <ajeffrey_>
+Domenic: hmm, "And the Document originally created for an iframe element, which has since been removed from the document, has no associated browsing context, since that browsing context was discarded."
+
+[15:11:04.0000] <ajeffrey_>
+(2nd note in https://html.spec.whatwg.org/multipage/browsers.html#windows)
+
+[15:16:23.0000] <Domenic>
+@_@
+
+[15:21:23.0000] <zcorpan>
+"When an iframe element is removed from a document, the user agent must discard the element's nested browsing context, if it is not null, and then set the element's nested browsing context to null."
+
+[15:21:36.0000] <zcorpan>
+https://html.spec.whatwg.org/multipage/embedded-content.html#the-iframe-element
+
+[15:23:15.0000] <Domenic>
+sure but "discard" is a term of art
+
+[15:23:19.0000] <Domenic>
+Someone else might have a reference to it
+
+[15:29:38.0000] <zcorpan>
+ah, yes. read scrollback more carefully now
+
+
+2016-12-02
+[06:57:45.0000] <gsnedders>
+well, someone seems to not want to stick around :)
+
+[12:26:44.0000] <TabAtkins>
+cwilso, yoav: Steve requested moving Scroll Anchoring to WICG back in Oct 10, but that hasn't happened yet. Was there anything blocking the move, or did it just slip thru the net?
+
+[12:53:19.0000] <cwilso>
+TabAtkins: I just missed it (sorry - run up to CDS).  I just invited Steve to WICG GH group, will work with him to xfer.
+
+[12:59:19.0000] <TabAtkins>
+Danke.
+
+[13:13:28.0000] <zcorpan>
+http://www.udd.cl/ is interesting. <address> is used for physical location for upcoming event, and applies to enclosing <article>
+
+[14:38:43.0000] <cwilso>
+TabAtkins: https://github.com/WICG/ScrollAnchoring is now a thing.
+
+
+2016-12-03
+[21:32:23.0000] <rbyers>
+Annevk: meant to mention that I succeeded in figuring who exactly is responsible for URL interop in blink (https://crbug.com/660384), but do not have the data to argue it's higher priority than the other things on that team's plate (Streams-related stuff).  Maybe this awesome post will help: https://webkit.org/blog/7086/url-parsing-in-webkit/
+
+
+2016-12-04
+[21:27:01.0000] <hsivonen>
+any #whatwg folks at Mozilla AllHands and not had dinner yet?
+
+[21:50:58.0000] <KiChjang>
+hsivonen, i recommend you contact nox
+
+
+2016-12-05
+[18:38:32.0000] <zewt>
+don't suppose there's anyone building firefox with the bogus extension signing thing removed? otherwise i'm probably just going to stop updating firefox, heh
+
+[18:40:20.0000] <zewt>
+(mozilla doesn't get to be a gatekeeper for add-ons, nobody should be tolerating that)
+
+[18:59:47.0000] <nox>
+Ah ah.
+
+[23:53:30.0000] <zcorpan>
+hmm, IE 10/11 had just rp { display:none }. IE 8..9 and Edge 13 have ruby rp { display:none }
+
+[23:54:10.0000] <zcorpan>
+did they decide to be compatible with Firefox for IE 8, and then decide to be compatible with Chrome in Edge 13?
+
+[23:57:41.0000] <zcorpan>
+MikeSmith: do you have an idea about the usefulness of "not mappable to XML 1.0" warnings? i suppose they are useful for some people but not at all for the majority, but would be good to have some kind of data
+
+[01:56:19.0000] <MikeSmith>
+zcorpan: as far as real XML usage, data we have consistently shows that at most 0.1% of HTML documents are served with an XML MIME type
+
+[01:57:22.0000] <MikeSmith>
+see the “XML input” line at https://validator.w3.org/nu/stats.html
+
+[01:58:26.0000] <MikeSmith>
+and there is Opera MAMA data that indicates the same 0.1%
+
+[01:58:30.0000] <MikeSmith>
+lemme find it
+
+[01:58:58.0000] <zcorpan>
+MikeSmith: ok. but that stat doesn't say so much about whether XML warnings in text/html are useful, right?
+
+[01:59:33.0000] <zcorpan>
+MikeSmith: such warnings would be useful if one tries to parse the HTML and serialize as XML for something other than serving the page to the browser
+
+[02:00:54.0000] <MikeSmith>
+well I don’t know how we could get figures for that
+
+[02:01:12.0000] <zcorpan>
+or, for some cases, try to generate an equivalent DOM using DOM core APIs (which often but not always reject things that are not allowed in XML)
+
+[02:01:36.0000] <MikeSmith>
+yeah I don’t think we want to encourage people to try to do stuff like that anyway
+
+[02:02:06.0000] <MikeSmith>
+if they do they are likely to run into more problems than the subset of what we warn about, I htink
+
+[02:02:28.0000] <MikeSmith>
+so I think we should drop those "not mappable to XML 1.0" warnings
+
+[02:03:01.0000] <MikeSmith>
+I think they are just noise to the vast majority of users
+
+[02:03:37.0000] <zcorpan>
+ok. yeah, i think so too. for element and attribute names we give an error anyway for names that can't be used in XML
+
+[02:03:49.0000] <MikeSmith>
+yeah
+
+[02:04:44.0000] <zcorpan>
+and anyone trying to serialize text/html as XML will be better off doing infoset coersion than trying to warn the Internet into behaving
+
+[02:04:46.0000] <MikeSmith>
+I think that 0.1% figure does probably also roughly align with the data for number of users who want to do that other XMLish stuff
+
+[02:05:15.0000] <MikeSmith>
+as maybe does the “Doctype with「SYSTEM "about:legacy-compat"」found” figure at https://validator.w3.org/nu/stats.html
+
+[02:05:30.0000] <MikeSmith>
+which is 0.06%
+
+[02:05:40.0000] <zcorpan>
+Yeah
+
+[02:06:10.0000] <MikeSmith>
+OK so dropping the warnings is an htmlparser change
+
+[02:06:43.0000] <MikeSmith>
+I’m happy to make them directly but also happy to merge them if you make a PR
+
+[02:07:05.0000] <MikeSmith>
+btw for htmlparser changes make sure to use the validator-nu branch as the base
+
+[02:07:20.0000] <MikeSmith>
+for https://github.com/validator/htmlparser I mean
+
+[02:07:32.0000] <MikeSmith>
+I think that is what should automatically happen now
+
+[02:08:02.0000] <MikeSmith>
+because I recently switched it so that validator-nu branch is the default for that github repo
+
+[02:21:33.0000] <zcorpan>
+hmm htmlparser is a submodule. i don't know what to do. :-D
+
+[02:43:53.0000] <MikeSmith>
+cd htmlparser && git checkout validator-nu && git pull
+
+[03:41:22.0000] <zcorpan>
+MikeSmith: should the warning still be there for ALTER_INFOSET?
+
+[03:45:47.0000] <zcorpan>
+i suppose the warning can be useful there
+
+[04:08:58.0000] <MikeSmith>
+zcorpan: yeah agreed
+
+[04:12:24.0000] <zcorpan>
+MikeSmith: https://github.com/validator/htmlparser/pull/3
+
+[04:13:19.0000] <zcorpan>
+MikeSmith: Trailing whitespace got trimmed. I've built and tested manually and run tests
+
+[04:13:39.0000] <zcorpan>
+but not written new automated tests
+
+[04:48:16.0000] <ondras>
+hm, this is a specced behavior? https://jsfiddle.net/2xy87m6z/
+
+[04:48:26.0000] <ondras>
+(not getting checked even if explicitely requested)
+
+[15:29:39.0000] <botie>
+rniwa, at 2016-11-23 23:00 UTC, Domenic said: for a repro file for https://github.com/whatwg/html/issues/2058
+
+
+2016-12-06
+[07:01:18.0000] <zcorpan>
+hmmmm. per https://www.chromestatus.com/metrics/feature/popularity 'datetime' is used more often than 'datetime-local'
+
+[15:53:35.0000] <Mek>
+XHR spec issue, shepherd issue or bikeshed issue: I can link to {{XMLHttpRequest/send()}} just fine, but {{XMLHttpRequest/getAllResponse Headers()}} doesn't work (instead seems to be indexed as XMLHttpRequest/dom-XMLHttpRequest-getAllResponseHeaders)
+
+
+2016-12-07
+[16:29:15.0000] <annevk>
+Mek: prolly XHR
+
+[16:29:25.0000] <annevk>
+Mek: XHR has yet to migrate to Bikeshed
+
+[16:29:37.0000] <annevk>
+Mek: the problem with doing that is that it requires IDL changes and I don't want to make IDL changes...
+
+[16:44:28.0000] <TabAtkins>
+(To be specific, it requires changing the name of one of the arguments of two overloaded methods.)
+
+[16:44:49.0000] <TabAtkins>
+(And avoiding that change is a very complicated and fraught Bikeshed change, so I'm not planning on doing it any time soon.)
+
+[17:01:04.0000] <Mek>
+I see... The odd part is that in the XHR spec I don't see anything obviously different between the various methods, but then I have no idea what magic/heuristics shepherd is doing to index things
+
+[23:40:18.0000] <zcorpan>
+wat. "A database query error has occurred. This may indicate a bug in the software." https://wiki.whatwg.org/wiki/FAQ
+
+[23:40:37.0000] <zcorpan>
+who can fix this?
+
+[23:45:02.0000] <zcorpan>
+clearing cookies made it work
+
+[00:03:21.0000] <MikeSmith>
+zcorpan: I ran into that before too
+
+[00:03:37.0000] <MikeSmith>
+for me it cleared up on its own after a day or so
+
+[00:04:11.0000] <zcorpan>
+maybe that error message should suggest clearing cookies
+
+[00:04:34.0000] <MikeSmith>
+yeah that would be nice
+
+[00:04:47.0000] <MikeSmith>
+otherwise it’s just kind of baffling
+
+[00:04:49.0000] <zcorpan>
+or, you know, someone(TM) fix the bug in the software
+
+[00:07:40.0000] <MikeSmith>
+good luck to us on that
+
+[00:08:10.0000] <zcorpan>
+the irony that https://google.github.io/styleguide/htmlcssguide.xml?showone=Optional_Tags#Optional_Tags is itself using xml+xslt
+
+[00:08:22.0000] <MikeSmith>
+when I talked to Hixie about it he said he didn’t know who among us is responsible for keeping the wiki running
+
+[00:09:11.0000] <MikeSmith>
+haha XSLT will be with us forever
+
+[00:09:30.0000] <MikeSmith>
+like a guest who long overstays their welcome
+
+[00:09:36.0000] <MikeSmith>
+drinking all your beer
+
+[00:10:42.0000] <zcorpan>
+XSLT, you're drunk, go home
+
+[00:13:52.0000] <MikeSmith>
+haha
+
+[01:28:09.0000] <nox>
+zcorpan: While drunk, I'm definitely funnier than XSLT.
+
+[06:25:58.0000] <JakeA>
+annevk: Is there a way to find all the specs that depend on fetch? I'm looking at which APIs should skip the service worker when used in a service worker
+
+[06:26:02.0000] <JakeA>
+https://github.com/whatwg/fetch/issues/303
+
+[06:26:42.0000] <JakeA>
+Want to do a sweep of as many APIs as possible & work out which things should be on the allow/deny list
+
+[08:12:50.0000] <annevk>
+JakeA: anything you can think of that does networking; not keeping a list at the moment
+
+[08:13:40.0000] <JakeA>
+annevk: no worries. Still settled on the opt-out-of SW list.
+
+[10:25:51.0000] <salty-horse>
+hi. I forgot how to report bugs on the html spec. can anyone help? (or I can just report it here)
+
+[10:31:47.0000] <espadrine>
+salty-horse: you can go to whatwg.org/html, select a piece of text related to the bug, click the "file an issue" link at the bottom right
+
+[10:34:01.0000] <salty-horse>
+thanks!
+
+[10:34:32.0000] <salty-horse>
+oh I totally missed that link
+
+[10:42:34.0000] <salty-horse>
+I find it very odd that the ImageSmoothingQuality enum is explained separately from the imageSmoothingQuality attribute
+
+[13:55:08.0000] <MikeSmith>
+JakeA: if anybody has a good answer for “Is there a way to find all the specs that depend on fetch”, it would be tobie I think
+
+[13:55:52.0000] <MikeSmith>
+I mean not specifically about fetch for the general question of find all specs that depend on some particular spec
+
+[14:13:59.0000] <JakeA>
+MikeSmith: cheers! Feels like something the bikeshed database might know
+
+[14:29:30.0000] <MikeSmith>
+for Android Chrome is there some way I can save a bookmark to my homescreen without it suppressing the browser chrome
+
+[14:30:44.0000] <MikeSmith>
+I need the address bar, but the Add to Homescreen thing makes that get suppressed, along with all the other browser controls
+
+
+2016-12-08
+[16:01:00.0000] <rniwa>
+kochi: yt?
+
+[16:01:07.0000] <rniwa>
+hayato: ping
+
+[16:14:09.0000] <MikeSmith>
+https://github.com/w3c/browser-payment-api/issues/307#issuecomment-265511874
+
+[16:14:46.0000] <MikeSmith>
+“I'd like to think that the implementation follows the spirit of the spec.”
+
+[17:06:58.0000] <rniwa>
+annevk: yt?
+
+[17:07:00.0000] <rniwa>
+Domenic: yt?
+
+[17:11:12.0000] <annevk>
+rniwa: sorta
+
+[17:11:33.0000] <rniwa>
+annevk: do you recall know why fullscreenElement: https://fullscreen.spec.whatwg.org/#dom-document-fullscreenelement
+
+[17:11:50.0000] <rniwa>
+annevk: needs to check whether candidate & context object are in the same tree after retargeting the lement?
+
+[17:11:58.0000] <rniwa>
+that seems odd because retargeting should guarantee that
+
+[17:12:21.0000] <rniwa>
+oh I guess it's not necessary true if the retargeted node is in another shadow tree...
+
+[17:12:36.0000] <rniwa>
+wait, retargeting should fix that
+
+[17:13:16.0000] <rniwa>
+oh, i guess if we called fullscreenElement on a shadow tree and fullscreenElement is in the document, we'd hit this...
+
+[17:14:52.0000] <annevk>
+rniwa: sounds plausible, foolip and kochi might know more
+
+[17:32:46.0000] <Domenic>
+rniwa: annevk: does sound like worth adding an example to the spec for
+
+[17:39:48.0000] <annevk>
+Yeah, makes sense
+
+[17:40:05.0000] <annevk>
+Is there a combined term for the GET and HEAD methods?
+
+[18:34:05.0000] <rniwa>
+Domenic, annevk: an example for what?
+
+[18:34:24.0000] <annevk>
+rniwa: the fullscreenElement thing you mentioned
+
+[18:34:42.0000] <rniwa>
+ah, I see
+
+[18:56:30.0000] <Ms2ger>
+slightlyoff, here?
+
+[18:59:04.0000] <slightlyoff>
+Ish. Whaddup?
+
+[19:00:12.0000] <Ms2ger>
+slightlyoff, I'm failing to make sense of the definition of origin in https://w3c.github.io/ServiceWorker/#run-service-worker
+
+[19:02:14.0000] <slightlyoff>
+Send mail? On Indian 2G, won't be able to answer quickly
+
+[19:03:29.0000] <Ms2ger>
+Oh, okay
+
+[19:03:34.0000] <Ms2ger>
+Thanks anyway :)
+
+[22:22:36.0000] <rniwa>
+annevk, hayato : should fullscreenchange be composed?
+
+[22:22:56.0000] <rniwa>
+oh, I guess this fires on document so no need
+
+[22:40:00.0000] <rniwa>
+annevk, hayato: on the other hand, that seems to indicate that we should be firing these events on shadow root as well...
+
+[22:40:25.0000] <rniwa>
+otherwise we get into a weird situation where in order to listen to a fullscreen state change, you need to attach your event listener to document
+
+[22:49:57.0000] <rniwa>
+/me filed https://github.com/w3c/webcomponents/issues/614
+
+[23:55:31.0000] <salty-horse>
+how can I compile the "source" file into HTML? is the post-processor proprietary and therefore not provided?
+
+[00:01:37.0000] <JakeA>
+Ms2ger: we could probably replace that with the script's origin. Is that what you mean?
+
+[00:07:25.0000] <MikeSmith>
+salty-horse: https://github.com/whatwg/html-build/
+
+[00:08:33.0000] <salty-horse>
+MikeSmith, thanks. I looked in README instead of CONTRIBUTING.
+
+[00:08:42.0000] <MikeSmith>
+ah
+
+[00:09:13.0000] <MikeSmith>
+hmm yeah we used to have that info in teh README but we moved it to CONTRIBUTING a few months ago
+
+[00:09:44.0000] <MikeSmith>
+because of the fact CONTRIBUTING is what the GH issue tracker auto-links to
+
+[00:10:16.0000] <MikeSmith>
+but it seems we should maybe mention it in the README still as well
+
+[00:10:24.0000] <salty-horse>
+is it ok if my fix breaks the 100 column width rule? (I have to, to prevent any newlines from appearing in the output)
+
+[00:10:39.0000] <MikeSmith>
+yeah it is OK
+
+[00:10:45.0000] <MikeSmith>
+if there is a reason for it
+
+[00:11:07.0000] <MikeSmith>
+that 100 column width rule is not a hard requirement for the processor or anything
+
+[00:11:18.0000] <MikeSmith>
+it is just a policy, style rule
+
+[00:12:14.0000] <MikeSmith>
+salty-horse: if you have any problems with the build please report them
+
+[00:12:22.0000] <salty-horse>
+trying..
+
+[00:12:40.0000] <MikeSmith>
+even if they are just frustrations and not show stoppers
+
+[00:12:53.0000] <MikeSmith>
+we have tried hard to make the build as easy to use as possible
+
+[00:13:19.0000] <MikeSmith>
+but I think it probably still has a lot of room for improvement
+
+[00:17:11.0000] <salty-horse>
+MikeSmith, have you considered making "html-build" a git submodule of "html"? I don't see a reason why I would want one and not the other
+
+[00:41:24.0000] <MikeSmith>
+We have but decided intentionally to not make it a submodule
+
+[00:42:02.0000] <MikeSmith>
+because submodules are one of those "now you have two problems" things
+
+[00:50:59.0000] <MikeSmith>
+salty-horse: https://github.com/whatwg/html/pull/2151
+
+[00:52:38.0000] <salty-horse>
+MikeSmith, looks good!
+
+[00:54:59.0000] <kochi>
+rniwa: sorry for being late, I was busy for other things today. As you may have understood, the "retargeting" algorithm does not guarantee that the context object and the retargeted node is in the same node tree.  The "retargeting" algorithm was originally for event retargeting, but as most part can be reused, the algorithm is used for fullscreenElement.
+
+[00:55:16.0000] <MikeSmith>
+salty-horse: so actually waht we normally do for cases like that line is wrap the “ data-x="dom-context-2d-imageSmoothingQuality-low">low</code>".</p>” part to the next line
+
+[00:55:22.0000] <kochi>
+rniwa: also pointerLockElement uses the retargeting algorithm. https://w3c.github.io/pointerlock/#dom-documentorshadowroot-pointerlockelement
+
+[00:55:35.0000] <MikeSmith>
+salty-horse: that is, break it before the attribute name
+
+[00:55:55.0000] <kochi>
+Looks like Safari TP supports PointerLock!! http://caniuse.com/#search=pointerlock
+
+[00:56:06.0000] <salty-horse>
+hmm ok. yes the docs mentioned it, but I thought this was more readable.
+
+[00:57:16.0000] <MikeSmith>
+yeah we do it even if it is less reabable
+
+[00:57:20.0000] <rniwa>
+kochi: it looks like fullscreenchange event is still broken: https://github.com/w3c/webcomponents/issues/614
+
+[00:57:38.0000] <rniwa>
+kochi: as things stand, you have to listen to the event on document level if one of the elements in a shadow tree is full screen'ed
+
+[00:57:59.0000] <MikeSmith>
+salty-horse: actually it is more that we go with whatever our text editors do when given a 100-column limite
+
+[00:59:06.0000] <salty-horse>
+fixing nw
+
+[01:00:51.0000] <rniwa>
+/me sigh... one of these days, i'd go home before midnight
+
+[03:29:04.0000] <ondras>
+so, is there an "official" way of making html/css tables with a fixed header and a scrollable body?
+
+[03:30:02.0000] <boogyman>
+This isn't really a support channel, but what do you mean by "official"
+
+[03:31:49.0000] <zcorpan>
+where does webidl say to "perform a security check" for constructors? or does it not? heycam|away tobie annevk Domenic - context https://github.com/w3c/browser-payment-api/issues/361#issuecomment-265719019
+
+[03:41:53.0000] <ondras>
+boogyman: such as "there is a dedicated attribute for this" or "the <tbody> cannot really overflow, so you need to use display:block or wrap it" ... something more worthy than a random crappy SO search
+
+[03:42:20.0000] <ondras>
+no looking for a solution to be copypasted. looking for a right direction (or a statement about no direction being available at all)
+
+[03:46:03.0000] <boogyman>
+position: fixed is the most likely, but I have not tried to use it in the context of <table><thead>...<tbody>
+
+[03:46:51.0000] <ondras>
+okay, thanks
+
+[04:19:34.0000] <tobie>
+zcorpan: afaik it doesn't
+
+[04:19:40.0000] <tobie>
+zcorpan: see: https://heycam.github.io/webidl/#es-constructible-interfaces
+
+[04:21:00.0000] <zcorpan>
+tobie: shouldn't it, somewhere before step 6?
+
+[04:21:37.0000] <tobie>
+zcorpan: instantiation being neither done by an operation nor a getter/setter, we'd need to modify https://heycam.github.io/webidl/#dfn-perform-a-security-check
+
+[04:23:02.0000] <tobie>
+zcorpan: it seems like a reasonable thing to do, but I'm no authority in this topic. Can you file a ticket?
+
+[04:25:18.0000] <zcorpan>
+sure
+
+[04:28:26.0000] <zcorpan>
+filed https://github.com/heycam/webidl/issues/249
+
+[04:38:34.0000] <tobie>
+zcorpan: ty
+
+[04:40:02.0000] <zcorpan>
+ondras: afaik, that is still an unsolved issue in css, but display:block "works"
+
+[04:40:47.0000] <ondras>
+zcorpan: I would say that display:block totally f*cks up the width computation of the tbody cells, so having absolutely positioned <thead> might work better. gave it only a rough try though.
+
+[04:41:25.0000] <ondras>
+zcorpan: https://jsfiddle.net/zo1tg7L7/1/
+
+[04:41:39.0000] <zcorpan>
+ondras: yeah maybe positioning the thead is less painful
+
+[04:41:56.0000] <ondras>
+(but still painful)
+
+[04:42:33.0000] <zcorpan>
+you'd need to display:block the thead as well, and then specify widths for the cells so they hopefully line up
+
+[04:43:49.0000] <ondras>
+zcorpan: I would like to retain the automatic column width computation algorithm
+
+[04:44:34.0000] <ondras>
+/me thinking about the css grid for this particular case...
+
+[05:01:34.0000] <tobie>
+zcorpan: isn't the security check done by step 9 (Assert: O.[[Realm]] is equal to F.[[Realm]])?
+
+[05:04:30.0000] <zcorpan>
+tobie: no? that happens after the constructor's algorithm has run (step 6), and isn't "Assert" meant for things that should be impossible to be false if the spec is implemented correctly?
+
+[05:05:26.0000] <zcorpan>
+i.e. strictly non-normative
+
+[05:05:51.0000] <tobie>
+zcorpan: yeah, you're right on both counts.
+
+[05:15:17.0000] <tobie>
+MikeSmith, JakeA: sorry forgot to get back to you this morning. I unfortunately don't have a good answer to this. TabAtkins might have this data ("Is there a way to find all the specs that depend on fetch") from shepherd.
+
+[05:15:45.0000] <MikeSmith>
+tobie: OK
+
+[05:16:19.0000] <MikeSmith>
+/me watches hot potato get passed to TabAtkins 
+
+[05:17:42.0000] <tobie>
+MikeSmith: I do have a bunch of code written specifically to get this data out, but the project was put on the back burner, unfortunately.
+
+[05:18:02.0000] <MikeSmith>
+ah yeah
+
+[05:18:21.0000] <MikeSmith>
+I thought you had done some work back some time ago
+
+[05:18:42.0000] <MikeSmith>
+so my memory is not as bad as I imagined
+
+[05:20:32.0000] <zcorpan>
+iirc shepherd doesn't know which specs reference which. i needed this when switching html to en-US but ended up greping various repos and googling
+
+[05:22:26.0000] <zcorpan>
+So... "secure context" cannot change during the lifetime of a document, correct?
+
+[05:22:45.0000] <MikeSmith>
+TabAtkins just needs to write a replacement for shepherd
+
+[05:23:43.0000] <MikeSmith>
+zcorpan: dunno the answer but you thinking about that in the context of future-proofing “allowed to use” for Feature Policy compat?
+
+[05:24:50.0000] <zcorpan>
+MikeSmith: that is related yeah. i'm trying to wrap my head around how these things work.
+
+[05:25:33.0000] <zcorpan>
+MikeSmith: i found [SecureContext] in webidl means the thing is not exposed at all in non-secure contexts, but that's not how it's implemented in chromium for PaymentRequest at least
+
+[05:26:32.0000] <zcorpan>
+instead it throws early in the constructor https://chromium.googlesource.com/chromium/src/+blame/master/third_party/WebKit/Source/modules/payments/PaymentRequest.cpp#682
+
+[05:32:18.0000] <MikeSmith>
+zcorpan: I guess I have ceased being surprised by cases where blink+chromium+v8 doesn’t conform to webidl
+
+[05:32:41.0000] <MikeSmith>
+seems to be the rule rather than the exception
+
+[05:33:23.0000] <MikeSmith>
+well that’s overstating things but… it’s frustrating
+
+[05:35:19.0000] <MikeSmith>
+especially when I take time to report it and end up getting ’splained to, that well actually, the blink+chromium+v8 is right and wontfix
+
+[06:17:00.0000] <felixjet>
+Figure Content model:
+
+[06:17:00.0000] <felixjet>
+Either: One figcaption element followed by flow content.
+
+[06:17:00.0000] <felixjet>
+Or: Flow content followed by one figcaption element.
+
+[06:17:17.0000] <felixjet>
+flow content... but can be more than 1?
+
+[06:17:37.0000] <felixjet>
+like <figure><figcaption></figcaption><div></div><div></div><div></div><div></div></figure>
+
+[06:17:51.0000] <felixjet>
+is that valid?
+
+[06:25:28.0000] <MikeSmith>
+felixjet: yes
+
+[06:26:33.0000] <felixjet>
+and the example of figure + code shows this figcaption: <figcaption>Listing 4. The primary core interface API declaration.</figcaption>
+
+[06:26:53.0000] <felixjet>
+so, its a caption, and the flow content associated is <pre><code>
+
+[06:27:08.0000] <felixjet>
+thats ok, but what if the figcaption is used like <figcaption>javascript</figcaption>
+
+[06:27:19.0000] <felixjet>
+is that semantically still correct and good use?
+
+[06:27:45.0000] <felixjet>
+because thats not a caption at all, it's not describing the content of the code
+
+[06:30:10.0000] <zcorpan>
+felixjet: why is it not a caption?
+
+[06:30:50.0000] <felixjet>
+because it's not describing whats inside the <code> tag
+
+[06:30:52.0000] <felixjet>
+it's more like a label
+
+[06:30:56.0000] <felixjet>
+label != caption
+
+[06:32:40.0000] <zcorpan>
+"The figcaption element represents a caption or legend"
+
+[06:38:24.0000] <zcorpan>
+I guess "javascript" is arguably not correct use of figcaption, given dictionary definitions of the these words
+
+[06:38:50.0000] <zcorpan>
+maybe you want <pre class="language-javascript"><code>
+
+[06:40:03.0000] <zcorpan>
+https://html.spec.whatwg.org/#the-code-element
+
+[06:40:28.0000] <zcorpan>
+or class on the <code>
+
+[07:07:44.0000] <felixjet>
+the language-javascript is a class that specifies the language of the code
+
+[07:08:06.0000] <felixjet>
+i'm talking about showing that language label
+
+[07:08:21.0000] <felixjet>
+if it should be figcaption or not
+
+[07:08:42.0000] <felixjet>
+the class doesn't show, it just style the <code>
+
+[11:04:10.0000] <igrigorik>
+annevk: ping :) .. https://github.com/whatwg/fetch/pull/419 - anything I can do to help land that?
+
+[11:04:10.0000] <botie>
+will do
+
+[11:05:15.0000] <annevk>
+igrigorik: yeah I was looking for WPT
+
+[11:05:40.0000] <annevk>
+igrigorik: sorry for the delay in replying, some vacation plus now it's Mozilla week
+
+[11:06:08.0000] <annevk>
+igrigorik: we're slowly moving to a world where specification changes require corresponding WPT changes
+
+[11:07:03.0000] <igrigorik>
+annevk: np! re, WPT: as in, merge failing tests showing that update hasn't been implemented anywhere.. yet? =/
+
+[11:07:27.0000] <annevk>
+igrigorik: heh, yeah, that would do
+
+[11:07:49.0000] <annevk>
+igrigorik: preferably with a pointer to the Fetch PR
+
+[11:08:03.0000] <annevk>
+igrigorik: and then when I land the Fetch PR I'll point to the tests
+
+[12:11:17.0000] <annevk>
+gsnedders: jgraham: the formatting in http://testthewebforward.org/docs/test-format-guidelines.html#tests-involving-multiple-origins seems wrong
+
+[12:12:04.0000] <jgraham>
+annevk: You mean there is text missing?
+
+[12:12:11.0000] <annevk>
+jgraham: yeah
+
+[12:12:25.0000] <annevk>
+jgraham: also, what can I assume location.host to return when a test is normally run?
+
+[12:12:35.0000] <annevk>
+jgraham: would that include a subdomain or not?
+
+[12:12:59.0000] <annevk>
+jgraham: that is, I'm wondering how to construct a request to a different domain given location.host as input
+
+[12:13:58.0000] <jgraham>
+annevk: https://github.com/w3c/web-platform-tests/blob/master/docs/test-format-guidelines.md has the unbroken documentation
+
+[12:15:48.0000] <annevk>
+jgraham: okay, but it doesn't really say much about how to do any of that from script
+
+[12:16:21.0000] <jgraham>
+It's a text substitution feature. Script doesn't really come into it
+
+[12:17:14.0000] <jgraham>
+I mean you can write `var host = "{{location[host]}}"` and put it in foo.sub.js for example
+
+[12:19:51.0000] <annevk>
+jgraham: I was trying to avoid substitution since I was just modifying an existing JS file used by several tests
+
+[12:20:10.0000] <annevk>
+jgraham: but I think I'm going to skip writing the test I was wanting to write since it's a little more involved than I want
+
+[12:52:16.0000] <gsnedders>
+annevk: oh, yeah, I noticed that a few days ago
+
+[12:52:48.0000] <gsnedders>
+annevk, jgraham: it's basically impossible to fix on ttwf without making it use non-standard Markdown stuff which breaks it on github :\
+
+[13:28:55.0000] <jgraham>
+gsnedders: ttwf must die
+
+[13:35:07.0000] <gsnedders>
+jgraham: I agree.
+
+[13:35:18.0000] <gsnedders>
+jgraham: OTOH, Github Pages is still Jekyll so we hit the same issue
+
+[13:36:07.0000] <gsnedders>
+see <https://github.com/gsnedders/wpt-docs/commit/b778d04cfd3d476160b5f8ef7a87813029c91878> which fixes that, if anyone wants to cherry-pick it and break the Github view :\
+
+[14:00:06.0000] <zcorpan>
+Domenic: are you doing Starting Strength?
+
+[14:05:12.0000] <Ms2ger>
+Is that something people do? Why?
+
+[14:34:13.0000] <zcorpan>
+Ms2ger: to get stronger typically
+
+[14:41:11.0000] <Domenic>
+zcorpan: modified Stronglifts 5x5; clean and snatch scare me
+
+[14:45:01.0000] <zcorpan>
+Domenic: ok. but just 1 set for deadlift?
+
+[14:45:12.0000] <Domenic>
+zcorpan: ya
+
+[14:47:37.0000] <zcorpan>
+Domenic: i did that too for many years. this year i upped the volume for deadlift. 5x5 two times a week with linear progression, then a 5x5 "light" day and a heavier day with 2-3 sets of 3-5 reps. seems like it paid off
+
+[14:48:23.0000] <Domenic>
+oh wow, yeah
+
+[14:49:30.0000] <zcorpan>
+now time to sleep :-) nn
+
+[14:54:32.0000] <caitp>
+what does "paid off" entail though
+
+[14:57:37.0000] <gsnedders>
+can lift, bro
+
+[15:02:23.0000] <jgraham>
+Can probably also lift things that aren't bros
+
+[15:04:39.0000] <caitp>
+"it paid off so much that now the inlaws are calling me over whenever they need to move heavy furniture it's great"
+
+[15:13:33.0000] <MikeSmith>
+http://stackoverflow.com/questions/41047773/service-workers-fetch-event-never-fires
+
+[15:29:31.0000] <MikeSmith>
+http://stackoverflow.com/questions/16824661/cors-request-not-working-in-safari/22924272#22924272 seems to indicate that Safari adds “Origin” to Access-Control-Request-Headers
+
+[15:29:40.0000] <MikeSmith>
+which seems non-conforming
+
+
+2016-12-09
+[16:11:25.0000] <Ms2ger>
+Is @import loading sync?
+
+[16:11:51.0000] <SimonSapin>
+https://github.com/w3c/csswg-drafts/issues/453 (re @import)
+
+[18:00:57.0000] <annevk>
+MikeSmith: https://travis-ci.org/whatwg/fetch/builds/181216088 something goes wrong with Java
+
+[18:01:10.0000] <MikeSmith>
+/me looks
+
+[18:01:58.0000] <MikeSmith>
+annevk: it’s not calling the Java8 `java`
+
+[18:02:17.0000] <MikeSmith>
+need to do the thign of giving it the full path to the right `java` binary
+
+[18:02:26.0000] <MikeSmith>
+I thought we changed that we for fetch already
+
+[18:03:12.0000] <MikeSmith>
+that PR branch need to be rebased maybe?
+
+[18:04:40.0000] <annevk>
+Ah okay, rebasing it would probably fix it I guess
+
+[18:04:40.0000] <annevk>
+MikeSmith: thanks
+
+[23:15:44.0000] <ondras>
+morning
+
+[23:15:56.0000] <ondras>
+chrome behaves rather strangely in the first case: https://jsfiddle.net/5xzp876y/
+
+[23:16:05.0000] <ondras>
+is this known/specced?
+
+[23:46:09.0000] <annevk>
+rbyers: ping for https://github.com/whatwg/dom/issues/334
+
+[23:46:10.0000] <botie>
+will do
+
+[23:46:25.0000] <annevk>
+miketaylr: that's also the issue you want to look at /\
+
+[23:46:43.0000] <annevk>
+miketaylr: and we should maybe discuss tomorrow afternoon if we find the time
+
+[01:39:04.0000] <MikeSmith>
+zcorpan: about character references at this point in time I wonder what problems they are actually solving for anybody
+
+[01:39:28.0000] <MikeSmith>
+I wonder why anybody still intentionally chooses to use them
+
+[01:41:25.0000] <MikeSmith>
+so as far as guidance, maybe what we really should be having the spec start out by say is: Don't use character references. They’re a legacy of another era. But if you choose to use them anyway, here are the rules about how they work.
+
+[01:42:02.0000] <zcorpan>
+MikeSmith: maybe for invisibles that don't have named charrefs, or to hide their emails from email scrapers, or because they're still in an environment that's not all-utf-8
+
+[01:42:59.0000] <MikeSmith>
+yeah those seem all seem like problems that are better fixed with other solutions
+
+[01:43:31.0000] <MikeSmith>
+like, don’t use non-ut8 environments
+
+[01:43:57.0000] <MikeSmith>
+and use a text editor that lets you show invisibles in some way
+
+[01:45:04.0000] <MikeSmith>
+anway in general I think we should be having the spec say more “don’t use this” language about crufty old stuff like this
+
+[01:45:31.0000] <MikeSmith>
+otherwise, unless the spec says something, it is kind of enshrining that stuff
+
+[01:45:42.0000] <MikeSmith>
+as far as how readers perceive it
+
+[01:46:03.0000] <MikeSmith>
+it is like the spec is blessing it, unless it clearly says otherwise
+
+[01:46:32.0000] <MikeSmith>
+anyway, maybe it is just me who sees it that way
+
+[01:46:36.0000] <MikeSmith>
+pet peeve
+
+[01:46:43.0000] <zcorpan>
+MikeSmith: are they causing harm?
+
+[01:46:49.0000] <MikeSmith>
+yes
+
+[01:47:12.0000] <MikeSmith>
+because people use them when they should be fixing their environments, and learning how to do that
+
+[01:47:19.0000] <MikeSmith>
+modernizing
+
+[01:48:20.0000] <MikeSmith>
+and also their docs may get handed off to somebody else to deal with
+
+[01:49:17.0000] <MikeSmith>
+and that new person has a non-broken authoring environment and gets handed some doc riddled with character refs where they should be real unicode and they are rightly gonna feel, wtf
+
+[01:51:14.0000] <zcorpan>
+i don't feel strongly about it, but i wouldn't object to opinionated non-normative text in the spec
+
+[02:21:29.0000] <zcorpan>
+botie: tell caitp being strong improves quality of life throughout life, and it will make a much bigger difference when getting old
+
+[02:21:30.0000] <botie>
+will do
+
+[02:21:49.0000] <zcorpan>
+oh caitp was here already
+
+[05:01:24.0000] <JakeA>
+Crazy idea: "TypeShed" - something that takes typescript and converts it into spec prose
+
+[05:04:29.0000] <rbyers>
+Annevk:  Sorry I missed that.  Replied.  On vacation without a laptop, but dtapuska and tkent are the right people for this area anyway.
+
+[05:47:11.0000] <saba>
+Is there anything wrong, faulty or bad with using a character reference like this in HTML? <p>http://example.com/foo&amp;bar</p>
+
+[05:47:28.0000] <saba>
+Compared to <p>http://example.com/foo&bar</p>
+
+[05:47:52.0000] <saba>
+Its not an ambiguous ampersand. So should it be encoded like that?
+
+[05:51:20.0000] <saba>
+I'm just checking my sanity here.
+
+[07:15:12.0000] <zcorpan>
+saba: either is OK. if unsure, use &amp;
+
+[07:40:55.0000] <felixjet>
+so yesterday i asked something but everyone was afk xD let's try again
+
+[07:41:05.0000] <felixjet>
+while wrapping <pre><code> inside <figure>
+
+[07:41:29.0000] <felixjet>
+it is valid to use <figcaption>JavaScript</figcaption> to represent the language of the code?
+
+[07:41:38.0000] <felixjet>
+as a label
+
+[07:41:46.0000] <felixjet>
+because the spec says that figcaption should be a legend
+
+[07:42:03.0000] <felixjet>
+and the dictionary says that a legend explains the content
+
+[07:43:25.0000] <felixjet>
+something like <figcaption>Function that parse text and returns an AST</figcation> is valid. but what about my first example?
+
+[07:43:55.0000] <felixjet>
+class="language-javascript" is used to highlight the code or to give it some semantics
+
+[07:44:15.0000] <felixjet>
+but i'm asking about <figcaption>JavaScript</figcaption> to be used as a label to show the user the language of the code
+
+[08:03:30.0000] <annevk>
+felixjet: prolly depends on context whether that is a suitable caption
+
+[08:03:53.0000] <felixjet>
+there is just 1 possible context
+
+[08:04:12.0000] <felixjet>
+correct or incorrect, but just one
+
+[08:06:50.0000] <saba>
+zcorpan: thanks
+
+[10:53:02.0000] <miketaylr>
+annevk: cool, will find you after lunch today
+
+[15:44:02.0000] <ajeffrey_>
+A question about document.write...
+
+[15:44:42.0000] <ajeffrey_>
+In https://html.spec.whatwg.org/multipage/webappapis.html#dom-document-write,
+
+[15:45:23.0000] <ajeffrey_>
+step 3 is "If the Document object is not an active document, then abort these steps."
+
+[15:45:45.0000] <ajeffrey_>
+should this say "fully active" rather than "active"?
+
+[15:46:43.0000] <jgraham>
+hsivonen: ^
+
+
+2016-12-10
+[16:19:09.0000] <tobie>
+TabAtkins: why are non-exported DFNs still displayed in the Terms defined by this specification section?
+
+[18:39:53.0000] <smaug>
+are there any plans to fix SecureContext, to make it actually secure context
+
+[18:40:27.0000] <smaug>
+since right now it is just random set of communication which is blocked between non-SecureContext and Securecontext
+
+[19:02:54.0000] <rniwa_>
+Domenic: are you still there?
+
+[00:47:31.0000] <botie>
+caitp, at 2016-12-09 10:21 UTC, zcorpan said: being strong improves quality of life throughout life, and it will make a much bigger difference when getting old
+
+
+2016-12-12
+[01:39:01.0000] <kochi>
+I am struggling to understand what rniwa_ proposes in https://github.com/w3c/csswg-drafts/issues/159
+
+[08:02:39.0000] <smaug>
+do I recall correctly, that some blink folks were wondering if removing <dialog> was still possible?
+
+[10:00:55.0000] <wanderview>
+JakeA: ping
+
+[10:01:07.0000] <JakeA>
+wanderview: hey!
+
+[10:01:36.0000] <wanderview>
+JakeA: has there been any discussion of background sync events only when you are wifi, etc?
+
+[10:04:34.0000] <wanderview>
+JakeA: I have someone requesting that feature... which seems kind of reasonable
+
+[10:04:58.0000] <wanderview>
+right now its only really doable with navigation.connection on the main window (AFAIK)
+
+[10:05:23.0000] <JakeA>
+wanderview: yeah, that feature got dropped from the MVP
+
+[10:05:46.0000] <JakeA>
+wanderview: although devs would have to be careful, some users *never* go on wi-fi
+
+[10:05:54.0000] <JakeA>
+so it'd have to be a choice they expose to the user
+
+[10:06:24.0000] <JakeA>
+although, I question why limiting to wifi is important. If the uploads are large, background sync is probably the wrong choice vs background fetch
+
+[10:06:42.0000] <wanderview>
+JakeA: well, background fetch does not exist yet :-\
+
+[10:07:11.0000] <wanderview>
+JakeA: I think the use case here is opportunistic pre-caching... but they don't want to waste metered network for it
+
+[10:07:23.0000] <wanderview>
+(yea, wifi does nto necessarilly mean not metered)
+
+[10:08:51.0000] <JakeA>
+wanderview: I think it's a reasonable feature... I'm just worried it's wrong for this particular use-case
+
+[10:09:33.0000] <wanderview>
+JakeA: background fetch would not disciminate between mobile data and wifi, right?
+
+[10:12:26.0000] <wanderview>
+JakeA: anyway, I suggested they write a bg-sync spec issue
+
+[10:16:40.0000] <JakeA>
+wanderview: I don't have anything in background-fetch for that right now. I can't decide if it'd be better as a per-site feature or a browser feature
+
+[10:16:58.0000] <JakeA>
+wanderview: eg the browser could assume wifi only unless the user clicks something in the notification to start it now
+
+[10:19:14.0000] <wanderview>
+JakeA: I think in this case they would not want to pester the user with a notification at all since this sounds like low-priority opportunistic stuff
+
+[10:19:45.0000] <wanderview>
+JakeA: seems like sites should be able to indicate "the users asked for this explicitly... download ASAP" vs "I think maybe they want this, download if possible but whatever"
+
+[10:19:46.0000] <JakeA>
+wanderview: hmm, but if it's large background download, it really need to be visible from a privacy perspective
+
+[10:19:56.0000] <wanderview>
+JakeA: I don't think these are particularly large
+
+[10:20:09.0000] <JakeA>
+wanderview: large enough for wi-fi vs cell to matter
+
+[10:20:56.0000] <wanderview>
+JakeA: do you think a native app like Snapchat should have to put up a notification if its downloading images in the background?
+
+[10:21:23.0000] <wanderview>
+only thinking of that one since I know snapchat ate a ton of my wife's data plan one month with background downloads
+
+[10:22:02.0000] <JakeA>
+wanderview: the podcast app I use does, and I kinda like that it does. Also useful if I have limited bandwidth I can see that the podcast app is clogging up the pipes
+
+[10:23:29.0000] <wanderview>
+JakeA: play store updates do as well... but it just feels different to do it for large things like apps, videos, podcasts... vs "I'm downloading 20 articles I think you might want to read maybe"
+
+[10:23:59.0000] <wanderview>
+JakeA: I mean... why wouldn't small stuff using bg-sync be able to discriminate based on wifi?  why restrict it?
+
+[11:08:07.0000] <JakeA>
+wanderview: yeah, I think it's a feature we should have. It was in the original designs
+
+[11:15:53.0000] <wanderview>
+JakeA: I feel like we have a long tail of stuff we should implement... hard to prioritize
+
+[11:17:35.0000] <KiChjang>
+https://domparsing.spec.whatwg.org has an invalid security certificate
+
+[11:18:04.0000] <KiChjang>
+can anyone fix it?
+
+[11:18:31.0000] <ajeffrey_>
+KiChjang: you beat me to it :)
+
+[11:26:40.0000] <Domenic>
+KiChjang: ajeffrey_: that's just a redirect to https://w3c.github.io/DOM-Parsing/ ; where did you find a link to it?
+
+[11:30:07.0000] <ajeffrey_>
+Domenic: we still have links to it from the servo code base, we should probably update at our end.
+
+[11:30:24.0000] <ajeffrey_>
+the update is a bit more urgent now the cert has expired :)
+
+[11:30:41.0000] <Domenic>
+Yeah I pinged Hixie, I believe he still manages all the certs
+
+[11:35:47.0000] <JakeA>
+wanderview: yeah, I want to use the next meeting to work out the priorities
+
+[11:36:11.0000] <wanderview>
+JakeA: I wrote another issue to discuss too!  random thought I had this week... https://github.com/w3c/ServiceWorker/issues/1024
+
+[15:07:18.0000] <MikeSmith>
+PSA: if you think https://bugs.chromium.org/p/chromium/issues/detail?id=443374 should be prioritized higher, please star it
+
+[15:07:32.0000] <MikeSmith>
+= “Web Worker network requests blocked by main thread in Chrome”
+
+[15:08:10.0000] <MikeSmith>
+https://bugs.chromium.org/p/chromium/issues/detail?id=443374#c8 “super important for PWA sites, because fetch() in Service Workers is also blocked by the main thread”
+
+
+2016-12-13
+[16:17:12.0000] <apowers313>
+does `bikeshed watch` watch more than one file at a time? or just the first .bs file it finds?
+
+[17:32:42.0000] <MikeSmith>
+TabAtkins: ⬆
+
+[01:32:22.0000] <smaug>
+hmm, setting an enum attribute to a non-valid value doesn't throw?
+
+[01:37:56.0000] <smaug>
+had very much forgotten that
+
+[01:54:06.0000] <tobie>
+annevk, Domenic: I remeber reading a quite detailed proposal of internal slots somewhere. Can't seem to find it. Either of you have a pointer? I'd like to tackle that soonish.
+
+[01:55:15.0000] <tobie>
+I know there's this: https://www.w3.org/Bugs/Public/show_bug.cgi?id=27354 but there was some more recent thinking somehwere
+
+[04:42:47.0000] <Domenic>
+tobie: I don't remember any proposal. I do think this is an area where it'd be good to write up and debate something before starting on the work.
+
+[04:52:42.0000] <tobie>
+Domenic: absolutely
+
+[04:53:55.0000] <Domenic>
+One issue I wonder about is whether internal slots should have types
+
+[04:54:01.0000] <Ms2ger>
+Yes, definitely
+
+[04:54:21.0000] <Domenic>
+Sometimes it's useful, but sometimes you want to store something conceptual in them
+
+[04:54:50.0000] <Domenic>
+And since Web IDL types are "really" type conversions, it's not clear it makes sense to convert twice
+
+[04:56:31.0000] <Domenic>
+so for example a URL record https://url.spec.whatwg.org/#concept-url is not a Web IDL type
+
+[04:57:00.0000] <Domenic>
+So https://html.spec.whatwg.org/#concept-hyperlink-url would not be representable as a slot if we said slots must have types
+
+[04:57:58.0000] <Domenic>
+Similarly https://drafts.csswg.org/cssom/#associated-css-style-sheet
+
+[04:58:52.0000] <Domenic>
+Maybe just a strong convention of `// a <a href="...">CSS style sheet</a>` would make sense
+
+[05:00:24.0000] <tobie>
+Domenic: same kinds of questions here. I was wondering if it would also make sense to allow infra data structures in there.
+
+[05:01:57.0000] <Domenic>
+Yeah that's another common case
+
+[05:02:10.0000] <Domenic>
+My intuition is that typing them in any formal way would not work out
+
+[05:02:56.0000] <Domenic>
+Or at least would make them less useful/used. And thus be confusing: "oh, no, you meant the informal concept of internal slot, not the formal one which is only used sometimes because of these restrictions."
+
+[05:03:25.0000] <Domenic>
+I guess maybe if everything converted to infra it might work
+
+[05:03:50.0000] <Domenic>
+E.g. URL and CSS style sheet would become whatever we name https://github.com/whatwg/infra/issues/21
+
+[05:04:21.0000] <tobie>
+Well, there a cases where you want to hold on to a webidl type, though.
+
+[05:04:51.0000] <tobie>
+Eg a promise, an instance of something related, etc.
+
+[05:05:48.0000] <JakeA>
+Domenic: I posted concerns at https://github.com/eslint/eslint/pull/7563#issuecomment-266733140
+
+[05:09:45.0000] <Domenic>
+tobie: yes, but there's no single type system that encompasses Web IDL types + vague spec types. So I think `// a <a href="..."><code>Document</code></a>` would suffice for the Web IDL cases
+
+[05:10:15.0000] <Domenic>
+You can always hold Web IDL type instances without a formal type declaration documenting it. Use actual comments for documentation.
+
+[05:10:34.0000] <tobie>
+Yeah. This was to your point really.
+
+[05:10:48.0000] <Domenic>
+JakeA: I thought it was opt-in already
+
+[05:12:46.0000] <JakeA>
+Domenic: huh, http://eslint.org/docs/rules/no-await-in-loop#when-not-to-use-it makes it sound opt-out. Investigating…
+
+[05:13:21.0000] <Domenic>
+JakeA: http://eslint.org/docs/rules/
+
+[05:13:24.0000] <JakeA>
+Domenic: ah, you're right
+
+[06:03:13.0000] <tobie>
+Domenic: not sure if my use case is uncommon, but I'd also need the equivalent of class-level slots (static slots?)
+
+[06:03:28.0000] <Domenic>
+tobie: that seems bad; just put them on Window then
+
+[06:05:58.0000] <tobie>
+Domenic: well, they're *really* class-level. E.g.: different instances of the Gyroscope class have a different frequency requirements at which to poll the underlying HW sensor.
+
+[06:06:16.0000] <Domenic>
+tobie: I'm confused, instance-level or class-level?
+
+[06:06:28.0000] <Domenic>
+Every class exists exactly once per Window instance so tying to Window makes more sense.
+
+[06:06:48.0000] <Domenic>
+That doesn't sound like a slot though, more like a constant
+
+[06:07:03.0000] <tobie>
+Domenic: at the class level, we look at all of the requested frequencies, pick the largest one, and use that one to determine at what freq to poll the sensor
+
+[06:07:44.0000] <tobie>
+Domenic: that value is revisited every time a new Gyro instance starts or stops listening to the sensor
+
+[06:08:43.0000] <Domenic>
+tobie: this sounds really confusing to me, so maybe needs to be part of the writeup. I maintain that anything class/static should go on Window instead, but it sounds like this has something to do with instances instead, so I am just confused.
+
+[06:13:39.0000] <tobie>
+Domenic: yeah--the sensor model is quite complex because there are multiple layers in between the JS and the underlying HW which are different per OS and HW.
+
+[06:14:05.0000] <tobie>
+Domenic: I also did a poor job of explaining it above.
+
+[06:15:48.0000] <howdoi>
+/me would wait to see finger print scanning, biometrics, SMS and contacts access from web
+
+[06:16:13.0000] <tobie>
+Domenic: Basically you have one HW sensor (e.g. a gyroscope), but you can create lots of instances of the gyroscope class which can all require a different polling frequency of the HW sensor. The HW sensor is then polled at the highest one of those.
+
+[06:17:06.0000] <tobie>
+Domenic: whenever you start or stop one of those gyroscope instance, you change the underlying HW polling frequency accordingly.
+
+[06:17:07.0000] <Domenic>
+OK. So you need some kind of map stored on Window, of which one entry is Gyroscope -> highest polling frequency?
+
+[06:17:32.0000] <tobie>
+Domenic: basically, yes. I hold on to all created instances.
+
+[06:17:55.0000] <Domenic>
+Seems like a GC nightmare, but I'm probably not understanding fully :)
+
+[06:18:16.0000] <tobie>
+Domenic: hopefully the latter.
+
+[06:18:19.0000] <tobie>
+:)
+
+[06:26:33.0000] <tobie>
+Domenic: regardless of these potential GC issues, I could just store the HW polling frequency value instead, but that would still a class-level slot.
+
+[06:26:52.0000] <tobie>
+Domenic: you'd just stick those on window?
+
+[06:26:55.0000] <Domenic>
+yeah
+
+[06:27:04.0000] <tobie>
+What about the naming collision?
+
+[06:27:21.0000] <Domenic>
+Add a prefix if you're worried about it
+
+[06:27:40.0000] <Domenic>
+Seems better than inventing a new parallel concept with different semantics
+
+[06:28:14.0000] <tobie>
+Well, don't we already have static attributes and constants?
+
+[06:28:40.0000] <Domenic>
+yep, which are paralllel concepts with different semantics from instance attributes
+
+[06:29:06.0000] <Domenic>
+(or rather, prototype attributes)
+
+[06:32:39.0000] <tobie>
+Domenic: to be clear, I have no idea whether my particular use case is common or not. If it isn't, there no point in working out a dedicated solution for it.
+
+[06:37:49.0000] <tobie>
+Domenic: how would you handle flags? Turn them into booleans?
+
+[06:38:55.0000] <Domenic>
+Leaving them as flags seems fine?
+
+[06:40:27.0000] <tobie>
+ Domenic: if instance.[[flag]] is set, then ... ?
+
+[06:41:06.0000] <Domenic>
+Yeah seems fine
+
+[06:44:33.0000] <tobie>
+Domenic: k
+
+[08:06:40.0000] <Ms2ger>
+Domenic, you asked whether they should have types, not WebIDL types
+
+[08:07:04.0000] <Domenic>
+Ms2ger: I was kind of assuming inventing a new type system was not a project anyone wanted to take on
+
+[08:07:26.0000] <Ms2ger>
+You'd be surprised...
+
+[08:08:42.0000] <Ms2ger>
+However, I'm not sure if we'd be inventing a new type system; all we need is a link to a BS definition, really
+
+[09:27:03.0000] <innovati>
+Hi all!
+
+[09:28:51.0000] <innovati>
+I've been working on a few ideas related to CSS that I think would help with writing HTML and building websites - is this the right spot to get feedback and discuss ideas?
+
+[09:47:46.0000] <TabAtkins>
+tobie: Re "why are non-exported DFNs still displayed in the Terms defined by this specification section?", because they're still terms defined by the specification, just ones intended for internal use. Still useful to have them in the index.
+
+[09:48:31.0000] <TabAtkins>
+apowers313: Re "does `bikeshed watch` watch more than one file at a time? or just the first .bs file it finds?" The documentation should be clear on this <https://tabatkins.github.io/bikeshed/#cli-watch>
+
+[09:50:46.0000] <TabAtkins>
+JakeA: We're not currently tracking all *links* in Shepherd, tho that's possible (and desired by me).
+
+[09:53:16.0000] <JakeA>
+TabAtkins: good to know!
+
+[09:54:42.0000] <annevk>
+tobie: I was sorta hoping for consolidated types across IDL and Infra, but a good first step might be to start defining slots without being explicit about that
+
+[09:54:53.0000] <annevk>
+tobie: or only being explicit about that part in prose
+
+[10:39:06.0000] <astearns>
+innovati: probably better to start at https://discourse.wicg.io/ - see if anyone's working on something similar, first
+
+[10:41:42.0000] <innovati>
+I'm on there, and one of the ideas seems to have fizzled out, the other has some activity but I'm not sure how to keep the ball rolling!
+
+[14:22:09.0000] <tantek>
+annevk: I'm not seeing the OWFa licensing text in some recent WHATWG spec updates - did those get removed?
+
+[14:22:21.0000] <tantek>
+e.g. I know https://dom.spec.whatwg.org/ used to have it at the top - where did it go?
+
+[14:22:48.0000] <tantek>
+also I'm getting a cert error on https://domparsing.spec.whatwg.org/
+
+[14:23:54.0000] <tantek>
+yes, at some point OWFa got dropped from all of these specs: https://wiki.mozilla.org/Standards/license#WHATWG
+
+[14:24:02.0000] <tantek>
+that seems like a pretty major regression
+
+[14:24:30.0000] <tantek>
+CC0 is still there at the bottom of the document, but that's not enough
+
+[14:24:44.0000] <annevk>
+tantek: I remember we discussed that when it was done
+
+[14:24:59.0000] <tantek>
+I have no memory of any discussion of dropping OWFa
+
+[14:25:07.0000] <tantek>
+I would have strongly objected
+
+[14:25:26.0000] <annevk>
+tantek: the problem with OWFa is that we didn't actually have signed forms
+
+[14:25:31.0000] <tantek>
+after we had Mozilla's lawyers even provide/approve specific language to dual license CC0 OWFa
+
+[14:26:02.0000] <annevk>
+tantek: I see, file an issue? I can look at that when I'm back
+
+[14:26:18.0000] <tantek>
+that wording was done in such a way not to need separate signatures. that with every commit it was re-acknowledged
+
+[14:26:26.0000] <tantek>
+ok
+
+[14:26:32.0000] <tantek>
+on any particular spec?
+
+[14:26:42.0000] <tantek>
+because it looks like a spec-wide issue
+
+[14:27:21.0000] <tantek>
+the desired language (and markup) is here: https://wiki.mozilla.org/Standards/license#Markup (has been stable for years)
+
+[14:31:01.0000] <tobie>
+TabAtkins: re: ECMAScript throw, it turns out that non "ES throw" has a for="exception" attribute.
+
+[14:31:41.0000] <tobie>
+TabAtkins: today it seems you can omit it, as it's the only dfn called "throw" in the whole spec.
+
+[14:33:03.0000] <tobie>
+TabAtkins: if I move [=es throw|throw=] to  [=ECMAScript/throw=], will folks referencing [=exception/throw=] need to move from [=throw=] to [=exception/throw=]?
+
+[14:33:34.0000] <tobie>
+TabAtkins: or does what you explained in PR#250 work for that case too?
+
+[14:33:55.0000] <TabAtkins>
+That's exactly the case I described in #250, I think.
+
+[14:36:23.0000] <tobie>
+TabAtkins: yeah, that's sort of the conclusion I came to as I was writing the last sentence down.
+
+[14:36:29.0000] <TabAtkins>
+hehehe
+
+[14:37:10.0000] <tobie>
+I wish the mental model I have of DFNs actually matched the one you've implemented.
+
+[14:37:41.0000] <TabAtkins>
+It's the same model, basically, as @font-face vs 'font-family'.  Which is to say, slightly confusing for people until they finally "get" it.
+
+[14:38:22.0000] <tobie>
+yeah--"finally'"s been taking a while, here.
+
+
+2016-12-14
+[22:40:19.0000] <MikeSmith>
+igrigorik: style in body, as far as possible negative effects on perf, should the HTML spec continue to say author should no do it?
+
+[22:40:32.0000] <MikeSmith>
+can’t remember if we asked you about this before or not
+
+[22:41:19.0000] <MikeSmith>
+but please consider commenting at https://github.com/whatwg/html/pull/1606 if you have specific info you want to add there
+
+[22:41:40.0000] <MikeSmith>
+or alternatively at https://github.com/whatwg/html/issues/1605
+
+[03:23:09.0000] <smaug>
+hmm, can CSP override sandbox flags ?
+
+[03:24:27.0000] <smaug>
+I hope not
+
+[05:49:11.0000] <derkirche>
+I don't understand how a style in body could be vulnerable to XSS/CSP... eval() maybe?
+
+[06:05:09.0000] <mounir>
+annevk: when you have time, can you have a look at https://github.com/WICG/mediasession/issues/148 ? :)
+
+[06:22:19.0000] <annevk>
+mounir: back Thursday
+
+[07:45:34.0000] <tobie>
+derkirche: some examples there, not sure which still apply to modern browsers, though: https://www.owasp.org/index.php/XSS_Filter_Evasion_Cheat_Sheet#STYLE_sheet
+
+[07:48:03.0000] <derkirche>
+ah, I should've looked there first
+
+[10:52:31.0000] <smaug>
+hmm, should <dialog>'s showModal really not work in shadow DOM?
+
+[11:04:33.0000] <Domenic>
+smaug: it probably should work!
+
+[11:04:43.0000] <Domenic>
+smaug: remember "in a document" = "we haven't yet looked at this in detail"
+
+[11:04:46.0000] <smaug>
+Filed a chromium bug
+
+[11:05:02.0000] <smaug>
+since as usual, it is doing against the current spec when dealing with this kind of stuff
+
+[11:05:15.0000] <Domenic>
+Does it work in shadow DOM in chromium or not?
+
+[11:05:26.0000] <smaug>
+it does work
+
+[11:05:31.0000] <Domenic>
+OK then we should fix the spec
+
+[11:05:42.0000] <smaug>
+need to think a bit...
+
+[11:05:47.0000] <smaug>
+there is the stack of dialogs
+
+[11:07:29.0000] <smaug>
+allowing in Shadow DOM is probably ok
+
+[11:08:28.0000] <smaug>
+Domenic: https://bugs.chromium.org/p/chromium/issues/detail?id=674217
+
+[13:01:01.0000] <MikeSmith>
+https://stackoverflow.com/questions/41081577/unchanged-service-worker-is-re-installing-and-re-caching
+
+[15:28:29.0000] <gsnedders>
+anyone know when the HTML parser was first added to WA1.0?
+
+[15:28:42.0000] <gsnedders>
+it's already there by the initial checkin to SVN
+
+
+2016-12-15
+[16:30:42.0000] <IZh>
+Domenic: Hi! My PDF generating script fails because of error when contacting notification URL https://html.spec.whatwg.org/update-pdf.cgi. Curl error 52. IIRC, it corresponds to empty response.
+
+[17:09:39.0000] <MikeSmith>
+gsnedders: http://web.archive.org/web/20060202011253/http://whatwg.org/specs/web-apps/current-work/
+
+[17:11:28.0000] <MikeSmith>
+gsnedders: http://web.archive.org/web/20050507071329/http://www.whatwg.org/specs/web-apps/current-work/ added a stub for it first
+
+[17:12:17.0000] <MikeSmith>
+gsnedders: see https://platform.html5.org/history/
+
+[17:19:45.0000] <gsnedders>
+MikeSmith: yeah, I'd found the stub, but not the actual first draft
+
+[17:34:25.0000] <gsnedders>
+MikeSmith: anyhow, thx!
+
+[18:06:35.0000] <MikeSmith>
+gsnedders: the first link I posted is when the algorithm was actually added
+
+[18:07:17.0000] <MikeSmith>
+February 2006
+
+[19:03:56.0000] <kochi>
+smaug: thanks for spotting the remaining "in a document" bug.
+
+[04:22:08.0000] <zcorpan>
+"This component includes all functionality related to JavaScript manipulation of window, document and navigator objects that are available in Navigator 4.x and earlier, and that was never defined by the W3C."
+
+[04:22:31.0000] <zcorpan>
+i guess it's about time for someone(TM) to update b.m.o's component descriptions
+
+[04:23:18.0000] <zcorpan>
+links to https://www.w3.org/TR/REC-DOM-Level-1/
+
+[05:33:10.0000] <MikeSmith>
+zcorpan: about the wording of the iframe[sandbox] warning for https://github.com/validator/validator/issues/361, how about “Setting both allow-scripts and allow-same-origin is not recommended, because it effectively enables an embedded page to break out of all sandboxing.”
+
+[05:37:46.0000] <zcorpan>
+MikeSmith: 👍
+
+[05:37:58.0000] <MikeSmith>
+super
+
+[05:37:59.0000] <MikeSmith>
+thanks
+
+[05:43:08.0000] <zcorpan>
+hmmmmmmmmm, why does PaymentRequest check the origin at all, instead of only invoke "allowed to use"?
+
+[05:44:34.0000] <zcorpan>
+if everything is same-origin, the script can construct top.PaymentRequest.
+
+[05:45:05.0000] <zcorpan>
+i assume the use case for payments in iframes is cross-origin from the top-level BC's document
+
+[05:48:22.0000] <zcorpan>
+and chromium throws in the same-origin case in iframes without allowpaymentrequest
+
+[05:49:00.0000] <MikeSmith>
+zcorpan: good question
+
+[05:50:38.0000] <zcorpan>
+having the origin check seems broken in two ways: (1) if everything is same-origin, "allowed to use" is not invoked at all which allows inactive documents. (2) ...i lost this thought
+
+[05:51:48.0000] <MikeSmith>
+heh
+
+[05:53:11.0000] <zcorpan>
+another thing i noticed now is it only checks things for non-top-level browsing contexts, but we should be doing the active document check there as well
+
+[05:53:25.0000] <zcorpan>
+removing text seems to fix things
+
+[05:57:32.0000] <mounir>
+annevk: welcome back! :)
+
+[08:06:19.0000] <annevk>
+mounir: ta, super jetlagged, but I left a reply
+
+[08:07:22.0000] <annevk>
+A double red-eye flight with another flight inbetween is not the best way to travel
+
+[08:09:01.0000] <mounir>
+annevk: thanks! :)
+
+[08:09:18.0000] <mounir>
+annevk: vingtetun told me that it wasn't the best all hands for European mozillians indeed
+
+[08:09:26.0000] <mounir>
+hope it was worth the travel :)
+
+[10:15:28.0000] <felixjet>
+if you modify the appareance of <div>, you should be using a class, and not a data attribute. but what if the attribute value is actual data?
+
+[10:17:38.0000] <felixjet>
+for example data-show-lines-as-red="1,2,3,5,7"
+
+[10:17:56.0000] <felixjet>
+this modifies appareance, so it shouldn't be also a class?
+
+[11:09:49.0000] <wanderview>
+JakeA: are you still around?  or have I missed you for today?
+
+[11:39:41.0000] <felixjet>
+The figcaption element represents a caption or legend for the rest of the contents of the figcaption element's parent figure element, if any.
+
+[11:39:45.0000] <felixjet>
+what does "legend" means here?
+
+[11:42:29.0000] <JakeA>
+wanderview: im out for today, but will pick stuff up in the morning
+
+[11:42:38.0000] <wanderview>
+np
+
+[11:43:02.0000] <wanderview>
+JakeA: I'll send you an email if I get that far... trying to remember where we finally landed on potential client, reserved client, omgwtf client, etc
+
+[11:45:06.0000] <JakeA>
+wanderview: I wrote up my understanding at https://jakearchibald.com/2016/service-worker-meeting-notes/
+
+[11:45:44.0000] <wanderview>
+thanks!
+
+[11:50:22.0000] <wanderview>
+I guess all that has landed in the spec (TIL)... so I guess I will go read the spec
+
+
+2016-12-16
+[23:52:51.0000] <annevk>
+JakeA: so what do about canceling promises now?
+
+[23:53:39.0000] <annevk>
+JakeA: seems Domenic had to abandon given some Google-internal struggles, but fetch() is still without termination
+
+[23:56:11.0000] <annevk>
+felixjet: legend means definition
+
+[23:56:25.0000] <JakeA>
+annevk: I think we should leave the dust to settle on this (until Jan?), but I guess we provide a method to reject with an AbortError :(
+
+[23:56:52.0000] <JakeA>
+annevk: I need to catch up a bit and see if tokens are similarly doomed
+
+[23:57:16.0000] <annevk>
+felixjet: using data-* instead of class is fine
+
+[23:58:28.0000] <annevk>
+JakeA: if this is on Request objects we will need to redesign how they work
+
+[00:00:04.0000] <JakeA>
+annevk: we already pass the stream from object to object, wouldn't we just pass a token along as well?
+
+[00:02:29.0000] <annevk>
+JakeA: yeah I guess
+
+[00:02:30.0000] <JakeA>
+annevk: along with the mechanism, need to figure out "does [solution] error the request only, or the response too?"
+
+[00:02:42.0000] <JakeA>
+annevk: I posted on the centithread btw
+
+[00:02:46.0000] <annevk>
+JakeA: I think I'd still like to figure out if we can prevent copying Request sometimes
+
+[00:02:54.0000] <annevk>
+JakeA: oh my
+
+[00:54:29.0000] <MikeSmith>
+can somebody remind me: custom elements can only be used in text/html, right?
+
+[00:57:35.0000] <annevk>
+MikeSmith: I thought they'd work in XML too
+
+[00:57:53.0000] <annevk>
+MikeSmith: I don't remember a lot of text/html special casing, but I'm not entirely sure
+
+[01:00:42.0000] <MikeSmith>
+Ok
+
+[02:06:27.0000] <JakeA>
+annevk: https://github.com/whatwg/notifications/pull/89/files - Bikeshed turns Note: into <p class=note> automatically, or are you wanting to be explicit about it?
+
+[02:07:38.0000] <JakeA>
+annevk: also, not sure I understand the indenting stuff - it isn't indented on master https://github.com/whatwg/notifications/blob/master/notifications.bs#L382
+
+[02:09:36.0000] <annevk>
+JakeA: oh, it seems it's all inconsistent :/
+
+[02:09:59.0000] <JakeA>
+annevk: but the stuff in the PR is how you'd like it from now on?
+
+[02:30:17.0000] <zcorpan>
+MikeSmith: i think they should work in XML too but it's limited to HTML elements
+
+[02:58:48.0000] <annevk>
+JakeA: I'll fix the remaining nit in that PR with respect to indenting
+
+[02:59:21.0000] <annevk>
+JakeA: oh, you fixed some of that
+
+[02:59:53.0000] <JakeA>
+annevk: lmk if it's wrong (for my own learnings)
+
+[03:00:21.0000] <annevk>
+JakeA: that resource is super inconsistent; my usual style is one-space indentation
+
+[03:00:39.0000] <annevk>
+JakeA: and you missed the first <li>, but I'll do a pass
+
+[03:00:59.0000] <JakeA>
+ah, balls
+
+[03:01:13.0000] <JakeA>
+annevk: http://editorconfig.org/ is kinda useful when it comes to indenting & wrapping
+
+[03:14:37.0000] <JakeA>
+annevk: why go headers use byte sequences? Because they're not unicode?
+
+[03:15:00.0000] <annevk>
+JakeA: basically
+
+[03:15:07.0000] <JakeA>
+ta
+
+[03:15:33.0000] <annevk>
+JakeA: various programming languages represent them in different ways, but they're effectively bytes
+
+[03:16:03.0000] <annevk>
+JakeA: although I suppose we could use the ASCII string abstraction we use for URLs too
+
+[03:17:00.0000] <annevk>
+JakeA: any rejiggering of that though will have to wait until the HTTP community decides what they want them to be
+
+[03:17:02.0000] <robertkowalski>
+annevk: question to the url spec
+
+[03:17:15.0000] <robertkowalski>
+before i open an issue / invetsigate further
+
+[03:18:10.0000] <robertkowalski>
+new URL('https://rocko:pass#word⊙ec/blerg')
+
+[03:18:18.0000] <robertkowalski>
+throws because of the hash
+
+[03:19:29.0000] <robertkowalski>
+i haven't found a section regarding passwords and special / reserved chars. is this a bug in the spec? it limits the amount possible passwords a lot
+
+[03:20:04.0000] <nox>
+robertkowalski: It should be encoded.
+
+[03:20:22.0000] <annevk>
+Yeah, you can encode it
+
+[03:21:15.0000] <annevk>
+robertkowalski: the specification basically doesn't want you to use URLs to encode username/password
+
+[03:21:28.0000] <annevk>
+robertkowalski: https://url.spec.whatwg.org/#url-syntax doesn't allow them
+
+[03:21:45.0000] <annevk>
+robertkowalski: (see note at the end of that section)
+
+[03:22:38.0000] <annevk>
+robertkowalski: the reason that throws though I think is because # is seen as the start of the path and then a host cannot contain :
+
+[03:22:50.0000] <annevk>
+robertkowalski: well, because :pass is not a valid port
+
+[03:23:53.0000] <annevk>
+robertkowalski: for that, see how https://url.spec.whatwg.org/#authority-state and also the host state will treat # as the end of that
+
+[03:24:24.0000] <annevk>
+robertkowalski: and https://url.spec.whatwg.org/#port-state for how port will return failure for non-digits
+
+[03:27:15.0000] <robertkowalski>
+thank you
+
+[03:27:45.0000] <robertkowalski>
+the replciator in couchdb accepts urls with hash as part of the password
+
+[03:27:56.0000] <robertkowalski>
+and when we pull them out and want to use them in the browser
+
+[03:27:58.0000] <robertkowalski>
+it explodes
+
+[03:30:13.0000] <nox>
+robertkowalski: new URL('https://rocko:pass%23word⊙ec/blerg')
+
+[03:31:17.0000] <robertkowalski>
+ty nox - we run into a chicken egg problem here. as we use `new URL` to parse the URL ^^
+
+[03:31:30.0000] <robertkowalski>
+so we probably have to fix that in the couch api, not in the frontend
+
+[03:36:14.0000] <annevk>
+robertkowalski: yeah, it sounds like the Couch DB API parses URLs differently from browsers
+
+[03:36:42.0000] <annevk>
+robertkowalski: that will cause subtle bugs
+
+[04:20:36.0000] <zcorpan>
+foolip: hmm https://travis-ci.org/w3c/web-platform-tests/jobs/184507619
+
+[04:21:17.0000] <foolip>
+zcorpan: a timeout, or what is one to make of that?
+
+[04:21:47.0000] <zcorpan>
+foolip: not a testharness.js-level timeout
+
+[04:22:03.0000] <foolip>
+flaky infra? can one poke travis to try again?
+
+[04:22:25.0000] <foolip>
+If you're happy with the nit, I can just rebae or something to tickle it
+
+[04:22:29.0000] <zcorpan>
+i can try restarting the build
+
+[04:23:01.0000] <zcorpan>
+restarted
+
+[04:32:07.0000] <foolip>
+zcorpan: seems to have worked?
+
+[04:38:44.0000] <zcorpan>
+foolip: ya
+
+[04:41:58.0000] <yoav>
+annevk: in https://fetch.spec.whatwg.org/#concept-request-destination wasn't "track" its own destination, rather than "media"? If it changed, why did it change?
+
+[04:44:07.0000] <annevk>
+yoav: I'm not sure
+
+[04:44:26.0000] <yoav>
+git blame points to the bikeshed conversion :/
+
+[04:44:47.0000] <annevk>
+yoav: I think when we changed how this worked we grouped them because CSP did?
+
+[04:45:38.0000] <annevk>
+yoav: the commit prior to Bikeshed just renames the files, should be doable to trace from there?
+
+[04:45:39.0000] <yoav>
+that makes sense from a CSP perspective, but doesn't correspond to how preload is implemented
+
+[04:46:06.0000] <yoav>
+yeah, I'll blame it to track the change
+
+[04:46:43.0000] <yoav>
+but currently hitting issues in Chrome's implementation of `type` for `as=media`
+
+[04:46:55.0000] <yoav>
+vtt is not a valid type
+
+[04:47:13.0000] <yoav>
+for media files
+
+[04:47:34.0000] <annevk>
+Hmm
+
+[04:47:53.0000] <annevk>
+Why can audio and video be grouped then?
+
+[04:50:26.0000] <yoav>
+both considered "media" internally
+
+[04:50:38.0000] <yoav>
+I guess you could argue that they shouldn't be
+
+[04:50:40.0000] <yoav>
+https://github.com/whatwg/fetch/commit/6b9cdaa9
+
+[04:51:34.0000] <foolip>
+the media resource for audio/video elements is treated the same internally, quite differently from the vtt resources for track elements, so grouing audio/video but not track makes sense to me
+
+[04:53:10.0000] <yoav>
+foolip: from an implementation perspective or from a spec perspective?
+
+[04:54:00.0000] <yoav>
+So, I implemented as={video/audio/track}, then spec changed, but I failed to change impl for track (only changed it for video/audio)
+
+[04:54:22.0000] <foolip>
+yoav: both, https://html.spec.whatwg.org/multipage/embedded-content.html#concept-media-load-resource is shared for audio/video, and is different from https://html.spec.whatwg.org/multipage/embedded-content.html#concept-media-load-resource
+
+[04:55:00.0000] <yoav>
+foolip: same link twice, so I'm guessing the second was pointing at VTT loading
+
+[04:55:03.0000] <foolip>
+That being said, ungrouping into three categories would be fine two, but I guess that's not what you're discussing
+
+[04:55:16.0000] <foolip>
+yoav: https://html.spec.whatwg.org/multipage/embedded-content.html#start-the-track-processing-model
+
+[04:55:24.0000] <foolip>
+yoav: yes :)
+
+[04:56:00.0000] <yoav>
+foolip: I'm fine with leaving audio and video grouped, if it makes sense for non-Blink/Chromium implementations
+
+[04:56:33.0000] <yoav>
+but I'd like to split track into it's own destination (that maps to media-src in terms of CSP)
+
+[04:57:29.0000] <yoav>
+annevk: Thoughts? If OK by you, I'll spin up a PR
+
+[05:02:00.0000] <annevk>
+yoav: seems we agreed in https://github.com/whatwg/fetch/pull/211 to merge all
+
+[05:07:19.0000] <yoav>
+Yeah... not liking past me for https://github.com/whatwg/fetch/pull/211#issuecomment-181813238
+
+[05:07:44.0000] <yoav>
+"probably also possible"
+
+[05:08:29.0000] <annevk>
+yoav: I think if we degroup we should also split audio/video
+
+[05:09:05.0000] <annevk>
+yoav: e.g., one thing we could do then is define an Accept header for those
+
+[05:09:49.0000] <yoav>
+true
+
+[05:10:44.0000] <annevk>
+foolip: so I thought we uncovered quite a few problems last we looked at the animation frame task stuff
+
+[05:11:21.0000] <annevk>
+foolip: https://www.w3.org/Bugs/Public/show_bug.cgi?id=28876 is one
+
+[05:11:43.0000] <yoav>
+foolip: Thoughts on changing `as` values? I'm guessing we'd need UMA to see usage under "media" (or continue to support "media" after adding "video" and "audio")
+
+[05:11:53.0000] <annevk>
+foolip: and https://www.w3.org/Bugs/Public/show_bug.cgi?id=28001 in particular
+
+[05:12:23.0000] <annevk>
+yoav: the problem is that these values are also exposed to service workers
+
+[05:12:54.0000] <yoav>
+so exposed in two places? :|
+
+[05:13:13.0000] <foolip>
+yoav: I'm not really familiar with this stuff, but having media as a group for audio+video as well as them individually seems fine, if that's what you mean
+
+[05:13:42.0000] <yoav>
+foolip: Yeah, that's what I meant
+
+[05:14:10.0000] <yoav>
+to avoid potentially breaking content with `as=media` out there
+
+[05:16:11.0000] <zcorpan>
+drive-by fixes, knowing when to stop :-D https://github.com/w3c/web-platform-tests/pull/4353
+
+[05:16:12.0000] <foolip>
+annevk: which bits of #28001 in particular? I think that Fullscreen could work without a queue of its own, and the timing of "enqueue animation frame task" would be right before the requestAnimationFrame callbacks for that same window, not a top-level thing
+
+[05:16:43.0000] <foolip>
+annevk: which makes things interesting for Fullscreen because we have to pick which document to use, and I think the one the request was on makes sense
+
+[05:17:32.0000] <foolip>
+annevk: unfortunately, if one wanted to use one task per document affected, then events would always fire in frame tree order, which isn't what we currently want for fullscreenchange events when exiting
+
+[05:21:04.0000] <annevk>
+yoav: https://fetch.spec.whatwg.org/#dom-request-destination
+
+[05:23:10.0000] <annevk>
+foolip: I don't know which of HTML or Fullscreen is wrong, but HTML is currently running the hook per-document
+
+[05:23:47.0000] <annevk>
+foolip: the event loop is I guess per unit of browsing contexts that can touch each other, though OOP <iframe> is making that much more complicated...
+
+[05:24:15.0000] <yoav>
+JakeA: around? Do you have a hunch on how many SW code relies on request.destination?
+
+[05:24:32.0000] <yoav>
+s/many/much/
+
+[05:25:09.0000] <foolip>
+annevk: yes, cross-origin is still a bit of a mystery for fullscreen
+
+[05:25:43.0000] <foolip>
+annevk: currently Blink tries to do make the observable behavior the same as if everything was in the same process, but things can go wrong in funny ways
+
+[05:27:15.0000] <annevk>
+foolip: anyway, I guess what I meant was that figuring out what HTML should do there seems important
+
+[05:27:39.0000] <foolip>
+annevk: FWIW, I think one could make it all work with each document running their steps fullscreen individually and sacrificing event order on exit, but it'd all look quite different from now
+
+[05:28:23.0000] <foolip>
+the unpleasant part is what happens with fullscreen requests that then come in between those small chunks of applying a single requestFullscreen call
+
+[05:28:49.0000] <foolip>
+(with OOP <iframe> it becomes unfeasible to say that there can only be a single pending request globally)
+
+[05:29:21.0000] <foolip>
+If I had better imagination, maybe I could see how Fullscreen would have worked if designed with multi-process in mind.
+
+[05:34:50.0000] <annevk>
+foolip: okay with you if I merge the two if statements in https://github.com/whatwg/fullscreen/pull/68 into a single step?
+
+[05:35:02.0000] <annevk>
+foolip: since the consequences are the same we might as well OR it
+
+[05:35:21.0000] <foolip>
+annevk: sure, I kept them separate because I wanted to change on of them to resolve, but I can unmerge later if so :)
+
+[05:36:01.0000] <annevk>
+foolip: ooh, hmm, I guess unmerge later is better in case that doesn't end up happening
+
+[05:36:18.0000] <foolip>
+annevk: yep!
+
+[05:44:51.0000] <annevk>
+I think I finally completed my GitHub backlog
+
+[05:45:01.0000] <annevk>
+If anyone is waiting on me, let me know, since I missed it
+
+[05:47:53.0000] <JakeA>
+yoav: I don't think we support it in stable, so not a lot
+
+[05:48:06.0000] <yoav>
+that's great news!
+
+[05:48:22.0000] <yoav>
+Sounds like the exact right time to break it :)
+
+[05:49:31.0000] <yoav>
+JakeA: What do you think of breaking up the `media` destination into "audio", "video" and "track"?
+
+[05:56:15.0000] <JakeA>
+yoav: I think "type" already takes care of that
+
+[05:56:48.0000] <JakeA>
+yoav: https://fetch.spec.whatwg.org/#concept-request-type
+
+[05:57:33.0000] <yoav>
+JakeA: So, the issue is that <link preload as=media> as currently defined can mean video, audio or track
+
+[05:58:57.0000] <yoav>
+which now I realized is: a) not how I actually implemented b) causes impl problems in terms of internal resource type and "type" attribute support
+
+[06:00:11.0000] <yoav>
+so it'd make me happy if we could split the destination up (preload is using the destination values for `as` values)
+
+[06:01:35.0000] <JakeA>
+yoav: preload should be using "type" I think
+
+[06:02:07.0000] <yoav>
+type doesn't cleanly map to CSP directives
+
+[06:02:34.0000] <JakeA>
+hmm fair point
+
+[06:09:30.0000] <JakeA>
+yoav: I'm struggling to work out the distinction between type/destination now
+
+[06:11:40.0000] <yoav>
+Dunno, seems to be related to content sniffing & mime type blocking
+
+[06:13:02.0000] <yoav>
+so, iiuc (and annevk will probably correct me) type is related to the expected resource type while destination is related to where that resource will be used
+
+[06:15:09.0000] <annevk>
+yoav: yeah, roughly
+
+[06:15:22.0000] <annevk>
+yoav: it's clearest with script
+
+[06:15:47.0000] <yoav>
+yeah, that's the only point I see where there a clear 1 type => many destinations
+
+[06:19:11.0000] <annevk>
+I could see something similar happening for "image", but I think we care less about the destinations
+
+[06:28:02.0000] <yoav>
+annevk & JakeA: I think I'll send a PR changing all "media" to their relative types and we can further discuss it over there
+
+[06:52:38.0000] <wanderview>
+/me tries to formulate Client questions for Jake earlier in the day...
+
+[06:56:50.0000] <wanderview>
+JakeA: so... I'm trying to understand the case of the reserved Client during a navigation that is redirected
+
+[06:57:26.0000] <wanderview>
+looking at the html spec it seems we create a single reserved Client at step 7 of https://html.spec.whatwg.org/#process-a-navigate-fetch
+
+[06:57:46.0000] <wanderview>
+and then just keep that reserved client through the redirects at step 9
+
+[06:58:20.0000] <wanderview>
+but we never update the URL on the reserved client
+
+[06:59:01.0000] <wanderview>
+so those FetchEvents for the redirected URLs will see the wrong URL on clients.get(evt.reservedClientId).then(client => client.url)
+
+[06:59:03.0000] <wanderview>
+right?
+
+[06:59:14.0000] <wanderview>
+JakeA: is that what we intend? ^^^
+
+[06:59:30.0000] <wanderview>
+it would seem to me we should either create a new reserved client for each redirect step or update the url on the client
+
+[07:01:48.0000] <wanderview>
+although I guess we allow Client.url to be different in the cases where history.pushState() has changed the location
+
+[07:01:55.0000] <wanderview>
+I think that has to be same-origin, though
+
+[07:02:11.0000] <wanderview>
+in this case we may get a reserved Client with a cross-origin creation URL
+
+[07:02:45.0000] <wanderview>
+maybe thats ok since the FetchEvent.request.url will have the current URL
+
+[07:02:50.0000] <wanderview>
+anyway, just trying to clarify intent
+
+[07:19:16.0000] <JakeA>
+wanderview: huh, good catch. We don't want to create a new client, else you can't postMessage to it
+
+[07:19:26.0000] <JakeA>
+wanderview: I guess we should update the URL
+
+[07:19:55.0000] <JakeA>
+wanderview: but if it goes cross origin we need to make sure postMessage doesn't get delivered to it
+
+[07:19:58.0000] <wanderview>
+JakeA: I mean... do we want people to be able to observe the original URL that started the navigation?
+
+[07:20:03.0000] <wanderview>
+started the redirect chain
+
+[07:20:47.0000] <wanderview>
+JakeA: what is the use case for postMessage() to the reserved client across redirects?
+
+[07:20:58.0000] <wanderview>
+feels to my like it would be cleanest to not propagate postMessage() there
+
+[07:32:08.0000] <wanderview>
+JakeA: not updating the url would also mean that Client.ancestorOrigins[0] could be different from the origin of Client.url... I think that would be a bit unexpected
+
+[07:33:20.0000] <annevk>
+wanderview: did Client.ancestorOrigins land already? With bz objecting to its sibling feature elsewhere, it would be somewhat weird for us to ship that
+
+[07:33:50.0000] <wanderview>
+annevk: its in the spec AFAICT... https://w3c.github.io/ServiceWorker/#client-ancestororigins
+
+[07:34:05.0000] <wanderview>
+annevk: which builds on https://html.spec.whatwg.org/multipage/browsers.html#concept-location-ancestor-origins-array
+
+[07:34:39.0000] <annevk>
+wanderview: understood, but https://github.com/whatwg/html/issues/1918 (and prior issues)
+
+[07:35:03.0000] <annevk>
+wanderview: hence me wondering if we ship it one place and not another and bypassed bz somehow
+
+[07:35:15.0000] <annevk>
+wanderview: which would argue for using "Intent to ship" for more minor things I think
+
+[07:35:50.0000] <wanderview>
+annevk: we ship Location.ancestorOrigins in Firefox, but not Client.ancestorOrigins yet
+
+[07:36:22.0000] <wanderview>
+annevk: oh, we don't ship it
+
+[07:36:26.0000] <wanderview>
+its just in some tests
+
+[07:36:40.0000] <annevk>
+Okay, all good then
+
+[07:37:27.0000] <annevk>
+miketaylr: we forgot to actually discuss https://github.com/whatwg/dom/issues/334
+
+[07:49:50.0000] <wanderview>
+JakeA: I wrote it up in an issue: https://github.com/w3c/ServiceWorker/issues/1031
+
+[08:03:37.0000] <JakeA>
+Thanks!
+
+[11:57:36.0000] <annevk>
+Domenic: https://github.com/w3c/web-platform-tests/pull/4299 has some tests
+
+[12:14:32.0000] <Domenic>
+Ah excellent
+
+[14:34:41.0000] <jsbell>
+Dangit, https://github.com/whatwg/fetch/issues/332 bites again
+
+[14:35:50.0000] <jsbell>
+Well, that or my inability to see the "The definition of value needs serious work." warning. :P
+
+
+2016-12-17
+[23:07:04.0000] <annevk>
+We really need to fix that somehow
+
+[23:07:28.0000] <annevk>
+Maybe we should give up on HTTP fixing it
+
+[23:07:42.0000] <annevk>
+Guess I can reach out one last time
+
+[01:33:24.0000] <annevk>
+JakeA: do you have a pointer to the FetchController idea? Sounds interesting
+
+[01:34:07.0000] <annevk>
+JakeA: we do want to expose more things such as priority adjustments and H2 push
+
+[01:34:36.0000] <annevk>
+JakeA: sounds like that might offer it
+
+[01:36:43.0000] <JakeA>
+annevk: not sure we have anything beyond "a function that exposes an instance"
+
+[01:37:25.0000] <JakeA>
+I wonder if we can just subclass the promise and add this stuff on the returned value
+
+[01:37:25.0000] <annevk>
+JakeA: ah okay, so just a callback on RequestInit
+
+[01:37:31.0000] <JakeA>
+Yeah
+
+[01:38:28.0000] <annevk>
+JakeA: I like promise subclass personally, feels natural to me, but Domenic was not a fan
+
+[01:38:54.0000] <annevk>
+JakeA: callback seems good too
+
+[01:41:35.0000] <JakeA>
+Domenic: ^ is subclassing promises still a no-no? We're looking at adding methods onto the thing fetch() returns
+
+[02:11:20.0000] <JakeA>
+annevk: we could put observables on there for h2 push too.
+
+[02:11:37.0000] <JakeA>
+Although that gives us a TC39 dependency again
+
+[03:22:25.0000] <annevk>
+JakeA: yeah, but H2 push is in no hurry
+
+[03:23:20.0000] <annevk>
+JakeA: adjusting priority seems good
+
+[03:23:50.0000] <annevk>
+JakeA: as something sooner rather than later
+
+[03:24:09.0000] <annevk>
+JakeA: and termination of course
+
+[03:24:35.0000] <JakeA>
+annevk: the more I think about it the more I want a promise subclass again. Or proxy then/catch to an underlying promise. Subclass would be preferable
+
+[03:24:57.0000] <annevk>
+JakeA: and cheap progress reports although I'm a little unclear if we have sufficient use cases for that one
+
+[03:29:19.0000] <JakeA>
+annevk: upload progress certainly
+
+[03:30:15.0000] <JakeA>
+I think streams can be used for download progress efficiently, but probably needs things like BYOB reader
+
+[03:30:26.0000] <JakeA>
+To avoid GC
+
+[04:17:27.0000] <annevk>
+JakeA: someone else suggested we offer some kind of transform stream that exposes progress, but is otherwise transparent so the UA can optimize around that
+
+[04:28:01.0000] <JakeA>
+annevk: if it takes a stream it'll have to take a content-length too
+
+[04:28:42.0000] <JakeA>
+But that means you can create a generic progress transform
+
+[04:29:52.0000] <annevk>
+JakeA: content-length could be on top in theory, but yeah, I suppose
+
+
+2016-12-18
+[22:46:42.0000] <MikeSmith>
+GPHemsley: IIRC you’re the admin for https://wiki.whatwg.org/wiki/Main_Page. If so I could use your help: When logged out I can view any page there as expected, but when logged in, every time I try to view any page there I just get “A database query error has occurred. This may indicate a bug in the software.”
+
+[00:16:24.0000] <MikeSmith>
+Domenic: why do custom element names allow U+200C and U+200D ('ZERO WIDTH NON-JOINER' and 'ZERO WIDTH JOINER')
+
+[00:18:53.0000] <annevk>
+MikeSmith: does XML not?
+
+[00:19:13.0000] <MikeSmith>
+annevk: dunno
+
+[00:19:37.0000] <MikeSmith>
+are the allowe characters based on what is allowed in XML names?
+
+[00:21:34.0000] <MikeSmith>
+ah OK am looking at https://www.w3.org/TR/xml/#NT-NameStartChar now
+
+[00:22:09.0000] <MikeSmith>
+seems weird allow non-printing characters in element names
+
+[00:23:20.0000] <annevk>
+MikeSmith: intersection of XML and HTML iirc
+
+[00:23:28.0000] <MikeSmith>
+OK
+
+[00:24:05.0000] <MikeSmith>
+well it seems bad to allow names that won’t survive simple copy/paste
+
+[00:25:44.0000] <MikeSmith>
+or maybe rather that if a user types the name manually based on looking and it, but ends up with something different despite no visual/observable difference
+
+[00:57:12.0000] <annevk>
+MikeSmith: restricting artificial code points can also make things trickier
+
+[02:05:48.0000] <MikeSmith>
+so “foo-” is a valid custom element name?
+
+[02:05:52.0000] <MikeSmith>
+based on https://html.spec.whatwg.org/multipage/scripting.html#valid-custom-element-name
+
+[02:06:05.0000] <MikeSmith>
+that is, the name can end in a hypher?
+
+[02:06:17.0000] <MikeSmith>
+*hyphen
+
+[04:14:16.0000] <annevk>
+MikeSmith: yeah think so
+
+[04:14:36.0000] <MikeSmith>
+OK
+
+[05:30:09.0000] <MikeSmith>
+GPHemsley: and now I get no error any longer when logged in and visiting the wiki. Go figure
+
+[13:51:51.0000] <weinig>
+really trivial spec question to ether, should the IDL for HTMLImageElement (https://html.spec.whatwg.org/multipage/embedded-content.html#the-img-element) have the referrerPolicy attribute use the enum defined in https://w3c.github.io/webappsec-referrer-policy/#referrer-policy?
+
+[13:55:28.0000] <Domenic>
+weinig: no, but it's a tricky question...
+
+[13:55:38.0000] <Domenic>
+weinig: until recently we never used enums for reflected attributes
+
+[13:55:46.0000] <weinig>
+I see
+
+[13:55:59.0000] <Domenic>
+We introduced the first one for <link as>, but that's controversial because we bundled that with the decision that the reflection should be case-sensistive
+
+[13:56:18.0000] <Domenic>
+https://github.com/whatwg/html/issues/1665
+
+[13:56:28.0000] <weinig>
+Domenic: cool cool, thanks
+
+
+2016-12-19
+[17:42:08.0000] <MikeSmith>
+so I’m wondering why UAs can’t/don’t process the value of the “is” attribute case-insensitively
+
+[17:42:36.0000] <MikeSmith>
+given that the parser puts HTML elements into the DOM in lowercase
+
+[17:42:41.0000] <MikeSmith>
+including custom elements
+
+[17:44:42.0000] <MikeSmith>
+I don’t understand why at https://html.spec.whatwg.org/multipage/scripting.html#valid-custom-element-name we are requiring that valid custom element names not contain uppercase ASCII characters
+
+[17:46:17.0000] <MikeSmith>
+it seems like we should allow them to contain uppercase ASCII just as we allow all other HTML element names to contain uppercase ASCII
+
+[18:21:35.0000] <MikeSmith>
+and document.registerElement(...) also lowercases the element name
+
+[18:27:02.0000] <MikeSmith>
+ah... but window.customElements.define(...) doesn’t lowercase the name, and throws if it contains uppercase
+
+[19:47:10.0000] <MikeSmith>
+https://github.com/w3c/webcomponents/issues/604#issuecomment-259608657
+
+[19:56:26.0000] <MikeSmith>
+I notice at the time of https://github.com/w3c/webcomponents/issues/403 at least, there was an explicit step, “If DOCUMENT is an HTML document, let NAME be converted to ASCII lowercase”
+
+[19:56:32.0000] <MikeSmith>
+wonder why that was dropped
+
+[19:57:57.0000] <MikeSmith>
+/me finds https://www.w3.org/Bugs/Public/show_bug.cgi?id=25290 “Ban uppercase and leading "xml" in custom element names?” from zcorpan
+
+[20:03:22.0000] <MikeSmith>
+so I guess the problem is that unlike HTML parsers, XML parsers do not lowercase element names
+
+[00:18:11.0000] <annevk>
+MikeSmith: yeah, it's about XML compat
+
+[00:23:09.0000] <MikeSmith>
+annevk: yeah I can see now it makes sense
+
+[00:23:58.0000] <annevk>
+We do the same thing for data-*
+
+[00:25:16.0000] <MikeSmith>
+OK
+
+[00:26:04.0000] <MikeSmith>
+but now to me what make less sense is that we do not (yet) make it parse error in the parsing algorithm if a hyphen-containing tag name has uppercase characters
+
+[00:26:10.0000] <MikeSmith>
+I think we should
+
+[00:26:25.0000] <MikeSmith>
+I guess I’ll make a PR and see what others think
+
+[00:26:45.0000] <MikeSmith>
+if we make a change for that it will not affect the DOM
+
+[00:27:12.0000] <MikeSmith>
+DOM result will be no different, just that error-reporting parsers can report it
+
+[00:27:20.0000] <MikeSmith>
+and the HTML checker can report it
+
+[00:27:59.0000] <MikeSmith>
+because the problem is, without that, I have no way to report an error if a document has <Foo-Bar> or whatever
+
+[00:28:13.0000] <MikeSmith>
+because the parser silently lowercases it
+
+[00:28:40.0000] <MikeSmith>
+and it is exposed to the rest of the checker code as already-lowercased
+
+[00:29:28.0000] <MikeSmith>
+and then I end up a weird situation where the checker reports an error for <button is="Foo-Bar"> but not for <Foo-Bar>
+
+[00:34:08.0000] <annevk>
+MikeSmith: but that is as expected I think
+
+[00:34:24.0000] <annevk>
+MikeSmith: the HTML syntax for element names is case-insensitive, whereas for attributes it depends
+
+[00:35:00.0000] <annevk>
+MikeSmith: so it's perfectly fine to write a custom element name as HA-HA, since that ends up being ha-ha, which doesn't contain ASCII upper alpha
+
+[00:35:00.0000] <MikeSmith>
+I think it is not necessarily what users would expect in this case
+
+[00:36:04.0000] <annevk>
+It's the same for data-*
+
+[00:36:10.0000] <MikeSmith>
+well I think users will be surprised that is="HA-HA" causes a checker error but <HA-HA> does not
+
+[00:36:14.0000] <annevk>
+You can write data-TEST, but it will mean data-test
+
+[00:37:04.0000] <MikeSmith>
+yeah I think users would expect that is="HA-HA" should just end up as is="ha-ha"
+
+[00:37:18.0000] <MikeSmith>
+if "ha-ha" is an element name
+
+[00:37:43.0000] <annevk>
+Hmm, I guess we could make that work, but I'm not sure it's worth it
+
+[00:37:44.0000] <MikeSmith>
+it’s not just a normal attribute value, it’s a reference to an element name
+
+[00:37:50.0000] <MikeSmith>
+yeah not sure either
+
+[00:37:52.0000] <annevk>
+Seems better if everyone just uses lowercase
+
+[00:38:02.0000] <MikeSmith>
+maybe nobody other than me would care
+
+[00:47:54.0000] <MikeSmith>
+annevk: the problem the checker tries to help solve is, what happens when somebody doesn’t use lowercase and goes to check a document
+
+[00:48:16.0000] <annevk>
+tobie: FWIW, I think tackling mixin syntax would be better as a somewhat large feature
+
+[00:48:37.0000] <annevk>
+tobie: at least, I thought we singled that out as somewhat high priority during TPAC
+
+[00:49:19.0000] <annevk>
+MikeSmith: yeah, but if you use uppercase in markup and uppercase in the API, it won't work
+
+[00:49:39.0000] <annevk>
+MikeSmith: the custom element will only work if you know what you're doing (uppercase in markup, lowercase in API)
+
+[00:50:11.0000] <annevk>
+MikeSmith: but maybe the validator should at least warn about it?
+
+[00:50:31.0000] <annevk>
+MikeSmith: or measure how often it happens to see if it's worth worrying about
+
+[00:51:38.0000] <MikeSmith>
+yeah I could add a use counter for teh checker I guess
+
+[00:57:16.0000] <MikeSmith>
+annevk: not to beat this into the ground, but it comes down to whether <HA-HA> in a document is document-conformance error or not
+
+[00:57:33.0000] <MikeSmith>
+by a strict reading of the current spec, it is a conformance error
+
+[00:58:18.0000] <MikeSmith>
+because the spec says that custom elements must have a “valid custom element name”, and HA-HA is not a valid custom element name
+
+[01:03:30.0000] <annevk>
+MikeSmith: that's not how it works
+
+[01:03:37.0000] <annevk>
+MikeSmith: <A> is a conformance error too
+
+[01:03:49.0000] <annevk>
+MikeSmith: but you cannot write <A> in text/html and have it turn out as <A>
+
+[01:04:08.0000] <annevk>
+MikeSmith: so <A> ends up being conforming, due to the way the parser works, as it turns out as <a>
+
+[01:04:28.0000] <annevk>
+<HA-HA> is no different
+
+[01:04:55.0000] <MikeSmith>
+I don
+
+[01:04:58.0000] <MikeSmith>
+I don'
+
+[01:05:01.0000] <MikeSmith>
+oofs
+
+[01:05:10.0000] <MikeSmith>
+I think most users do not see things that way
+
+[01:06:31.0000] <annevk>
+If they see it as <A> and <a> being equivalent and that's what you want to push for, we should change the DOM APIs to lowercase
+
+[01:06:49.0000] <annevk>
+But I don't think that will necessarily go over well
+
+[01:06:57.0000] <annevk>
+Also, as for most users, I would expect them to not hit this
+
+[01:07:54.0000] <MikeSmith>
+yeah I guess that’s true
+
+[01:58:01.0000] <MikeSmith>
+OK I pushed checker support for custom-element-name checking conforming to https://html.spec.whatwg.org/multipage/scripting.html#valid-custom-element-name
+
+[01:58:16.0000] <MikeSmith>
+pushed to https://checker.html5.org/ and https://validator.w3.org/nu/
+
+[01:59:21.0000] <MikeSmith>
+with that I think the checker now has complete support for checking of custom-elements document-conformance requirements
+
+[01:59:40.0000] <MikeSmith>
+as far as the markup for custom elements at least
+
+[02:58:11.0000] <smaug>
+annevk: happy to see this https://github.com/whatwg/dom/issues/211#issuecomment-267918029 .  I wonder if you could have some helper tool/script to automate that. And at least bugzilla bugs could perhaps have some "spec-change" annotation or such
+
+[03:01:45.0000] <MikeSmith>
+annevk: https://stackoverflow.com/questions/40939857/fetch-with-readablestream
+
+[03:13:25.0000] <annevk>
+smaug: overholt at some point was working on something, but guessing he got too busy with other things
+
+[03:14:50.0000] <annevk>
+MikeSmith: follow issue link in second comment, I guess I can add an answer there too
+
+[03:50:51.0000] <MikeSmith>
+annevk: yeah was just FYI in case you wanted to add anything there
+
+[04:02:15.0000] <zcorpan>
+annevk: https://xhr.spec.whatwg.org/#dom-xmlhttprequest-open step 1, in which cases is there no responsible document?
+
+[04:03:57.0000] <zcorpan>
+in a worker?
+
+[04:06:45.0000] <zcorpan>
+seems so
+
+[04:28:52.0000] <Ms2ger>
+Yeah
+
+[05:56:56.0000] <annevk>
+JakeA: I just reread OP of issue 27; it's fun that we're back to the couple of alternatives we came up with 18 months ago
+
+[05:57:25.0000] <annevk>
+JakeA: I had totally forgotten about FetchController since which is why I didn't understand the reference in the later comments
+
+[06:42:23.0000] <wanderview>
+JakeA: should ServiceWorker globals be exposed as Client objects?  Seems that there can be existing SW threads that are same origin and captured by the existing Clients.matchAll({includeUncontrolled:true})
+
+[06:52:24.0000] <JakeA>
+annevk: :D maybe we can get promise subclassing now
+
+[06:53:31.0000] <JakeA>
+wanderview: yeah, I mentioned that in the fetch event (for notifications) issue
+
+[06:53:45.0000] <JakeA>
+wanderview: it'd be a new type & uncontrolled
+
+[06:54:03.0000] <wanderview>
+JakeA: oh, sorry I missed that... I'll write an issue
+
+[06:54:33.0000] <wanderview>
+JakeA: do you think Clients.matchAll() should return a Client for the current environment?  or exclude that explicitly
+
+[06:56:35.0000] <JakeA>
+wanderview: huh, good question. I guess this is the first time we've had to think about that. Um, my first instinct is to exclude the "self" client
+
+[06:57:03.0000] <wanderview>
+JakeA: agreed (affects my desire to expose on window.clients as well)
+
+[06:57:23.0000] <wanderview>
+JakeA: we can add an includeSelf:true option if people ask for it
+
+[07:05:09.0000] <JakeA>
++1
+
+[07:06:59.0000] <Ms2ger>
+<script type="text/javascript">document.write('</div>')</script>
+
+[07:07:00.0000] <Ms2ger>
+<noscript></div></noscript>
+
+[07:07:03.0000] <Ms2ger>
+Just for good measure
+
+[07:08:58.0000] <annevk>
+zcorpan: did we fix the timing of when allowpaymentrequest is consulted?
+
+[07:09:03.0000] <annevk>
+zcorpan: I thought that was a blocker
+
+[07:10:18.0000] <zcorpan>
+annevk: you mean snapshot vs live?
+
+[07:10:24.0000] <annevk>
+zcorpan: yeah
+
+[07:10:45.0000] <zcorpan>
+annevk: that is still open
+
+[07:11:22.0000] <annevk>
+zcorpan: I thought bz wanted that to be fixed first
+
+[07:11:34.0000] <annevk>
+zcorpan: or least have that be snapshots for any new additions
+
+[07:12:49.0000] <annevk>
+It's rather hard to find the original statement though since there's many issues
+
+[07:13:31.0000] <annevk>
+zcorpan: last paragraph of https://github.com/whatwg/html/issues/2143#issuecomment-265514585
+
+[07:15:19.0000] <zcorpan>
+annevk: i guess the important thing is what behavior is shipped in a browser
+
+[07:15:58.0000] <annevk>
+zcorpan: sure, but now the signalling is that allowpaymentrequest is standardized, while it's actually broken
+
+[07:21:06.0000] <zcorpan>
+annevk: do you think i should decouple allowpaymentrequest from allowfullscreen in https://github.com/whatwg/html/pull/2187 ?
+
+[07:21:14.0000] <wanderview>
+JakeA: btw, now that we have reserved Clients, I think its perhaps more reasonable to expose some kind of "unloaded" Client attribute to handle the case where chrome has unloaded a tab for memory purposes... we should discuss again
+
+[07:21:37.0000] <annevk>
+zcorpan: if doing it for fullscreen is not compatible, I think so
+
+[07:22:43.0000] <zcorpan>
+annevk: i guess there is some uncertainty about the compat for fullscreen. So yeah, I can fix that tomorrow + write snapshot tests for allowpaymentrequest
+
+[07:23:59.0000] <annevk>
+ta
+
+[07:29:57.0000] <gsnedders>
+foolip: I'll have a car if it's somewhere near the airport. Whether you should trust me driving in the States is another question altogether. :)
+
+[07:44:11.0000] <JakeA>
+wanderview: tricky part is it'd be the first time they're recognised in specs
+
+[07:45:01.0000] <wanderview>
+JakeA: given mobile, I think its a common and realistic problem, though... we such entries in firefox for android and I expect other mobile browsers do as well
+
+[07:45:24.0000] <wanderview>
+JakeA: I agree we should discuss more, but I'm less opposed than I was before
+
+[07:46:01.0000] <wanderview>
+JakeA: of course, I can't speak for anyone else at mozilla and we are likely to have 20 different opinions
+
+[07:49:18.0000] <JakeA>
+wanderview: haha. But yeah, I'm happy to look at it again too
+
+[07:50:47.0000] <inoas>
+Could a declarative Shadow-DOM-Tag + <link rel="preload" /> + HTTP2 Prefetching allow for CSS encapsulation/modularization without adding tons of transfer-channels/request? e.g. hit two nails with one head?
+
+[07:53:58.0000] <inoas>
+Here are some details https://discourse.wicg.io/t/declarative-shadow-dom/1904/7
+
+[07:54:17.0000] <inoas>
+and some more https://github.com/whatwg/html/issues/552#issuecomment-266546301
+
+[07:58:19.0000] <wanderview>
+JakeA: btw, I'm planning to build my window.clients thing behind a flag... might enable it in FF nightly to experiment
+
+[08:05:40.0000] <annevk>
+inoas: I doubt folks want to modify the HTML parser further
+
+[08:06:07.0000] <inoas>
+annevk, beyond that, can you see the benefit?
+
+[08:06:24.0000] <inoas>
+it would just create a shadow dom instance instead of through js
+
+[08:06:50.0000] <annevk>
+inoas: there is no beyond if it does not change
+
+[08:07:11.0000] <inoas>
+There needs to be a good reason to add things
+
+[08:07:37.0000] <inoas>
+and a good reason would be separation of concerns of "modules" on web pages (their html, css, js) and at the same time speedy delivery (through http2 push)
+
+[08:07:48.0000] <inoas>
+wouldn't that help a lot?
+
+[08:08:00.0000] <inoas>
+with maintainability etc
+
+[08:08:11.0000] <inoas>
+and it would be closely related to the existing shadow dom tech
+
+[08:08:58.0000] <annevk>
+I'm not sure
+
+[08:14:49.0000] <JakeA>
+wanderview: ohhh good idea! I wonder if it'll be weird that messages land in serviceWorker.onmessage when they're not from service workers
+
+[08:15:16.0000] <wanderview>
+JakeA: I think I would only target message events there if they are coming from a service worker
+
+[08:15:26.0000] <wanderview>
+JakeA: but that is the most annoying thing to work around, yea
+
+[08:15:40.0000] <wanderview>
+JakeA: otherwise, I plan to fire message events at clients.onmessage
+
+[08:23:19.0000] <JakeA>
+wanderview: hah, thought the same. We could fire it there and work to deprecate serviceWorker.onmessage
+
+[08:25:00.0000] <JakeA>
+wanderview: clients API becomes another thing to break out of the SW spec
+
+[08:26:16.0000] <wanderview>
+JakeA: I think so yes... I think its a good primitive that can live on its own an underpin a lot of other stuff... I think Client should be defined next to "browsing context+environment+etc" in html... or maybe one day replace environment, etc
+
+[08:26:46.0000] <wanderview>
+well, given my short view of web history anyway... others probably have a better perspective than I do
+
+[08:27:13.0000] <wanderview>
+JakeA: and it would be nice to have something to suggest as a replacement for window.open
+
+[08:29:24.0000] <wanderview>
+async, avoids window.opener difficulties
+
+[08:29:38.0000] <wanderview>
+can be cross-process as a result
+
+[08:30:42.0000] <foolip>
+gsnedders: could you be more reckless than the average driver? I doubt it.
+
+[08:31:05.0000] <gsnedders>
+foolip: I'm used to neither LHD cars nor automatics, and US-101 scares me.
+
+[08:31:16.0000] <foolip>
+I would trust AI over you though, so know your days are counted!
+
+[08:32:16.0000] <gsnedders>
+foolip: I'm not sure *I* really trust myself to drive in the States. Mostly because I don't have the awareness of body language and unwritten habits of driving there.
+
+[08:32:27.0000] <gsnedders>
+I seem to keep doing so, though. :(
+
+[08:35:32.0000] <foolip>
+gsnedders: I've never driven in the US, not as brave/reckless as you are ;)
+
+[08:37:03.0000] <gsnedders>
+really what I should do is spend a few days driving around Sweden, where I'm familiar with the road laws, and get used to driving a LHD car, and then it'll probably start to be easier, given I won't have the overload of everything unknown at once :)
+
+[08:39:36.0000] <foolip>
+seriously, though, why bother driving at all, the long-distance trips will be rather few, right?
+
+[08:43:05.0000] <gsnedders>
+foolip: in part because practically I have the Sunday after I arrive and most of the Saturday before leaving to do stuff
+
+[08:43:42.0000] <foolip>
+Ah, but don't you know that walking around Mountain View on foot is great? The sights, the smells!
+
+[08:44:37.0000] <gsnedders>
+foolip: also, who even knows if the Google shuttles take contractors? etc.
+
+[08:45:58.0000] <gsnedders>
+foolip: also finding information about them is next to impossible, and flexibility with getting places in evenings, etc.
+
+[08:47:29.0000] <foolip>
+gsnedders: looks "TVCs" can use GBus for a symbolic amount for tax reasons.
+
+[08:47:54.0000] <foolip>
+gsnedders: but that won't help you have fun in the weekend, so...
+
+[08:49:13.0000] <gsnedders>
+I mean if we end up meeting in SF on Monday like hell am I driving up there.
+
+[08:49:40.0000] <gsnedders>
+I've driven in SF before; really the problems are the same as any big city with busy traffic where you don't know your way, but it still doesn't make me keen.
+
+[08:50:51.0000] <JakeA>
+wanderview: +1
+
+[10:11:46.0000] <annevk>
+gsnedders: why do you stay in MTV?
+
+[10:12:02.0000] <annevk>
+gsnedders: just go to SF and walk/cycle around there
+
+[10:13:28.0000] <tantek>
+yes ^^^
+
+[10:18:09.0000] <Ms2ger>
+Domenic, ping
+
+[10:18:17.0000] <Domenic>
+Ms2ger: pong
+
+[10:18:46.0000] <Ms2ger>
+Domenic, I'm trying to make sense of fetch/api/response/multi-globals/url-parsing.html in wpt, and failing miserably
+
+[10:19:38.0000] <Ms2ger>
+Domenic, it seems to call the Response constructor with one argument, "url", and checking
+
+[10:19:39.0000] <Ms2ger>
+        assert_equals(res.headers.get("Location"), new URL("current/url", location.href).href);
+
+[10:20:32.0000] <Domenic>
+Ms2ger: it's calling Response.redirect(url)
+
+[10:20:42.0000] <Ms2ger>
+I am blind indeed
+
+[10:20:44.0000] <Ms2ger>
+Thanks :)
+
+[10:20:53.0000] <Domenic>
+Phew, glad it wasn't something more complicated :)
+
+[10:26:25.0000] <TabAtkins>
+MikeSmith: The ZWJ and ZWNJ *are* printing characters (as much as any other modifier character is), and they *do* survive copy-paste iirc. They're a necessary part of formatting words in some languages.
+
+[10:27:44.0000] <Ms2ger>
+/me formats TabAtkins 
+
+[10:29:02.0000] <Ms2ger>
+TabAtkins, did you file a bug for https://github.com/w3c/csswg-drafts/issues/695 ?
+
+[10:29:48.0000] <TabAtkins>
+gsnedders: If you have a G badge, you can ride the bus. fantasai's done it plenty.  The bus schedules are semi-private, but I'm happy to share them with you; there's a nice spreadsheet-masquerading-as-app that has all the info.
+
+[10:30:08.0000] <TabAtkins>
+Ms2ger: I did not. I'll get on that, thanks.
+
+[10:30:27.0000] <Ms2ger>
+Takk
+
+[10:31:23.0000] <Ms2ger>
+TabAtkins, also wanna fight Hixie in https://lists.w3.org/Archives/Public/www-archive/2016Oct/0009.html ? :)
+
+[10:32:41.0000] <TabAtkins>
+I'll fight him after the change is made; it's not gonna be worth it before then. ^_^
+
+[11:01:29.0000] <TabAtkins>
+Ms2ger: https://bugs.chromium.org/p/chromium/issues/detail?id=675670
+
+[11:01:48.0000] <Ms2ger>
+Thanks
+
+[11:03:50.0000] <gsnedders>
+annevk: BlinkOn is in MV. There *may* be a meeting in SF the day before.
+
+[11:04:19.0000] <gsnedders>
+annevk: The meeting the day before may also be in MV. And I've already got a hotel in MV for the whole week.
+
+[11:04:28.0000] <annevk>
+gsnedders: you can still stay in SF and take the "wonderful" Caltrain
+
+[11:04:57.0000] <gsnedders>
+ehhh. I'd be sufficiently scarcely in SF it wouldn't really be worth it.
+
+[11:05:13.0000] <annevk>
+gsnedders: anyway, I'd just take the train into the city on your free days
+
+[11:05:15.0000] <gsnedders>
+TabAtkins: I need to get a badge on the Monday; that's one of the things I need to do
+
+[11:08:32.0000] <Domenic>
+[EnsureUTF16] was replaced with USVString, right?
+
+[11:08:39.0000] <gsnedders>
+Yes.
+
+[11:09:07.0000] <Domenic>
+Ah I see already filed https://github.com/w3c/FileAPI/issues/9
+
+[11:16:19.0000] <Ms2ger>
+Yeah, we had an editor for a moment there, but he disappeared too :/
+
+[11:17:52.0000] <smaug>
+Domenic: ok, I'm totally lost now what you're asking
+
+[11:18:03.0000] <smaug>
+oh, hmm
+
+[11:18:11.0000] <smaug>
+you mean the DataTransfer part
+
+[11:18:26.0000] <Domenic>
+Yes, if you want a DataTransfer constructor, how would you spec/implement it
+
+[11:19:23.0000] <smaug>
+Domenic: what is the issue with that?
+
+[11:19:34.0000] <smaug>
+DataTransfer has setData
+
+[11:19:44.0000] <smaug>
+and such
+
+[11:19:54.0000] <smaug>
+so, I think I'm still missing what you mean
+
+[11:19:56.0000] <Domenic>
+smaug: yes, which set data on an active drag data store, associated with a user drag
+
+[11:20:15.0000] <smaug>
+oh, that part
+
+[11:20:30.0000] <smaug>
+yeah, "untrusted" DataTransfer would just keep the data alive
+
+[11:20:34.0000] <smaug>
+and do nothing else
+
+[11:20:38.0000] <Domenic>
+e.g. what does setting dropEffect/effectAllowed do
+
+[11:20:46.0000] <smaug>
+nothing
+
+[11:20:51.0000] <smaug>
+just keep the state there
+
+[11:20:57.0000] <Domenic>
+You end up just creating a parallel universe where every part of DataTransfer has an "if in the special testing mode, do X" branch
+
+[11:21:48.0000] <smaug>
+not much different to say trusted vs untrusted events
+
+[11:22:38.0000] <smaug>
+whether it actually would be used is unclear
+
+[13:44:55.0000] <inoas>
+annevk: Did you take a look at the concept, does it sound solid?
+
+[15:02:46.0000] <tantek>
+what specs defines encodeURI?
+
+[15:02:52.0000] <tantek>
+*spec
+
+[15:05:08.0000] <Domenic>
+tantek: https://tc39.github.io/ecma262/#sec-encodeuri-uri
+
+[15:09:01.0000] <tantek>
+ty. now digging into https://github.com/tc39/test262
+
+[15:10:15.0000] <terinjokes>
+Domenic: looks like supporting `%d` as an alias for `%i` is going to be a breaking change for Node.js
+
+[15:10:33.0000] <Domenic>
+terinjokes: weird. Where are these discussions happening?
+
+[15:10:39.0000] <terinjokes>
+https://github.com/nodejs/node/issues/10292
+
+[15:11:12.0000] <terinjokes>
+where i sent Fishrock123 to the console issue tracker (albeit, looks like he was still using the old DevToolsWG spec)
+
+[15:13:49.0000] <Domenic>
+Good stuff
+
+[15:14:13.0000] <Domenic>
+terinjokes: you should work on https://github.com/whatwg/console/issues/74 :)
+
+[15:14:39.0000] <terinjokes>
+i just assigned myself
+
+[15:15:45.0000] <tantek>
+Domenic: background: seeing inconsistent encodeURI behavior between FF/Chrome and trying to track down which to fix: FF, Chrome, spec
+
+[15:16:10.0000] <terinjokes>
+Domenic: maybe worth closing the console.assert issue, or marking it as good first bug (to add the note) imho
+
+[15:16:11.0000] <Domenic>
+tantek: oh wow, I thought we ironed that out a long time ago; nice catch
+
+[15:16:26.0000] <Domenic>
+terinjokes: which one?
+
+[15:16:26.0000] <botie>
+i think which one is it?
+
+[15:16:45.0000] <terinjokes>
+Domenic: https://github.com/whatwg/console/issues/62
+
+[15:16:51.0000] <tantek>
+Jeremy Keith (adactio) came across the problem, Kartik Prabhu narrowed it down, and then someone has to dig into which bug databases / spec(s) / test suite(s)
+
+[15:17:32.0000] <Domenic>
+terinjokes: hmm yeah. You should fix it or write up a summary of what a good first PR would say and tag it :)
+
+[15:17:42.0000] <terinjokes>
+kk
+
+[15:18:21.0000] <terinjokes>
+/me goes back to his day job Java work
+
+[15:18:27.0000] <terinjokes>
+:'(
+
+[15:29:12.0000] <terinjokes>
+Domenic: does Edge not support global.performace?
+
+[15:29:16.0000] <terinjokes>
+or something similar?
+
+[15:29:27.0000] <terinjokes>
+i agree a bit here
+
+[15:29:37.0000] <Domenic>
+terinjokes: seems supported
+
+[15:30:03.0000] <terinjokes>
+in that it seems like a weird thing to tack onto console
+
+[15:34:56.0000] <gsnedders>
+tantek: which case are you hitting?
+
+[15:35:30.0000] <tantek>
+gsnedders, here's the user scenario, as documented: https://adactio.com/journal/11632#confuses%20the%20fragmention
+
+[15:35:41.0000] <tantek>
+still tracking down exactly where the incompat is happening
+
+[15:35:50.0000] <tantek>
+possibly to do with text selection handling too
+
+[15:37:48.0000] <gsnedders>
+tantek: oh, that I don't know about
+
+[15:38:06.0000] <tantek>
+gsnedders, yeah we're still narrowing it down
+
+[15:38:11.0000] <tantek>
+looking at suspects :)
+
+[15:39:48.0000] <gsnedders>
+Well, yeah. Just doesn't look like anything I'm aware of.
+
+[15:39:50.0000] <gsnedders>
+:)
+
+[15:39:52.0000] <gsnedders>
+/me -> bed
+
+
+2016-12-20
+[17:17:44.0000] <tantek>
+alright, looks like a Selection.toString inconsistency
+
+[17:21:32.0000] <tantek>
+and this looks like the place to file a bug about it https://github.com/w3c/selection-api/issues (unless there's some other better place someone wants to suggest)
+
+[17:22:58.0000] <tantek>
+for anyone who is curious, here is a failry minimized test/demo page that illustrates the inconsistency: https://kartikprabhu.com/static/demo/selection-encodeURI.html
+
+[17:23:11.0000] <tantek>
+(aside: encodeURI helps expose the incosistency but does not appear to be the source of any of the problem)
+
+[17:39:31.0000] <KevinMarks>
+Original bug is from 2010 https://www.w3.org/Bugs/Public/show_bug.cgi?id=10583
+
+[17:39:54.0000] <tantek>
+that's only regarding one aspect
+
+[18:00:21.0000] <MikeSmith>
+tantek: if in the IndieWeb spirit I want to host my own personal IM solution that people can chat with me one-on-one in real time, are there good options?
+
+[18:00:43.0000] <MikeSmith>
+tantek: Ideally want to just have a chatbox on my personal site
+
+[18:00:48.0000] <MikeSmith>
+web-based
+
+[18:01:21.0000] <tantek>
+MikeSmith - sounds like a good ideal
+
+[00:47:29.0000] <MikeSmith>
+zcorpan: thanks much for having taken time to raise all the checker issues you did
+
+[00:47:41.0000] <MikeSmith>
+sorry it took me so long to get around to them
+
+[00:47:51.0000] <MikeSmith>
+I still have a couple more to fix
+
+[00:47:55.0000] <zcorpan>
+MikeSmith: thanks for fixing 👍
+
+[00:49:10.0000] <tobie>
+annevk: wrt https://github.com/heycam/webidl/issues/260, I'm not sure I understand where in the grammar this is an issue.
+
+[00:49:26.0000] <MikeSmith>
+sigh I want to make a change to https://wiki.whatwg.org/wiki/MicrosyntaxDescriptions but I’
+
+[00:49:53.0000] <MikeSmith>
+...I’m getting the “A database query error has occurred. This may indicate a bug in the software.” thing again
+
+[00:50:54.0000] <MikeSmith>
+zcorpan: annevk lemme know if you are able to view the wiki while logged in, without getting that error
+
+[00:50:56.0000] <annevk>
+tobie: can you write "serializer stringifier attribute href;"?
+
+[00:51:17.0000] <annevk>
+zcorpan: I can't seem to view the wiki
+
+[00:51:37.0000] <MikeSmith>
+ah ok
+
+[00:51:39.0000] <annevk>
+GPHemsley is in charge, but he's not around much so maybe someone needs to look into it
+
+[00:52:41.0000] <annevk>
+tobie: in any event, I'm okay with dropping the whole serializer thing and just make folks write toJSON() in their IDL but then we need to stop forbidding people putting toJSON() there and make that change instead
+
+[00:53:01.0000] <zcorpan>
+MikeSmith: I also get that error. Last time it helped to clear cookies. Now it did not help. :-(
+
+[00:53:31.0000] <tobie>
+annevk: oh! That's what you had in mind. I imagine the right syntax for that would be: stringifier attribute href; serializer = [ href ];
+
+[00:53:48.0000] <tobie>
+annevk: but it seems we want to get rid of this AND no one implements it
+
+[00:53:56.0000] <annevk>
+tobie: yeah, bz mentioned that in the original issue
+
+[00:54:08.0000] <annevk>
+tobie: but I'm not going to add that with the whole serializer thing being in flux
+
+[00:54:30.0000] <MikeSmith>
+zcorpan: yeah I think the cookie-clearing thing might have just been a coincidence. In the past for me it just clears up by itself after some period of time. I am kind of wondering if this is some anti-spam measure gone awry
+
+[00:54:33.0000] <tobie>
+annevk: agreed. Was just trying to figure out what the exact issue was
+
+[00:57:16.0000] <zcorpan>
+GPHemsley: halp
+
+[01:06:14.0000] <annevk>
+If I want to write a couple of basic web pages that make use of the https://github.com/jsdom/whatwg-url library, what's the best way to do that these days and where can I read a tutorial?
+
+[01:06:26.0000] <annevk>
+I imagine copy-and-pasting the code is no longer the way to go here...
+
+[01:07:58.0000] <tobie>
+annevk: quick question before you start learning React and Webpack:
+
+[01:08:22.0000] <tobie>
+annevk: any idea what identifier is refered to in step 2 of https://heycam.github.io/webidl/#es-serializer
+
+[01:09:06.0000] <tobie>
+annevk: "the identifier of the serializer, and"
+
+[01:10:31.0000] <annevk>
+tobie: that might be a bug, seems like not all operations have an identifier
+
+[01:10:39.0000] <annevk>
+tobie: anyway, if we remove serializers that problem goes away
+
+[01:10:47.0000] <annevk>
+/me looks at Webpack
+
+[01:10:56.0000] <tobie>
+annevk: don't
+
+[01:11:07.0000] <annevk>
+It looks complex
+
+[01:11:16.0000] <tobie>
+annevk: yeah--I was joking
+
+[01:11:33.0000] <annevk>
+I really just need <script src=latestversionofjsdomwhatwg-url>
+
+[01:15:22.0000] <Sebmaster>
+annevk: browserify is a bit simpler
+
+[01:15:38.0000] <Sebmaster>
+It has kinda come out of fashion for some reason
+
+[01:16:32.0000] <tobie>
+annevk: you need babel for the conversion, imho
+
+[01:16:49.0000] <tobie>
+annevk: sadly not joking this time.
+
+[01:17:17.0000] <tobie>
+annevk: with the correct plugin depending on the flavor of ES this is written in.
+
+[01:17:57.0000] <annevk>
+tobie: I only need support latest browsers
+
+[01:18:25.0000] <annevk>
+Sebmaster: that looks okayish, still more work than I wanted to put into this
+
+[01:19:47.0000] <tobie>
+annevk: you still need one of those presets: https://babeljs.io/docs/plugins/#presets-official-presets
+
+[01:20:16.0000] <annevk>
+tobie: but why would I need Babel at all?
+
+[01:21:28.0000] <tobie>
+annevk: does your target browser support the "class" syntax?
+
+[01:22:07.0000] <annevk>
+My target browsers are nightly builds, so I guess
+
+[01:22:52.0000] <tobie>
+annevk: if they support all the syntax in: https://github.com/jsdom/whatwg-url/blob/master/lib/URL-impl.js
+
+[01:23:09.0000] <tobie>
+annevk: then you only really need something to resolve the require statements
+
+[01:23:20.0000] <tobie>
+annevk: in which case, browserify is fine
+
+[01:23:32.0000] <annevk>
+I'll find out I guess
+
+[01:23:50.0000] <annevk>
+If I get browserify working, someone else can layer additional dependencies to get older browsers to work
+
+[01:24:11.0000] <annevk>
+If I get it to work I'll put all the code up on GitHub
+
+[01:26:58.0000] <Sebmaster>
+annevk: should be able to do `npm i whatwg-url; echo 'window.MyURL = require("whatwg-url").URL;' > index.js; browserify index.js -o bundle.js`
+
+[01:28:50.0000] <annevk>
+Sebmaster: thanks, that would give index.js code access to MyURL which is whatwg-url?
+
+[01:29:05.0000] <Sebmaster>
+yep
+
+[02:09:07.0000] <annevk>
+Sebmaster: btw, if index.js ends up being empty, is there a better way of doing it?
+
+[02:17:55.0000] <MikeSmith>
+http://stackoverflow.com/questions/41238350/why-is-safari-not-allowing-a-form-element-after-template-element is pretty odd
+
+[02:18:29.0000] <MikeSmith>
+bug in WebKit HTML parser
+
+[02:18:32.0000] <Sebmaster>
+annevk: how'd you access the URL instance?
+
+[02:18:54.0000] <annevk>
+Sebmaster: as Url it seems like
+
+[02:22:19.0000] <annevk>
+Sebmaster: what you gave me is fine btw, I can just treat index.js as temporary resource and remove it afterwards
+
+[02:23:16.0000] <Sebmaster>
+annevk: I'm pretty sure you need something to expose the node module on window so you can access it "normally"
+
+[02:26:36.0000] <annevk>
+Sebmaster: okay, temp file will do
+
+[02:28:37.0000] <annevk>
+zcorpan: I can't review your PRs today looks like, have to fetch the kid
+
+[02:29:00.0000] <zcorpan>
+annevk: ok
+
+[03:15:25.0000] <fourpie>
+I have a question about mutation observers
+
+[03:16:18.0000] <fourpie>
+In https://dom.spec.whatwg.org/#notify-mutation-observers, step 5.3 says "Remove all transient registered observers"
+
+[03:17:08.0000] <fourpie>
+but it doesn't say remove from what
+
+[03:18:28.0000] <fourpie>
+the surrounding text says "Each node has an associated list of registered observers", but I can't find a reference to a node in the algorithm either
+
+[03:25:33.0000] <annevk>
+fourpie: I guess it's reasonable to file an issue on that so we could clarify the language
+
+[03:26:05.0000] <annevk>
+fourpie: the meaning is some kind of global removal, remove any that exist whose observer is _mo_
+
+[03:26:25.0000] <annevk>
+(not entirely sure how I'd clarify though)
+
+[03:27:48.0000] <annevk>
+Sebmaster: looking at the API for whatwg-url it doesn't seem like you log syntax errors somewhere, right?
+
+[03:32:17.0000] <annevk>
+Sebmaster: I guess I'd have to use URLStateMachine directly
+
+[03:32:47.0000] <annevk>
+Sebmaster: but that isn't exported
+
+[03:36:10.0000] <fourpie>
+annevk: I'm not sure what else (apart from a node) can hold a reference to a registered observer, but if they exist, "remove any that exist" sounds like removing every reference to it, whether it is from a node or not. Is that correct?
+
+[03:36:47.0000] <annevk>
+fourpie: they would be removed from the node
+
+[03:37:21.0000] <annevk>
+fourpie: the operation is basically asking to go through all the nodes and remove any whose observer is _mo_
+
+[03:38:12.0000] <fourpie>
+ahh, I get it now, thanks
+
+[03:40:05.0000] <annevk>
+Sebmaster: I filed an issue
+
+[04:08:51.0000] <zcorpan_>
+botie: tell tantek Selection.toString should use the same behavior as innerText, though Selection.toString is not specced yet AFAIK. It's not super-clear to me how CSS's white-space processing works for this case
+
+[04:08:52.0000] <botie>
+will do
+
+[04:09:22.0000] <zcorpan_>
+botie: tell tantek https://html.spec.whatwg.org/multipage/dom.html#the-innertext-idl-attribute
+
+[04:09:22.0000] <botie>
+will do
+
+[06:38:33.0000] <Ms2ger>
+foolip, https://github.com/whatwg/html/issues/2109
+
+[07:01:14.0000] <Sebmaster>
+annevk: yeah, not sure what API to put over that
+
+[07:02:49.0000] <Sebmaster>
+You should be able to require state-machine directly if you require("whatwg-url/lib/url-state-machine"), although I'd only recommend to hack something together since it might break in patch updates
+
+[07:46:24.0000] <annevk>
+Sebmaster: could put some kind of flag on the URL record
+
+[07:46:40.0000] <Sebmaster>
+but then it doesn't match the spec anymore :(
+
+[07:46:45.0000] <annevk>
+Sebmaster: ideally a list of syntax violation messages
+
+[07:46:56.0000] <Sebmaster>
+You could spec that :p
+
+[07:47:07.0000] <Sebmaster>
+And I'll happily add it
+
+[07:47:19.0000] <annevk>
+Sebmaster: URL records are an impl detail anyway
+
+[07:48:18.0000] <annevk>
+Sebmaster: I guess I could redefine syntax violations in that specific way, but hmm
+
+[07:53:43.0000] <botie>
+tantek, at 2016-12-20 12:08 UTC, zcorpan_ said: Selection.toString should use the same behavior as innerText, though Selection.toString is not specced yet AFAIK. It's not super-clear to me how CSS's white-space processing works for this case and at 2016-12-20 12:09 UTC, zcorpan_ said:
+
+[07:53:43.0000] <botie>
+https://html.spec.whatwg.org/multipage/dom.html#the-innertext-idl-attribute
+
+[10:15:55.0000] <ajeffrey_>
+annevk: Domenic: a question re the note at https://html.spec.whatwg.org/multipage/browsers.html#the-session-history-of-browsing-contexts
+
+[10:16:09.0000] <ajeffrey_>
+it says "Each entry, when first created, has a Document. However, when a Document is not active, it's possible for it to be discarded to free resources. The URL and other data in a session history entry is then used to bring a new Document into being to take the place of the original, should the user agent find itself having to reactivate that Document."
+
+[10:16:42.0000] <ajeffrey_>
+can a Document be discarded even if user script has a reference to it?
+
+[10:25:25.0000] <tantek>
+hmm do we have any spec text anywhere for "Selection.toString should use the same behavior as innerText" ?
+
+[10:25:51.0000] <tantek>
+(sounds reasonable, and I can't think of any reasons why they should behave differently)
+
+[10:30:33.0000] <Ms2ger>
+/me looks
+
+[10:30:41.0000] <Ms2ger>
+Damn respec
+
+[10:31:27.0000] <Ms2ger>
+tantek, the spec for toString() is "See W3C bug 10583."
+
+[10:31:31.0000] <Ms2ger>
+So... technically?
+
+[10:31:36.0000] <Ms2ger>
+https://www.w3.org/Bugs/Public/show_bug.cgi?id=10583
+
+[10:33:09.0000] <tantek>
+Ms2ger I feel like that bug is only about one specific aspect of toString
+
+[10:33:36.0000] <Ms2ger>
+c5 says "I'm working on this, along with innerText (it will be the same algorithm for both)."
+
+[10:33:47.0000] <tantek>
+innerText has a spec though
+
+[10:33:49.0000] <tantek>
+from roc
+
+[10:33:58.0000] <tantek>
+and I'd say this is the bug for toString: https://github.com/w3c/selection-api/issues/7
+
+[10:34:22.0000] <Ms2ger>
+Whose summary links to that bug :)
+
+[10:34:24.0000] <Ms2ger>
+Anyway
+
+[10:34:36.0000] <Ms2ger>
+There's no normative text about toString() at this time
+
+[10:34:48.0000] <tantek>
+tests?
+
+[10:34:51.0000] <Ms2ger>
+Maybe in the next six years
+
+[10:35:12.0000] <Ms2ger>
+Not in wpt afaict
+
+[10:46:39.0000] <Domenic>
+ajeffrey_: I think it can be
+
+[10:49:08.0000] <ajeffrey_>
+Domenic: OK, so it's possible for a Document to be discarded, even though its browsing context isn't.
+
+[10:50:19.0000] <Domenic>
+ajeffrey_: yeah, I mean, I think that's correct from my reading, but this whole areas is a mess as we've previously discussed, so really what we should be talking about is the observable consequences and how different browsers behave.
+
+[10:51:18.0000] <ajeffrey_>
+Domenic: indeed. I'm trying to work out what to do in Servo, just to add another engine to the mess :)
+
+[10:58:34.0000] <ajeffrey_>
+Domenic: the main source of observable weirdness is that if we get the Document from an iframe, then navigate the iframe forward then traverse back, we may get a different Document or not, depending on whether the browser reclaimed the document while it was inactive.
+
+[10:58:35.0000] <KiChjang>
+is there a default value for the cancelable and bubbles attribute for Events?
+
+[10:58:52.0000] <Domenic>
+KiChjang: false
+
+[10:59:19.0000] <Domenic>
+ajeffrey_: yeah, and I guess the non-interop there is explicitly sanctioned by the spec, to allow for Firefox having a bfcache and others not.
+
+[11:00:51.0000] <ajeffrey_>
+Domenic: indeed.
+
+[11:02:30.0000] <ajeffrey_>
+Domenic: thanks!
+
+[11:02:41.0000] <Domenic>
+Yeah... wish I could be more helpful :)
+
+[11:04:11.0000] <ajeffrey_>
+Domenic: you are being as helpful as the spec allows :)
+
+[12:51:23.0000] <smaug>
+what is the file called in blink which defines default styling for html elements?
+
+[12:51:52.0000] <smaug>
+html.css I guess
+
+[15:57:59.0000] <MikeSmith>
+does anybody know why authors still use <link rel=apple-touch-icon sizes=...>
+
+[15:58:26.0000] <MikeSmith>
+are they putting it in only for users running some older Safari?
+
+[15:59:15.0000] <MikeSmith>
+or is it that standard <link rel=icon sizes=...> doesn’t work in current Safari?
+
+
+2016-12-21
+[16:03:30.0000] <tantek>
+MikeSmith - standard rel=icon (still AFAIK) doesn't work in *mobile* Safari
+
+[16:03:39.0000] <tantek>
+if you have support / citation otherwise, would appreciate seeing it!
+
+[16:03:49.0000] <MikeSmith>
+wow
+
+[16:03:57.0000] <tantek>
+yeah it's an annoying wart
+
+[16:04:05.0000] <MikeSmith>
+yeah nuts
+
+[16:04:37.0000] <MikeSmith>
+wonder what reason they could possibly have for not adding support for standard rel=icon
+
+[16:07:44.0000] <tantek>
+MikeSmith: I can't think of any good reasons so I'm not going to speculate on malice / laziness.
+
+[00:47:11.0000] <zcorpan>
+annevk: https://github.com/whatwg/html/pull/2195
+
+[00:49:28.0000] <annevk>
+zcorpan: maybe foolip can review?
+
+[00:50:04.0000] <annevk>
+zcorpan: I'm technically not working the remainder of the week and only a bit next week
+
+[00:50:24.0000] <zcorpan>
+ok, sure. have a nice christmas annevk :-)
+
+[00:52:02.0000] <annevk>
+You too! 🎄
+
+[01:44:23.0000] <smaug>
+jgraham: async_test(function(t) { runs the function synchronously, right?
+
+[01:45:05.0000] <zcorpan>
+smaug: yes
+
+[01:46:03.0000] <zcorpan>
+is there a reason we don't have data-dfn-type="element" for only 14 elements in HTML, and not all of them?
+
+[01:46:09.0000] <zcorpan>
+s/don't/
+
+[02:15:26.0000] <smaug>
+huh, resource selection algorithm  is super hard to read
+
+[02:15:52.0000] <smaug>
+cancelling outer algorithms somewhere down deep in inner ones
+
+[02:16:55.0000] <smaug>
+and some wpt tests for it are racy
+
+[02:19:41.0000] <zcorpan>
+smaug: which tests?
+
+[02:20:08.0000] <smaug>
+resource-selection-pointer-remove-source.html
+
+[02:20:14.0000] <smaug>
+at least
+
+[02:28:11.0000] <zcorpan>
+smaug: the resource selection algorithm's synchronous section should run before the <script> executes, IIRC. So x1 should always get an error event. But x2 seems like it is racy, since the sync section ends for the first <source> and then it awaits a stable state again
+
+[02:28:33.0000] <smaug>
+exactly
+
+[02:28:58.0000] <smaug>
+one doesn't know whether event loop spins after </video>
+
+[02:36:18.0000] <zcorpan>
+filed https://github.com/w3c/web-platform-tests/issues/4376
+
+[02:37:04.0000] <zcorpan>
+in other news https://nerdydata.com/search looks pretty cool
+
+[04:01:54.0000] <MikeSmith>
+zcorpan: I copied the microsyntax descriptions to https://github.com/validator/validator/wiki/Microsyntax-descriptions and marked https://wiki.whatwg.org/wiki/MicrosyntaxDescriptions as obsolete
+
+[04:02:28.0000] <MikeSmith>
+and I changed the checker to parse and use https://github.com/validator/validator/wiki/Microsyntax-descriptions from now on
+
+[04:02:43.0000] <zcorpan>
+MikeSmith: ok
+
+[04:04:33.0000] <zcorpan>
+MikeSmith: looks like it needs some cleanup markup-wise
+
+[04:05:02.0000] <zcorpan>
+yay wiki markup
+
+[04:13:46.0000] <smaug>
+zcorpan: do you happen to know about media attribute in <source>
+
+[04:14:18.0000] <smaug>
+in case of <video> being the parent element, WhatWG HTML and W3C HTML5 spec handle this case differently
+
+[04:16:58.0000] <smaug>
+or foolip
+
+[04:17:05.0000] <smaug>
+resource-selection-source-media.html seems to be related here
+
+[04:23:31.0000] <smaug>
+which is racy test, btw
+
+[04:24:15.0000] <zcorpan>
+smaug: we removed it from the spec
+
+[04:24:48.0000] <smaug>
+zcorpan: ok. apparently no implementation bugs were filed about it
+
+[04:24:57.0000] <smaug>
+at least Gecko
+
+[04:25:13.0000] <smaug>
+/me is just helping someone to go through failing media handling related tests
+
+[04:27:09.0000] <zcorpan>
+smaug: this was a while ago, but i can file a bug for gecko
+
+[04:27:36.0000] <smaug>
+zcorpan: I think it is being filed
+
+[04:27:45.0000] <zcorpan>
+ah ok
+
+[04:27:54.0000] <smaug>
+zcorpan: rather annoying just to have this W3C HTML spec :)
+
+[04:28:02.0000] <smaug>
+which some people may accidentally even read
+
+[04:30:19.0000] <zcorpan>
+smaug: you can edit https://wiki.whatwg.org/wiki/W3C with concrete instances of it being annoying or wasting time
+
+[04:30:48.0000] <MikeSmith>
+zcorpan: what kind of cleanup where?
+
+[04:31:00.0000] <zcorpan>
+MikeSmith: &lt; should be <
+
+[04:31:08.0000] <zcorpan>
+MikeSmith: <nowiki>
+
+[04:31:22.0000] <MikeSmith>
+ah OK
+
+[04:31:25.0000] <MikeSmith>
+will fix those
+
+[04:31:49.0000] <MikeSmith>
+I used pandoc to convert it. It’s very good but I guess it misses those
+
+[04:33:44.0000] <zcorpan>
+smaug: bug is https://www.w3.org/Bugs/Public/show_bug.cgi?id=19619
+
+[04:34:45.0000] <smaug>
+thanks
+
+[04:35:34.0000] <smaug>
+odd stuff there
+
+[04:35:37.0000] <smaug>
+why it was removed
+
+[04:35:39.0000] <smaug>
+oh well
+
+[05:55:55.0000] <inoas>
+zcorpan what is the most likely implementation of css encapsulation so that you can stop leakings of part of the html to the body, and from the body to parts of the html?
+
+[05:56:56.0000] <inoas>
+my 2 cents: imho, only this and wide http2 push adoption and the platform will get a huge boost in terms of reliabiltiy/maintainability and speed
+
+[05:57:11.0000] <zcorpan>
+inoas: i'm not sure i understand the question
+
+[05:57:31.0000] <inoas>
+zcorpan currently you cannot isolate CSS to be only applied to parts of the DOM easily
+
+[05:57:55.0000] <inoas>
+and you cannot stop CSS that applies to the whole DOM from being applied to parts of the DOM easily
+
+[05:58:52.0000] <inoas>
+technologies like this try to workaround the issue: http://getbem.com/introduction/
+
+[05:59:08.0000] <inoas>
+but it creates a mess of classes and takes discipline
+
+[06:02:30.0000] <inoas>
+zcorpan: is my question clear now?
+
+[06:03:19.0000] <zcorpan>
+inoas: so basically scoped styles? plus resetting styles to UA defaults?
+
+[06:03:56.0000] <inoas>
+it should be obligatory that it does not leak outside and optional if you want to leak inside (e.g. not reset UA defaults)
+
+[06:04:15.0000] <inoas>
+it doesn't have to be the declarative shadow-dom or the scoped style tag
+
+[06:04:52.0000] <inoas>
+I am not religious here, but I am looking and hoping for a change that makes the BEM workaround (see above) obsolete
+
+[06:05:12.0000] <inoas>
+If you add HTTP2 server push into the mix, you can create awesome componentized sites
+
+[06:05:32.0000] <inoas>
+very clean separation of concerns, caching on HTTP tech, still only one request
+
+[06:07:28.0000] <zcorpan>
+inoas: i guess i would recommend compiling a list of use cases and requirements, with links to examples that would benefit or are working around the lack of this (like BEM), and list pros/cons of declarative shadow dom or other possible solutions
+
+[06:07:55.0000] <zcorpan>
+inoas: i have no idea what the most likely implementation is though :-)
+
+[06:08:10.0000] <inoas>
+I really don't want to annoy - I just see there are huge gains for the average developers
+
+[06:08:22.0000] <inoas>
+e.g. a lot more speedy sites
+
+[06:09:11.0000] <zcorpan>
+i don't think anybody would be annoyed
+
+[06:09:46.0000] <inoas>
+I don't know much about shadow-dom, the sexy part about a declarate interface to setting a shadow-dom root would be that those who embrace shadow-dom based web components would also get all the benefits because it is a unified solution
+
+[06:10:09.0000] <inoas>
+I read that the mode refers to the javascript of the component being able to read the parent dom, is that correct?
+
+[06:10:17.0000] <inoas>
+e.g. the javascript "leaks outside"
+
+[06:10:39.0000] <inoas>
+is the general dom able to read/write into the sub-tree of shadow-dom?
+
+[06:10:47.0000] <inoas>
+if latter is true, it would be able to "leak inside"
+
+[06:11:01.0000] <inoas>
+and for css the questions are the same and probabily the answers
+
+[06:11:43.0000] <zcorpan>
+i'm not a shadow dom expert, but there is an "open" and a "closed" mode that affects encapsulation
+
+[06:11:45.0000] <inoas>
+so cssMode would be required, which if set to open would inherit the outer CSS, else UA defaults
+
+[06:12:08.0000] <inoas>
+it could even use the same mode attribute, then you are forced however to either open js and css, or none.
+
+[06:13:44.0000] <inoas>
+if I want to open an issue any hints about what to name it and where to open? is github css wg ok?
+
+[06:14:33.0000] <inoas>
+https://github.com/w3c/csswg-drafts/issues
+
+[06:15:27.0000] <inoas>
+annevk: recently said there is little will to add anything to the html parser ... and that's where the whole endavour already ends... I really hope the core teams at whatwg and w3c can see the benefit (or have a lot better idea!)
+
+[06:17:02.0000] <zcorpan>
+inoas: csswg seems ok
+
+[09:21:29.0000] <ajeffrey_>
+annevk: Domenic: another spec question about document discarding...
+
+[09:22:00.0000] <ajeffrey_>
+in https://html.spec.whatwg.org/multipage/browsers.html#joint-session-history it says "Entries in the joint session history are ordered chronologically by the time they were added to their respective session histories."
+
+[09:22:39.0000] <ajeffrey_>
+If an inactive document is discarded, then we traverse to it, which timestamp should we use?
+
+[09:23:20.0000] <ajeffrey_>
+I'm guessing we should use time timestamp of when the document was originally loaded,
+
+[09:23:45.0000] <ajeffrey_>
+otherwise we're going to get into an odd state where the session history order and timestamp order disagree with each other.
+
+[09:33:19.0000] <Domenic>
+ajeffrey_: right, discarding doesn't reset "the time they were added to their respective session histories"
+
+[09:34:26.0000] <ajeffrey_>
+Domenic: and neither does reloading?
+
+[09:36:48.0000] <Domenic>
+ajeffrey_: IIRC reloading does do a navigation with replacement enabled which does replace the history entry with a new one
+
+[09:37:15.0000] <ajeffrey_>
+Domenic: er, that sounds problematic.
+
+[09:37:27.0000] <Domenic>
+Why?
+
+[09:37:37.0000] <Domenic>
+I see
+
+[09:37:38.0000] <ajeffrey_>
+do we not end up with a situation where the timestamp order disagrees with session history order?
+
+[09:38:44.0000] <Domenic>
+My guess is that the chronological order is wrong
+
+[09:38:51.0000] <Domenic>
+As the ordering is well-specified elsewhere
+
+[09:38:53.0000] <ajeffrey_>
+(this is possibly an issue for reloading in general, not just as a result of discarding)
+
+[09:39:22.0000] <Domenic>
+Or maybe "added" is meant to exclude the "replaced" case
+
+[09:39:34.0000] <ajeffrey_>
+Domenic: where else is the joint session history order specified?
+
+[09:39:52.0000] <Domenic>
+ajeffrey_: things are added to it one by one. You add things at the end
+
+[09:40:04.0000] <ajeffrey_>
+The session history order is fine, it's the joint session history that is chronologically ordered.
+
+[09:40:15.0000] <Domenic>
+Oh... /facepalm
+
+[09:40:22.0000] <ajeffrey_>
+Domenic: :)
+
+[09:40:29.0000] <Domenic>
+OK then my thing about reloading is probably wrong
+
+[09:40:36.0000] <Domenic>
+But hmm
+
+[09:40:59.0000] <ajeffrey_>
+I think the idea is that reloading shouldn't update the timestamp.
+
+[09:41:03.0000] <Domenic>
+Yeah that seems likely
+
+[09:41:11.0000] <Domenic>
+In general replacement should not update the timestamp I am pretty sure
+
+[09:41:29.0000] <Domenic>
+Wouldn't it be great if we added an explicit concept of timestamp to the spec??
+
+[09:42:11.0000] <ajeffrey_>
+Domenic: yes, there is an implicit timestamp in the jsh, it's just not explicitly discussed.
+
+[09:42:27.0000] <ajeffrey_>
+Domenic: should I file an issue?
+
+[09:42:43.0000] <Domenic>
+ajeffrey_: I think it's all part of the "update session history to match browsers" issue
+
+[09:42:46.0000] <Domenic>
+Maybe add a comment there
+
+[09:43:24.0000] <ajeffrey_>
+Domenic: do you know the issue number?
+
+[09:43:58.0000] <Domenic>
+I can search for it
+
+[09:44:10.0000] <Domenic>
+https://github.com/whatwg/html/issues/1454
+
+[09:44:30.0000] <ajeffrey_>
+Domenic: thanks!
+
+[09:49:39.0000] <ajeffrey_>
+added comment https://github.com/whatwg/html/issues/1454#issuecomment-268592522.
+
+[09:52:19.0000] <TabAtkins>
+https://github.com/w3c/csswg-drafts/issues/711#issuecomment-265861196
+
+[10:36:47.0000] <tobie>
+Domenic: your comments on https://github.com/heycam/webidl/issues/188#issuecomment-268601139 appreciated
+
+[10:37:33.0000] <Domenic>
+tobie: they all seem like good questions. I was kind of hoping we could just get away with telling everyone to define their own toJSON(), but maybe that's not convenient enough.
+
+[10:37:59.0000] <Domenic>
+The mixin idea is intriguing
+
+[10:38:04.0000] <Domenic>
+I wonder what bzbarsky thinks of it
+
+[10:39:11.0000] <tobie>
+Domenic: there's an added issue with toJSON, though: the return value of serializing operations is currently defined with a mix of IDL types and what are de facto infra types.
+
+[10:39:27.0000] <Domenic>
+yeah
+
+[10:39:42.0000] <Domenic>
+I guess asking spec authors to create their own dictionaries or similar is annoying
+
+[10:40:10.0000] <Domenic>
+well but they only need to do that if they need something custom
+
+[10:40:24.0000] <Domenic>
+so if you need a custom version: define a dictionary type; define a custom toJSON() that returns an instance of that
+
+[10:40:29.0000] <tobie>
+Domenic: well, we could get away with using record<DOMString, any> or the like I guess
+
+[10:40:32.0000] <Domenic>
+(or returns a string or other JSON type)
+
+[10:40:35.0000] <Domenic>
+Hmm true
+
+[10:40:44.0000] <Domenic>
+But the shape is fixed generally so dictionary is better
+
+[10:40:55.0000] <Domenic>
+The question is how to make it easy for the case where people just want to serialize all attributes
+
+[10:41:13.0000] <tobie>
+that's my suggestion #4
+
+[10:41:33.0000] <tobie>
+just say: toJSON defaults to that behavior
+
+[10:41:45.0000] <Domenic>
+Yeah
+
+[10:41:54.0000] <Domenic>
+I guess I would probably want something explicit, like = default
+
+[10:42:08.0000] <Domenic>
+because otherwise people will go searching for the definition in prose and not find it
+
+[10:42:41.0000] <tobie>
+well, you could just have an abstract operation in WebIDL and refer to it in prose
+
+[10:43:33.0000] <Domenic>
+Yeah I guess so
+
+[10:44:44.0000] <tobie>
+It feels like you either want to use an abstract serialization mechanism throughout or only use toJSON.
+
+[10:45:37.0000] <tobie>
+Mixing the two creates a lot of questions when they collide in the inheritance tree.
+
+[10:47:48.0000] <tobie>
+Domenic: anyway, thanks for your feedback. I'll wait for bz's comments and move on from there.
+
+[10:48:19.0000] <Domenic>
+Yeah. I think you are on the right track. Custom toJSON, either completely custom or delegating to some helper abstract op in Web IDL.
+
+[12:44:37.0000] <tobie>
+Domenic: wrt to https://github.com/heycam/webidl/issues/255, what are your thoughts?
+
+[12:45:10.0000] <secureSuggest>
+Hello. Is here an expert for html5 input elements?
+
+[12:45:58.0000] <Domenic>
+tobie: https://github.com/heycam/webidl/pull/257#issuecomment-267100851
+
+[12:46:11.0000] <secureSuggest>
+I think I have a suggestion for extending the standard, so I'd like to find someone who wants to talk about that topic.
+
+[12:48:20.0000] <tobie>
+Domenic: yeah, saw that. Is your suggestion to fix the language that originally made a distinction between the DFN and IDL type and no longer does?
+
+[12:48:38.0000] <Domenic>
+tobie: yeah I guess so. I don't see what the distinction buys us.
+
+[12:49:11.0000] <tobie>
+Domenic: it's sort of easier to reason about (at least that was my conclusion last week).
+
+[12:49:40.0000] <Domenic>
+Hmm I don't really see how.
+
+[12:51:18.0000] <tobie>
+Domenic: well for one the fact that we're referring to it in plural multiple times throughout the spec was a good sign we were talking about the DOM exceptions and not DOMException
+
+[12:51:37.0000] <Domenic>
+tobie: I thought it just meant we were talking about DOMException instances
+
+[12:51:50.0000] <Domenic>
+I don't know what a "DOM exception" is, except a DOMException instance.
+
+[12:52:31.0000] <tobie>
+Domenic: a DOM Exception is anyone of "XXXError" DOMException.
+
+[12:53:01.0000] <Domenic>
+tobie: that doesn't really help; what are those? Are they DOMExceptions?
+
+[12:53:01.0000] <tobie>
+*a DOM exception...
+
+[12:53:38.0000] <tobie>
+they're an abstract concept, much like simple exceptions.
+
+[12:53:53.0000] <Domenic>
+simple exceptions are not an abstract concept
+
+[12:54:01.0000] <Domenic>
+They're one of four-ish specific types
+
+[12:54:11.0000] <Domenic>
+a TypeError is a simple exception
+
+[12:55:07.0000] <Domenic>
+(5)
+
+[12:55:40.0000] <Domenic>
+I just can't see anything in https://github.com/heycam/webidl/pull/257/files which is improved by the distinction
+
+[12:55:54.0000] <Domenic>
+In general I can't envision a situation where it's helpful to say "no, that's not a DOMException, that's a DOM exception"
+
+[12:56:23.0000] <tobie>
+heh
+
+[12:58:21.0000] <tobie>
+Ok. I'll see if I can fix the non-sensical sentences instead.
+
+[12:59:32.0000] <tobie>
+Then work on adding the ability to set props.
+
+[12:59:40.0000] <Domenic>
+set props?
+
+[13:00:16.0000] <tobie>
+On DOMexceptions
+
+[13:00:24.0000] <Domenic>
+oh, create new exception types you mean?
+
+[13:00:41.0000] <Domenic>
+Or maybe setting own props on normal DOMException types would be fine, interesting
+
+[13:01:04.0000] <tobie>
+Yeah. I think that was the conclusion from TPAC.
+
+[13:01:23.0000] <Domenic>
+Huh OK, I don't remember that at all, but I'm sure that's just my memory :)
+
+[13:01:35.0000] <Domenic>
+It is nice and simple
+
+[13:02:01.0000] <tobie>
+Yeah. It's in the notes.
+
+[13:02:19.0000] <Domenic>
+\o/
+
+[13:02:23.0000] <tobie>
+You said pretty much the same thing when it was mentioned then. :D
+
+[13:03:09.0000] <tobie>
+I need to think through the slots a bit more.
+
+[13:03:32.0000] <tobie>
+Understand the end goal better.
+
+[14:42:37.0000] <Domenic>
+TabAtkins: I'm confused, is it offset-before (https://drafts.csswg.org/css-position/#logical-box-offsets-beaso) or block-start (https://drafts.csswg.org/css-logical-props/#logical-controls) ?
+
+[14:44:23.0000] <weinig>
+annevk: hey, in https://github.com/whatwg/html/issues/1102, I can’t quite tell, are you advocating merging <input capture> attribute into HTML?
+
+[14:47:37.0000] <Domenic>
+TabAtkins: nevermind, cbeisinger found https://drafts.csswg.org/css-logical-props/#propdef-offset-block-start for me and told me css-position is outdated
+
+[14:53:04.0000] <annevk>
+weinig: yeah, at the very least least cross-reference
+
+[14:53:21.0000] <weinig>
+annevk: ok, cool
+
+[14:53:49.0000] <annevk>
+All your HTML belong to HTML
+
+[14:54:11.0000] <weinig>
+annevk: agreed
+
+[15:51:55.0000] <rniwa>
+Domenic: yt?
+
+[15:52:02.0000] <Domenic>
+rniwa: yep
+
+[15:52:02.0000] <rniwa>
+annevk: yt?
+
+[15:52:24.0000] <rniwa>
+Domenic: so, do you know anything about navigating to a fragment?
+
+[15:52:36.0000] <rniwa>
+Domenic: as far as i read the spec, it seems to imply that it needs to happen in the next task
+
+[15:52:58.0000] <Domenic>
+rniwa: mehhhh i reviewed some patches on that section of the spec at some point. Let's dig in...
+
+[15:53:00.0000] <rniwa>
+Domenic: however, this is what we implement nor do we intend to implement this.
+
+[15:53:06.0000] <rniwa>
+not* what we implement
+
+[15:53:21.0000] <rniwa>
+Domenic: scrolling on iOS happen completely asynchronously
+
+[15:54:45.0000] <Domenic>
+rniwa: tracing through spec links it seems like we end up in https://drafts.csswg.org/cssom-view/#perform-a-scroll
+
+[15:55:09.0000] <Domenic>
+rniwa: it sounds like maybe what we want here is to give UAs license to always do a smooth scroll?
+
+[15:56:12.0000] <rniwa>
+Domenic: or maybe that the definition of "instant scroll" needs to change
+
+[15:56:50.0000] <Domenic>
+rniwa: yeah maybe that would make sense... so if you do document.body.scrollTo(x, y), document.body.scrollTop === x; that will generally be false in WebKit?
+
+
+2016-12-22
+[16:01:46.0000] <rniwa>
+Domenic: hm... scrollTo works synchronously
+
+[16:02:04.0000] <rniwa>
+Domenic: I think it's really the navigation that can't really be sync
+
+[16:02:05.0000] <Domenic>
+Hmm OK, so I guess instant scroll probably still has some value
+
+[16:03:04.0000] <Domenic>
+So you think it's important that given <span id="foo">, span.scrollIntoView() and clicking <a href="#foo"> behave differently?
+
+[16:03:28.0000] <rniwa>
+Domenic: i don't think it's important per se
+
+[16:03:37.0000] <rniwa>
+Domenic: in fact, it's probably better their behavior aligned
+
+[16:03:47.0000] <rniwa>
+Domenic: I'm just saying that it's not what iOS safari does
+
+[16:03:58.0000] <Domenic>
+Ah OK
+
+[16:04:07.0000] <rniwa>
+Domenic: and it apparently is hard to fix on our end
+
+[16:06:08.0000] <rniwa>
+Domenic: oh... actually, i might be completely off here.
+
+[16:06:48.0000] <rniwa>
+Domenic: I think what's happening is that on iOS, we do sync scroll in the task scheduled by a task scheduled by clicking on an anchor
+
+[16:07:26.0000] <rniwa>
+Domenic: so you have to do nested setTimeout(~, 0) to get to after the scrolling whereas on other browsers, a single setTimeout(~, 0) would suffice
+
+[16:07:39.0000] <Domenic>
+oh fascinating
+
+[16:07:50.0000] <Domenic>
+yeah i was just trying to track down how many tasks are posted during navigation
+
+[16:08:22.0000] <rniwa>
+Domenic: yeah, it's really tricky there because it goes though
+
+[16:08:27.0000] <rniwa>
+follow a hyperlink: https://html.spec.whatwg.org/#following-hyperlinks-2
+
+[16:08:27.0000] <rniwa>
+navigate: https://html.spec.whatwg.org/#navigate
+
+[16:08:28.0000] <rniwa>
+navigate to a frament: https://html.spec.whatwg.org/#scroll-to-fragid
+
+[16:08:34.0000] <rniwa>
+follow a hyperlink: https://html.spec.whatwg.org/#following-hyperlinks-2
+
+[16:08:38.0000] <Domenic>
+yeah, navigation is a known quagmire :(
+
+[16:08:46.0000] <Domenic>
+annevk's been cleaning it up bit by bit
+
+[16:11:14.0000] <rniwa>
+Domenic: I think it's supposed to have a single task there
+
+[16:11:28.0000] <Domenic>
+Yeah I found the one in "follows a hyperlink" and can't find any others
+
+[16:11:32.0000] <rniwa>
+Domenic: right
+
+[17:24:46.0000] <MikeSmith>
+Domenic: are there no open browser feature-implementation bugs for <script type=module>?
+
+[17:25:44.0000] <MikeSmith>
+OK found https://bugs.chromium.org/p/chromium/issues/detail?id=594639 at least
+
+[17:26:40.0000] <MikeSmith>
+Domenic: how I can make the HTML spec show the annotation with a link to the bug?
+
+[17:27:08.0000] <MikeSmith>
+if I add https://html.spec.whatwg.org/multipage/webappapis.html#module-script in a comment, would that do it?
+
+[17:27:49.0000] <MikeSmith>
+or does it need to be https://html.spec.whatwg.org/multipage/#module-script
+
+[17:32:04.0000] <MikeSmith>
+/me goes to read the build sources
+
+[17:35:00.0000] <MikeSmith>
+d’oh nm I realize it doesn’t do that at all, it just looks at W3C bugzilla and caniuse
+
+[17:47:57.0000] <MikeSmith>
+raised https://bugs.webkit.org/show_bug.cgi?id=166405
+
+[23:30:23.0000] <hsivonen_>
+Is there an online view of git blame for the HTML spec?
+
+[23:30:35.0000] <hsivonen_>
+(too large for github)
+
+[23:50:55.0000] <MikeSmith>
+hsivonen: there is not, as far as I know
+
+[23:56:35.0000] <hsivonen>
+MikeSmith: thanks
+
+[23:56:48.0000] <hsivonen>
+blame appears to be very slow even locally
+
+[23:57:01.0000] <hsivonen>
+this could use an online service that caches blame for each rev
+
+[23:58:19.0000] <MikeSmith>
+yeah
+
+[00:34:20.0000] <tobie>
+annevk: are all ByteStrings, USVStrings and all USVStrings, DOMStrings?
+
+[00:35:17.0000] <annevk>
+tobie: they are conversions, so not really, but in a way, perhaps
+
+[00:36:41.0000] <tobie>
+annevk: that's helpful. :D
+
+[00:40:23.0000] <annevk>
+tobie: ByteString should convert to a byte sequence I think, open issue
+
+[00:41:14.0000] <annevk>
+tobie: USVString should convert to a string and DOMString too; I guess these could use the same string type
+
+[00:42:34.0000] <tobie>
+annevk: I'm trying to define the acceptable types for toJSON return values
+
+[00:43:16.0000] <tobie>
+annevk: my assumption is that all records would be, regardless of which string type is used as key
+
+[00:47:03.0000] <tobie>
+annevk: it could have been kind of nice to have a special type for that so you could say: record<stringType, SerializableType>, etc.
+
+[00:47:58.0000] <zcorpan>
+maybe my English intuition is wrong but i thought "any ... objects whose constructor was" was correct. any opinions? https://github.com/whatwg/html/pull/2207#discussion_r93528785
+
+[00:48:58.0000] <tobie>
+annevk: but that seems super hard to define and make work across union types, distinguishability and the like. Anyway.
+
+[00:49:39.0000] <tobie>
+zcorpan: http://wasorwere.com/
+
+[00:51:47.0000] <zcorpan>
+tobie: the question is really "constructor" vs "constructors" -- was vs were falls out of that
+
+[00:52:15.0000] <zcorpan>
+with my intuition, "constructors" implies each object can have multiple constructors
+
+[00:53:02.0000] <tobie>
+zcorpan: oh, right, apologies.
+
+[01:00:06.0000] <MikeSmith>
+nox: am curious was Url serde impls is
+
+[01:00:13.0000] <nox>
+MikeSmith: What?
+
+[01:00:37.0000] <MikeSmith>
+https://github.com/servo/rust-url/pull/263/commits/146aee3e1eb1db5d917a23dbdf90e68b2a20c369
+
+[01:00:48.0000] <MikeSmith>
+「Slightly improve Url serde impls」
+
+[01:01:08.0000] <nox>
+MikeSmith: serde is Rust's serialisation framework.
+
+[01:01:23.0000] <MikeSmith>
+ah OK
+
+[01:01:26.0000] <annevk>
+tobie: why? This is post-conversion. You can only use on of these pre-conversion.
+
+[01:01:37.0000] <nox>
+MikeSmith: Our impls for Url used to allocate an intermediate String for nothing on serialisation, and panic on parse errors instead of returning them.
+
+[01:01:51.0000] <annevk>
+tobie: they are not distinguishable and such
+
+[01:02:26.0000] <MikeSmith>
+nox: this loooks nicer
+
+[01:02:49.0000] <tobie>
+annevk: not sure what you mean.
+
+[01:02:53.0000] <MikeSmith>
+nox: it did not expose the error description before?
+
+[01:03:05.0000] <nox>
+MikeSmith: Worse, it just panicked. :)
+
+[01:03:21.0000] <nox>
+MikeSmith: .unwrap() takes the v in Ok(v) of a result, and panics otherwise.
+
+[01:03:29.0000] <MikeSmith>
+ah OK
+
+[01:04:50.0000] <MikeSmith>
+not so familiar with “panic” it this context… means it fails hard? does not now how to recover? or ..
+
+[01:06:04.0000] <MikeSmith>
+*know how
+
+[01:06:06.0000] <tobie>
+annevk: what return type should `toJSON()` have when you'll rely on the abstract operation that rounds up all the attributes?
+
+[01:08:12.0000] <jgraham>
+MikeSmith: Typically panic is "terminate the process immediately"
+
+[01:08:24.0000] <jgraham>
+For some value of "immediately"
+
+[01:08:39.0000] <MikeSmith>
+ok
+
+[01:09:11.0000] <MikeSmith>
+I call that “catch fire and fail”
+
+[01:09:32.0000] <MikeSmith>
+because that is how it is described in the XML world
+
+[01:09:34.0000] <jgraham>
+(although see also https://doc.rust-lang.org/std/panic/fn.catch_unwind.html)
+
+[01:09:45.0000] <MikeSmith>
+and I am all about XML
+
+[01:09:58.0000] <MikeSmith>
+XML Forever
+
+[01:10:07.0000] <MikeSmith>
+XML, Right or Wrong
+
+[01:10:37.0000] <jgraham>
+/me backs away slowly
+
+[01:10:59.0000] <annevk>
+tobie: record<>?
+
+[01:11:08.0000] <MikeSmith>
+/me goes back to composing replies on xml-dev threads 
+
+[01:11:33.0000] <tobie>
+annevk: record<DOMString, any?> ?
+
+[01:11:38.0000] <tobie>
+annevk: record<DOMString, any>
+
+[01:11:45.0000] <annevk>
+tobie: yeah
+
+[01:12:27.0000] <annevk>
+tobie: will have more time starting Tue
+
+[01:12:34.0000] <tobie>
+annevk: np
+
+[01:12:39.0000] <tobie>
+annevk: take care till then
+
+[01:15:53.0000] <annevk>
+You too 🎄
+
+[01:19:58.0000] <nox>
+Do you folks know about any spec using NodeIterator with filters not coming from script?
+
+[01:21:29.0000] <nox>
+And was URLMismatchError removed from all the specs?
+
+[01:30:57.0000] <nox>
+Also, do any specs have double, boolean or null constants?
+
+[01:52:16.0000] <tobie>
+nox, I wish we had a DB of all WebIDL snippets across all specs
+
+[01:53:31.0000] <zcorpan>
+nox: i don't think so. i can only find https://dxr.mozilla.org/mozilla-central/source/dom/webidl/Console.webidl#44
+
+[05:30:59.0000] <MikeSmith>
+annevk: thanks for digging up the thread about apple-touch-icon
+
+[05:31:09.0000] <MikeSmith>
+did not know that chrome supported it too
+
+[05:42:49.0000] <Ms2ger>
+Domenic, around?
+
+[09:47:19.0000] <TabAtkins>
+Domenic: Ugh, yeah, I'm gonna go add a warning to Position, Microsoft picked it up and then immediately dropped it.
+
+[09:47:36.0000] <Domenic>
+Yay
+
+[10:16:11.0000] <TabAtkins>
+Domenic: Warning is live, sorry it took me so long to make that fix.
+
+[10:16:17.0000] <TabAtkins>
+Should have been done months ago.
+
+
+2016-12-23
+[00:34:32.0000] <zcorpan>
+what is the interaction of [OverrideBuiltins] and [Unforgeable]?
+
+[00:36:52.0000] <zcorpan>
+[OverrideBuiltins] interface A1 { [Unforgeable] readonly attribute DOMString x; }; // The supported property names are "x"
+
+
+2016-12-25
+[10:26:48.0000] <__an0n>
+annevk: hello, could you take a look at https://github.com/whatwg/fetch/issues/252#issuecomment-269131852 ?
+
+[10:29:50.0000] <__an0n>
+just want a confirmation
+
+[10:30:07.0000] <__an0n>
+if anyone else knows…
+
+[10:34:18.0000] <__an0n>
+that sentence:
+
+[10:34:21.0000] <__an0n>
+> Similarly, `Access-Control-Expose-Headers`, `Access-Control-Allow-Methods`, and `Access-Control-Allow-Headers` response headers can only use `*` as value when request’s credentials mode is not "include".
+
+[10:36:20.0000] <__an0n>
+makes me think that you can have a request mode "cors" and credentials "same-origin" which would have a Access-Control-Expose-Headers field value of "*"
+
+[10:36:48.0000] <__an0n>
+is that correct?
+
+[10:51:42.0000] <__an0n>
+no one has any idea?
+
+[11:01:57.0000] <__an0n>
+In short it seems that https://github.com/whatwg/fetch/commit/cdbb13c08650b10c9ebfc54d046bec0639e7ba7c contradicts this sentences fromt the spec:
+
+[11:01:59.0000] <__an0n>
+> Similarly, `Access-Control-Expose-Headers`, `Access-Control-Allow-Methods`, and `Access-Control-Allow-Headers` response headers can only use `*` as value when request’s credentials mode is not "include".
+
+[11:02:34.0000] <__an0n>
+one says only omit, the other omit and same-origin
+
+[11:08:56.0000] <__an0n>
+someone could redirect me to the proper channel? (clearly I am not on the right one)
+
+[12:26:31.0000] <annevk>
+Well, it is a holiday…
+
+
+2016-12-26
+[02:17:41.0000] <annevk>
+FWIW, that might be a bug, I'll have a look later this week
+
+[03:06:13.0000] <Ms2ger>
+annevk, do you know if there's a reasonably easy way to test a document's origin without using doc.origin?
+
+[03:06:38.0000] <Ms2ger>
+(If you're around)
+
+[04:45:41.0000] <annevk>
+Ms2ger: not offhand
+
+[04:46:04.0000] <annevk>
+Ms2ger: usually the global's origin that matters
+
+
+2016-12-28
+[03:49:03.0000] <annevk>
+Anyone here played Broken Age? Such a great little game
+
+[06:27:22.0000] <annevk>
+https://github.com/annevk/live-url-viewer is mostly functioning again and online
+
+[06:30:48.0000] <MikeSmit1>
+annevk: what’s the difference liveview and liveview2 and liveview3?
+
+[06:31:07.0000] <annevk>
+MikeSmit1: the JavaScript ends up showing slightly different things
+
+[06:31:26.0000] <annevk>
+MikeSmit1: this code is all based on something rubys created at one point
+
+[06:31:49.0000] <annevk>
+MikeSmit1: not sure it's the best interface, but at least it now runs on top of a new URL parser
+
+[06:33:14.0000] <MikeSmit1>
+yeah definitely nice to have an implementation to check with that is known to fully conform to the spec
+
+[06:38:16.0000] <MikeSmith>
+annevk: about https://github.com/whatwg/fetch/issues/443, the comment “I really don't understand how people are creating production-quality applications with fetch() as it does not give access to pre-flight responses” I am wondering what the alternative is that he uses for production-quality applications
+
+[06:39:12.0000] <annevk>
+MikeSmith: worth asking
+
+[06:41:10.0000] <MikeSmith>
+well it was a rhetorical question I guess
+
+[06:42:16.0000] <MikeSmith>
+because in the context of the limitation he mention, there is not an alternative on the client side that behaves any differently in that regard
+
+[08:11:37.0000] <smaug>
+setTimeout/Interval callbacks never run in the same task, right?
+
+[08:11:48.0000] <smaug>
+I mean, each callback get their own task
+
+[08:48:53.0000] <annevk>
+smaug: yeah
+
+[08:49:16.0000] <smaug>
+ok, thanks
+
+[09:05:29.0000] <smaug>
+there isn't a concept of "end of task" defined really anywhere, right?
+
+[09:05:33.0000] <smaug>
+should it be defined?
+
+[09:05:37.0000] <smaug>
+IDB uses it
+
+[09:06:50.0000] <annevk>
+smaug: sounds like a bug in IDB
+
+[09:07:04.0000] <annevk>
+smaug: I guess it means to use microtasks or some such?
+
+[09:07:10.0000] <smaug>
+no
+
+[09:07:16.0000] <smaug>
+it clearly tries to use something else
+
+[09:09:02.0000] <smaug>
+"When control is returned to the event loop, the implementation must unset the active flag." and  "When transaction is finished, immediately set request’s transaction to null. This must be done in the same task as the task firing the complete or abort event, but after the event has been fired."
+
+[09:10:29.0000] <smaug>
+I guess https://github.com/w3c/IndexedDB/issues/87 is about this
+
+[09:10:51.0000] <annevk>
+Oh it seems they could just restructure the way algorithms work there
+
+[09:11:04.0000] <annevk>
+Since it sounds like the flag is unset before microtasks
+
+[09:11:59.0000] <smaug>
+after microtasks
+
+[09:21:19.0000] <annevk>
+oh, that is fairly magical
+
+[09:21:31.0000] <annevk>
+good times
+
+[09:23:17.0000] <annevk>
+smaug: but if the microtasks run as a result of the event dispatch there's not really an issue I think
+
+[09:23:58.0000] <annevk>
+smaug: because they'd all run at that point and not at the end of the task
+
+[09:39:20.0000] <annevk>
+when you do url.searchParams.forEach(fun)
+
+[09:41:09.0000] <annevk>
+why is fun invoked as if its signature is value, name rather than name, value?
+
+[10:14:35.0000] <Domenic>
+it mirrors arrays
+
+[10:14:42.0000] <Domenic>
+array.forEach((value, index) => ...)
+
+[10:38:47.0000] <annevk>
+Domenic: thanks, makes sense I guess
+
+[11:54:29.0000] <botond>
+TabAtkins: hey, are you around? i have a question about bikeshed
+
+
+2016-12-29
+[17:28:00.0000] <Domenic>
+Oh wow, the Web IDL XSLT toolchain lives on in web crypto: https://github.com/w3c/webcrypto/tree/master/spec
+
+[17:28:01.0000] <Domenic>
+who knew
+
+[20:18:53.0000] <MikeSmith>
+Domenic: XSLT the selfish gene
+
+[20:50:43.0000] <GPHemsley>
+Are people still having trouble with the wiki?
+
+[20:52:25.0000] <GPHemsley>
+wiki.whatwg.org seems to be timing out for me
+
+[20:52:40.0000] <GPHemsley>
+for both https and sftp
+
+[20:52:49.0000] <GPHemsley>
+but not for ping
+
+[20:52:58.0000] <GPHemsley>
+oh wait
+
+[20:53:00.0000] <GPHemsley>
+there it goes
+
+[20:53:39.0000] <GPHemsley>
+sftp is still timing out
+
+[21:00:18.0000] <GPHemsley>
+annevk: Can you check in the site configuration to ensure sftp is still turned on correctly?
+
+[21:03:46.0000] <GPHemsley>
+and/or ssh
+
+[21:21:33.0000] <MikeSmith>
+GPHemsley: the wiki has been working fine for me recently
+
+[21:21:55.0000] <MikeSmith>
+but that said the only thing I have been doing it to set up redirect to content elsewhere
+
+[21:22:30.0000] <MikeSmith>
+because at least for content I care about myself I’m not going to be relying on it any longer
+
+[21:23:42.0000] <MikeSmith>
+between that weird wiki database error and the Dreamhost IPv6 brokenness for whatwg.org it’s not usable for what I need it for
+
+[21:24:03.0000] <MikeSmith>
+which is to say, mostly for the HTML checker
+
+[21:26:08.0000] <MikeSmith>
+I had the HTML checker build set up to grab content (e.g., the MicrosyntaxDescriptions page) from the wiki at build time, and if that failed the build fails, basically
+
+[22:10:55.0000] <GPHemsley>
+hmm
+
+[22:11:21.0000] <GPHemsley>
+well someone ping me if the database error appears again
+
+[22:11:28.0000] <GPHemsley>
+I do eventually read my pings
+
+[22:12:05.0000] <GPHemsley>
+I haven't actually seen the error myself
+
+[22:14:07.0000] <GPHemsley>
+direct e-mail for anything urgent
+
+[22:14:23.0000] <GPHemsley>
+@gmail
+
+[22:54:52.0000] <MikeSmith>
+GPHemsley: ok, thanks
+
+[00:28:49.0000] <annevk>
+GPHemsley: I forwarded the request
+
+[00:48:43.0000] <annevk>
+GPHemsley: thanks for taking a look, btw
+
+[04:55:07.0000] <annevk>
+Domenic: https://github.com/w3c/IndexedDB/issues/87 is of interest to you I think
+
+[06:30:30.0000] <annevk>
+MikeSmith: does GitHub provide some kind of feature for overlong wpt-stability-bot comments to be clipped by default?
+
+[06:30:59.0000] <annevk>
+MikeSmith: https://github.com/w3c/web-platform-tests/pull/4104#issuecomment-269637001 is somewhat bad, especially as you try to find the next useful comment
+
+[06:36:38.0000] <gsnedders>
+annevk: <details>, but then you hit the cross-browser styling issues
+
+[06:36:47.0000] <gsnedders>
+annevk: and you don't control the stylesheet, obviously
+
+[06:37:42.0000] <annevk>
+gsnedders: oh, if that works that seems alright, only when there's so many words in the comment I guess
+
+[06:40:56.0000] <gsnedders>
+oh, they seem to have fixed it, so the <details> element triangle now does appear in Firefox
+
+[06:41:01.0000] <gsnedders>
+so yeah, that works now
+
+[06:59:05.0000] <MikeSmith>
+annevk: what gsnedders said
+
+[06:59:55.0000] <MikeSmith>
+if github fixed their <details> but then we should update the stability checker to do use it
+
+[07:00:31.0000] <MikeSmith>
+gsnedders: you wanna file an issue for that or you want me to?
+
+[07:01:10.0000] <MikeSmith>
+I thought jgraham had implemented <details> output for it but then had to be back it out because of that github bug
+
+[07:01:19.0000] <MikeSmith>
+but maybe I just dreamed that
+
+[07:14:27.0000] <gsnedders>
+MikeSmith: you do
+
+[07:16:09.0000] <gsnedders>
+/me heads out
+
+[09:43:01.0000] <annevk>
+GPHemsley: should all still work
+
+[09:43:53.0000] <annevk>
+GPHemsley: did you lose credentials? Or just timing out? Both sftp and ssh?
+
+[09:56:23.0000] <MikeSmith>
+annevk: take a look at https://github.com/w3c/web-platform-tests/pull/4407 please
+
+[09:58:07.0000] <jgraham>
+MikeSmith, gsnedders: <details> doesn't work anyway because you can't use markdown inside the element
+
+[09:58:25.0000] <jgraham>
+Which you want for the table or the text logs become unreadable
+
+[09:58:33.0000] <jgraham>
+and most people have to use the text logs
+
+[09:59:00.0000] <MikeSmith>
+jgraham: seems like you can use markdown inside details actually
+
+[09:59:19.0000] <MikeSmith>
+look at the comments in https://github.com/w3c/web-platform-tests/pull/4407
+
+[09:59:23.0000] <jgraham>
+Oh? When I tried this a couple of weeks ago you couldn't for sure
+
+[09:59:28.0000] <MikeSmith>
+yah
+
+[09:59:53.0000] <MikeSmith>
+I think they maybe fixed that at the same time the first the disclosure-triangle bug
+
+[09:59:59.0000] <jgraham>
+Fair enough
+
+[10:01:19.0000] <MikeSmith>
+/me goes back to his MDN editing marathon for now
+
+[10:02:36.0000] <jgraham>
+MikeSmith: r+ please merge whenever
+
+[10:09:49.0000] <MikeSmith>
+jgraham: w00t
+
+[10:09:51.0000] <MikeSmith>
+thanks
+
+[10:20:44.0000] <MikeSmith>
+annevk: rebase your PRs
+
+[10:21:00.0000] <MikeSmith>
+/me now heads off to sleep
+
+[11:22:57.0000] <Domenic>
+Makign specs work offline https://github.com/whatwg/streams/pull/637
+
+[14:39:17.0000] <Domenic>
+annevk: hmm why do some of your specs omit the index and idl-index?
+
+[14:52:11.0000] <zcorpan>
+https://html.spec.whatwg.org/#parsing-main-inbody:special-3 .... am I missing something or does the spec not have a parse error for <!doctype html><body></adsfasdf> ?
+
+[14:53:42.0000] <zcorpan>
+it seems to me it's only a parse error if asdfasdf is on the stack (and not the current node after implied end tags), or is in the special category
+
+[14:54:26.0000] <gsnedders>
+zcorpan: also surely the algorithm doesn't terminate in that case?!
+
+[14:54:44.0000] <gsnedders>
+i.e., you'll just keep "Set node to the previous entry in the stack of open elements."
+
+[14:55:15.0000] <zcorpan>
+ah yeah. :-|
+
+[14:55:29.0000] <zcorpan>
+weird!?
+
+[14:55:46.0000] <gsnedders>
+/me starts seeing value in what he decided not to do earlier in the year again with formally verifying parts of the parser again…
+
+
+2016-12-30
+[16:23:02.0000] <lukeshu>
+pbot: tell ovruni: Is it ok if I package openrc 0.23?
+
+[16:23:02.0000] <botie>
+will do
+
+[16:24:30.0000] <lukeshu>
+Whoops, wrong channel, sorry.
+
+[16:47:19.0000] <MikeSmith>
+lukeshu: hah, funny that you got another bot to respond though
+
+[16:47:32.0000] <lukeshu>
+indeed :)
+
+[18:54:15.0000] <guest271314>
+Hi. New here.
+
+[18:56:35.0000] <guest271314>
+Interested in implementation of passing ReadableStream to Request.body at fetch and fetch upload progress.
+
+[18:57:57.0000] <guest271314>
+Not sure how can help, though am willing to.
+
+[20:36:56.0000] <MikeSmith>
+guest271314: this is pretty much the quietest time of day here, so you probably want to hang around for a while yet
+
+[20:37:28.0000] <guest271314>
+@MikeSmith Ok
+
+[21:20:56.0000] <Teletek>
+yo
+
+[21:21:28.0000] <Teletek>
+/me is wondering
+
+[22:08:36.0000] <guest271314>
+Good day
+
+[01:27:02.0000] <Ms2ger>
+<a href="javascript:window.open('http://bing.com')">This changes the page</a>
+
+[03:42:39.0000] <annevk>
+MikeSmith: seems it no longer runs the tests now https://github.com/w3c/web-platform-tests/pull/4104#issuecomment-269761621
+
+[03:43:07.0000] <MikeSmith>
+annevk: oh
+
+[03:43:14.0000] <MikeSmith>
+you pushed changes to the tests?
+
+[03:43:17.0000] <MikeSmith>
+rebased?
+
+[03:43:20.0000] <MikeSmith>
+/me looks
+
+[03:43:56.0000] <MikeSmith>
+nothing I changed would have affected the running of the tests
+
+[03:44:36.0000] <MikeSmith>
+/me looks through travis log
+
+[03:45:51.0000] <MikeSmith>
+weird
+
+[03:45:55.0000] <annevk>
+MikeSmith: just pushed
+
+[03:46:04.0000] <annevk>
+MikeSmith: changes that is
+
+[03:46:22.0000] <MikeSmith>
+dunno why it didn’t run the test
+
+[03:48:25.0000] <MikeSmith>
+looking at the logs I see the stability checker does recognize that the setters_tests.json and urltestdata.json files changed, but then it doesn’t identify the affected tests
+
+[03:49:13.0000] <MikeSmith>
+so, maybe some bug there
+
+[03:49:29.0000] <MikeSmith>
+will investigate
+
+[03:49:49.0000] <MikeSmith>
+in the mean time I think if you rebase and push again it will work
+
+[05:40:12.0000] <annevk>
+MikeSmith: okay, thanks, I don't really need it to work for these PRs, was mostly curious
+
+[05:40:25.0000] <annevk>
+MikeSmith: btw, are there plans to make Safari and Edge work too?
+
+[05:42:20.0000] <MikeSmith>
+annevk: yes, jgraham is on it already
+
+[05:42:31.0000] <MikeSmith>
+Simple Matter of Jgraham Time
+
+[05:43:01.0000] <annevk>
+best time
+
+[05:43:07.0000] <MikeSmith>
+heh
+
+[06:21:28.0000] <jgraham>
+Edge requires Microsoft to release it on some windows variant you can use with a CI system (i.e. not Windows 10 for licensing reasons)
+
+[06:21:36.0000] <jgraham>
+Safari is just a matter of time
+
+[06:26:01.0000] <jgraham>
+(there was something on Twitter about Microsoft having Plans here, but being twitter it's impossible to find now)
+
+[07:09:11.0000] <gsnedders>
+jgraham: oh, some talk with people made me conclude we could use BrowserStack, given we already just run Edge in wptrunner using RemoteWebDriver
+
+[07:09:23.0000] <gsnedders>
+jgraham: and that works for Edge and Safari
+
+[12:15:26.0000] <jgraham>
+gsnedders: I am pretty spectacurarly unexcited about connecting to a remote service running the browser vs having it on the same machine with full control over the browser process
+
+[12:16:20.0000] <gsnedders>
+jgraham: OTOH, the changes of getting a Windows or OS X box any time soon to do this seems… low.
+
+[12:17:09.0000] <jgraham>
+Travis has OSX boxes
+
+[12:17:16.0000] <jgraham>
+Not sure which OSX they have
+
+[12:17:37.0000] <jgraham>
+(are we supposed to call it macOS these days)
+
+[12:18:08.0000] <gsnedders>
+(probably)
+
+[12:18:20.0000] <jgraham>
+I would be way more inclined to care about fixing the problem for Edge if it wasn't an artifical issue purely of Microsoft's own making
+
+[12:18:22.0000] <gsnedders>
+you can get 10.12 for the latest Xcode at least
+
+[12:18:46.0000] <gsnedders>
+the alternative solution for the MS problem is to ask MS to provide some hardware and licenses to avoid the problem
+
+[12:20:42.0000] <jgraham>
+I would be happy with that solution too
+
+[12:21:34.0000] <jgraham>
+Honestly a single box would probably be enough. But being able to provision it with an in-tree config like we do with AppVeyor and Travis would be a big advantage
+
+[12:22:56.0000] <gsnedders>
+aye
+
+
+2016-12-31
+[07:03:04.0000] <MikeSmith>
+Happy New Year from Japan everybody
+
+[13:07:06.0000] <foo12345>
+is there any IDL spec for HTTP Headers?
+

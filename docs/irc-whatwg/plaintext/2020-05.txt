@@ -1,0 +1,2952 @@
+2020-05-01
+[18:52:41.0000] <Domenic>
+window.onerror is still not interoperable, wtffffd
+
+[18:53:12.0000] <Domenic>
+(https://github.com/whatwg/html/issues/5500)
+
+[20:55:37.0000] <annevk>
+Domenic: well, report an exception… but this is a novel angle 😊
+
+[11:16:35.0000] <andreubotella>
+hm, I was trying out FACEs and turns out there aren't any MDN docs
+
+[11:16:46.0000] <andreubotella>
+who do I have to contact to get that on someone's todo list?
+
+[13:38:51.0000] <Domenic>
+andreubotella: I think MDN has a few GitHub repos these days?
+
+[13:54:18.0000] <andreubotella>
+Domenic: I haven't contributed to MDN before and I'm not quite clear on how to go about it
+
+[13:54:24.0000] <andreubotella>
+I'll file an issue on mdn/sprints, I guess
+
+[13:54:37.0000] <Domenic>
+Yeah, I mean, it's a wiki, but I don't know much more than you there.
+
+[13:55:00.0000] <Domenic>
+MikeSmith probably does, and might wake up soon. (Or might stay away from IRC on a weekend, which is also very reasonable.)
+
+[14:58:08.0000] <ato>
+Reaching out to Chris Mills would be a good starting point.
+
+[16:16:10.0000] <MikeSmith>
+yeah https://github.com/mdn/sprints is these days the place to suggest a new article for MDN
+
+
+2020-05-02
+[17:29:41.0000] <devsnek>
+has there ever been any discussion about the reviver function and response.json()
+
+[17:30:05.0000] <devsnek>
+I'm guessing response.text() + JSON.parse is just good enough
+
+[17:55:26.0000] <Domenic>
+devsnek: https://github.com/whatwg/fetch/issues/104
+
+[18:37:49.0000] <devsnek>
+Domenic: thanks for the link
+
+[18:38:29.0000] <devsnek>
+it looks like it's assumed there that streaming json on main thread < buffer text and parse?
+
+[19:04:07.0000] <Domenic>
+I'm not sure how to parse that sentence
+
+[19:53:26.0000] <devsnek>
+Domenic: it seems like it was assumed in that thread that streaming parsing on the main thread isn't worth it compared to building up a string with .text() and calling parse
+
+[19:53:56.0000] <devsnek>
+which is surprising to me but of course I'm not an expert on performance
+
+[20:08:26.0000] <MikeSmith>
+reading https://groups.google.com/a/chromium.org/forum/#!topic/blink-dev/bKn2DLuRdeU
+
+[20:08:39.0000] <MikeSmith>
+about <iframe loading="lazy">
+
+[20:09:10.0000] <MikeSmith>
+> the <img> portions of the spec have landed, whereas we dropped a ball on the <iframe> variant landing in the HTML spec …
+
+[20:09:29.0000] <MikeSmith>
+> some have suggested
+
+[20:09:30.0000] <MikeSmith>
+un-shipping the feature.
+
+[20:09:59.0000] <MikeSmith>
+Why?
+
+[20:10:04.0000] <MikeSmith>
+Where? Who?
+
+[20:11:18.0000] <MikeSmith>
+I realize the message also says it’s not gonna be un-shipped, but I don’t understand why anybody would have suggested it to begin with
+
+[21:03:45.0000] <Domenic>
+/me MikeSmith: first message of https://groups.google.com/a/chromium.org/forum/#!topic/blink-api-owners-discuss/JjETiVoN6l8 has yoav suggesting removing the feature as one course of action
+
+[21:03:59.0000] <MikeSmith>
+aha
+
+[21:04:08.0000] <Domenic>
+(did not mean to /me that, I guess there's some IRCCloud keyboard shortcut that automatically inserts a /me prefix...)
+
+[21:04:22.0000] <Domenic>
+devsnek: "streaming parsing on the main thread" isn't well-defined.
+
+[21:05:31.0000] <Domenic>
+https://groups.google.com/a/chromium.org/d/msg/blink-api-owners-discuss/JjETiVoN6l8/3JeXh6rjAAAJ has Addy Osmani also suggesting moving it back behind a flag
+
+[21:06:20.0000] <devsnek>
+my thinking was that with the json source proposal it might be worth taking another look
+
+[21:06:42.0000] <devsnek>
+I imagine parsing out bigints will be somewhat common
+
+[21:07:20.0000] <MikeSmith>
+Domenic: thanks!
+
+[21:07:58.0000] <Domenic>
+devsnek: I think step 1 would be someone proposing an actual processing model for streaming JSON that has well-defined semantics. So far nobody has. The closest is NLDJSON.
+
+[21:08:18.0000] <Domenic>
+s/NLDJSON/NDJSON
+
+[21:09:10.0000] <devsnek>
+I was thinking step 0 would be "does anyone actually want this"
+
+[21:09:28.0000] <Domenic>
+Right, well, it's not clear what "this" is
+
+[21:10:11.0000] <devsnek>
+well parsing a bunch of json that might be broken into pieces is not difficult
+
+[21:10:33.0000] <Domenic>
+In a way different than just buffering into text and parsing all at once?
+
+[21:10:57.0000] <devsnek>
+well since all the modern json parsers in engines are loop based instead of recursion based
+
+[21:10:59.0000] <MikeSmith>
+Domenic: I had actually just mis-took the message I cited as being about un-shipping img[loading]..
+
+[21:11:13.0000] <devsnek>
+it should be as simple as just calling into a function every time you get more data
+
+[21:11:35.0000] <Domenic>
+devsnek: you can't produce any incremental results because if you have `{ ... 500 KiB of valid object literal JSON ... ]` then the whole thing must be a parse error.
+
+[21:11:56.0000] <devsnek>
+ah I see what you mean
+
+[21:12:02.0000] <devsnek>
+yeah that is unfortunate I guess
+
+[21:12:23.0000] <devsnek>
+scrap everything I said
+
+[21:12:23.0000] <Domenic>
+You need a new format that can have "checkpoints" for validity. NDJSON is one stab at that, but I'm unsure on the adoption.
+
+[21:14:05.0000] <devsnek>
+ndjson would serve the use cases I know of but I wouldn't suggest it being part of browsers
+
+[21:41:02.0000] <annevk>
+https://siguza.github.io/psychicpaper/ (test your parsers or ideally just have one of them)
+
+[21:44:00.0000] <annevk>
+Oh lol, they mitigated with more parsers
+
+[21:47:33.0000] <annevk>
+But also, what I thought was usage of XML is in fact several terrible dialects of XML
+
+[22:22:06.0000] <MikeSmith>
+annevk: wow
+
+[22:22:42.0000] <MikeSmith>
+> We can also ask ourselves how a bug like that could ever exist. Why the hell there are 4 different plist parsers on iOS. Why we are still using XML even. But I figure those are more philosophical than technical in nature.
+
+[22:22:46.0000] <MikeSmith>
+haha
+
+[22:31:46.0000] <annevk>
+Another instance of technical debt not being prioritized
+
+[01:00:45.0000] <nixi>
+hi
+
+[01:01:27.0000] <nixi>
+i have been looking for a formal specifications on which codecs to use in html video and i am not sure there is any
+
+[01:02:28.0000] <nixi>
+i have ben searching here mainly: https://html.spec.whatwg.org/multipage/media.html#the-video-element
+
+[03:51:21.0000] <annevk>
+nixi: there are no mandated formats atm
+
+[03:55:12.0000] <nixi>
+annevk: ah ok, so it is a free-for-all in terms of browser implementation of formats
+
+[03:55:55.0000] <annevk>
+unfortunately, yes, though I think through WebRTC there might be some mandated formats, but those might be scoped to WebRTC specifically, not sure
+
+[03:56:25.0000] <annevk>
+Hopefully AV1 is the way out of this mess
+
+[04:07:39.0000] <nixi>
+no daala?
+
+[06:15:48.0000] <annevk>
+If anyone is interested in somewhat more formalized storage architecture: https://github.com/whatwg/storage/pull/86
+
+[07:15:20.0000] <annevk>
+Another thing, I noticed that our snapshots now use the snapshot logos and it's rather nice: https://whatpr.org/storage/86.html
+
+[08:12:34.0000] <Domenic>
+There's a bug with the warning that I can't repro locally... it should say "this is a PR preview" not "not ready for implementation". But it only shows up on whatpr.org, not when I run the same commands locally.
+
+[08:21:05.0000] <annevk>
+Domenic: I suspect the PR preview software might need changes; tobie added that warning before we had something iirc
+
+[08:21:25.0000] <Domenic>
+Hmm
+
+[08:23:01.0000] <Domenic>
+Ah, yeah... https://github.com/tobie/pr-preview/blob/a38138ef02f65d8829a2c01c5a7195fa7b4ea941/lib/models/config.js#L44-L47
+
+[08:23:14.0000] <Domenic>
+It overrides the default md-warning set by our boilerplate
+
+[08:23:23.0000] <Domenic>
+That's awkward
+
+[08:23:35.0000] <Domenic>
+Maybe we can hard-code a WHATWG exception
+
+[08:27:24.0000] <Domenic>
+Filed https://github.com/tobie/pr-preview/issues/55
+
+[08:29:15.0000] <annevk>
+We could branch on params["md-status"] I guess
+
+[08:30:18.0000] <Domenic>
+Yeah that's what I ended up suggesting
+
+[08:36:00.0000] <annevk>
+https://github.com/tobie/pr-preview/pull/56
+
+
+2020-05-04
+[23:08:00.0000] <annevk>
+Nobody imlemented onslotchange...
+
+[06:34:35.0000] <MikeSmith>
+annevk: https://stackoverflow.com/questions/60465083/safari-cannot-load-local-js-file-reports-cross-origin-error
+
+[06:34:48.0000] <MikeSmith>
+and https://stackoverflow.com/questions/61592515/safari-throws-cors-error-loading-local-js-module
+
+[06:35:15.0000] <MikeSmith>
+Any idea why Safari is doing that when Chrome and Firefox don’t?
+
+[06:36:46.0000] <annevk>
+No, rwlbuis would be a good person to ping, but not sure where they hang out
+
+[06:37:27.0000] <MikeSmith>
+k
+
+[10:21:48.0000] <Krinkle>
+I believe we don't have a standard for how pages should be "saved" by a browser, is that right?
+
+[10:21:49.0000] <Krinkle>
+https://bugs.chromium.org/p/chromium/issues/detail?id=1077816
+
+[10:22:14.0000] <Krinkle>
+or for how a browser should render HTML/CSS over the file:/ protocol?
+
+[10:23:06.0000] <Krinkle>
+in particular to ensure that <link rel=stylesheet href=/foo.bar> responding with text/css also gets saved and then opened in a way the browser still recognises
+
+[10:33:26.0000] <zcorpan_>
+annevk: I've sent this re "master" in git: https://public-inbox.org/git/CAOAHyQwyXC1Z3v7BZAC+Bq6JBaM7FvBenA-1fcqeDV==apdWDg⊙mgc/T/#u
+
+[10:58:56.0000] <annevk>
+zcorpan_: replies are kinda missing the point unfortunately :/
+
+[16:53:14.0000] <Domenic>
+Krinkle: there is no such standard, indeed.
+
+
+2020-05-05
+[10:37:35.0000] <Bakkot>
+is there anyone here from the steering group who could provide an update on https://github.com/whatwg/sg/issues/63?
+
+[10:40:23.0000] <jgraham>
+https://github.com/web-platform-tests/wpt/blob/master/printing/print-microtask-after-navigate.html is there spec support for the idea that you can't call print when a document is unloading?
+
+[10:40:38.0000] <jgraham>
+Also I don't think the order of events in that test is what's claimed
+
+[10:41:19.0000] <Domenic>
+jgraham: only the fact that the first step is "The user agent may display a message to the user or return (or both)."
+
+[10:42:56.0000] <jgraham>
+Right, the spec always allows you to do nothing for print()
+
+[10:43:13.0000] <jgraham>
+Basically my question is "should I just delete that test, or is there actual value in it?"
+
+[10:43:54.0000] <Domenic>
+I mean, I assume there's value in testing for no crashes
+
+[10:44:22.0000] <Domenic>
+Probably worth asking the original author.
+
+[10:48:06.0000] <jgraham>
+Sure, there's always value in testing for no crashes, but at the moment the test times out in Firefox and Safari because they display a print dialog, so it's a rather expensive way to test that
+
+[10:48:30.0000] <jgraham>
+But OK, I'll ask the test author
+
+[11:15:40.0000] <annevk>
+Bakkot: I'm not sure they hang out here, I guess foolip and othermaciej sometimes do
+
+[11:17:40.0000] <annevk>
+Bakkot: I'd expect a bit more progress given https://github.com/whatwg/sg/issues/117#issuecomment-618033095, but probably still longer than desired
+
+[11:17:48.0000] <annevk>
+taking longer*
+
+[11:20:04.0000] <Bakkot>
+annevk: yeah, I'm mostly hoping to hear that it's something they're actively working on
+
+[11:20:19.0000] <Bakkot>
+the last message was in january promising updates
+
+[11:20:48.0000] <Bakkot>
+and it doesn't seem to have come up at the last meeting, per the notes
+
+[11:21:57.0000] <annevk>
+Bakkot: I suspect only https://github.com/whatwg/sg/issues/114 got tackled and this might take longer still, but I haven't asked anyone about it recently
+
+[11:25:09.0000] <Bakkot>
+yeah, and I'm glad to see progress on that one; unfortunately as editor of ecma-262 I am pretty firmly in the field of web technologies so it doesn't help me personally
+
+[15:48:15.0000] <TimothyGu>
+Domenic: for onerror, you could probably make the language a bit more precise using https://html.spec.whatwg.org/multipage/webappapis.html#event-handler-target?
+
+[15:51:13.0000] <MikeSmith>
+can somebody who has IE11 please test https://wpt.live/html/browsers/history/the-location-interface/location_origin.html and say what the result is?
+
+[15:55:07.0000] <MikeSmith>
+Bakkot: as an ecma-262 you might want to add info to https://github.com/whatwg/sg/issues/63 about how what the editors’ process is for identifying and handling non-normative changes
+
+[15:55:36.0000] <MikeSmith>
+in https://github.com/whatwg/sg/issues/63#issuecomment-570756354 I explained it as I understand it
+
+[15:56:19.0000] <MikeSmith>
+but the information would be more useful on record there coming from an actual editor rather than just me
+
+[15:56:54.0000] <Bakkot>
+MikeSmith I think your link to our contributor agreement is sufficient; I don't have anything to say beyond that
+
+[15:57:18.0000] <MikeSmith>
+ok
+
+[15:58:54.0000] <MikeSmith>
+anyway, thanks for not giving up on this, making an effort to get a response from the SG
+
+[16:06:14.0000] <MikeSmith>
+Bakkot: by the way, I am still lookin forward to a fix for that Salvation bug I reported :p
+
+[16:07:36.0000] <Bakkot>
+MikeSmith yeah, it's on my radar; I've just been working on a rewrite of it which has been taking up all the attention I've had for the project
+
+[16:08:27.0000] <MikeSmith>
+ok
+
+[16:08:52.0000] <MikeSmith>
+anyway, for the HTML checker I already have a workaround in place for now
+
+[16:10:25.0000] <Domenic>
+TimothyGu: that seems perfect, thank you
+
+[16:47:21.0000] <MikeSmith>
+interesting read https://lists.w3.org/Archives/Member/internal-gpu/2020May/0001.html
+
+
+2020-05-06
+[17:05:55.0000] <gsnedders>
+<meta http-equiv="Refresh" content="20; URL=page4.html"> when loaded at page1.html#foobar doesn't preserve the fragment, does it? (c.f. behaviour of the Location header on HTTP 3xx)
+
+[17:08:45.0000] <gsnedders>
+MikeSmith: WHY IS THAT IN MO SPACE?!
+
+[17:10:03.0000] <MikeSmith>
+😕
+
+[17:10:25.0000] <MikeSmith>
+oh MO = member only
+
+[17:10:38.0000] <MikeSmith>
+damn
+
+[17:10:47.0000] <MikeSmith>
+they should no even be using that list
+
+[17:11:33.0000] <gsnedders>
+like I can just about deal with sending an email saying "here's the connection details for the next telecon" in MO space, but everything else :grimmace:
+
+[17:11:40.0000] <MikeSmith>
+even weirder, there isn’t even a working group for the GPU work yet
+
+[17:11:47.0000] <gsnedders>
+I mean it's a CG right?
+
+[17:11:50.0000] <MikeSmith>
+yeah
+
+[17:12:01.0000] <MikeSmith>
+so that list should not even exist to begin with
+
+[17:12:11.0000] <gsnedders>
+a few CGs have group-only lists which are implemented as Member+group
+
+[17:12:16.0000] <MikeSmith>
+ah
+
+[17:12:24.0000] <MikeSmith>
+well that doesn’t seem so great
+
+[17:12:30.0000] <gsnedders>
+it may even be part of the default setup?
+
+[17:12:40.0000] <MikeSmith>
+yeah it would have to be I guess
+
+[17:12:41.0000] <gsnedders>
+https://lists.w3.org/Archives/Member/ looks like every CG does?
+
+[17:12:51.0000] <MikeSmith>
+/me looks
+
+[17:12:57.0000] <MikeSmith>
+sigh
+
+[17:13:11.0000] <MikeSmith>
+not good
+
+[17:13:17.0000] <MikeSmith>
+まずい
+
+[17:13:25.0000] <gsnedders>
+what guidelines do we give CG contributors? do we give any indiciation as to when which ML shoudl be used?
+
+[17:13:44.0000] <MikeSmith>
+I would hope so
+
+[17:13:46.0000] <MikeSmith>
+I will look
+
+[17:14:03.0000] <gsnedders>
+sorry if I seem snarky
+
+[17:14:25.0000] <gsnedders>
+but you know I always am about anything technical in MO space, and soemwhat snarky about admin stuff in MO space
+
+[17:15:01.0000] <MikeSmith>
+yeah as you should be
+
+[17:15:07.0000] <MikeSmith>
+as everybody should be
+
+[17:15:13.0000] <MikeSmith>
+https://www.w3.org/community/about/tool/#lists
+
+[17:15:19.0000] <MikeSmith>
+> Each group has three mailing lists by default
+
+[17:15:28.0000] <MikeSmith>
+problem number 1...
+
+[17:15:47.0000] <MikeSmith>
+> Community Groups must only use this list for administrative matters.
+
+[17:16:36.0000] <MikeSmith>
+I think maybe the internal-mygroup⊙wo list was originally intended only for discussions about patent-related stuff for CG’s specs
+
+[17:17:01.0000] <MikeSmith>
+ah well
+
+[17:18:24.0000] <MikeSmith>
+gsnedders: I hope you or somebody other than many has the psychic energy free to start a discussion somewhere asking for this to be fixed
+
+[17:18:38.0000] <MikeSmith>
+*you or somebody other than *me*
+
+[17:19:26.0000] <MikeSmith>
+(I sometimes like to refer to myself in the third person as “many”
+
+[17:21:13.0000] <gsnedders>
+I really don't have the energy to fight it when I'm not even paid to do anything outside of the CSS WG
+
+[17:26:00.0000] <MikeSmith>
+/me hands gsnedders some https://www.youtube.com/watch?v=mi1DUsfSH5Y to listen to
+
+[10:03:21.0000] <annevk>
+Domenic: Canary?
+
+[10:05:06.0000] <annevk>
+Domenic: seems really weird that macOS has hosts and Windows does not, but what do I know
+
+[10:05:10.0000] <Domenic>
+annevk: yep. Looks like sleevi's looking at it too... in general it's a known issue that Chromium has divergent URL parsing on different OSes.
+
+[10:56:39.0000] <annevk>
+Sounds like I need to get a BrowserStack account again
+
+[10:57:09.0000] <annevk>
+I'm a little worried Live URL Viewer might break down in IE6 though
+
+[10:57:23.0000] <Domenic>
+It breaks down in IE11
+
+[10:57:32.0000] <annevk>
+good times
+
+[10:57:40.0000] <Domenic>
+Back to <base> and <a> tests I guess
+
+[10:58:01.0000] <Domenic>
+I guess thankfully <base> isn't necessary for the case in question
+
+[11:01:47.0000] <Bakkot>
+> Chromium has divergent URL parsing on different OSes
+
+[11:01:49.0000] <Bakkot>
+wait what
+
+[11:01:53.0000] <Bakkot>
+is there an issue for that somewhere?
+
+[11:05:31.0000] <Domenic>
+I could swear there was, but I'm not finding it
+
+[11:05:50.0000] <Domenic>
+https://source.chromium.org/chromium/chromium/src/+/master:url/url_parse_file.cc;l=68;drc=0e223687cb484dd52c99a56813eaa2e142e9263a?originalUrl=https:%2F%2Fcs.chromium.org%2F anyway
+
+[11:07:37.0000] <Bakkot>
+neat, thanks
+
+[11:09:30.0000] <annevk>
+There are more general bugs on aligning Chromium with the URL parser though they mostly get activity from silly bots
+
+[11:10:17.0000] <annevk>
+/me takes a peek at registerProtocolHandler()
+
+[11:16:54.0000] <Domenic>
+As I search for this bug I'm adding more blocking bugs to https://bugs.chromium.org/p/chromium/issues/detail?id=660384
+
+[11:29:33.0000] <annevk>
+Thanks!
+
+[11:30:20.0000] <annevk>
+So registerProtocolHandler() is messy and https://github.com/whatwg/html/issues/481 is very much a thing in Firefox at least.
+
+[11:30:47.0000] <annevk>
+It seems to block navigating to a registered scheme for a fair number of code points, even if they end up percent-encoded.
+
+[11:32:43.0000] <Domenic>
+I was hoping you'd finish up your registerProtocolHandler() cleanup PR at some point
+
+[11:33:35.0000] <Domenic>
+But I guess you're gesturing at deeper problems. https://github.com/whatwg/html/issues/3377 is informative.
+
+[11:34:13.0000] <annevk>
+Yeah, I was looking at that and then found out what I thought was a non-issue is an issue too.
+
+[11:34:44.0000] <annevk>
+Well, or Firefox has a bug. Will look a bit more tomorrow.
+
+[14:35:03.0000] <saber1>
+Domenic: ping
+
+
+2020-05-07
+[18:13:41.0000] <saber1>
+Domenic: question about this test https://github.com/web-platform-tests/wpt/blob/master/html/semantics/interactive-elements/the-dialog-element/centering-iframe.sub.html#L17, shouldn't the margin be auto here to allow the element to be centered? I think all the tests expect the dialog element is centered
+
+[18:31:07.0000] <saber1>
+also for example these 2 test cases https://github.com/web-platform-tests/wpt/blob/master/html/semantics/interactive-elements/the-dialog-element/centering.html#L27-L28, shouldn't we test `top` and `bottom` here? because the inline start and inline end suppose to be left and right and they are set to 0?
+
+[21:47:00.0000] <MikeSmith>
+reason/reminder #999 for why I dislike the word “standards”: https://github.com/mdn/browser-compat-data/issues/6103
+
+[21:48:59.0000] <MikeSmith>
+what it comes down to is that “standard” and “standards track” are subjective, imprecise, ambiguous terms
+
+[21:50:39.0000] <MikeSmith>
+and we (me included) seem to keep finding new ways to collectively waste our time debating whether something is a “standard” or “standard track”
+
+[22:11:06.0000] <annevk>
+What stuff in WICG has two implementations?
+
+[22:11:53.0000] <annevk>
+Feature Policy's allow="" attribute came to mind, but I think that moved to WebAppSec
+
+[23:46:43.0000] <MikeSmith>
+annevk: good question
+
+[23:47:16.0000] <MikeSmith>
+and I can actually generate a report that would show
+
+[23:48:05.0000] <MikeSmith>
+well, I can find which ones that are documented in MDN/BCD have two implementations
+
+[23:48:17.0000] <MikeSmith>
+/me is running the repor tnow
+
+[23:50:08.0000] <MikeSmith>
+so far I know that https://wicg.github.io/budget-api/ does not a least
+
+[23:50:18.0000] <MikeSmith>
+hmm, but that one is long-obsolete anyway
+
+[23:50:50.0000] <MikeSmith>
+/me makes a note to update the BCD data for that one
+
+[23:54:09.0000] <MikeSmith>
+Entries API has some >1 implemented features
+
+[23:54:34.0000] <MikeSmith>
+well, one at leasat
+
+[23:54:39.0000] <MikeSmith>
+>    webkitGetAsEntry: dom-datatransferitem-webkitgetasentry in entries-api.json (https://wicg.github.io/entries-api/) has two or more implementations.
+
+[23:58:20.0000] <MikeSmith>
+OK yeah actually many or most Entries API features have two implementations
+
+[23:59:08.0000] <MikeSmith>
+a quick scroll through https://wicg.github.io/entries-api/ and the MDN annotations can be seen there
+
+[23:59:52.0000] <MikeSmith>
+see als0 https://w3c.github.io/mdn-spec-links/less-than-2.html?spec=entries-api
+
+[23:59:56.0000] <annevk>
+Ah yeah, that's HTML Standard upstreaming material
+
+[00:00:06.0000] <annevk>
+We should document that somewhere
+
+[00:00:11.0000] <MikeSmith>
+yeah
+
+[00:00:21.0000] <MikeSmith>
+well I am glad you asked the question
+
+[00:01:10.0000] <MikeSmith>
+because I now realize the tools I have made can be used for more than just the things I made them for :)
+
+[00:01:24.0000] <annevk>
+heh
+
+[00:02:03.0000] <MikeSmith>
+but yeah clearly that spec needs to graduate
+
+[00:02:22.0000] <MikeSmith>
+nothing should still be in the WICG when it’s that mature
+
+[00:05:40.0000] <annevk>
+well, the features are
+
+[00:06:08.0000] <annevk>
+it's kind of a problem that this is still somewhere on the side with all that new file activity going on
+
+[00:08:56.0000] <MikeSmith>
+I guess maybe Joshua has not been able to make time needed
+
+[00:09:11.0000] <annevk>
+https://github.com/WICG/entries-api/issues/1 is pretty bad for instance
+
+[00:09:19.0000] <MikeSmith>
+/me looks
+
+[00:09:28.0000] <MikeSmith>
+oh wow
+
+[00:09:40.0000] <MikeSmith>
+and june 2016
+
+[00:09:44.0000] <MikeSmith>
+nearly 4 years
+
+[00:09:59.0000] <annevk>
+I wonder if all this new file activity accounts for this set of APIs
+
+[00:10:29.0000] <MikeSmith>
+hope so?
+
+[00:10:31.0000] <annevk>
+Mek: ^^
+
+[00:11:05.0000] <MikeSmith>
+oh hey the much-maligned https://wicg.github.io/netinfo/ spec also has two-implementations features?
+
+[00:11:24.0000] <MikeSmith>
+https://wicg.github.io/netinfo/#connection-attribute
+
+[00:12:03.0000] <annevk>
+MikeSmith: which implementations? The top says Chrome and Edge, that doesn't count
+
+[00:12:21.0000] <MikeSmith>
+Android Firefox I guess
+
+[00:12:46.0000] <annevk>
+That seems bad if true
+
+[00:12:56.0000] <MikeSmith>
+from version 31+
+
+[00:13:03.0000] <MikeSmith>
+/me goes some git blame
+
+[00:14:31.0000] <MikeSmith>
+https://github.com/mdn/browser-compat-data/pull/1691
+
+[00:16:35.0000] <MikeSmith>
+https://caniuse.com/#feat=netinfo shows same I guess
+
+[00:17:23.0000] <MikeSmith>
+(though it shows v68 because that is the earliest Android Firefox version that caniuse has data for, I think)
+
+[00:18:14.0000] <MikeSmith>
+https://wicg.github.io/BackgroundSync/spec/#sync-event is another >1 feature
+
+[00:20:53.0000] <MikeSmith>
++ Speech API
+
+[00:26:10.0000] <MikeSmith>
++ Visual Viewport API https://wicg.github.io/visual-viewport/
+
+[03:06:10.0000] <annevk>
+So how are registerProtocolHandler() and text/plain connected?
+
+[06:39:14.0000] <Domenic>
+saber1: can you open an issue on web-platform-tests so I can investigate later?
+
+[06:40:36.0000] <Domenic>
+MikeSmith: +1 to your sentiment though. Specifications are more important here than any formal standardization status (Living Standard, REC, Internet Standard, ...)
+
+[06:43:31.0000] <annevk>
+Is building HTML locally without wattsi broken?
+
+[06:43:37.0000] <annevk>
+I get "curl: (92) HTTP/2 stream 0 was not closed cleanly: PROTOCOL_ERROR (err 1)"
+
+[06:47:27.0000] <annevk>
+Fortunately a double </p> was all I did wrong this time around
+
+[06:53:43.0000] <Domenic>
+annevk: I've seen similar errors from people with outdated curls
+
+[06:54:45.0000] <annevk>
+Domenic: oh, I think my curl is whatever ships with macOS
+
+[06:55:21.0000] <Domenic>
+Yeah, it feels like macOS defaults are getting more and more outdated...
+
+[07:04:34.0000] <saber1>
+Domenic: done! https://github.com/web-platform-tests/wpt/issues/23459
+
+[07:26:36.0000] <domfarolino>
+What is an "overflow clip" in https://www.w3.org/TR/intersection-observer/#ref-for-intersectionobserver-intersection-root%E2%91%A5
+
+[07:52:02.0000] <benjamingr__>
+Hey
+
+[07:52:20.0000] <benjamingr__>
+I started a document about EventEmitter and EventTarget
+
+[07:52:44.0000] <benjamingr__>
+If anyone can take a look and contribute one of the gagillion things we've missed, you're welcome to do so https://docs.google.com/document/d/1NFARs04-4U_2y6Ssw9Lqu1GMXBUM981-NO9PLJWifTI/edit?usp=sharing
+
+[07:59:46.0000] <annevk>
+benjamingr__: seems fine, added some nits
+
+[08:00:06.0000] <annevk>
+benjamingr__: as far as EventTarget goes that is, not very familiar with Emitter
+
+[08:01:03.0000] <benjamingr__>
+Awesome, thanks Anne! Appreciated, the target is to see if we can add AbortController to Node :]
+
+[08:02:35.0000] <benjamingr__>
+That's the session https://github.com/openjs-foundation/summit/issues/273 - it'll be online and you're of course welcome to attend.
+
+[08:22:29.0000] <annevk>
+benjamingr__: putting EventTarget in Node.js seems cool FWIW; I'm also still open to figuring out ways to harmonize EventTarget / EventEmitter more within compatibility limits. There was a recent attempt at TC39 but that got abandoned.
+
+[08:25:10.0000] <benjamingr__>
+Yeah, basically having fetch in Node means AbortController in Node and EventTarget in Node (and whatwg streams in Node but that's another big story). EventTarget seems like the one where we'd start.
+
+[08:46:44.0000] <Mek>
+The "problem" with entries-api is that while it's implemented pretty widely, we wish it wasn't... I.e. it's documenting chrome's implementation because other engines were implementing it anyway, but we don't like the API, and would love to deprecate it/replace it with something better/more modern
+
+[08:47:10.0000] <Mek>
+MikeSmith / annevk ^^
+
+[08:47:41.0000] <annevk>
+Mek: unship it?
+
+[08:48:00.0000] <annevk>
+but that seems unlikely to happen...
+
+[08:48:50.0000] <Mek>
+certainly not any time soon, yes. We have some vague hope that the native file system API will provide all the same functionality, but as long as that is chrome only that doesn't help us unship the cross-browser (but webkit prefixed) entries API bits...
+
+[08:50:11.0000] <annevk>
+Mek: but also, webkitdirectory seems like a win?
+
+[08:51:12.0000] <Mek>
+having directory upload support in some way seems like a win, yes. But webkitdirectory has some issues. For one it requires recursively iterating over the entire directory, creating javascript objects for all files in the directory when a user selects a directory. Which doesn't work for large directories.
+
+[09:01:35.0000] <annevk>
+Domenic: is something durable if it lasts for a week? I guess it depends on who you ask
+
+[09:01:48.0000] <Domenic>
+I mean it's more durable than session storage
+
+[09:01:56.0000] <Domenic>
+Hmm maybe investigate antonyms of session...
+
+[09:02:05.0000] <Domenic>
+Or just go with "more-durable" ^_^
+
+[09:02:21.0000] <annevk>
+Yeah let's do that
+
+[09:47:30.0000] <saber1>
+Domenic: do you know why this test case expect offsetParent to be null https://github.com/web-platform-tests/wpt/blob/master/html/semantics/interactive-elements/the-dialog-element/dialog-scrolled-viewport.html#L24?
+
+[11:39:37.0000] <Domenic>
+saber1: I don't know. It may be worth filing a spec bug since Chrome implements that behavior. My guess is that it is an unspecced consequence of https://fullscreen.spec.whatwg.org/#top-layer.
+
+[12:35:20.0000] <saber1>
+Domenic: sure I can file a bug, spec bug against the dialog element or top layer?
+
+[12:35:36.0000] <Domenic>
+saber1: probably on whatwg/html would get the most attention
+
+[12:35:48.0000] <Domenic>
+Although hmm
+
+[12:35:52.0000] <Domenic>
+Maybe test fullscreen elements
+
+[12:36:10.0000] <Domenic>
+If they have offsetParent === null too then I'd file on whatwg/fullscreen
+
+[12:41:04.0000] <saber1>
+Domenic: it's `<body>` in both Firefox and Chrome
+
+[12:45:06.0000] <Domenic>
+OK cool, then yeah, more likely a HTML bug. (Which I am currently guessing people will agree on being a Chrome bug.)
+
+[12:54:27.0000] <saber1>
+Domenic: thanks! filed https://github.com/whatwg/html/issues/5520
+
+[13:21:55.0000] <annevk>
+Mek: appreciated your thoughts on that btw; guess I should think about it some more and maybe look into usage
+
+[13:27:15.0000] <annevk>
+Domenic: given Joshua’s comment, temporal storage bucket?
+
+[13:40:01.0000] <Domenic>
+annevk: I don't hate it.
+
+[13:40:37.0000] <Domenic>
+In the end I think I kind of prefer "local" to all of these... i.e. saying that local and session storage are the two types of storage. localStorage and sessionStorage are specific APIs that tap into those types, but there can be other types, like IDB and some hypothetical future session-IDB.
+
+
+2020-05-08
+[21:02:02.0000] <annevk>
+Yeah, maybe “local” is our best pick. I also thought of “pressure-based”, but…
+
+[21:03:05.0000] <annevk>
+I’m not sure I want this term to show up in APIs though. Prolly rather not.
+
+[23:32:48.0000] <annevk>
+Domenic: you might want to follow https://github.com/unicode-org/icu4x/issues/73 as well as I think that's something you care about
+
+[02:04:55.0000] <gsnedders>
+/me wonders if we can make document.evaluate static by default
+
+[02:09:04.0000] <gsnedders>
+or am I misunderstanding the iterator/snapshot difference?
+
+[04:36:31.0000] <tobie>
+annevk: changes to pr-preview deployed. LMK if they work for you or if you're having issues.
+
+[05:35:31.0000] <annevk>
+tobie: oh cool, let me try push another commit to a PR
+
+[05:36:35.0000] <annevk>
+tobie: seems to work great: https://whatpr.org/storage/86.html
+
+[05:36:39.0000] <annevk>
+thanks
+
+[05:47:23.0000] <zcorpan>
+domfarolino: do you have thoughts on the element scroll container case here? https://github.com/whatwg/html/issues/5408#issuecomment-623981827
+
+[06:48:28.0000] <tobie>
+annevk: Great! I have fixed my notification settings, so I think I will be prompted more quickly in the future. :)
+
+[07:39:03.0000] <domfarolino>
+seems zcorpan is gone now :(
+
+[09:14:14.0000] <treora>
+Hi all; I wonder if there are any IDL specs that narrow down attribute types for subclasses.
+
+[09:14:14.0000] <treora>
+For example, in <https://dom.spec.whatwg.org/#interface-node>, the Node interface contains: “readonly attribute Document? ownerDocument;”
+
+[09:14:14.0000] <treora>
+This attribute’s behaviour is then defined as: “The ownerDocument attribute’s getter must return null, if this is a document, and this’s node document otherwise.”
+
+[09:14:14.0000] <treora>
+I’d think one could then create an IDL for the Document interface that says “readonly attribute null ownerDocument;”
+
+[09:14:14.0000] <treora>
+But the spec does not contain this, and accordingly neither do (e.g.) Typescript’s dom type declarations, and as a result people’s code contains needless type errors.
+
+[09:14:16.0000] <treora>
+Any opinions here on whether/where/how this could (or might already) be addressed somehow?
+
+[09:18:04.0000] <Domenic>
+treora: specs do not do that because doing so would change JS observable behavior and require extra C++ implementation, by causing the overridden property to no longer inherit from the prototype.
+
+[09:18:27.0000] <Domenic>
+treora: TypeScript and IDL are not isomorphic, so it is unfortunate that people try to derive TypeScript types from IDL.
+
+[09:18:53.0000] <Domenic>
+I.e. TypeScript is for catching type errors, so lots of little subtypes maybe is useful. IDL is for generating C++ code, so lots of little subtypes would be actively bad.
+
+[09:25:00.0000] <treora>
+Thanks for explaining. I assumed such narrowing down would indeed be kept outside of the interface definitions, but could perhaps be listed somewhere as ‘corrolaries’, a sort of appendix with some machine-readable implications of the spec.
+
+[09:25:37.0000] <treora>
+*corollaries :)
+
+[09:28:22.0000] <treora>
+Of course it could be done in projects like Typescript, but it seems more easily maintained and more reusable when kept ‘closer to the spec’.
+
+[09:29:55.0000] <treora>
+As you say it is unfortunate that IDL is used to derive types at all, perhaps this would need a more thorough approach..
+
+[09:31:36.0000] <Domenic>
+I don't think that's something that would make sense in the spec, since it's not useful for implementing.
+
+[09:31:45.0000] <Domenic>
+It would make sense for it to exist in TypeScript if TypeScript is going to use it.
+
+[09:32:49.0000] <treora>
+ok, clear.
+
+[09:48:02.0000] <annevk>
+I wonder if that case could fall out of formalized slots
+
+[09:50:49.0000] <annevk>
+Maybe, but prolly not worth the complexity
+
+[10:17:16.0000] <treora>
+There are better examples than the above by the way, e.g.  I suppose a ChildNode could be guaranteed to always have a parentNode.
+
+[10:18:48.0000] <treora>
+I found a place for typescript where I guess these things might go: https://github.com/microsoft/TSJS-lib-generator/blob/master/inputfiles/overridingTypes.json
+
+[10:48:47.0000] <saber1>
+Domenic: this test https://github.com/web-platform-tests/wpt/blob/master/html/semantics/interactive-elements/the-dialog-element/abspos-dialog-layout.html#L200-L210, I guess I understand what it means. The containing block is the `absoluteContainer`, and the test expects the dialog element used this containing block to calculate it's position. Please feel free to correct if I am wrong. My question is, I don't see this is how
+
+[10:48:47.0000] <saber1>
+the spec is defined? I'd still expect the dialog element to use the viewport
+
+[11:03:00.0000] <Domenic>
+saber1: I'm sorry, I'm really not a dialog expert... it's best to post these questions on some public forum and gather input from those that are.
+
+[11:03:31.0000] <saber1>
+gotcha, thanks!
+
+[11:05:08.0000] <annevk>
+Domenic: do you know who to contact at Chrome?
+
+[11:05:37.0000] <annevk>
+Domenic: perhaps you could introduce them to saber1 to move things along a bit more quickly? We're trying to ship it in Fx as I understand
+
+[11:05:40.0000] <Domenic>
+annevk: @mfreed7 is my go-to DOM team contact
+
+[11:05:40.0000] <annevk>
+it*
+
+[11:06:35.0000] <annevk>
+k
+
+[11:06:44.0000] <Domenic>
+I'm happy to do an intro email if that'd be appreciated; just let me know what email address to use.
+
+[11:26:36.0000] <annevk>
+TabAtkins: heh, I might even supply a PR to Bikeshed 🙂
+
+[11:26:46.0000] <TabAtkins>
+yessssssss
+
+[11:27:31.0000] <annevk>
+TabAtkins: just need to figure out a bit more what exactly we need; but perhaps the easiest fix would be a similar thing to MDN annotations, a switch to allow us to use our own styles and scripts
+
+[11:59:56.0000] <Domenic>
+annevk: Should we maybe require filing bugs on Node.js when the URL Standard changes? Since they have a spec-complaint implementation and are actually going to pay attention to the kinds of minor changes that have happened recently.
+
+[12:00:22.0000] <Domenic>
+I will file one for the recent changes
+
+[12:47:59.0000] <annevk>
+Domenic: thanks, I like that
+
+[12:49:12.0000] <annevk>
+Domenic: the host parser restrictions contributor is from Node’s team, but I should prolly have double checked
+
+[12:54:40.0000] <Domenic>
+Ah yeah true
+
+[12:59:47.0000] <annevk>
+Domenic: I’ve been idly wondering if we should have more process around URL as it gets more stable, but not entirely clear we’re there yet
+
+[13:00:08.0000] <Domenic>
+Yeah, I did notice that the last PR got merged with several boxes left unchecked
+
+[13:00:20.0000] <Domenic>
+Maybe starting with Safari and Node.js bugs, since they've demonstrated care, would be good.
+
+[13:00:29.0000] <annevk>
+Would be nice to have two browsers fully comply
+
+[13:00:48.0000] <annevk>
+Oh a non-editorial PR?
+
+[13:06:56.0000] <Domenic>
+Yeah https://github.com/whatwg/url/pull/497
+
+[13:09:49.0000] <annevk>
+Maybe one thing to do is confirm each browser has a URL tracking bug remaining
+
+[13:11:21.0000] <annevk>
+I figures for that one I could decide for Fx and we have bugs on file, but a bit sloppy indeed
+
+[13:13:14.0000] <annevk>
+Figured*
+
+[13:50:56.0000] <saber1>
+creating a PR to whatwg/html, how do I add <!-- ACKS, I don't see it anywhere
+
+[14:31:43.0000] <Domenic>
+saber1: in the `source` file it's around line 120803
+
+
+2020-05-09
+[11:27:11.0000] <annevk>
+If people could double check https://github.com/whatwg/url/issues/415#issuecomment-626195881 that’d be great!
+
+[13:49:56.0000] <shu>
+annevk: i apologize for ljharb being unproductive
+
+[13:50:32.0000] <shu>
+annevk: i'd be happy to review the IsHTMLL PR next week if you'd like to reopen it and just ignore his comments, if he comments more
+
+[16:42:35.0000] <MikeSmith>
+wow https://stackoverflow.com/questions/61672829/how-does-chrome-decide-what-to-highlight-when-you-double-click-japanese-text
+
+[16:42:38.0000] <MikeSmith>
+pretty cool
+
+[16:47:22.0000] <MikeSmith>
+> it turns out v8 has a non-standard multi-language word segmenter and it handles Japanese
+
+[16:47:36.0000] <MikeSmith>
+> Windows already have the ability to select the correct word when double clicking on a Japanese word. You don't even need Chrome for this
+
+[16:48:32.0000] <MikeSmith>
+bravo ICU
+
+[16:51:32.0000] <devsnek>
+fetch can use h2c right?
+
+[16:54:24.0000] <MikeSmith>
+devsnek: the fetch spec doesn’t say anything about it, right?
+
+[16:54:30.0000] <devsnek>
+i don't think so
+
+[16:55:01.0000] <MikeSmith>
+I guess it would be orthogonal to fetch behavior
+
+[16:55:37.0000] <MikeSmith>
+I mean, I don’t think there’s anything in specified fetch requirements/behavior that would prevent it
+
+[16:55:54.0000] <devsnek>
+yeah i don't think there's a technical limitation
+
+[16:56:05.0000] <devsnek>
+but i know lately browsers have been limiting things to https
+
+[16:56:28.0000] <MikeSmith>
+ah
+
+[16:56:44.0000] <MikeSmith>
+limiting to secure contexts
+
+[16:57:01.0000] <MikeSmith>
+..which is some cases can be non-https
+
+[16:57:07.0000] <MikeSmith>
+e.g, localhost case
+
+[16:58:32.0000] <MikeSmith>
+or rather, the 127.0.0.1 case I guess
+
+
+2020-05-10
+[17:00:39.0000] <MikeSmith>
+hmm, word selection of Japanse text also works as expected in Firefox and Safari on macOS, so maybe macOS has this built in from ICU too (as Windows does)
+
+[17:01:46.0000] <devsnek>
+it is a reasonable thing to have
+
+[17:01:59.0000] <devsnek>
+i wish polm23 didn't mention v8BreakIterator
+
+[00:10:07.0000] <annevk>
+What's h2c?
+
+[02:11:25.0000] <MikeSmith>
+annevk: abbreviation for cleartext HTTP/2
+
+[02:11:27.0000] <MikeSmith>
+right?
+
+[02:12:27.0000] <annevk>
+I see, I guess there's nothing prohibiting that at the moment
+
+[02:14:25.0000] <MikeSmith>
+given that browsers support it, I guess it’s sort of moot anyway
+
+[02:14:34.0000] <MikeSmith>
+as far as fetch goes
+
+[02:14:55.0000] <MikeSmith>
+or anything else in frontend JavaScript code in browsers
+
+[02:15:35.0000] <MikeSmith>
+though I guess it could maybe be used in Node, with fetch
+
+[02:16:00.0000] <MikeSmith>
+if Node has support
+
+[02:16:56.0000] <MikeSmith>
+I think for server-server communication or backend stuff in general, cleartext HTTP2 has some use cases
+
+[02:17:46.0000] <MikeSmith>
+I enabled it in the (Jetty) backend for the HTML checker web service
+
+[02:19:33.0000] <MikeSmith>
+in the W3C deployment of the HTML checker, the TLS termination happens at another level anyway, so there’s no point in TLS-enabling the checker itself anyway
+
+[04:06:40.0000] <annevk>
+MikeSmith: pretty sure server-server also needs TLS to be secure
+
+[04:07:22.0000] <MikeSmith>
+really
+
+[04:07:38.0000] <MikeSmith>
+seems like in some situations that could just be overkill
+
+[04:08:23.0000] <MikeSmith>
+I mean in the case of the HTML checker, it is getting the requests from a load balancer, inside the W3C intranet
+
+[04:10:32.0000] <MikeSmith>
+to MITM that traffice, the attacker would need to already have breached the firewall and have access to internal network
+
+[04:13:49.0000] <MikeSmith>
+well and then there’s the fact that the cert name is for validator.w3.org, and the host name for both the load balancer and the individual checker instance is the same, so I don’t even know how I could have a separate cert for the checker
+
+[04:14:49.0000] <MikeSmith>
+I guess the load balancer just calls the checker instances by IP address
+
+[04:16:43.0000] <MikeSmith>
+anyway I suppose there’s still some way to deploy TLS on the checker instances too, in that network architecture. But if so I don’t know how
+
+[04:20:26.0000] <annevk>
+I’m pretty sure you should not rely on the network being secure, but you could prolly get by with self-signed certificates
+
+[04:50:06.0000] <MikeSmith>
+I can imagine that being the ideal thing to do in theory, but I wonder whether in practice most network admins ever seriously estimate that to be worth the added overhead enough to justify really doing it
+
+[04:56:41.0000] <MikeSmith>
+at that level to me it seems similar to trying to secure IPC communication between applications on your laptop, so that in case somebody ever steals your laptop, at least they won’t be able to eavesdrop on how any applications are your laptop are communicating with each other
+
+[05:16:08.0000] <annevk>
+MikeSmith: it might depend a bit on the scale of your network, but there were some high profile incidents around this
+
+[05:18:24.0000] <MikeSmith>
+OK
+
+[05:19:15.0000] <MikeSmith>
+well I basically have zero domain knowledge about this area anyway, so I’t just talking out of my hat
+
+[10:59:14.0000] <Domenic>
+I'm pretty sure a major part of the government hacks that Snowden leaked were using the fact that server-server was not secure.
+
+[10:59:35.0000] <Domenic>
+"SSL added and removed here" pointing to an intranet
+
+[11:00:07.0000] <Domenic>
+https://cdn57.androidauthority.net/wp-content/uploads/2014/06/SSL-Added-and-Removed-Here.jpg
+
+[11:01:03.0000] <Domenic>
+https://blog.encrypt.me/2013/11/05/ssl-added-and-removed-here-nsa-smiley/
+
+[12:43:17.0000] <annevk>
+Thanks for digging that up, that’s what I meant
+
+
+2020-05-11
+[21:25:33.0000] <annevk>
+MikeSmith: could use your input on https://github.com/whatwg/url/pull/503, especially around hyphens
+
+[01:55:03.0000] <annevk>
+2022 might have been a bit optimistic with the kind of bugs we're still finding in decade-old features
+
+[01:55:50.0000] <annevk>
+/me is now idly wondering whether anyone put 2022 as "too soon"
+
+[09:03:53.0000] <annevk>
+Domenic: I know there's quite a few PRs outstanding at this point from me, but https://github.com/whatwg/url/pull/503 is the one that blocks most things in flight I think
+
+[09:04:13.0000] <Domenic>
+Dang OK, that's the one that requires the most understanding :)
+
+[09:05:04.0000] <annevk>
+Domenic: so I'm also fine with you doing your own thing to be clear
+
+[09:06:09.0000] <annevk>
+Domenic: the other priority-related thingie I have is that my BrowserStack access is for the next two weeks; perhaps unlikely we get all the file URL stuff before then, but hopefully we can at least make a dent in answering the questions we need for a decision
+
+[09:06:32.0000] <Domenic>
+Sounds good. Hoping to get to most of the PRs today, but we'll see.
+
+[09:17:25.0000] <annevk>
+Domenic: yeah, thinking some more the other thing that might be nice for your colleague is COOP, but that's also involved
+
+[09:18:33.0000] <annevk>
+/me is quite happy with the URL refactoring/fixing-all-the-issues distraction he created for himself
+
+[09:18:42.0000] <Domenic>
+COOP keeps coming back as "this is almost done; here are some things to fix. Also I'd like to have domenic and mkwst take a look". And then I figure I can wait until those things are fixed :). It's probably more helpful to get in early though, heh.
+
+[09:19:28.0000] <annevk>
+I think now would be a good time to pile on, basically
+
+[09:19:54.0000] <annevk>
+I also have the feeling I'm reading over stuff
+
+[09:21:40.0000] <annevk>
+Looking at some of the IDL examples I wonder if that's where all the bad prose in specifications originates from
+
+[09:22:21.0000] <annevk>
+"If the familyName attribute is null" wait what IDL itself is promoting calling a public API
+
+[09:24:11.0000] <Domenic>
+Nice catch
+
+[09:25:39.0000] <annevk>
+Also, I didn't know https://heycam.github.io/webidl/#get-the-underlying-value was a thing. Should that even exist?
+
+[10:48:04.0000] <Domenic>
+It's internal
+
+[10:48:29.0000] <Domenic>
+Hmm but maybe it could be merged with "getter steps"
+
+
+2020-05-12
+[22:43:58.0000] <annevk>
+MikeSmith: even percent encode on its own would have a hyphen? I guess I should try that and see what people think
+
+[22:46:19.0000] <MikeSmith>
+annevk: yeah I think “percent-encode”, always, would make sense in this case
+
+[22:46:41.0000] <MikeSmith>
+see also https://developer.mozilla.org/en-US/docs/Glossary/percent-encoding, which has a hyphen
+
+[22:46:59.0000] <MikeSmith>
+well and https://en.wikipedia.org/wiki/Percent-encoding too
+
+[22:47:10.0000] <annevk>
+MikeSmith: I would kinda expect conditionally-UTF-8 percent-encode then though (but I'm not going for that name anymore I think)
+
+[22:47:32.0000] <annevk>
+MikeSmith: yeah, but that's a tad different from "To percent-encode, ..." but fair
+
+[22:48:10.0000] <annevk>
+Oh no, Wikipedia has percent-encode in that way. Great, let's do that
+
+[22:49:36.0000] <MikeSmith>
+more data points: “percent-encode” throughout https://tools.ietf.org/html/rfc3986#section-2.4
+
+[22:50:23.0000] <MikeSmith>
+https://metacpan.org/pod/URI::Escape
+
+[22:50:26.0000] <MikeSmith>
+etc
+
+[22:52:21.0000] <MikeSmith>
+annevk: why “conditionally-UTF-8 percent-encode”?
+
+[22:52:43.0000] <MikeSmith>
+oh, that means it *might* be UTF-8?
+
+[22:52:47.0000] <MikeSmith>
+if so then yeah
+
+[22:53:04.0000] <MikeSmith>
+/me reads the spec/PR
+
+[22:54:28.0000] <MikeSmith>
+ah, that’s not in the spec or PR yet — just a comment?
+
+[22:54:45.0000] <MikeSmith>
+I guess that’s why I didn’t read it in context
+
+[23:01:09.0000] <annevk>
+MikeSmith: yeah, sorry
+
+[23:01:53.0000] <annevk>
+MikeSmith: I could have presented the questions a bit clearer, but your and Domenic's feedback has helped a lot in figuring out an "ideal" end state
+
+[01:48:41.0000] <annevk>
+MikeSmith: could you maybe review https://github.com/whatwg/html/pull/5537?
+
+[08:31:07.0000] <annevk>
+Domenic: so looking at that file URL fix in Chrome I noticed this line
+
+[08:31:12.0000] <annevk>
+> FAIL Parsing: <//d:> against <file:///C:/a/b> assert_equals: href expected "file:///d:" but got "file:///D:"
+
+[08:31:28.0000] <annevk>
+But there's no uppercasing for https://jsdom.github.io/whatwg-url/#url=ZmlsZTphOlx0ZXN0&base=YWJvdXQ6Ymxhbms=
+
+[08:41:33.0000] <annevk>
+https://jsdom.github.io/whatwg-url/#url=Ly9kOg==&base=ZmlsZTovLy9DOi90ZXN0 hmm
+
+[09:02:49.0000] <Domenic>
+You mean there's no uppercasing in the standard? yeah, that was interesting.
+
+[09:04:00.0000] <Domenic>
+Jeez Edge doesn't even have TextEncoder
+
+[09:04:02.0000] <annevk>
+Domenic: well but I can't reproduce in Chrome
+
+[09:04:09.0000] <Domenic>
+Oh I can, on Windows
+
+[09:04:15.0000] <annevk>
+Oh Windows
+
+[09:04:21.0000] <Domenic>
+Yeah most of this is behind an #ifdef
+
+[09:04:39.0000] <annevk>
+I should have tested on Windows
+
+[09:05:19.0000] <annevk>
+This would be easy to add to normalized-windows-drive-letter
+
+[09:06:10.0000] <annevk>
+I gotta go for a bit, might not get back to this until tomorrow
+
+[09:06:16.0000] <Domenic>
+I'm going to add the test cases from that crbug to urltestdata.json
+
+[15:14:12.0000] <MikeSmith>
+so from https://github.com/validator/validator/issues/958 I become aware that we have on* event-handler IDL attributes defined in the CSS Transitions spec rather then the HTML spec
+
+[15:14:32.0000] <MikeSmith>
+do we have some consistent policy of dealing with those kinds of cases?
+
+[15:14:43.0000] <MikeSmith>
+*policy for dealing with
+
+[15:16:54.0000] <MikeSmith>
+ah I see now that spec does at least also define the corresponding content attributes
+
+[15:17:01.0000] <MikeSmith>
+https://drafts.csswg.org/css-transitions/#event-handlers-on-elements-document-objects-and-window-objects
+
+[15:18:28.0000] <MikeSmith>
+so anyway is it fine for those attributes to not be incorporated into the HTML spec but just continue to remain only in a separate spec?
+
+[15:18:53.0000] <MikeSmith>
+do we have a policy for this written down somewhere? guidance for editors of other specs?
+
+
+2020-05-13
+[23:16:28.0000] <annevk>
+MikeSmith: yes, "don't monkey patch"
+
+[23:16:36.0000] <annevk>
+MikeSmith: I think there might be an issue open for this against HTML
+
+[23:16:43.0000] <MikeSmith>
+ok
+
+[23:16:54.0000] <annevk>
+MikeSmith: https://github.com/whatwg/html/issues/5204
+
+[23:19:16.0000] <annevk>
+MikeSmith: and filed https://github.com/w3ctag/design-principles/issues/184
+
+[23:20:25.0000] <MikeSmith>
+/me loosk
+
+[23:20:56.0000] <MikeSmith>
+ah cool
+
+[23:20:58.0000] <MikeSmith>
+thanks
+
+[23:22:57.0000] <MikeSmith>
+in other news, the UI Events spec doesn’t seem to actually define any event handlers named “onfocusin” and “onfocusout” (despite defining “focusin” and “focusout” events)
+
+[23:24:19.0000] <MikeSmith>
+and blink and gecko don’t seem to have “onfocusin” and “onfocusout” event handlers, though webkit does
+
+[23:25:03.0000] <annevk>
+MikeSmith: that has an issue too
+
+[23:25:11.0000] <MikeSmith>
+aha
+
+[23:25:14.0000] <annevk>
+MikeSmith: (UI Events is a mess in general)
+
+[23:25:18.0000] <MikeSmith>
+yeah
+
+[23:25:29.0000] <MikeSmith>
+and I vaguely recall having asked about this before
+
+[23:25:33.0000] <annevk>
+MikeSmith: the whole lot of focus events ought to be moved to HTML
+
+[23:25:40.0000] <MikeSmith>
+right
+
+[23:25:45.0000] <MikeSmith>
+that would be nice
+
+[23:25:49.0000] <MikeSmith>
+I vote for that
+
+[23:26:18.0000] <annevk>
+If we have focusin/focusout we should also have the event handlers
+
+[23:26:37.0000] <MikeSmith>
+yeah
+
+[23:27:02.0000] <MikeSmith>
+anyway, found https://github.com/whatwg/html/issues/4542 Should `onfocusin`/`onfocusout` IDL attributes be added?
+
+[23:27:18.0000] <MikeSmith>
+and https://github.com/whatwg/html/issues/3514 Define all focus events
+
+[01:50:43.0000] <annevk>
+MikeSmith: https://github.com/w3c/webappsec-feature-policy/issues/359#issuecomment-627845363 wants another tech writer opinion 🙂
+
+[03:12:26.0000] <annevk>
+ta
+
+[08:04:19.0000] <Domenic>
+Wow I was unsure on permission vs. permissions but that "right policy" argument has me solidly convinced.
+
+[09:08:54.0000] <annevk>
+Domenic: quick check, is the default revert commit message fine for the title or did we have a different style, e.g., "Revert: ..."?
+
+[09:09:06.0000] <annevk>
+I should probably include the information from OP in the body for clarity
+
+[09:09:08.0000] <Domenic>
+Default is what I remember
+
+[09:09:12.0000] <annevk>
+k
+
+[09:09:25.0000] <annevk>
+And yeah, I regret not testing that one, that was dumb
+
+[09:27:35.0000] <annevk>
+Domenic: I should have looked at mgiuca's branch earlier, that has an approach that probably works
+
+[09:27:43.0000] <Domenic>
+Nice
+
+[09:34:28.0000] <Domenic>
+annevk: can you use spec-factory to give Infra the latest makefile?
+
+[09:35:16.0000] <annevk>
+Hmm, it should have created a PR
+
+[09:35:57.0000] <annevk>
+Domenic: https://github.com/whatwg/infra/pull/301
+
+[09:36:27.0000] <annevk>
+I guess I could run it again though I'm worried that some repos that haven't merged it will get a duplicate
+
+[09:36:43.0000] <Domenic>
+It got outdated hmm
+
+[09:37:48.0000] <annevk>
+yeah that's weird
+
+[09:38:12.0000] <Domenic>
+The GitHub button seemed to work
+
+[09:41:03.0000] <annevk>
+ooh
+
+[09:41:08.0000] <annevk>
+i think this is my fault
+
+[09:41:11.0000] <annevk>
+let me fix something
+
+[09:42:09.0000] <annevk>
+I had enabled "Require branches to be up to date before merging " in a few places without realizing what a pain it was
+
+[09:42:14.0000] <Domenic>
+Ah yeah
+
+[09:42:29.0000] <annevk>
+forgot to disable it here
+
+[14:29:04.0000] <saber1>
+Domenic: I have a testcase https://mozilla.seanfeng.dev/files/testcase-fullscreen-dialog.html, clicks the div makes the div fullscreen, and it'll show a modal dialog afterwords. At this point, press `escape` will exit the fullscreen first in Chrome. Would you consider this a Chrome bug? I think it violate the `Canceling dialogs` section
+
+[14:31:38.0000] <Domenic>
+saber1: I don't think it violates the spec, as the Canceling dialogs section is intentionally vague and UI affordances like "what does Esc do" are really up to each browser. But I think I would personally prefer to escape out of all dialogs first before escaping out of fullscreen; I'd be curious what our UX/security folks think.
+
+[14:32:01.0000] <Domenic>
+I guess it would be bad if you could pop up a ton of modal dialogs and thus prevent the user from exiting fullscreen until they pressed Esc a thousand times?
+
+[14:39:46.0000] <saber1>
+Domenic: I see...What I was thinking was, if the `escape` key is the user interface to cancel the dialog, since the document is blocked by the modal dialog, pressing this key should cancel the dialog. But yeah I see your point, I think this is fine
+
+
+2020-05-14
+[20:57:59.0000] <annevk>
+Domenic: saber1: the fullscreen popup in Fx suggests you can exit with Esc, not sure if Chrome does the same, but having a reliable key to get out of a potential spoofing situation is important
+
+[07:06:11.0000] <annevk>
+TabAtkins: if I'm reading this correctly all we'd need to do is add omit script-dfn-panel and omit style-dfn-panel to our defaults to not get inline styles and scripts for dfn, right?
+
+[07:06:37.0000] <TabAtkins>
+Yes
+
+[07:07:09.0000] <annevk>
+Domenic: thoughts on spec.css vs standard.css? Also, probably separate script element as we had before?
+
+[07:07:46.0000] <annevk>
+I guess I need to figure out if HTML reuses the styles first
+
+[07:08:28.0000] <Domenic>
+annevk: review drafts don't have dfn panels so standard.css, I think
+
+[07:09:50.0000] <annevk>
+Domenic: k
+
+[07:14:49.0000] <annevk>
+Looks like this is going to be another fun time getting many things to land together
+
+[07:25:38.0000] <annevk>
+What a mess, the styles for HTML's dfnPanel are in standard.css
+
+[07:26:22.0000] <Domenic>
+It used to be for all standards
+
+[07:35:36.0000] <annevk>
+And some of this stuff is broken, such as headers marked with data-dfn-type
+
+[07:35:54.0000] <annevk>
+https://html.spec.whatwg.org/#workers uses a pointer icon, but clicking yields nothing
+
+[07:37:42.0000] <Domenic>
+Oof
+
+[07:39:24.0000] <annevk>
+I won't get to this today, but maybe tomorrow
+
+
+2020-05-15
+[08:46:40.0000] <domfarolino>
+you around annevk ?
+
+[10:49:43.0000] <annevk>
+domfarolino: am now for a bit
+
+[10:58:34.0000] <domfarolino>
+annevk: I forget what I was going to ask lol, will try and remember for another time
+
+[11:07:18.0000] <annevk>
+heh
+
+[11:11:09.0000] <annevk>
+domfarolino: it's fine for the spec to use weak pointers internally btw
+
+[11:11:45.0000] <annevk>
+domfarolino: though in general I think we don't do that and instead just wait for the environment to die
+
+[11:12:54.0000] <annevk>
+Domenic: Timothy approved https://github.com/heycam/webidl/pull/882. Wanna have another look?
+
+[11:13:28.0000] <annevk>
+Anyone else want to have another look? If you're editing specs that contain an API it'll affect you
+
+[11:13:43.0000] <Domenic>
+Will do
+
+[11:13:55.0000] <annevk>
+s/an API/IDL fragments/
+
+
+2020-05-16
+[16:50:06.0000] <TimothyGu>
+Would it be appropriate to archive https://github.com/whatwg/loader?
+
+
+2020-05-17
+[21:18:35.0000] <annevk>
+TimothyGu: maybe ask in https://github.com/whatwg/loader/issues/159?
+
+[02:55:36.0000] <brunoais>
+Hello, I need a lead on where to go. I want to propose a new DOM event for <input> and <textarea>. Where should I go do to such proposal to w3c or WHATWG?
+
+[04:33:59.0000] <annevk>
+TabAtkins: attr()’s url type ignoring the base URL seems a bit flawed?
+
+[04:37:33.0000] <annevk>
+Will also get different results if encodings mismatch
+
+[10:36:38.0000] <annevk>
+Domenic: so I can merge the Infra PR?
+
+[10:37:44.0000] <Domenic>
+annevk: probably, sorry for commenting on a weekend
+
+[11:04:23.0000] <annevk>
+I don’t mind, I work different hours too
+
+[14:46:48.0000] <TabAtkins>
+annevk: What you do you mean? Can you give an example of what you're expecting?
+
+
+2020-05-18
+[21:17:37.0000] <annevk>
+TabAtkins: if the document and style sheet URL are different href=“blah” will lead to different places with the current definition
+
+[22:09:23.0000] <annevk>
+TabAtkins: filed https://github.com/w3c/csswg-drafts/issues/5079
+
+[08:03:41.0000] <annevk>
+Refactoring sessionStorage/localStorage is quite a lot of work
+
+
+2020-05-19
+[04:59:20.0000] <smaug____>
+I assume https://html.spec.whatwg.org/multipage/browsers.html#auxiliary-browsing-context means in practice something like there is opener relationship
+
+[05:00:02.0000] <smaug____>
+"are related to" without any linking is a tad vague
+
+[05:23:53.0000] <annevk>
+smaug____: yeah, popups
+
+[05:24:02.0000] <annevk>
+smaug____: including <a target=test>
+
+[05:24:30.0000] <smaug____>
+and noopener is supposed to break that relation?
+
+[05:25:15.0000] <annevk>
+smaug____: noopener causes a new top-level browsing context to be created, which doesn't have the field
+
+[05:25:27.0000] <annevk>
+smaug____: see rules for choosing a browsing context or some such
+
+[05:25:42.0000] <smaug____>
+"the field" ?
+
+[05:25:48.0000] <annevk>
+smaug____: the opener field
+
+[05:25:59.0000] <smaug____>
+right, but https://html.spec.whatwg.org/multipage/browsers.html#auxiliary-browsing-context doesn't talk about that
+
+[05:26:26.0000] <annevk>
+no, that's just at type definition
+
+[05:26:30.0000] <annevk>
+a*
+
+[09:37:47.0000] <Domenic>
+annevk: I assume https://github.com/whatwg/html/pull/5560 (Storage refactor) is not yet ready for review?
+
+[09:47:36.0000] <annevk>
+Domenic: it doesn't actually call into the Storage Standard yet for a bottle map and doesn't clone sessionStorage data across browsing sessions, apart from that I consider it good
+
+[09:48:01.0000] <Domenic>
+Should I wait on those parts, or would it make sense to land in stages?
+
+[09:48:19.0000] <annevk>
+Domenic: I don't think we can land, but if you feel like you can review already that might help
+
+[09:48:39.0000] <annevk>
+Domenic: I hope that given how I layered things those to be fairly incremental commits
+
+[10:07:27.0000] <annevk>
+The one interesting architectural question I noticed is how much tasks we should use when broadcasting. If a bunch of tasks end up running in the same agent, should they be one task? (Not sure if it's observable though as these are event callbacks when the stack is empty. But I guess you can tell if they got interleaved.)
+
+[10:07:47.0000] <Mek>
+I would like to specify some algorithms in terms of streams (have some other spec provide a readable stream to my algorithm, apply some transformations to that, and eventually expose the output of that through some non-stream API). But I'm not sure if this actually makes sense, or if this will be very weird since all the streams algorithm operate on actual javascript objects...
+
+[10:10:49.0000] <Domenic>
+Mek: does the other spec provide a `ReadableStream`, or a conceptual "readable stream"?
+
+[10:11:36.0000] <Mek>
+neither part is written yet, but my idea is that it will provide a conceptual "readable stream". I.e. it'll define some way of producing data.
+
+[10:12:07.0000] <Domenic>
+In that case I would avoid using the Streams Standard machinery, as the JS objects aspects of it will cause you some pain.
+
+[10:12:32.0000] <Domenic>
+We're cleaning that up a bit, but it's still not super-pleasant.
+
+[10:12:37.0000] <Mek>
+hmm, having to reinvent a lot of it will be somewhat painfull as well...
+
+[10:12:56.0000] <Domenic>
+Well, how much would you reinvent?
+
+[10:13:08.0000] <Domenic>
+Like, if this is all behind the scenes, it feels like you could get away without needing too much...
+
+[10:14:34.0000] <annevk>
+Mek: looking at Encoding and see if you could generalize that?
+
+[10:14:51.0000] <annevk>
+I would be willing to help with putting some of that into Infra
+
+[10:15:02.0000] <annevk>
+We've had other requests
+
+[10:16:12.0000] <Mek>
+looking at encoding gave me headaches trying to figure out what exactly it is doing (with streams-within-streams, i.e. every chunk in its encode algorithm is treated as another conceptual stream) :) But yeah, something like that perhaps...
+
+[10:16:58.0000] <annevk>
+Mek: I meant everything in this section: https://encoding.spec.whatwg.org/#terminology
+
+[10:17:46.0000] <annevk>
+Mek: wrapping that in Streams doesn't seem like a concern you have
+
+[10:18:07.0000] <Mek>
+I don't think that quite works for what I want. I really want more of the "pull algorithm" style that streams provide. But I guess I can just have specs provide just the required algorithms rather than an actual stream.
+
+[10:18:37.0000] <Mek>
+(context, trying to define Blob read behavior better; in particular how IndexedDB (or Native File System) provides/invalidates data that can be read via a Blob.
+
+[10:21:14.0000] <annevk>
+Mek: maybe also look into the blob store scoping issue?
+
+[10:21:26.0000] <Mek>
+oh yes, sorry I forgot to reply to that
+
+[10:21:51.0000] <annevk>
+No good ideas for invalidation as I'm not very familiar unfortunately
+
+[10:23:30.0000] <andreubotella>
+Mek: Chunks are not streams. You might be getting confused with how Encoding overloads the term "stream", though.
+
+[10:24:38.0000] <andreubotella>
+There was an issue about renaming it to "token queues" and moving it to Infra, which I thought I could take on, but now I can't find it.
+
+[10:25:08.0000] <Mek>
+andreubotella: yeah, that's what I meant. In the en/decode and enqueue a chunk algorithms, Encoding creates a conceptual stream out of the chunk (where the chunk was a chunk written to the actual WritableStream). And it took me a few readings to figure out there were two stream concepts.
+
+[10:25:33.0000] <annevk>
+andreubotella: be my guest 🙂; https://github.com/whatwg/encoding/issues/180
+
+[10:25:59.0000] <andreubotella>
+annevk: Oh, right. The title confused me.
+
+[10:26:00.0000] <andreubotella>
+thanks
+
+[10:26:01.0000] <Mek>
+like, a TextEncoderStream is a GenericTransformStream, but it also has a conceptual stream, and those are unrelated :)
+
+[10:26:05.0000] <annevk>
+andreubotella: although I think initially we should just keep it in Encoding until we have another more serious consumer
+
+[10:26:20.0000] <andreubotella>
+that makes sense
+
+[10:27:10.0000] <annevk>
+Mek: turtles all the way down
+
+[10:29:22.0000] <andreubotella>
+Mek: I'm not as familiar with the stream parts of Encoding as with the rest, and that threw me off a bit 😅
+
+[10:35:17.0000] <Domenic>
+Yeah, encoding is not a paragon of clarity. Renaming will help.
+
+[10:36:37.0000] <annevk>
+Well, I'm not sure I agree with that statement
+
+[10:37:09.0000] <annevk>
+I tend to think it's one of the more polished things we publish, but I'm biased 🙂
+
+[11:04:33.0000] <Domenic>
+Hmm yeah I think my complaints were misremembering... the problem is more in the fetch/streams interaction. https://github.com/whatwg/fetch/issues/661
+
+[11:05:03.0000] <Domenic>
+Oh right, but the problem is that encoding operations on "streams", but often specs feed it byte sequences.
+
+[11:10:07.0000] <andreubotella>
+The chunks in Encoding streams are code points for decoding and bytes for decoding.
+
+[11:10:46.0000] <andreubotella>
+The string → "stream" of code points and byte sequence → "stream" of bytes conversion is implicit and perhaps shouldn't be.
+
+[11:12:56.0000] <Domenic>
+It's the opposite direction I'm particularly concerned with
+
+[11:13:24.0000] <Domenic>
+Since I believe encoding feeds things into the "stream"s of code points/bytes incrementally, but specs often expect them to be one-shot strings/byte sequences.
+
+[11:16:21.0000] <andreubotella>
+I guess, since I'm renaming "streams" in encoding#180, I could specify that strings/byte sequences can be converted into "streams" implicitly, but not vice versa.
+
+[11:29:22.0000] <annevk>
+That sounds great; it would also be good to write down what we think we would ultimately want in an issue to keep that in mind as things change
+
+[11:31:26.0000] <smaug____>
+hmm, does wpt have some way to close a tab/window which can't be closed using window.close() ?
+
+[12:26:36.0000] <annevk>
+smaug____: let me know if you find out
+
+[12:34:49.0000] <jgraham>
+smaug____: Not at the moment afaik, although I think it could
+
+[12:35:04.0000] <smaug____>
+ok
+
+[14:16:40.0000] <jgraham>
+smaug____: To elaborate a little, the problem is usually knowing which window to close
+
+[14:17:03.0000] <jgraham>
+WebDriver specifies a way to serialize window handles, but afaik no one supports it yet
+
+[14:17:23.0000] <jgraham>
+So you couldn't trivially do something like testdriver.close(window)
+
+[14:18:08.0000] <jgraham>
+There could be some hack to make it work like adding a property on the window and then cycling through all of them until you find the one where the property exists
+
+[14:18:26.0000] <smaug____>
+right
+
+[14:18:37.0000] <smaug____>
+I was thinking some helper method in window object to forceClose it
+
+[14:19:06.0000] <jgraham>
+Well we can also specify test-only apis of course but it feels like maybe overkill for this case
+
+[14:19:22.0000] <jgraham>
+I keep meaning to figure out how to specify a test-only gc api for wpt
+
+[14:19:30.0000] <jgraham>
+But so far didn't manage
+
+[14:19:32.0000] <jgraham>
+/me away
+
+
+2020-05-20
+[09:01:45.0000] <Domenic>
+annevk: for the Origin-Isolation header PR should I use "Is URL potentially trustworthy" like the COOP PR currently does? Or are we going to create some new environment-accepting algorithm?
+
+[09:02:57.0000] <annevk>
+Domenic: https://github.com/whatwg/html/issues/5558
+
+[09:03:25.0000] <Domenic>
+I'm not sure how that answers my question...
+
+[09:04:07.0000] <annevk>
+Domenic: well that's my progress towards addressing the second question
+
+[09:04:14.0000] <Domenic>
+Got it
+
+[09:04:39.0000] <Domenic>
+annevk: I guess my question is more, is using potentially-trustworthy URL incorrect? Or is it a reasonable thing to do for now, and we can maybe replace it later?
+
+[09:04:39.0000] <annevk>
+But it requires changes to Shivani's work which isn't great
+
+[09:04:50.0000] <annevk>
+(in terms of timing)
+
+[09:05:54.0000] <annevk>
+Domenic: it's reasonable for a top-level navigation
+
+[09:06:06.0000] <annevk>
+I don't have Origin-Isolation paged in entirely
+
+[09:06:10.0000] <Domenic>
+Oh, OK, so not great for origin-isolation.
+
+[09:07:15.0000] <annevk>
+Domenic: if you have a handle to the top-level document you could use it, but it might end up looking ungainly
+
+[09:07:58.0000] <Domenic>
+I see
+
+[09:08:04.0000] <Domenic>
+Maybe I should just try to help out with 5558...
+
+[09:08:15.0000] <annevk>
+Domenic: review would be nice 🙂
+
+[09:08:18.0000] <Domenic>
+5558 is complicated though :(
+
+[09:09:29.0000] <annevk>
+Effectively it's merging target top-level origin and top-level origin (and place them both on environment) and adding top-level creation URL
+
+[09:10:18.0000] <Domenic>
+So the reason we need top-level creation URL is because we want pages which are top-level data: or top-level about:blank to make all their descendants count as secure contexts?
+
+[09:13:19.0000] <Domenic>
+annevk: ^
+
+[09:13:54.0000] <annevk>
+Domenic: hmm maybe we don't need it then though then you have top-level origin potentially switching between two origins rather than null and an origin
+
+[09:14:33.0000] <annevk>
+Domenic: I hadn't looked too closely at what the URL secure contexts thing did, I just saw that the environment thing was using it
+
+[09:14:43.0000] <Domenic>
+Cool, glad to be helpful
+
+[09:14:54.0000] <annevk>
+Domenic: in fact, if we go with top-level document decides we could drop it entirely, which is nice
+
+[09:14:58.0000] <Domenic>
+annevk: switching between two origins seems closer to what I'm understanding of the implementation
+
+[09:15:20.0000] <annevk>
+Domenic: oh wait, an opaque origin doesn't have a scheme
+
+[09:15:34.0000] <annevk>
+Domenic: so if the the top-level is sandboxed, how would you tell it's secure?
+
+[09:15:42.0000] <Domenic>
+How can the top-level be sandboxed?
+
+[09:15:52.0000] <Domenic>
+<iframe sandboxed>, right?
+
+[09:16:00.0000] <annevk>
+Domenic: CSP: sandbox
+
+[09:16:06.0000] <Domenic>
+Ah
+
+[09:16:23.0000] <annevk>
+Domenic: I guess in theory that would create an insecure context, but I doubt that's what we want
+
+[09:16:29.0000] <Domenic>
+Looks like currently the Secure Contexts specs says it's insecure, yeah.
+
+[09:16:34.0000] <Domenic>
+I.e. "Not Trustworthy"
+
+[09:17:10.0000] <annevk>
+The number of yaks to shave is too damn high
+
+[09:17:18.0000] <Domenic>
+Oh, no, it says the URL is "Not Trustworthy", but the "Is environment a secure context?" returns "Secure", I think.
+
+[09:17:51.0000] <Domenic>
+It doesn't bother checking the URL or origin if sandboxed origin browsing context flag is set.
+
+[09:18:08.0000] <annevk>
+aaah right
+
+[09:18:13.0000] <annevk>
+and that's why we need top-level creation URL
+
+[09:18:16.0000] <annevk>
+🙂
+
+[09:18:20.0000] <Domenic>
+It is?
+
+[09:18:49.0000] <annevk>
+I think so, because then you don't use an opaque origin but instead use the real URL
+
+[09:18:54.0000] <annevk>
+which will be secure
+
+[09:18:56.0000] <Domenic>
+Oh, step 5.3
+
+[09:19:33.0000] <annevk>
+Note that I simplified that a bit in https://github.com/w3c/webappsec-secure-contexts/pull/75
+
+[09:19:57.0000] <Domenic>
+annevk: I'm inclined to let Shivani finish her PR using top-level origin, then just work on top of that as we need to, in a behavior-preserving way?
+
+[09:20:23.0000] <annevk>
+well, how many concepts do we want to end up with?
+
+[09:20:37.0000] <annevk>
+so then we have target top-level origin and top-level origin, which have some overlap
+
+[09:20:46.0000] <annevk>
+and we'll need top-level creation URL for secure contexts
+
+[09:21:02.0000] <annevk>
+gotta go for a bit
+
+[09:21:13.0000] <Domenic>
+That seems acceptable to me, and then if we find a simplification we can do another PR on top of it to narrow them down
+
+[09:21:47.0000] <Domenic>
+Or we can convert top-level origin into top-level URL as part of our secure contexts fixup PR, but it can be our responsibility to do so in a way that preserves the behavior Shivani's PR introduces
+
+[09:50:37.0000] <annevk>
+Yeah, I guess if Shivani is okay with this setup I can put some time into making it work
+
+[09:51:00.0000] <annevk>
+I'd rather not clean up afterwards as I'm somewhat afraid there'll be many incoming references to these things
+
+[09:56:59.0000] <annevk>
+Also put that in the issue
+
+[11:08:16.0000] <annevk>
+Domenic: can you merge https://github.com/whatwg/infra/pull/306 so it gets picked up tonight?
+
+[11:08:44.0000] <Domenic>
+Done, sorry that slipped through
+
+[11:19:53.0000] <annevk>
+Domenic: thanks, the Web storage thing is ready for hot takes btw
+
+[11:20:21.0000] <annevk>
+I think that's all I got to today more or less
+
+[11:22:37.0000] <Domenic>
+Sounds good
+
+[11:45:59.0000] <Domenic>
+Why is disowned separate from opener = null again?
+
+[11:47:35.0000] <annevk>
+Domenic: isn’t it the result of setting to null?
+
+[11:47:59.0000] <Domenic>
+annevkL We have two states on WindowProxy: opener BC, which can be either null or a BC, and disowned, a boolean.
+
+[11:48:13.0000] <Domenic>
+It looks like "familiar with" consults opener BC and disregards disowned.
+
+[11:49:51.0000] <annevk>
+I don’t recall. Familiar with is 313 iirc
+
+[11:50:22.0000] <Domenic>
+Nice recall
+
+[15:25:01.0000] <saber1>
+Domenic: I haven't created a issue about this because I wonder if I missed something obvious. Say the dialog is vertical (means `top:0, bottom:0`) , if we do `window.scroll(0, 2000); dialog.showModal()`, to make it's centered, we'd need to change the `top` value. Don't you feel this is a bit odd?
+
+[15:25:28.0000] <Domenic>
+saber1: what is odd about it?
+
+[15:26:12.0000] <saber1>
+Domenic: top is set to 0 by `inset-inline-start`?
+
+[15:26:41.0000] <Domenic>
+Sure, but that's just the UA stylesheet. Centered alignment mode overrides that.
+
+[15:34:55.0000] <saber1>
+okay..let me think about this a bit more...
+
+
+2020-05-21
+[01:52:49.0000] <MikeSmith>
+annevk: Python 3 changes for html-build done, I think
+
+[01:53:01.0000] <MikeSmith>
+well, PR’ed
+
+[02:06:14.0000] <MikeSmith>
+hmm, not done yet https://travis-ci.org/github/whatwg/html-build/builds/689563011#L246
+
+[02:06:30.0000] <MikeSmith>
+will try fixing that now
+
+[02:16:00.0000] <annevk>
+MikeSmith: cool, can we do 3.8? That's what we use elsewhere for WHATWG
+
+[02:16:36.0000] <MikeSmith>
+yeah sure
+
+[02:16:36.0000] <annevk>
+MikeSmith: seems like the changes ended up being fairly minimal too for a change
+
+[02:16:51.0000] <MikeSmith>
+yeah, nothing big
+
+[02:17:46.0000] <MikeSmith>
+most of it was updating highlighter but the more-time-consuming part of that was actually not related to Python3 migration but to other changes
+
+[02:32:32.0000] <MikeSmith>
+ah now the wattsi build is failing under CI https://travis-ci.org/github/whatwg/html-build/builds/689576444
+
+[02:42:23.0000] <MikeSmith>
+hmm no maybe not wattsi
+
+[02:42:56.0000] <MikeSmith>
+something else is exiting 1 but from the Travis logs, I can’t find any way to identify what is
+
+[02:43:28.0000] <MikeSmith>
+need some insight from Domenic
+
+[06:49:51.0000] <MikeSmith>
+so it has come to my attention that for the case of custom elements, there’s no way to make the HTML checker fully conforming the spec requirements about labelable elements
+
+[06:50:01.0000] <MikeSmith>
+https://html.spec.whatwg.org/multipage/forms.html#category-label
+
+[06:51:11.0000] <MikeSmith>
+specifically, the checker is not able to distinguish between custom elements that aren’t form-associated custom elements, and custom elements that are
+
+[06:52:23.0000] <MikeSmith>
+that’s because determining if a custom element is a form-associated custom element requires executing JavaScript and using DOM APIs to examine the document
+
+[07:23:52.0000] <Domenic>
+MikeSmith: agreed. This seems like a special case of the problem described in https://html.spec.whatwg.org/#conformance-classes under "Conformance checkers"
+
+[07:24:19.0000] <MikeSmith>
+yeah
+
+[07:27:51.0000] <MikeSmith>
+as far as the effects on the checker behavior, it just means the checker won’t report an error for a label[for] reference to a custom-element that’s not really form-associated
+
+[07:28:28.0000] <MikeSmith>
+but non-errors as a class aren’t pain points for developers
+
+[07:29:15.0000] <MikeSmith>
+especially vs the alternative of reporting false positives for custom elements that are actually form-associated
+
+[07:31:43.0000] <Domenic>
++1
+
+[08:14:48.0000] <eeeps>
+Semi-theoretical question: what happens when a GitHub user making a PR to HTML is a member of multiple Entity orgs? Anything at all?
+
+[08:26:05.0000] <annevk>
+eeeps: first match per https://github.com/whatwg/participate.whatwg.org/blob/master/lib/get-user-status.js#L35
+
+[08:29:35.0000] <eeeps>
+annevk: Cool. So there's no need to associate particular PRs with particular entities. The more the merrier, really.
+
+[09:22:41.0000] <Domenic>
+annevk: can I get a LGTM on https://github.com/heycam/webidl/pull/885?
+
+
+2020-05-22
+[02:52:55.0000] <annevk>
+littledan: if you're around, is it worth opening a dedicated issue for privilege of a type on https://github.com/tc39/proposal-module-attributes?
+
+[02:53:31.0000] <annevk>
+littledan: e.g., I might be okay with HTML modules if they don't import scripts
+
+[02:53:51.0000] <annevk>
+littledan: or perhaps HTML modules start out without script and then later get script, would they need a new type?
+
+[04:01:10.0000] <littledan>
+annevk: Yeah it'd be good to get discussion going. Honestly I don't have a good idea how we could handle such a transition that implies a change in privilege levels; my intuition is that a higher-privileged thing should have a new MIME type and type: value
+
+[04:01:55.0000] <annevk>
+littledan: yeah, that might well be easiest; I guess my main hope after thinking about it for an hour is that it's a documented concern
+
+[04:02:04.0000] <annevk>
+I'll file something
+
+[04:02:06.0000] <littledan>
++1
+
+[04:02:26.0000] <littledan>
+I'm thinking to propose module attributes for Stage 2 at the upcoming TC39 meeting starting June 1st, with the idea that these kinds of decisions like that ultimately up to hosts
+
+[04:03:54.0000] <littledan>
+Stage 2 would mean, I guess, that we want to do in-band module attributes, and JSON modules with this syntax; there's some things mandated for hosts around that, but ultimately hosts have a lot of freedom
+
+[09:37:46.0000] <benjamingr__>
+Hey, I help maintain a library that aims to somewhat implement the whatwg timers spec (fake-timers that was once called lolex).
+
+[09:37:46.0000] <benjamingr__>
+At the moment we support `setTimeout(string, number)`, some users have asked us to not support it (because of a warning eval creates in the tooling). I think the spec does require it when it says "Apply the ToString() abstract operation to the first argument to the method, and let script source be the result.". My intuition would be to not drop the support for `setInterval/setTimeout(string)` for compatibility (it's
+
+[09:37:46.0000] <benjamingr__>
+a testing library) - some other users have noted that in almost all cases setTimeout(string) is a user bug.
+
+[09:37:47.0000] <benjamingr__>
+Do the smart folk of #whatwg have a strong opinion about what @sinonjs/fake-timers should do?
+
+[10:39:30.0000] <annevk>
+benjamingr__: if Node has something that disables eval or string evaluation it should prolly respect that (HTML does too), but otherwise dunno.
+
+[12:35:58.0000] <benjamingr__>
+Node's timers aren't compatible with the web timers spec and their semantics are slightly different in various areas. Node timers throw an error when you pass a string to them - I suspect whomever implemented them was just unaware of the ability to pass a string :] (I checked as far back as Node 0.6)
+
+[12:36:31.0000] <benjamingr__>
+Is the ability to pass strings to timers as an argument something that's gonna stay for good or are there plans to eventually deprecate it?
+
+[12:44:26.0000] <annevk>
+benjamingr__: no plans that I know of
+
+[12:50:06.0000] <benjamingr__>
+thanks
+
+
+2020-05-23
+[21:30:53.0000] <diazdeleon>
+Hello
+
+[21:33:35.0000] <diazdeleon>
+i founded this chat because im looking for grab notifications from web browser... i wonder to ask if i can do testing in my computer... or how can i do testing
+
+[13:17:59.0000] <domfarolino>
+I'm confused about #prepare-a-script step 2 where we save element's parser document to a variable, and set the parser document to null
+
+[13:18:25.0000] <domfarolino>
+The note underneath it says "This is done so that if parser-inserted script elements fail to run when the parser tries to run them, [...], another script can later mutate them and cause them to run again."
+
+[13:19:20.0000] <domfarolino>
+If we simply left the script's "parser document" alone, and the parser-inserted script failed..why would a later mutation cause the script *not* to run?
+
+[13:53:06.0000] <domfarolino>
+Oh, I think if we left a failed parser-inserted script's parser document alone, then later mutations are not considered as per https://html.spec.whatwg.org/multipage/scripting.html#script-processing-model:parser-inserted-2. If someone wants to confirm that, that'd be great tho
+
+[13:57:31.0000] <domfarolino>
+Domenic: Does https://github.com/web-platform-tests/wpt/blob/master/html/semantics/scripting-1/the-script-element/moving-between-documents/resources/moving-between-documents-helper.js#L51-L52 have an incorrect
+
+[13:57:39.0000] <domfarolino>
+"not" in it?
+
+[14:23:06.0000] <Domenic>
+domfarolino: seems likely
+
+[14:23:57.0000] <Domenic>
+domfarolino: confirmed that's why a later mutation would cause the script not to run
+
+[14:24:06.0000] <domfarolino>
+thanks!
+
+
+2020-05-24
+[11:30:57.0000] <domfarolino>
+Does a DocumentFragment contain a "Document" object?
+
+[11:33:06.0000] <domfarolino>
+What I'm trying find out is: if you have a script inside a template element, what's the script's "parser document"? The outer document? Or is there another parser created for the DocumentFragment, that parses the script element?
+
+[11:59:03.0000] <Domenic>
+Great question...
+
+[11:59:16.0000] <Domenic>
+<template>s all share a separate no-browsing context document
+
+[11:59:22.0000] <Domenic>
+But I think the parser still operates on the main document... let's see...
+
+[12:00:01.0000] <Domenic>
+Ah, "Set the element's parser document to the Document", not a lot of precision there... :-/
+
+[12:02:50.0000] <Domenic>
+domfarolino: My read of the spec is that the parser document is the outer document. All the handling of the template contents and template contents owner document seems to happen at insertion (in https://html.spec.whatwg.org/#appropriate-place-for-inserting-a-node), whereas setting the "parser document" seems to happen at element creation.
+
+[12:03:35.0000] <domfarolino>
+Domenic: https://bugs.chromium.org/p/chromium/issues/detail?id=1070667
+
+[12:03:53.0000] <domfarolino>
+This bug seems to want to change what the parser document will be, if I'm reading it correctly
+
+[12:04:28.0000] <Domenic>
+Hmm hmm
+
+[12:04:42.0000] <domfarolino>
+> My read of the spec is that the parser document is the outer document.
+
+[12:04:42.0000] <domfarolino>
+I agree, that's how the spec reads currently it seems
+
+[12:05:26.0000] <domfarolino>
+Yeah, Chrome seems to have this OwnerDocumentForCurrentNode() retargeting mechanism that mason seems at least interested in introducing to the spec (though no issues about it are filed under his name)
+
+[12:05:46.0000] <Domenic>
+I'd be curious to see what tests say about cross-browser behavior here, both for the case he's mentioning, and the script case.
+
+[12:06:23.0000] <Domenic>
+My guess (not digging in too deeply) is that for the case he's mentioning Chrome is correct, and any other behavior would be bad. So the spec needs updating. But the implications of that for the script case might not be correct.
+
+[12:07:11.0000] <Domenic>
+Hmm, maybe not though, he might be wrong
+
+[12:07:27.0000] <Domenic>
+I think in particular if we changed it in the way he suggests then custom elements would not work inside <template>s
+
+[12:07:36.0000] <Domenic>
+Hmm which is maybe... correct? Weekend brain...
+
+[12:10:50.0000] <domfarolino>
+(brb code searching to try and figure out the exact implications on scripts that move documents)
+
+[12:35:26.0000] <domfarolino>
+Domenic: OK, I don't believe there's any consequence to scripts moved from templates => outer doc. When #prepare-a-script is initially entered for those scripts, they're not run because they're not connected. So #prepare-a-script returns early, removing the "parser document" from the script. Later when the script becomes connected, the "parser document" is never consulted in #prepare, because it is null
+
+[12:36:05.0000] <Domenic>
+Nice, that makes sense to me
+
+[12:36:34.0000] <domfarolino>
+As an aside, I have a CL a brewing for the tests Chrome fails in https://wpt.fyi/results/html/semantics/scripting-1/the-script-element/moving-between-documents?label=experimental&label=master&aligned
+
+[12:38:04.0000] <Domenic>
+Oh sweet
+
+[15:07:10.0000] <alystair>
+Why does insertAdjacentElement return the resulting element, yet insertAdjacentHTML doesn't have a return value? Sensibly it should return a NodeList. Has this ever been discussed?
+
+
+2020-05-25
+[02:41:50.0000] <Ms2ger>
+annevk, do you know if there's precedent for asserting that a step is not reached, which could be added at the end of https://webassembly.github.io/spec/js-api/#tojsvalue , for example?
+
+[02:45:00.0000] <Ms2ger>
+Alternatively, maybe that could be a switch, but https://github.com/whatwg/infra/issues/102
+
+[03:10:09.0000] <annevk>
+Ms2ger: I would make the conditional of step 4 the assert and the return step 5
+
+[03:10:43.0000] <Ms2ger>
+I wanna keep the parallel setup, though
+
+[03:10:51.0000] <Ms2ger>
+/symmetric
+
+[03:11:40.0000] <annevk>
+It would work for both, no?
+
+[03:12:22.0000] <annevk>
+Guess you could also drop the initial assert then
+
+[03:13:17.0000] <annevk>
+Or you make that assert it’s one of three, might be clearer
+
+[12:54:31.0000] <younder>
+whatwg seems to have died these days. Still there are plenty of web developers. Where do they meet now?
+
+
+2020-05-26
+[03:42:11.0000] <annevk>
+MikeSmith: could it be that wattsi is still not feeling well? Getting build errors after a rebase on something that was working before
+
+[03:42:17.0000] <annevk>
+MikeSmith: https://github.com/whatwg/html/pull/5491
+
+[03:46:41.0000] <MikeSmith>
+/me looks
+
+[03:48:16.0000] <MikeSmith>
+annevk: yeah it’s still broke
+
+[03:48:40.0000] <MikeSmith>
+oh wait
+
+[03:48:50.0000] <MikeSmith>
+not “still”
+
+[03:49:07.0000] <MikeSmith>
+I was thinking that it was caused by the Python 3 changes
+
+[03:49:51.0000] <MikeSmith>
+but those are only  in https://github.com/whatwg/html-build/pull/227 and not merged yet
+
+[03:51:13.0000] <MikeSmith>
+> /bin/sh: 1: /whatwg/wattsi/build.sh: not found
+
+[03:51:57.0000] <MikeSmith>
+that doesn’t look familiar
+
+[03:59:21.0000] <annevk>
+MikeSmith: let's wait for Domenic then
+
+[03:59:39.0000] <annevk>
+(it's not really blocking me, was just curious)
+
+[04:00:11.0000] <MikeSmith>
+well I realize now what caused it
+
+[04:00:24.0000] <MikeSmith>
+https://github.com/whatwg/wattsi/commit/9f5e9e75bf1071fd8bc22c5765266b89305b0cce
+
+[04:00:50.0000] <MikeSmith>
+we merged that without updating html-build to align with that change
+
+[04:38:29.0000] <noamr>
+annevk: hola! wanted to chat re. https://github.com/whatwg/html/pull/5574
+
+[04:38:37.0000] <noamr>
+(intrinsic image resolution)
+
+[06:27:17.0000] <annevk>
+noamr: best to leave a question
+
+[06:27:48.0000] <noamr>
+annevk: sure! I am struggling with how to add that algorithm into the HTML spec, because EXIF and image metadata are not things that are well defined in HTML-land and are codec-related to an extent. Was thinking to add a passage about "Updating the image metadata", where the orientation/resolution/size are read from the image metadata, but without referring normatively to EXIF. Maybe adding a non-normative note about EXIF
+
+[06:28:03.0000] <noamr>
+(sorry, had this written and forgot to press Enter)
+
+[06:28:42.0000] <noamr>
+I actually created a new PR with this approach... but it's not clear where HTML stops and image codecs start wrt standartization
+
+[06:28:49.0000] <annevk>
+noamr: why can we not reference EXIF normatively?
+
+[06:30:27.0000] <noamr>
+Since JPEG/GIF/PNG etc. are not referenced normatively, and EXIF is embedded in them. I don't mind referencing it normatively though
+
+[06:31:12.0000] <annevk>
+noamr: does EXIF define the embedding for each of those?
+
+[06:31:59.0000] <annevk>
+I guess we currently only require PNG encoding, sigh
+
+[06:32:16.0000] <noamr>
+yes, but it can be potentially be defined in other metadata formats like XMP.
+
+[06:33:43.0000] <annevk>
+noamr: should UAs support those though?
+
+[06:34:47.0000] <noamr>
+probably not for now.
+
+[06:34:50.0000] <annevk>
+noamr: so I guess we want the abstract "obtain image" that returns an image bitmap + metadata and that algorithm can then be a bit vague about formats, but it could say that if UAs support GIF, they must do X for EXIF
+
+[06:35:40.0000] <annevk>
+noamr: that way we sidestep requiring formats, but do require a particular metadata strategy if the format is supported
+
+[06:36:07.0000] <annevk>
+noamr: perhaps Domenic finds it reasonable to start requiring some baseline image formats though, certainly seems reasonable to me
+
+[06:43:05.0000] <noamr>
+annevk: Sure, I'll do that. Most codecs support EXIF, and I can define that if the image codec supports EXIF embedding, then metadata extraction should use that.
+
+[06:43:58.0000] <noamr>
+annevk: I'm doing this for density correction, but shouldn't this be also done for orientation? Maybe a follow up would be to be more explicit about reading orientation from EXIF
+
+[06:44:37.0000] <annevk>
+noamr: yeah, though orientation has this weird quirk with the CSS property
+
+[06:45:42.0000] <noamr>
+annevk: this is kinda similar, with the image-resolution CSS Property. However, I didn't bother with it since nobody seems to be planning to implement image-resolution in the foreseeable future :)
+
+[06:45:55.0000] <annevk>
+there's also imageOrientation in <canvas>
+
+[06:46:18.0000] <annevk>
+I really rather not have CSS properties as it's rather unclear how they apply in a number of places
+
+[06:46:50.0000] <annevk>
+I guess we also forgot to test EXIF + imageOrientation :/
+
+[06:47:44.0000] <noamr>
+yea I agree - not dealing with CSS for now.
+
+[06:47:52.0000] <noamr>
+thanks annevk, will come up with a new patch soonish
+
+[07:30:41.0000] <domfarolino>
+annevk: for your review of #5573, should I instead say when setting the loading attribute, run these steps: [possibly set the ready to be lazy loaded flag]? Is that more accurate, since it lists the requirement?
+
+[07:35:17.0000] <annevk>
+domfarolino: "when X is set, the user agent must set Y" (see other attribute UA requirements)
+
+[07:35:37.0000] <annevk>
+domfarolino: does make me wonder what happens if you set it and then remove it, and edge cases like that
+
+[07:49:21.0000] <domfarolino>
+annevk: Yeah so an interesting case to test would be 1) Setting it to something 2) Entering #updating-the-image-data 3) Setting it to something else when the micro task is queued, 4) Asserting that the rest of the algorithm acknowledges the latest ‘loading’ value
+
+[07:49:50.0000] <domfarolino>
+annevk: otherwise if the image is just deferred, setting the attr to eager and then quickly removing it shouldn’t be any different than just setting it to eager
+
+[07:51:01.0000] <annevk>
+domfarolino: yeah, but you can test the latter too as implementations might well do something else
+
+[07:51:17.0000] <domfarolino>
+True
+
+[09:32:38.0000] <domfarolino>
+annevk: Do you know of a firefox bug or iframe lazyloading? Or can I just reuse https://bugzilla.mozilla.org/show_bug.cgi?id=1542784
+
+[10:35:21.0000] <annevk>
+domfarolino: https://bugzilla.mozilla.org/show_bug.cgi?id=1622090
+
+[11:55:44.0000] <domfarolino>
+Domenic: Can you explain what you mean by "The changes from 5/6 to 4/6 passing in Blink/WebKit make me a bit worried that the refactoring broke something". When I `./wpt serve` on the latest PR, and navigate to a test in Chrome stable, I still see "5 tests", with at most 1 failing
+
+[11:55:57.0000] <domfarolino>
+(Admittedly I haven't run them all, because they take a little while)
+
+[12:03:16.0000] <Domenic>
+domfarolino: I was looking at https://wpt.fyi/results/html/semantics/scripting-1/the-script-element/moving-between-documents?diff&filter=ADC&run_id=554640001&run_id=567930001
+
+[12:03:48.0000] <Domenic>
+and https://wpt.fyi/results/html/semantics/scripting-1/the-script-element/moving-between-documents?diff&filter=ADC&run_id=558510001&run_id=539730001
+
+[12:04:17.0000] <domfarolino>
+Ooh I don't think I knew you could do that. OK I'll check it out
+
+[12:17:53.0000] <domfarolino>
+Domenic: Ah, so my refactoring made it "better". Will comment back on the thread
+
+[12:19:33.0000] <Domenic>
+This button is magic https://usercontent.irccloud-cdn.com/file/gSNQYtLq/wpt-fyi.png
+
+[12:21:25.0000] <domfarolino>
+Yassss OK good to know, that is lit
+
+[12:26:07.0000] <Domenic>
+TabAtkins: ping on https://github.com/whatwg/html-build/pull/227#issuecomment-632401568
+
+[12:26:34.0000] <TabAtkins>
+thanks for the ping; i'll handle it today
+
+[15:30:07.0000] <gsnedders>
+https://github.com/html5lib/html5lib-tests/pull/126 if anyone wants a trivial parser test PR
+
+
+2020-05-27
+[17:46:35.0000] <TimothyGu>
+Domenic: I've been working with japhet to try to clarify some Blink-internal terminologies around active/fully active documents. In Blink, there seems to be a distinction between documents that have never become active versus documents that used to be active but no longer. Do you happen to know if HTML has a similar distinction?
+
+[17:51:35.0000] <Domenic>
+TimothyGu: Very interesting. I'm not aware of anything. Closest I can think of is similar things around user activation, and special checks for initial about:blank.
+
+[17:57:31.0000] <MikeSmith>
+very nice to have https://wiki.mozilla.org/Standards
+
+[17:58:20.0000] <MikeSmith>
+not just for Mozilla-internal reasons but also for non-Mozilla folk to know who is handling what
+
+[20:00:37.0000] <MikeSmith>
+https://stackoverflow.com/questions/62034488/what-part-of-htmlimageelement-prototype-needs-to-be-overridden-to-control-how-i
+
+[23:19:23.0000] <annevk>
+How do people stand on outright deleting spammy issues?
+
+[23:19:54.0000] <annevk>
+I plan to continue reporting them, but I wonder if deleting them might reduce the amount of spam for people using GitHub's notifications view to track things
+
+[23:20:06.0000] <annevk>
+(rather than email, where you'll be out-of-luck)
+
+[23:20:24.0000] <alystair>
+what would be classified as a spammy issue
+
+[23:30:08.0000] <jgraham>
+a
+
+[23:48:23.0000] <alystair>
+thanks for the guidance annevk I'll review the faq and w3c guidelines tomorrow. As a web dev it was a bit hard wrapping my head around all the governing bodies... started at TC39 and now my adventure continues
+
+[23:52:03.0000] <annevk>
+alystair: https://github.com/whatwg/html/issues/5557 is an example
+
+[23:52:44.0000] <annevk>
+alystair: there are quite a few indeed, happy to help navigate
+
+[23:57:42.0000] <alystair>
+thanks - was also nervous the issue I posted was one of them, gnight
+
+[23:59:05.0000] <annevk>
+alystair: not at all
+
+[00:16:40.0000] <MikeSmith>
+in W3C repos, I just delete the ones that are clearly spam/junk
+
+[01:02:03.0000] <annevk>
+omg https://github.com/w3c/csswg-drafts/issues/5115
+
+[01:02:09.0000] <annevk>
+it's happening, maybe?
+
+[02:13:41.0000] <noamr>
+I could use some help with html-build on mac... it keeps trying to go to the wattsi build server thingy and receiving an HTTP2 error
+
+[02:14:00.0000] <noamr>
+anyone here familiar with this? thanks :)
+
+[02:20:43.0000] <annevk>
+noamr: I think that's due to macOS curl being out-of-date or some such
+
+[02:21:41.0000] <annevk>
+/me files https://github.com/whatwg/html-build/issues/230
+
+[02:23:38.0000] <MikeSmith>
+annevk: is that just a problem for curl on macOS?
+
+[02:25:11.0000] <MikeSmith>
+and if so is there some other command-line client which is known to have working HTTP/2 support and that we could use in the documentation instead?
+
+[02:25:24.0000] <MikeSmith>
+I guess wget doesn’t do HTTP/2
+
+[02:26:07.0000] <MikeSmith>
+but maybe a command-line python one-liner?
+
+[02:26:17.0000] <MikeSmith>
+or node even
+
+[02:26:42.0000] <jgraham>
+I don't think that Python has a http2 client in the stdlib
+
+[02:26:47.0000] <MikeSmith>
+ah OK
+
+[02:26:47.0000] <annevk>
+MikeSmith: Python's requests module would work
+
+[02:27:03.0000] <annevk>
+MikeSmith: and now we require Python 3 you have to install some stuff anyway
+
+[02:27:15.0000] <annevk>
+MikeSmith: so that seems reasonable to me, we use it elsewhere on WHATWG
+
+[02:27:30.0000] <MikeSmith>
+yeah well requests itself isn’t part of the standard distro, even in Python 3, is it?
+
+[02:27:36.0000] <annevk>
+MikeSmith: correct
+
+[02:27:41.0000] <MikeSmith>
+OK
+
+[02:28:18.0000] <MikeSmith>
+well I guess it’s not an either-or; we could say, “if curl doesn’t work, try this, and this”
+
+[02:28:59.0000] <MikeSmith>
+but really for macOS I think the simplest thing would be to tell users, “brew install curl”, right?
+
+[02:29:30.0000] <MikeSmith>
+or even full “/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
+
+[02:29:34.0000] <MikeSmith>
+oofs
+
+[02:29:47.0000] <MikeSmith>
+or even full “/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)" && brew install curl”
+
+[04:18:46.0000] <MikeSmith>
+https://stackoverflow.com/questions/62041644/csp-sandbox-from-a-serviceworker
+
+[04:28:07.0000] <MikeSmith>
+https://gregoryszorc.com/blog/2020/01/13/mercurial%27s-journey-to-and-reflections-on-python-3/ is a great read
+
+[04:28:50.0000] <MikeSmith>
+> The effort required to port to Python 3 was staggering. ... As a project maintainer, it's natural to ask what we could have accomplished if we weren't forced to carry out this sideshow.
+
+[09:34:37.0000] <Domenic>
+Anyone with a Mac and Python 3 able to tell me whether `pip3` is in your path?
+
+[09:43:51.0000] <Mek>
+it is for me
+
+[09:48:08.0000] <annevk>
+Domenic: here too
+
+[09:48:22.0000] <Domenic>
+Good to hear :)
+
+[09:48:51.0000] <annevk>
+I hope that they never do Python 4
+
+[16:28:09.0000] <MikeSmith>
+https://stackoverflow.com/questions/62050273/how-to-know-when-a-fetch-ends-without-locking-the-body-stream seems like a pretty good question
+
+[16:50:44.0000] <Domenic>
+I agree with the comment saying "An alternative would be to just pass a callback function to..." In general it should be the responsibility of the thing consuming the stream to let the caller know when they're done consuming the stream.
+
+
+2020-05-28
+[02:54:01.0000] <noamr>
+annevk: hi, can I ask you to take a look at https://github.com/whatwg/html/pull/5574 again? It now includes all the EXIF details as we've discussed.
+
+[03:33:54.0000] <annevk>
+noamr: done
+
+[03:50:50.0000] <noamr>
+thanks annevk! Regarding the algorithm, it introduces some variables: preferred width/height, preferred horizonta/vertical resolution, preferred resolution unit. All of them only live within the "update the metadata" algorithm. is there a normative way to go about algorithm-local vars as such?
+
+[03:51:53.0000] <annevk>
+noamr: 1) use <var>, not <code> and 2) don't tie them to img
+
+[03:52:28.0000] <annevk>
+noamr: so not img's preferred width, but let _preferredWidth_ be ...
+
+[03:52:36.0000] <noamr>
+got it, thanks again annevk. Will ping you again when it's amended
+
+[03:53:06.0000] <annevk>
+noamr: reading https://infra.spec.whatwg.org/ might help
+
+[03:53:51.0000] <noamr>
+got it
+
+[06:44:08.0000] <noamr>
+annevk: I think those issues are fixed now... ready for another look
+
+[06:44:44.0000] <noamr>
+(finally got my builds running quickly after switching to local docker, could never get the wattsi server to return stable responses)
+
+[08:04:24.0000] <benjamingr__>
+Hey, I see that Chrome returns for `Object.keys(new Event('foo'))` `['isTrusted']`, looking at the spec it looks like isTrusted is "[LegacyUnforgeable]" but I am not sure if Chrome is correct to set it as enumerable https://heycam.github.io/webidl/#LegacyUnforgeable (Firefox behaves like Chrome, Edge does not enumerate it)
+
+[08:04:35.0000] <benjamingr__>
+My intuition is to behave like Chrome and Firefox here
+
+[08:11:18.0000] <annevk>
+benjamingr__: https://heycam.github.io/webidl/#define-the-unforgeable-regular-attributes
+
+[08:13:11.0000] <benjamingr__>
+Thanks!
+
+[10:27:04.0000] <benjamingr__>
+Hmm, I am starting to port WPTs to run in Node and I noticed a lot of the DOM event tests are very browser-specific (which makes sense). For example tests for `once` will dispatch the events on `document` rather than dispatch them on a `new EventTarget()`. I want to port those tests to run in Node but I don't have a `document` (since I'm not implementing the whole spec). I have a copy where I just do `const document
+
+[10:27:04.0000] <benjamingr__>
+= new EventTarget()` and I _think_ we can probably run the tests that way - but I was wondering if it would be helpful if I ported the source tests to use that format. For example this file: https://github.com/web-platform-tests/wpt/blob/master/dom/events/AddEventListenerOptions-once.html can be a `.js` file with `new EventTarget()` rather than `document` being used. Would that be at all helpful?
+
+[10:48:06.0000] <zcorpan>
+benjamingr__: it seems helpful for projects using wpt that aren't browsers (like Node.js, Deno)
+
+[10:49:00.0000] <zcorpan>
+benjamingr__: there's precedent for changing tests in that way for that purpose https://bocoup.com/blog/wpt-workshop-report
+
+[10:50:27.0000] <zcorpan>
+benjamingr__: it's *possible* that browsers have bugs in `document` or other objects that aren't shared with `EventTarget`, though, so ideal would be to keep that coverage somehow
+
+[11:17:53.0000] <benjamingr__>
+I can make a PR adding copies of those tests with EventTarget though that would be some duplicate coverage. Just asking what's helpful.
+
+[14:11:13.0000] <gsnedders>
+benjamingr__: I'd disagree with zcorpan here, not sure it really makes sense to duplicate them for everything
+
+
+2020-05-29
+[01:10:21.0000] <MikeSmith>
+annevk: if/when you’re around (and not in the middle of working on something else), I wanted to ask you what exactly needs doing for https://github.com/whatwg/html/issues/5539#issuecomment-627952544 as far as updating the MDN articles
+
+[01:11:01.0000] <MikeSmith>
+(either here on in MDN Web Docs on Mozilla Matrix)
+
+[01:13:42.0000] <annevk>
+MikeSmith: basically, whether a document is in a secure context is a function of its top-level document and doesn't depend on the opener chain
+
+[01:14:18.0000] <annevk>
+MikeSmith: so if http://example.com/ popups https://booyah.example/ the latter will be in a secure context
+
+[01:15:33.0000] <annevk>
+MikeSmith: thanks for fixing that, happy to review
+
+[01:15:38.0000] <MikeSmith>
+OK
+
+[01:15:40.0000] <annevk>
+And I guess then we can close out the HTML issue
+
+[01:15:46.0000] <MikeSmith>
+yup
+
+[01:15:53.0000] <MikeSmith>
+will try to get the changes made today
+
+[01:17:54.0000] <MikeSmith>
+right now I’m reviewing the set of features in the HTML spec that are known not to have two implementations
+
+[01:18:09.0000] <MikeSmith>
+starting from the raw list at https://w3c.github.io/mdn-spec-links/less-than-2.html?spec=html
+
+[01:18:53.0000] <MikeSmith>
+...which has a number of false positives due to BCD having incomplete data
+
+[01:19:13.0000] <MikeSmith>
+so I need to update BCD for some of those features
+
+[01:19:38.0000] <MikeSmith>
+navigator.mimeTypes for example
+
+[01:19:57.0000] <MikeSmith>
+(not that any developers actually care about that at this point)
+
+[04:05:00.0000] <benjamingr__>
+Why is passing `undefined` or `null` supported in addEventListener?
+
+[04:05:11.0000] <benjamingr__>
+I mean, `addEventListener('eventName', undefined)` :]?
+
+[04:06:47.0000] <annevk>
+benjamingr__: refactoring event tests seems somewhat reasonable, but it might be worth opening an issue first to discuss an approach
+
+[04:07:30.0000] <benjamingr__>
+Hey, sure, so should I open an issue in the wpt repo?
+
+[04:07:32.0000] <annevk>
+benjamingr__: probably because not all user agents threw an exception there and adding exceptions later is hard
+
+[04:07:41.0000] <annevk>
+benjamingr__: yeah, that seems good
+
+[04:07:52.0000] <benjamingr__>
+thanks, I will :]
+
+[04:07:59.0000] <annevk>
+benjamingr__: cc @smaug---- and @domenic I guess and me
+
+[04:16:17.0000] <benjamingr__>
+Opened, thanks a lot https://github.com/web-platform-tests/wpt/issues/23858
+
+[04:38:22.0000] <benjamingr__>
+I'm still a bit confused about passive listeners, why is "defaultPrevented" a property of the event but passive a property of the listener? So the event listener keeps context regarding whether or not it's part of a passive event listener and if it is `preventDefault` is a no-op?
+
+[04:40:11.0000] <annevk>
+benjamingr__: passive listeners are a bit of a hack to allow UAs to dispatch events differently
+
+[04:40:18.0000] <annevk>
+benjamingr__: based on the listeners
+
+[04:41:44.0000] <benjamingr__>
+Is my understanding correct and the events keep internal state about whether preventDefault is being called from the context of a passive listener?
+
+[04:42:25.0000] <annevk>
+benjamingr__: well, the dispatcher can keep that state I think
+
+[04:42:47.0000] <annevk>
+benjamingr__: as it will have inspected the listeners in order to determine if it can dispatch a passive event
+
+[04:42:50.0000] <annevk>
+iirc
+
+[04:42:53.0000] <annevk>
+it's been a while
+
+[04:43:43.0000] <benjamingr__>
+Thanks, I'll go digging through the spec and tests :] thanks a lot for the help btw, looking forward to having a universal spec compliant way to dispatch events and cancellation in JavaScript
+
+[05:25:08.0000] <benjamingr__>
+Just checking, how bad would it be for Node to behave differently from `EventTarget` regarding `addEventListener('eventName', null)`? https://github.com/nodejs/node/pull/33637#pullrequestreview-420889677
+
+[05:27:07.0000] <annevk>
+benjamingr__: do you have a developer console equivalent?
+
+[05:28:02.0000] <benjamingr__>
+annevk: We have `stdout` (and stderr for warnings) :]
+
+[05:28:06.0000] <annevk>
+I'd use that; I think as Domenic mentioned elsewhere, if you're not going for full compatibility, it'll just be confusing
+
+[05:29:15.0000] <benjamingr__>
+Use that to do what? Emit a warning for example?
+
+[05:29:29.0000] <annevk>
+benjamingr__: yes
+
+[05:30:37.0000] <benjamingr__>
+I  generally agree with Domenic (and that PoV). Would Node.js writing a warning to `stderr` for passing `undefined` or `null` as a second argument be allowed from a spec point of view?
+
+[05:31:18.0000] <annevk>
+benjamingr__: yeah, console is UI territory
+
+[05:31:46.0000] <benjamingr__>
+Ok great, thanks again. I'll go ahead and suggest that in the issue and see if it helps.
+
+[05:32:02.0000] <annevk>
+Although I guess in Node.js it's probably observable from script? Bit icky, but still seems okay to me
+
+[05:34:38.0000] <benjamingr__>
+It is observable from the script though generally `stderr` is used for things that are not part of the program output (which is why Node emits warnings there). The downside is that the user won't likely see the warning in production but that's true for all warnings Node emits (because stdout is considered, well, output :])
+
+[07:25:18.0000] <annevk>
+Domenic: see also https://github.com/whatwg/storage/issues/95
+
+[07:25:34.0000] <annevk>
+Domenic: still need to do Privacy/Security, maybe later, maybe next week
+
+[07:26:11.0000] <annevk>
+Domenic: and not really sure what to do with 5 MiB, perhaps just leave that locally, but in a different place, closer to all the Storage infrastructure (or perhaps the proxy map)
+
+[07:26:24.0000] <annevk>
+concept-Storage-map*
+
+[07:31:13.0000] <Domenic>
+annevk: makes sense. I'd appreciate more explicit links to the sections of the Storage Standard that you think contain the HTML text... it's not clear to me that Storage covers the same things, but I'm not the Storage editor.
+
+[08:20:56.0000] <annevk>
+Domenic: feel free to add questions there
+
+[16:04:19.0000] <benjamingr__>
+Hey, is https://dom.spec.whatwg.org/#window-current-event (window.event) fine not to implement in Node.js EventTarget? (Since it's marked  "Legacy extensions")
+
+[16:22:41.0000] <Domenic>
+benjamingr__: yes, IMO. I would call it a separate API, similar to CustomEvent or MouseEvent.
+
+[16:23:03.0000] <benjamingr__>
+ack, thanks.
+
+[16:23:24.0000] <Domenic>
+Also, practically speaking, it is mostly used by code in event handler attributes, e.g. `<body onclick="console.log(event.target)">`. So I expect there to be very few interop issues that would come from omitting it.
+
+
+2020-05-31
+[15:01:49.0000] <MikeSmith>
+https://stackoverflow.com/questions/62121310/how-to-handle-streaming-data-using-fetch
+

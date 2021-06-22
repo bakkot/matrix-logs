@@ -1,0 +1,2913 @@
+2020-11-01
+[17:51:46.0000] <EveryOS>
+I think I'm going to take a break from writing my DOM API. I've been super busy, and also I want to work on a program of mine that haa actual users.
+
+
+2020-11-02
+[18:29:10.0000] <Krinkle>
+TIL about rel="feed" (from above)
+
+[18:29:25.0000] <Krinkle>
+I wonder if that ever got meaningful adoption or if it was too little too late
+
+[18:29:46.0000] <Krinkle>
+might be a good excuse for me to finally figure out how to use http archive
+
+[18:30:50.0000] <Krinkle>
+though not sure dom attributes and/or <head> or <link> specifically is indexed by it
+
+[18:34:48.0000] <Krinkle>
+seems not, based on the mysql schema file
+
+[02:49:15.0000] <croraf>
+Let's say I have a select element with options
+
+[02:49:31.0000] <croraf>
+And there is an option with <option value>Text</option>
+
+[02:49:49.0000] <croraf>
+What would that mean, is this an error, or what is the value?
+
+[02:50:36.0000] <annevk>
+croraf: pretty sure the HTML Standard covers that in detail, but I forgot what it says exactly
+
+[03:45:19.0000] <croraf>
+annevk, https://html.spec.whatwg.org/#attr-option-value I check this. What does that mean
+
+[03:45:54.0000] <croraf>
+Oh I see now.
+
+[03:46:03.0000] <croraf>
+"The value attribute provides a value for element. The value of an option element is the value of the value content attribute, if there is one, or, if there is not, the value of the element's text IDL attribute."
+
+[03:46:49.0000] <croraf>
+So if I set the value attribute it is used as the value. If I don't the text (the content) is used instead.
+
+[03:50:42.0000] <croraf>
+Now, in the case I asked for, the value attribute is present but without being assigned to anything.
+
+[04:12:17.0000] <ondras>
+it is an empty string
+
+[04:49:41.0000] <croraf>
+ondras, thanks, have you tried it, or how do you know?
+
+[04:49:54.0000] <croraf>
+are any attributes defined without the value set to empty string?
+
+[04:53:27.0000] <croraf>
+I tried, and it indeed seems to be an empty string. I guess for any attribute without the value being set it is implicitly set to ""
+
+[04:55:28.0000] <ondras>
+the spec tells that as well
+
+[04:57:55.0000] <ondras>
+https://html.spec.whatwg.org/#attributes-2
+
+[04:58:01.0000] <ondras>
+The value is implicitly the empty string.
+
+[05:01:18.0000] <croraf>
+ondras, cool, ty very much
+
+[11:56:39.0000] <Krinkle>
+Do we know of any context in which scripts can execute in an HTML context in a modern brower (specifically Safari 14), but document.head is undefined by means other than e.g. something explicitly corrupting the document variable?
+
+[11:57:19.0000] <Krinkle>
+I thought head and body exist implicitly always as of HTML5 and thus these can't be undefined, or at least head can't be undefined from a script executing async, linked from inside <head>
+
+[12:07:02.0000] <zcorpan>
+Krinkle: it wouldn't be undefined but null, if a script removes the <head>, or if you're in an XML doc without a head
+
+[12:07:56.0000] <zcorpan>
+http://software.hixie.ch/utilities/js/live-dom-viewer/saved/8649
+
+[12:24:37.0000] <Domenic>
+The only ways I can think of to get undefined are: (1) `document` is not actually a `Document` somehow, which probably falls into your excluded category; (2) situations involving detached browsing contexts where browsers often seem to violate the spec (e.g. `const d = iframe.contentDocument; iframe.remove(); d.head` might give undefined sometimes, especially in Safari.
+
+
+2020-11-03
+[19:56:38.0000] <Krinkle>
+zcorpan: Domenic: Thanks, that helps :) - downstream ticket is https://phabricator.wikimedia.org/T266708
+
+[19:56:45.0000] <Krinkle>
+(: TypeError: document.head.appendChild is not a function)
+
+[19:57:03.0000] <Krinkle>
+Received regularly albeit at a low frequency on en.wikipedia.org from Mobile Safari
+
+[20:00:35.0000] <Krinkle>
+document not being Document seems unlikely given the diversity of clients, but given we do support greasemoney-style user scripts within the platform, that might still be a possibility. I'll see if I can find reports from users without a login session to rule  that out.
+
+[20:01:41.0000] <Krinkle>
+iframes might be it, we don't do that in our own code afaik, I can't imagine why, but again it's possible a user script might do that as a hacky way to accomplish some legacy thing without using the API through some kind of headless simulation of a user action for an automated/assisted editor workflow.
+
+[22:13:44.0000] <annevk>
+Might also wanna check when WebKit added document.head support
+
+[04:59:03.0000] <hsivonen>
+TIL: Safari is intolerant of https://hsivonen.com/test/ . It's OK with nginx serving flat files, it's OK with nginx proxying Jetty. Not OK with nginx proxying Apache.
+
+[05:11:26.0000] <annevk>
+Surely it's not the server but something particular in the response?
+
+[05:11:51.0000] <annevk>
+Anyway, I'd recommend filing a bug as they probably want to address that
+
+[15:27:43.0000] <MikeSmith>
+https://stackoverflow.com/questions/64671178/scroll-event-not-fired-in-chrome-when-document-hidden-is-true-any-workarounds
+
+[15:28:05.0000] <MikeSmith>
+> The scroll event is never fired by Chrome when the page is hidden, despite the page is actually scrolling. That looks like something they implemented to reduce cpu and network usage for pages that are not visible.
+
+[15:28:20.0000] <MikeSmith>
+is that behavior spec-conforming?
+
+
+2020-11-04
+[16:10:13.0000] <zcorpan>
+MikeSmith: hmm. yes. https://html.spec.whatwg.org/multipage/webappapis.html#update-the-rendering - rendering is skipped, and scroll events happen from there
+
+[17:39:26.0000] <MikeSmith>
+zcorpan: thanks
+
+[03:48:45.0000] <hsivonen>
+annevk: AFAICT, it's all responses that are proxied by nginx from Apache as opposed to being served by nginx directly or proxied by nginx from Jetty.
+
+[03:52:00.0000] <annevk>
+hsivonen: yeah, but that's all fairly high-level, no? Surely there's detail that Safari trips over that it would always trip over, regardless of which server did it
+
+[03:52:12.0000] <annevk>
+a detail, even
+
+[04:12:26.0000] <hsivonen>
+There has to be some detail, but Safari does not surface it to me. Filed https://bugs.webkit.org/show_bug.cgi?id=218560
+
+[04:12:54.0000] <hsivonen>
+This interferes with interoperability testing.
+
+[07:03:02.0000] <zcorpan>
+hsivonen: https://stackoverflow.com/questions/51266188/nsposixerrordomain100-error-on-safari-when-try-to-open-https
+
+[07:46:43.0000] <annevk>
+Which links https://megamorf.gitlab.io/2019/08/27/safari-nsposixerrordomain-100-error-with-nginx-and-apache/
+
+[07:47:28.0000] <annevk>
+Ah, Safari is actually conforming and other browsers are more like "whatever"
+
+[07:47:51.0000] <annevk>
+I guess H/2 didn't get the test suite it deserved
+
+[08:20:11.0000] <hsivonen>
+zcorpan: Thanks. That resolved the issue.
+
+[08:20:30.0000] <hsivonen>
+Not the best error message from Safari...
+
+[08:25:23.0000] <hsivonen>
+Also seems like a bad idea for nginx to pass on headers that are hop-specific.
+
+[08:42:58.0000] <MikeSmith>
+I guess even for H/2 the HTTP WG is still not following the practice of going back and updating their specs to align with how they actually ended up getting implemented
+
+[08:49:14.0000] <MikeSmith>
+if the possibility that Safari is going to end up being non-conforming in the same way as other UAs seems more likely than that other UAs will change to become more strictly conforming, then I would naively think the group would be considering to change the spec
+
+[10:19:12.0000] <Bakkot>
+annevk: are you going to take up maintainership of the CSP spec? because if so I have a bunch of issues I would like to see addressed :D
+
+[10:19:26.0000] <annevk>
+Bakkot: nope
+
+[10:19:31.0000] <Bakkot>
+alas
+
+[10:19:35.0000] <annevk>
+Bakkot: I just happen to have commit access
+
+[10:32:45.0000] <annevk>
+TabAtkins: somehow I borked my Bikeshed installation, it complains about html5lib being the wrong version and to do the pip3 install thing, but that gives success...
+
+[10:33:19.0000] <annevk>
+TabAtkins: this was after pulling the most recent 30 or so commits
+
+[10:36:12.0000] <TabAtkins>
+Hm, usually this means your Bikeshed executable is pointing to some different path. If you run `type bikeshed`, do you get a hashed path?
+
+[10:36:41.0000] <annevk>
+"bikeshed is hashed (/usr/local/bin/bikeshed)"
+
+[10:37:56.0000] <TabAtkins>
+try deleting, then running the pip install again?
+
+[10:43:42.0000] <annevk>
+TabAtkins: thanks, I have it working now
+
+[10:44:41.0000] <TabAtkins>
+cool. that's a really annoying problem that several people have run into, where bash caches an executable and you can't update it to the newer thing
+
+[10:44:42.0000] <annevk>
+Bakkot: want to review https://github.com/w3c/webappsec-csp/pull/445 though? :-)
+
+[10:44:52.0000] <TabAtkins>
+i don't understand how i can avoid it :(
+
+[10:46:32.0000] <annevk>
+I guess the only suggestion I have is to maybe document it, but I wouldn't have found it
+
+[10:47:01.0000] <annevk>
+Maybe the follow-up suggestion would be to put that in the pip3 install command suggestion
+
+[11:21:50.0000] <Bakkot>
+annevk: I'm not familiar enough with bikeshed to review that one, I'm afraid
+
+[11:21:54.0000] <Bakkot>
+also I'm not a maintainer or anything
+
+[11:22:34.0000] <annevk>
+I might just merge it unless Domenic feels curious
+
+[11:22:59.0000] <annevk>
+That way I can update Fetch tomorrow
+
+[15:00:43.0000] <Domenic>
+Wow, still finding interop bugs in the foundations of event dispatch in 2020? https://github.com/jsdom/jsdom/issues/3070
+
+[15:43:55.0000] <jyasskin>
+MikeSmith/hsivonen: The HTTPWG may just not know about the issue. They're starting an http2bis effort, described at https://lists.w3.org/Archives/Public/ietf-http-wg/2020OctDec/0064.html. I'll raise the question there.
+
+[15:44:29.0000] <MikeSmith>
+jyasskin: cool, thanks
+
+[15:47:14.0000] <jyasskin>
+https://github.com/httpwg/http2-spec/issues/789
+
+[15:49:03.0000] <jyasskin>
+Outside of an update cycle, an errata is probably the right feedback mechanism.
+
+[15:49:27.0000] <jyasskin>
+Or just an email, I guess.
+
+
+2020-11-05
+[21:07:26.0000] <annevk>
+Domenic: I suspect that’s fallout from shadow trees and that Chrome/Fx still haven’t fixed their bug but will double check later
+
+[23:01:07.0000] <hsivonen>
+jyasskin: thanks
+
+[00:24:40.0000] <hsivonen>
+https://bz.apache.org/bugzilla/show_bug.cgi?id=59311#c9 reminds me of Apache-sent text/plain for binary file vs. browsers, therefore, not treating text/plain as authoritative
+
+[00:27:23.0000] <annevk>
+/me sighs
+
+[01:45:11.0000] <zcorpan>
+/me sees https://bugs.webkit.org/show_bug.cgi?id=212069
+
+[01:45:21.0000] <zcorpan>
+Does WebKit support cross-origin isolation?
+
+[01:46:54.0000] <zcorpan>
+https://bugs.webkit.org/show_bug.cgi?id=215407
+
+[01:51:05.0000] <annevk>
+thanks zcorpan, left a comment on the first bug
+
+[01:53:37.0000] <zcorpan>
+👍
+
+[02:29:12.0000] <mathiasbynens>
+is it possible for the root element to somehow not take up the entire viewport (through non-default styles)?
+
+[02:30:03.0000] <annevk>
+mathiasbynens: I think by default it doesn't do that
+
+[02:30:07.0000] <annevk>
+mathiasbynens: just give it a border
+
+[02:30:57.0000] <annevk>
+(background and overflow might be confusing here, but they end up applying to the viewport instead when set on the root + special behavior for HTML's body element)
+
+[02:33:42.0000] <mathiasbynens>
+oh my this renders differently on Chrome vs. Firefox
+
+[02:33:43.0000] <mathiasbynens>
+data:text/html,<style>:root{border:5px solid red
+
+[02:34:13.0000] <mathiasbynens>
+(note: quirks mode)
+
+[02:34:21.0000] <mathiasbynens>
+it renders the same in standards mode thankfully
+
+[02:35:19.0000] <annevk>
+Not sure why Chromium and WebKit have that quirk
+
+[02:35:24.0000] <mathiasbynens>
+to be more precise, I'm trying to find out if there's a way for `:root { filter: ...; }` to not take effect on some part of the viewport
+
+[02:37:05.0000] <annevk>
+Maybe ecobos can help; filter is too new for what I know
+
+[02:38:09.0000] <andreubotella>
+https://quirks.spec.whatwg.org/#the-html-element-fills-the-viewport-quirk
+
+[02:38:36.0000] <andreubotella>
+assuming Firefox devtools' "computed" tab actually shows the computed values, the width of the html element is the actual (used) width, not auto
+
+[02:43:13.0000] <annevk>
+So there's a difference between getComputedStyle() and computed value and I'm not sure what DevTools does
+
+[02:46:48.0000] <andreubotella>
+I'm looking at wpt and there doesn't seem to be a test for that quirk
+
+[02:50:10.0000] <annevk>
+andreubotella: if you're interested in working on that spec I'm sure zcorpan would appreciate the help
+
+[02:51:19.0000] <zcorpan>
+this isn't a quirks mode thing, it's what getComputedStyle always does
+
+[02:52:30.0000] <zcorpan>
+https://drafts.csswg.org/cssom/#dom-window-getcomputedstyle step 5
+
+[02:53:03.0000] <zcorpan>
+-> https://drafts.csswg.org/cssom/#resolved-value
+
+[02:55:41.0000] <andreubotella>
+yeah, it does seem likely that the devtools "computed" tab is showing the results from getComputedStyle
+
+[02:55:56.0000] <andreubotella>
+that was just me trying to debug, though
+
+[02:56:14.0000] <andreubotella>
+<mathiasbynens> oh my this renders differently on Chrome vs. Firefox
+
+[02:56:14.0000] <andreubotella>
+<mathiasbynens> data:text/html,<style>:root{border:5px solid red
+
+[02:57:43.0000] <zcorpan>
+css/cssom/computed-style-002.html tests almost this case (getComputedStyle returning used value for 'width')
+
+[02:58:49.0000] <zcorpan>
+andreubotella: so firefox still doesn't implement https://quirks.spec.whatwg.org/#the-html-element-fills-the-viewport-quirk
+
+[02:59:29.0000] <zcorpan>
+https://bugzilla.mozilla.org/show_bug.cgi?id=1259924
+
+[03:07:14.0000] <annevk>
+If Firefox DevTools use the resolved value for "computed" I wish that was called out somehow
+
+[03:07:34.0000] <annevk>
+Although it would be even nicer to make the specification align with the name of the public-facing API
+
+[03:24:46.0000] <andreubotella>
+So I think I'll write a wpt test for that quirk
+
+[04:31:01.0000] <zcorpan>
+andreubotella: great! http://wpt.live/quirks/ looks like there are some tests for body-fills-html
+
+[04:32:01.0000] <zcorpan>
+but firefox passes those, so not sure
+
+[04:38:22.0000] <andreubotella>
+it looks like those tests are specifically checking that the quirk *doesn't* apply in the cases that the spec excludes, and nothing's checking that it applies elsewhere
+
+[04:38:32.0000] <andreubotella>
+also, that's "body fills html", not "html fills viewport"
+
+[04:39:04.0000] <zcorpan>
+ah right
+
+[04:39:25.0000] <andreubotella>
+but if firefox isn't implementing that quirk, maybe it's not needed for web compat
+
+[04:40:11.0000] <zcorpan>
+yeeeeah, except they have web compat problems documented in the bug, and chromium and webkit aren't removing it
+
+[04:40:24.0000] <zcorpan>
+the spec at first sided with gecko, until they asked me to change the spec
+
+[04:41:41.0000] <zcorpan>
+if you can get the 4% of the web that uses quirks mode down to 0%, maybe we can drop quirks mode altogether :)
+
+[04:43:57.0000] <andreubotella>
+yeah, I don't think that's something I can do :D
+
+[04:44:23.0000] <zcorpan>
+:( :( :(
+
+[05:17:00.0000] <ecobos>
+mathiasbynens: `:root { filter: ... }` is special
+
+[05:17:43.0000] <ecobos>
+mathiasbynens: and it applies on the whole viewport, including fixed-pos elements and so on (on all browsers except FF, but we need to change that)
+
+[05:18:14.0000] <mathiasbynens>
+ecobos: thanks for confirming! any idea which (part of which) spec mandates this?
+
+[05:20:06.0000] <ecobos>
+mathiasbynens: see https://bugzilla.mozilla.org/show_bug.cgi?id=1423746 / https://github.com/w3c/fxtf-drafts/issues/11. It should really be https://drafts.fxtf.org/filter-effects/#FilterProperty (I commented on that issue a while ago to ask for that change), but it is in here: https://drafts.fxtf.org/compositing/#pagebackdrop
+
+[05:20:14.0000] <ecobos>
+mathiasbynens: spec could be clearer
+
+[05:20:24.0000] <mathiasbynens>
+ecobos: cheers!
+
+[05:20:50.0000] <ecobos>
+mathiasbynens: one way to get around it could be to apply an inverse filter on a given part of the page
+
+[05:21:03.0000] <ecobos>
+mathiasbynens: (but that only works for filters that are actually invertible)
+
+[06:43:09.0000] <andreubotella>
+zcorpan: looks like webkit's skipping the "auto computed value" exception for html fills viewport
+
+[06:43:42.0000] <andreubotella>
+s/exception/restriction
+
+[06:43:53.0000] <Domenic>
+(+1 to "it would be even nicer to make the specification align with the name of the public-facing API"; I made this pitch several years back but the CSSWG folks seem really attached to their computed/used/resolved hierarchy and not willing to do any renames...)
+
+[06:44:35.0000] <zcorpan>
+andreubotella: do you have a demo?
+
+[06:44:58.0000] <andreubotella>
+that tests this in particular no, but it came up in tests for body fills html
+
+[06:45:05.0000] <zcorpan>
+TabAtkins: ^ (re computed value)
+
+[06:45:32.0000] <andreubotella>
+but give me a minute
+
+[06:50:49.0000] <andreubotella>
+hm, turns out that's not the case
+
+[06:51:12.0000] <andreubotella>
+there bug is with body fills html, but it's quite an odd one
+
+[06:55:56.0000] <andreubotella>
+https://software.hixie.ch/utilities/js/live-dom-viewer/?saved=8657
+
+[06:56:44.0000] <andreubotella>
+the body spans the whole viewport even though webkit's devtools have the html at 200x200
+
+[06:57:20.0000] <andreubotella>
+then again, I'm testing this with various webkit representatives on linux because I don't have a mac around, so ymmv
+
+[07:01:07.0000] <ecobos>
+/me really hates that quirk
+
+[07:06:45.0000] <benjamingr__>
+Hey, we're ( Node.js ) considering graduating our EventTarget and AbortController from experimental to stable and would love a glance by some skilled eyes on the code to make sure it looks good ( https://github.com/nodejs/node/pull/35949 is the PR). We were unable to port the WPT (since it tests node) but we added quite a bit of coverage to it.
+
+[07:06:46.0000] <benjamingr__>
+Also pinging Domenic and annevk who have been very helpful in this undertaking in the past :]
+
+[07:24:24.0000] <zcorpan>
+andreubotella: thanks. this makes it a bit clearer:  https://software.hixie.ch/utilities/js/live-dom-viewer/saved/8658
+
+[07:24:45.0000] <zcorpan>
+andreubotella: so yes, it seems webkit makes body fill the viewport, rather than filling the <html>
+
+[07:25:42.0000] <zcorpan>
+(the <span> is not necessary here)
+
+[07:27:37.0000] <andreubotella>
+zcorpan: right, I just copied from the existing tests
+
+[07:46:30.0000] <annevk>
+benjamingr__: nothing really comes to mind, other than wondering whether the tests you have also pass in browsers
+
+[08:15:24.0000] <benjamingr__>
+They all do, I usually run them in the browser console first to iterate quickly :]
+
+[08:56:05.0000] <benjamingr__>
+Domenic: if you don't mind - is there a specific reason event handler ordering works this way? (that is in https://github.com/nodejs/node/pull/35949#issuecomment-722496598 ) the behaviour is 1 2 3 4 and not 1 3 2 4 ?
+
+[08:58:25.0000] <annevk>
+benjamingr__: onmessage invokes addEventListener the first time it's called with a function that invokes the passed in function, roughly
+
+[08:58:48.0000] <annevk>
+benjamingr__: it falls out from how event handler attributes work, basically (defined in HTML)
+
+[09:00:40.0000] <benjamingr__>
+Yeah, I'm trying to figure out _why_ that's the behaviour
+
+[09:00:55.0000] <benjamingr__>
+That is, I assume event handlers behave this way for some reason (good or not), right?
+
+[09:02:47.0000] <TimothyGu>
+annevk: how much work would it be to convert Web IDL to use spec-factory? I assume spec-factory is currently only for WHATWG specs?
+
+[09:03:11.0000] <annevk>
+benjamingr__: I suspect it's just because that's what someone implemented back in the day
+
+[09:03:30.0000] <annevk>
+benjamingr__: it's not like a lot of the early web had a lot of collaborative design
+
+[09:04:29.0000] <annevk>
+TimothyGu: yeah, that's the case; not sure how much work it would be
+
+[09:14:41.0000] <TabAtkins>
+what in specific am i being pinged for?
+
+[09:20:17.0000] <andreubotella>
+TabAtkins: <Domenic> (+1 to "it would be even nicer to make the specification align with the name of the public-facing API"; I made this pitch several years back but the CSSWG folks seem really attached to their computed/used/resolved hierarchy and not willing to do any renames...)
+
+[09:21:02.0000] <TabAtkins>
+ah k. yeah, that's not happening now, it would involve changing so much verbage across so many specs; the split happened like 15 years ago
+
+[09:29:42.0000] <TabAtkins>
+The CSSWG at the time of the CSS2 -> CSS2.1 development made a bunch of "no, it's the children that are wrong"-type mistake
+
+[10:01:03.0000] <Domenic>
+What's that site with COEP/COOP/CORP stats? Something like isolation.policy, but not...
+
+[10:01:57.0000] <benjamingr__>
+annevk: got it :D
+
+[10:03:33.0000] <benjamingr__>
+By the way, two more questions I am unsure about a) are we allowed to expose a static utility to get the event listeners of an event target (kind of like `getEventListeners` in chrome)? b) are we allowed to warn (to stderr) if the number of listeners is above a certain threshold?
+
+[10:03:59.0000] <Domenic>
+benjamingr__: no new methods not in the spec... I'm not aware of Chrome having such a nonstandard method.
+
+[10:04:25.0000] <annevk>
+warn seems fine (assuming in the console)
+
+[10:04:39.0000] <Domenic>
+benjamingr__: console is generally up to the implementation. We do try to standardize some warnings, but a lot remain browser-specific, and that's fine, since (on the web) it's not observable
+
+[10:05:10.0000] <Domenic>
+benjamingr__: I guess you are referring to the method that only exists when you have the console open in Chrome? As long as it's not on the EventTarget interface itself, then it's fair game, yeah.
+
+[10:05:11.0000] <benjamingr__>
+Domenic:  I mean something like a `utils.getEventListeners(eventTarget)` and not a `eventTarget.getEventListeners`
+
+[10:05:17.0000] <Domenic>
+Ah yeah, then that'd be fine
+
+[10:05:29.0000] <benjamingr__>
+Ah, thanks, people have been asking for that for inspecting targets
+
+[10:05:51.0000] <Domenic>
+People have been asking for it in the spec too, but we're a bit stuck between the encapsulation folks and others...
+
+[10:06:12.0000] <Domenic>
+https://github.com/whatwg/dom/issues/412
+
+[10:06:34.0000] <benjamingr__>
+Interesting, thanks
+
+[10:25:43.0000] <croraf>
+Does the fetch standard also define how img and script html tags fetch the resources?
+
+[10:25:57.0000] <annevk>
+croraf: HTML does, but it uses fetch to do so
+
+[10:26:33.0000] <croraf>
+So the HTML standard says "fetch standard should be used for fetching"?
+
+[10:28:23.0000] <annevk>
+croraf: a lil more, but effectively that
+
+[10:28:34.0000] <croraf>
+annevk, thanks
+
+[10:29:56.0000] <andreubotella>
+croraf: standards do have access to some fields of the request that aren't available from the javascript fetch API, if that's something you care about
+
+[10:31:05.0000] <annevk>
+Ah yeah, although we haven't really updated HTML yet to poke at the internal response for <img> and <script>
+
+[10:31:30.0000] <croraf>
+andreubotella, I just meant in general, if the HTML spec in the tags for fetching resources requires the use of resource fetching aligned with the fetch standard.
+
+[10:32:53.0000] <andreubotella>
+annevk: <script> does poke at the internal response, it's <link> that doesn't
+
+[10:32:55.0000] <croraf>
+That is, it requries the underlying fetching is aligned with the fetch standard
+
+[10:33:24.0000] <andreubotella>
+I'll write a PR for that, but it looks like <link rel="icon"> won't be testable (https://github.com/whatwg/html/issues/6122)
+
+[10:36:04.0000] <croraf>
+andreubotella, "That is, HTML requires the underlying fetching for the tags is done using the fetch standard" Is this quote of mine correct?
+
+[10:36:21.0000] <andreubotella>
+yeah
+
+[10:40:20.0000] <croraf>
+Thanks. My next question is regarding the fetch JS API. It has the options argument, which defines headers['content-type'] property, and a body property.
+
+[10:41:11.0000] <croraf>
+Now, these two must be aligned, kind of.
+
+[10:44:06.0000] <andreubotella>
+croraf: So, depending on what JS object you pass as the body, you might get a default content-type automatically, but you can override it by setting the header explicitly
+
+[10:44:38.0000] <andreubotella>
+For example, a URLSearchParams object will get you Content-Type: application/x-www-form-urlencoded
+
+[10:44:54.0000] <andreubotella>
+I think that's part of the JS API, not the main fetch infrastructure
+
+[10:46:01.0000] <croraf>
+But the fetch standard also defines the JS API. It says that in the Preface: "The Fetch Standard also defines the fetch() JavaScript API"
+
+[10:47:19.0000] <andreubotella>
+sure, but the fetch infrastructure is defined at the spec level, not in terms of JS
+
+[10:47:33.0000] <andreubotella>
+thus why specs can use things JS doesn't have access to
+
+[10:50:05.0000] <croraf>
+I understand that the spec can access more things. My question is in the other direction. That is, where can I read how are header["content-type"] and body coordinated?
+
+[10:51:54.0000] <andreubotella>
+https://fetch.spec.whatwg.org/#dom-request step 37, and https://fetch.spec.whatwg.org/#concept-bodyinit-extract
+
+[10:52:32.0000] <andreubotella>
+as you can see, if you explicitly set the content-type header, your header wins
+
+[11:00:46.0000] <croraf>
+OK. And if there is no content-type header it is set by this "body extraction"?
+
+[11:00:49.0000] <croraf>
+andreubotella,
+
+[11:01:43.0000] <andreubotella>
+step 37 in the new Request algorithm starts with "If init["body"] exists and is non-null"
+
+[11:02:15.0000] <andreubotella>
+my bad, I misread
+
+[11:02:19.0000] <andreubotella>
+that's right
+
+[11:04:58.0000] <croraf>
+What is init["body"] is that just the value of the "body" property?
+
+[11:05:15.0000] <andreubotella>
+basically yeah
+
+[11:07:45.0000] <croraf>
+So if it is an object of ReadableStream type the extraction proceeds normally, and if it is not it will try to "cast" the body to ReadableStream?
+
+[11:09:15.0000] <andreubotella>
+I think this is relatively recent, so not all browsers will support a stream as the body, but yeah
+
+[11:10:03.0000] <croraf>
+I'm talking about 1. in https://fetch.spec.whatwg.org/#concept-bodyinit-extract
+
+[11:10:25.0000] <croraf>
+It is not clear to me what will be done if body is a plain JS object, or just a string, or a number...
+
+[11:10:48.0000] <andreubotella>
+that's where the "basically yeah" I gave above breaks down
+
+[11:11:11.0000] <croraf>
+Seems like JS object, a string, or number will have to be converted to the ReadableStream.
+
+[11:11:20.0000] <croraf>
+Oh, OK. So in which step is that handled?
+
+[11:12:11.0000] <croraf>
+Somewhere prior to step 37 in https://fetch.spec.whatwg.org/#dom-request ?
+
+[11:12:48.0000] <andreubotella>
+RequestInit's `body` takes the `BodyInit?` ("nullable BodyInit") WebIDL type
+
+[11:13:27.0000] <andreubotella>
+WebIDL handles the rest of JS objects, casting them to a string I suspect
+
+[11:13:29.0000] <Mek>
+step 1 creates a new ReadableStream, step 5 defines an "action" depending on the type of the body, and step 6 runs the action to enqueue data into the stream
+
+[11:16:23.0000] <croraf>
+Mek, but how does ReadableStream get created from a string, a plain JS object, or a number?
+
+[11:17:04.0000] <Mek>
+a string ends up in the "scalar value string" branch, which defines "action" as utf-8 encoding the string.
+
+[11:17:20.0000] <Mek>
+Step 6 then enqueues a Uint8Array containing that encoding to the stream that was created
+
+[11:17:53.0000] <Mek>
+and indeed, webidl will tostring anything that doesn't match any of the types in BodyInit
+
+[11:18:11.0000] <andreubotella>
+Since WebIDL handles the conversions before the params to the JS function ever get to spec-land, the "extract" algorithm won't ever have any type that isn't part of the BodyInit union
+
+[11:20:22.0000] <croraf>
+I think I see now. But the step 1 is confusing me very much
+
+[11:21:07.0000] <croraf>
+But this is kind of irrelevant because 5 is switching on an object, not on the stream.
+
+[11:21:12.0000] <andreubotella>
+Step 1 doesn't do any conversion, it just creates a new ReadableStream if the body wasn't one already
+
+[11:21:37.0000] <andreubotella>
+Step 5 then sets "action", which in step 6.1 populates the stream
+
+[11:22:15.0000] <croraf>
+Oh, so 1 will take the body if it is a ReadableStream, otherwise will create an empty ReadableStream (irrespective of the content of the body)?
+
+[11:22:21.0000] <andreubotella>
+right
+
+[11:22:25.0000] <croraf>
+I see.
+
+[11:25:08.0000] <croraf>
+And you did conclude that when entering here, the object is necesarily one of the types in the switch (5)?
+
+[11:25:24.0000] <croraf>
+here = https://fetch.spec.whatwg.org/#concept-bodyinit-extract
+
+[11:27:46.0000] <andreubotella>
+Since RequestInit's `body` is of type BodyInit?, init["body"] on the spec-land definition for new Request() is either missing (~= undefined), null, or one of the types in BodyInit
+
+[11:28:05.0000] <andreubotella>
+And the condition to step 37 is "if init["body"] exists and is non-null"
+
+[11:30:51.0000] <croraf>
+cool
+
+[11:31:51.0000] <croraf>
+So if it is a string Content-Type is set to text/plain;charset=UTF-8
+
+[11:32:09.0000] <croraf>
+If it is URLSearchParams to application/x-www-form-urlencoded;charset=UTF-8`.
+
+[11:33:33.0000] <croraf>
+FormData to multipart/form-data, and the only other option that sets the Content-Type is the Blob
+
+[11:34:18.0000] <croraf>
+If it is of type ReadableStream, BufferSource or byte sequence, seems like Content-Type will be extracted as null.
+
+[11:35:03.0000] <andreubotella>
+which gets filtered out by new Request's step 37.4
+
+[11:36:50.0000] <croraf>
+No, 37.4 has nothing to do with what I said.
+
+[11:37:24.0000] <andreubotella>
+"if Content-Type is non-null"
+
+[11:37:33.0000] <croraf>
+37.4 non-null, as you said before, deals with the explicit Content-Type property value
+
+[11:37:41.0000] <Bakkot>
+does anyone happen to have a state machine diagram for XHR lying around?
+
+[11:37:52.0000] <croraf>
+Oh, sorry, indeed, 37.4 also deals with the extraction
+
+[11:37:57.0000] <croraf>
+that is done in 37.3
+
+[11:44:17.0000] <croraf>
+Is init['body'] of type BodyInit?
+
+[11:45:18.0000] <croraf>
+I mean it can also be null, anything else?
+
+[11:56:27.0000] <andreubotella>
+croraf: WebIDL dictionary fields that don't have the "required" keyword will let you set the value to undefined in JS-land
+
+[11:56:51.0000] <andreubotella>
+the spec-level language for this is: init["body"] is missing, or init["body"] does not exist
+
+[12:24:52.0000] <Domenic>
+Bakkot: that is such a reasonable ask, but sadly I don't know of one. I'm surprised Google image search doesn't seem to have one either.
+
+[12:38:49.0000] <croraf>
+andreubotella, my point was more about the options handled in the switch not present in the interface: the byte sequence, and the scalar value string (which has a similar but not identical item in the interface at USVString)
+
+[12:42:04.0000] <Domenic>
+scalar value string === USVString
+
+[12:43:03.0000] <Domenic>
+byte sequence might be leftover; I can't find any callers that pass a byte sequence
+
+[12:47:34.0000] <croraf>
+Domenic, you think that byte sequence can perhaps be removed from the switch (5)?
+
+[12:48:07.0000] <Domenic>
+croraf: correct
+
+[12:48:23.0000] <croraf>
+And about scalar value string, why is it named differently than USVString?
+
+[12:48:32.0000] <annevk>
+I think we added that recently for something
+
+[12:50:44.0000] <annevk>
+Yeah you requested byte sequence Domenic 😊
+
+[12:50:48.0000] <annevk>
+https://github.com/whatwg/fetch/issues/1073
+
+[12:50:54.0000] <Domenic>
+nice...
+
+[12:51:55.0000] <Domenic>
+Oh, I see, I missed all the call sites of "safely extract"
+
+[12:52:02.0000] <Domenic>
+So yeah it definitely has uses
+
+[12:52:07.0000] <Domenic>
+(just not ones that appear from the fetch() API)
+
+[12:53:08.0000] <croraf>
+OK. What about "scalar value string", can it be replaced with USVString in the switch (5)?
+
+[12:53:35.0000] <croraf>
+And perhaps remove "scalar value string" completely from https://infra.spec.whatwg.org/#scalar-value-string
+
+[12:56:10.0000] <Domenic>
+We prefer the term "scalar value string"
+
+[12:57:02.0000] <Domenic>
+The fact that IDL uses WordsSmushedTogether instead of words like normal means there's a slight mismatch, but it's OK.
+
+[12:57:32.0000] <croraf>
+1 word instead of 3 is more concise, and more clear visually that a "specific type" is meant.
+
+[12:58:21.0000] <croraf>
+Doesn't matter, but the "inconsistency" might be slightly confusing.
+
+
+2020-11-06
+[01:12:35.0000] <annevk>
+The way I see it is that USVString is really a binding layer concern (about how some input maps to a scalar value string), past that layer, it's a scalar value string. Eventually we'll make IDL reflect that better. It's currently wrong for ByteString <> byte sequence I think.
+
+[03:35:44.0000] <croraf>
+One important thing that I didn't solve yesterday. What happens when you put just the plain JS object as the body?
+
+[03:37:52.0000] <annevk>
+croraf: for that specific case, since a string is one of the accepted types, it'll get stringified
+
+[03:38:15.0000] <croraf>
+Can you show me where is that conversion defined in the specs?
+
+[03:38:18.0000] <croraf>
+annevk,
+
+[03:38:27.0000] <annevk>
+croraf: it's in IDL
+
+[03:40:57.0000] <croraf>
+I'm checking this https://fetch.spec.whatwg.org/#fetch-method . This is not a JS fetch method, but an abstraction, right?
+
+[03:41:18.0000] <croraf>
+The JS fetch method is mapped to this abstraction?
+
+[03:41:38.0000] <croraf>
+with some conversions happening during the mapping
+
+[03:43:44.0000] <annevk>
+The JavaScript method is derived from it, per the rules in IDL
+
+[03:48:17.0000] <croraf>
+OK, so the JS method's init object must conform to these rules as per IDL?
+
+[03:48:18.0000] <croraf>
+https://fetch.spec.whatwg.org/#requestinit
+
+[03:48:20.0000] <croraf>
+annevk,
+
+[03:49:06.0000] <croraf>
+That is the body property must conform to this https://fetch.spec.whatwg.org/#bodyinit
+
+[03:49:28.0000] <annevk>
+I'm not sure what you mean by conform
+
+[03:50:19.0000] <andreubotella>
+croraf: WebIDL's conversions will throw if there's no way to convert the JS value to the WebIDL type, but it will first try and cast the value in some way
+
+[03:50:21.0000] <croraf>
+When JS method is implemented in the JS engine it must conform to this interface.
+
+[03:51:49.0000] <croraf>
+andreubotella, ok, and where can i see the rule of casting of JS init value (the second argument of JS fetch method) into BodyInit
+
+[03:52:26.0000] <andreubotella>
+BodyInit is a union type: https://heycam.github.io/webidl/#es-union
+
+[03:53:54.0000] <andreubotella>
+all components of the union except for USVString are WebIDL interfaces, and converting to those will throw if the JS object doesn't implement them: https://heycam.github.io/webidl/#es-interface
+
+[03:53:55.0000] <croraf>
+I guess the plain object is bullet 9 there?
+
+[03:54:06.0000] <andreubotella>
+so all that's left are USVStrings: https://heycam.github.io/webidl/#es-USVString
+
+[03:56:24.0000] <andreubotella>
+right, so the types in BodyInit don't match any of the cases in bullet point 9
+
+[03:56:45.0000] <croraf>
+First one side question, if I have parent steps and a parent step has children steps, and the children step says, return something.
+
+[03:57:12.0000] <croraf>
+Does the return happen only for children steps, or also the parent steps return?
+
+[03:57:26.0000] <croraf>
+Examples here: https://heycam.github.io/webidl/#es-union
+
+[03:58:46.0000] <andreubotella>
+Usually, it's returning from the algorithm as a whole, unless the parent step talks of the child steps as a function/callback
+
+[03:59:20.0000] <andreubotella>
+sometimes that gets confusing, like with step 5 in https://fetch.spec.whatwg.org/#main-fetch
+
+[04:02:29.0000] <croraf>
+andreubotella, So in https://heycam.github.io/webidl/#es-union when child returns the entire algorithm is terminated?
+
+[04:02:45.0000] <andreubotella>
+right
+
+[04:03:25.0000] <annevk>
+croraf: https://infra.spec.whatwg.org/#algorithm-control-flow (anything that doesn't conform to that is worth filing an issue on)
+
+[04:04:44.0000] <croraf>
+annevk, well, is the algorighm the whole algorithm or the subalgorithm for the step only
+
+[04:05:04.0000] <croraf>
+And yes https://fetch.spec.whatwg.org/#main-fetch is really confusing
+
+[04:05:53.0000] <croraf>
+So in main-fetch 5 only step 5 subalgorithm terminates when one of its children returns.
+
+[04:06:08.0000] <croraf>
+?
+
+[04:07:09.0000] <andreubotella>
+Step 5 has "set response to the result of running the steps..."
+
+[04:07:22.0000] <andreubotella>
+you can think of "running the steps" as calling a callback
+
+[04:12:22.0000] <croraf>
+Why do you think this is the correct interpretation?
+
+[04:15:20.0000] <andreubotella>
+experience in reading steps, mostly
+
+[04:15:28.0000] <andreubotella>
+s/steps/specs/
+
+[04:15:58.0000] <croraf>
+yes, this is not optimal.
+
+[04:16:22.0000] <andreubotella>
+feel free to suggest alternatives: https://github.com/whatwg/infra/issues/311
+
+[04:17:09.0000] <croraf>
+Also the control flow annevk posted is for the WHATWG specs not for the WebIDL that I asked for.
+
+[04:17:30.0000] <annevk>
+croraf: IDL should follow it too
+
+[04:17:36.0000] <croraf>
+ok
+
+[04:18:04.0000] <andreubotella>
+the "algorithm" parts of infra do little more than formalize what was already the standard across WHATWG and W3C specs
+
+[04:20:28.0000] <croraf>
+OK, so because the JS value of plain object doesnt satisfy any of the steps 3-8, the step 9 is entered.
+
+[04:20:32.0000] <annevk>
+there were definitely competing styles and some of that might still be there; Infra was created in part to reduce that
+
+[04:20:44.0000] <croraf>
+Here all are interfaces except BufferSource and USVString.
+
+[04:21:58.0000] <andreubotella>
+BufferSource is itself a union of interfaces, so it's all interfaces except for USVString
+
+[04:23:10.0000] <croraf>
+I'm not so sure that BufferSOurce is a union of interfaces, but lets assume that for now
+
+[04:23:24.0000] <andreubotella>
+https://heycam.github.io/webidl/#common
+
+[04:23:58.0000] <croraf>
+So interface is none of the types defined in 9.1-9.6
+
+[04:24:12.0000] <croraf>
+These are all types distinct from interface?
+
+[04:24:23.0000] <andreubotella>
+right
+
+[04:25:05.0000] <croraf>
+So which of these types is the USVString?
+
+[04:25:42.0000] <andreubotella>
+none of the substeps in step 9 apply, so you exit the substeps and continue
+
+[04:25:55.0000] <andreubotella>
+eventually you end up in step 13, and here USVString *is* a string type
+
+[04:27:20.0000] <croraf>
+cool
+
+[04:27:46.0000] <andreubotella>
+btw: DOMString (or Infra's "string") is &[u16] (UTF-16), ByteString is &[u8], USVString is &str
+
+[04:28:57.0000] <croraf>
+If you check https://heycam.github.io/webidl/#BufferSource you can see that it can be a wide variety of things
+
+[04:29:28.0000] <croraf>
+I cannot see that any of those is an interface
+
+[04:30:40.0000] <annevk>
+Maybe that should be clarified, but they are interfaces/classes
+
+[04:35:42.0000] <croraf>
+Ok. The conversion of plain object to USVString is done per https://heycam.github.io/webidl/#es-USVString
+
+[04:36:28.0000] <croraf>
+Which is basically a ToString(object)
+
+[04:39:19.0000] <croraf>
+and converted to UTF8 or?
+
+[04:39:48.0000] <andreubotella>
+decoded as UTF-16, with lone surrogates replaced with the replacement character
+
+[04:40:16.0000] <andreubotella>
+like rust's String::from_utf16_lossy
+
+[04:40:48.0000] <croraf>
+The comment below at x:26:37 was a reference to rust?
+
+[04:40:53.0000] <croraf>
+*above
+
+[04:41:04.0000] <andreubotella>
+yeah
+
+[04:41:53.0000] <croraf>
+Let's just clear this last thing out. ByteString are bytes containing UTF-8, DOMString are pairs of bytes containing UTF-16?
+
+[04:42:39.0000] <andreubotella>
+no
+
+[04:44:01.0000] <andreubotella>
+JS's strings and DOMString are &[u16], not necessarily valid UTF-16, but interpreted as such when there's some interpreting needed
+
+[04:46:34.0000] <andreubotella>
+but sometimes WebIDL needs strings that are ASCII only, to send to HTTP for example, and it will cast each number in the &[u16] to a u8
+
+[04:47:51.0000] <croraf>
+OK. To conclude, that's why i need to manually set Content-Type application/json on plain JS object body. Because otherwiser it will be interpreted as text/plain.
+
+[04:49:05.0000] <andreubotella>
+you don't wanna pass a plain JS object as the body, because String({}) === "[object Object]"
+
+[04:49:36.0000] <andreubotella>
+but yeah, you'd have to set the content-type manually
+
+[04:52:29.0000] <croraf>
+yes, thanks.
+
+[04:54:58.0000] <croraf>
+Something to clear the monotony, HTML spec: the select shouldn't trigger onchange if the same option is clicked?
+
+[04:57:20.0000] <croraf>
+I'll check, but I guess not. I'm using React and a UI library on top of it, so some of these is not conforming :|
+
+[05:21:08.0000] <croraf>
+Yes, indeed even in React the onChange is not triggered if the already selected option is reselected.
+
+[05:44:01.0000] <croraf>
+In short the issue was that the value of select was being set as a number, implicitly converted to string, and when reselect was made the string value was detected as newly selected, causing the change event.
+
+[08:25:15.0000] <benjamingr__>
+Is Node allowed to add additional symbols to its `EventTarget` for inspections/warnings? (like `EventTarget.symbolInspectDepth` and such)
+
+[08:25:49.0000] <benjamingr__>
+We want to add debugging related symbols to `EventTarget` that effect functionality in a non-observable way and I want to make sure we are not violating the spec in doing so.
+
+[08:27:58.0000] <Domenic>
+benjamingr__: no, you cannot add properties to interfaces that are not in the spec...
+
+[08:28:16.0000] <benjamingr__>
+Ok, thanks
+
+[08:28:40.0000] <benjamingr__>
+Wanted to make sure, will quote you on that when blocking the PR :P
+
+[08:30:35.0000] <Domenic>
+In particular https://heycam.github.io/webidl/#create-an-interface-object does not have a step that says "and then add any properties you want"
+
+[13:40:49.0000] <croraf>
+Anyone knows on the highlevel how the youtube video works. I see it has the video HTML element, but I even see that they download any video content through it?
+
+[13:41:36.0000] <croraf>
+I don't see any media request in the devtools network tab, but i see they download the content through xhr.
+
+[13:45:03.0000] <croraf>
+Seems like they somehow prevent the download to happen. For example this is the video element: <video tabindex="-1" class="video-stream html5-main-video" controlslist="nodownload" src="blob:https://www.youtube.com/b5b90a1b-c8c2-4673-9657-1d9c338db209" style="width: 612px; height: 344px; left: 0px; top: 0px;"></video>
+
+[13:46:25.0000] <andreubotella>
+the url in the src attribute has a blob scheme, not https
+
+[13:46:26.0000] <andreubotella>
+https://w3c.github.io/FileAPI/#url
+
+[14:00:20.0000] <croraf>
+andreubotella, thanks, I was suspecting into that blob, but going through the spec for the video element I arrived to here: https://url.spec.whatwg.org/#concept-url-parser
+
+[14:03:36.0000] <croraf>
+Does the basic url parser just resolve the absolute+relative path?
+
+[14:06:05.0000] <andreubotella>
+the important bit for this in the url parser is step 4, which populates the blob URL entry which is then used from https://fetch.spec.whatwg.org/#main-fetch
+
+[14:07:09.0000] <croraf>
+Yes, that's what I thought, the step 1 does nothing important
+
+[14:08:10.0000] <croraf>
+So you want to say that the browser stores a "blob dictionary"? How can I inspect it or add stuff to it?
+
+[14:08:36.0000] <andreubotella>
+https://w3c.github.io/FileAPI/#creating-revoking
+
+[14:10:04.0000] <andreubotella>
+you can't inspect it other than seeing if a particular blob URL resolves
+
+[14:10:37.0000] <andreubotella>
+I suppose that's because browsers have leeway in deciding when to garbage collect the blobs, and you don't want developers to start depending on some browser's current behavior
+
+[14:11:53.0000] <croraf>
+OK, so how can I find into what this blob:https://www.youtube.com/494cb097-fd0f-496a-be3f-fcc04b5218e3 resolves
+
+[14:12:03.0000] <croraf>
+I tried: window.URL.revokeObjectURL('https://www.youtube.com/494cb097-fd0f-496a-be3f-fcc04b5218e3')
+
+[14:13:06.0000] <croraf>
+in the console. and the video element's src with this blob is NOT in any iframe, but in the main window frame.
+
+[14:13:41.0000] <croraf>
+got undefined.
+
+[14:14:24.0000] <andreubotella>
+URL.prototype.revokeObjectURL always returns undefined
+
+[14:14:40.0000] <andreubotella>
+since you have a URL, you can try and fetch it or open it in a new tab
+
+[14:14:41.0000] <croraf>
+did i destroy the mapping with that?
+
+[14:14:44.0000] <andreubotella>
+yeah
+
+[14:15:14.0000] <croraf>
+but isn't there an api to see into what this resolves?
+
+[14:15:49.0000] <andreubotella>
+that'd break encapsulation, wouldn't it?
+
+[14:19:44.0000] <croraf>
+I can add an object to the blobstore with window.URL.createObjectURL(...) and retrive it by parsing the URL?
+
+[14:19:59.0000] <andreubotella>
+by fetching the URL, rather
+
+[14:20:10.0000] <andreubotella>
+that's the whole point of URL.createObjectURL(...)
+
+[14:21:04.0000] <andreubotella>
+there are many older APIs that will only take a URL rather than a Uint8Array or a ReadableStream, and this is a compatibility layer
+
+[14:21:52.0000] <croraf>
+In the context of the "media HTML elements" the parsing is done prior to fetching.
+
+[14:22:33.0000] <andreubotella>
+if you're trying to fetch a URL, you ofc need to parse it first
+
+[14:22:33.0000] <croraf>
+as a separate algorithm
+
+[14:22:48.0000] <andreubotella>
+but the parsing doesn't make the underlying blob or MediaStream available to any other API
+
+[14:22:50.0000] <andreubotella>
+fetching does
+
+[14:22:59.0000] <andreubotella>
+or the data inside it, rather
+
+[14:23:31.0000] <croraf>
+So parsing can be done only internally within specific APIs, like fetch() or "media elements"
+
+[14:24:15.0000] <andreubotella>
+sigh
+
+[14:24:33.0000] <andreubotella>
+URL's "blob URL entry" is essentially a private field
+
+[14:25:06.0000] <andreubotella>
+it's not available to the URL JS API, and I think only the File APIs and fetch use it
+
+[14:25:19.0000] <andreubotella>
+for everything else, the way to get the blob's data is by fetching the URL
+
+[14:33:32.0000] <croraf>
+andreubotella, thanks. I now created a URL with a blob content. Fetched it with fetch('blob-reference') and read its content. Kind of cool.
+
+[14:35:35.0000] <croraf>
+But for some reason I cannot fetch the blob src from the video element. How come?
+
+[14:36:03.0000] <andreubotella>
+maybe because it doesn't have a video content type?
+
+[14:36:05.0000] <andreubotella>
+I don't know
+
+[14:36:32.0000] <andreubotella>
+youtube is probably using MediaSource with the URL.createObjectUrl(...) API, but I've never used it or dived into the spec
+
+[14:36:33.0000] <Mek>
+at least in chrome blob urls created from a MediaSource instead of a Blob can't be fetched...
+
+[14:37:27.0000] <croraf>
+It says net::ERR_FILE_NOT_FOUND
+
+[14:38:50.0000] <Mek>
+yeah, in chrome blob URLs refering MediaSource objects are treated separately, and only can be resolved by code that specifically looks for MediaSource objects... (and only in the same process as where the URL was created)
+
+[14:40:45.0000] <croraf>
+Yes, indeed I try: window.URL.createObjectURL(new MediaSource()) and await fetch("blob:https://www.youtube.com/b4e0b59c-6711-49d8-8c23-9a924060df1a") on it gives ERR_FILE_NOT_FOUND
+
+[14:44:40.0000] <croraf>
+Two sidenotes. 1. blob is kind of unfortunate prefix and store name, cause it can contain a MediaSource also per w3c FileAPI. 2. MDN https://developer.mozilla.org/en-US/docs/Web/API/URL/createObjectURL says it can also contain a File object.
+
+[14:45:05.0000] <andreubotella>
+File is a subclass of Blob
+
+[14:46:23.0000] <croraf>
+Oh, I see. MDN should be slightly corrected though then.
+
+[14:48:48.0000] <andreubotella>
+And I suspect that originally only Blobs were supported and MediaSource was added later on
+
+[14:48:55.0000] <andreubotella>
+that kind of thing happens a lot
+
+[14:50:20.0000] <croraf>
+FF does also throw an error https://pasteboard.co/Jzaw4wR.png
+
+[14:51:03.0000] <croraf>
+Is this then alligned with the specification?
+
+[14:51:32.0000] <Mek>
+I think so, yes. https://fetch.spec.whatwg.org/#scheme-fetch says "[if] blob is not a Blob object, then return a network error. "
+
+[14:54:47.0000] <croraf>
+cool
+
+[15:04:03.0000] <andreubotella>
+but if I'm reading the media loading parts of the HTML spec correctly (and assuming that a URL's "object" is an older name for the blob URL entry), <video> should be able to handle MediaSource URLs
+
+[15:05:34.0000] <croraf>
+Yes, video is using them likely.
+
+[15:05:47.0000] <croraf>
+But I'm trying to see if I can get this MeidaSource directly
+
+[15:06:26.0000] <croraf>
+I tried (optimistically :D) new MediaSource('blob:...') but dont think I got anything :D
+
+[15:06:41.0000] <croraf>
+I got an empty MediaSource
+
+[15:07:20.0000] <croraf>
+I dont think I can get the underlying souce either through the video element
+
+[15:17:49.0000] <croraf>
+I think in the case of this video element, the video resource is resolved as following:
+
+[15:19:01.0000] <croraf>
+1. https://html.spec.whatwg.org/multipage/media.html#concept-media-load-algorithm 9.attribute is entered where urlRecord is a resolved MediaSource object
+
+[15:19:23.0000] <croraf>
+in bullet 2 of 9.attribute
+
+[15:21:18.0000] <croraf>
+In bullet 5 of 9.attribute a resource fetch algorithm is called with URL record whose object is a media provider object (a MediaSource), so the mode is set to local.
+
+[15:28:18.0000] <croraf>
+And current media resource is set to the underlying MediaSource object, and the local mode branch of https://html.spec.whatwg.org/multipage/media.html#concept-media-load-resource is processed.
+
+
+2020-11-07
+[07:57:19.0000] <croraf>
+Hi. I'm checking ReadableStream API. How come does the reader know to parse the underlying data, especially to parse it to the correct type?
+
+[07:57:32.0000] <croraf>
+https://codesandbox.io/s/musing-field-x8l4e?file=/src/index.ts I made this example
+
+[10:43:37.0000] <croraf>
+I think I see that streams operate around chunks, underlying source enqueues chunks, and reader.read() reads chunks.
+
+[14:30:38.0000] <croraf>
+Wouldnt it be good that the audioContext.createBufferSource accepts an AudioBuffer argument?
+
+[15:21:06.0000] <croraf>
+Oh, it seems that Web Audio API is not managed by whatwg
+
+
+2020-11-09
+[17:37:11.0000] <croraf>
+Anyone knows if there is a public IRC or something to ask questions about Webaudio API?
+
+[02:41:34.0000] <MikeSmith>
+annevk: For dictionary names in specs, conforming implementations aren’t required to implement actual representations with those names, right?
+
+[02:42:35.0000] <MikeSmith>
+I mean, since the dictionary names aren’t observable or testable from web content
+
+[02:42:47.0000] <annevk>
+MikeSmith: correct
+
+[02:42:50.0000] <MikeSmith>
+OK
+
+[02:42:52.0000] <MikeSmith>
+thanks
+
+[02:43:03.0000] <MikeSmith>
+the context is https://github.com/mdn/browser-compat-data/issues/7287
+
+[02:43:06.0000] <MikeSmith>
+and related issues
+
+[02:43:06.0000] <annevk>
+MikeSmith: this is also a big hesitation I have with just exposing those names to content, since they're not at all consistently named
+
+[02:43:13.0000] <MikeSmith>
+yeah
+
+[02:43:37.0000] <MikeSmith>
+well for BCD I wish we could get rid of them
+
+[02:44:42.0000] <MikeSmith>
+...and instead just deal with their members as parameter for the actual methods that in the spec reference them
+
+[02:45:29.0000] <MikeSmith>
+or as return types
+
+[08:02:13.0000] <Domenic>
+Stong +1
+
+[08:23:39.0000] <benjamingr__>
+Hey, I'm trying to start learning bikeshed to try to contribute a fix and when checkout out the whatwg/dom repo (from master) and building it I get the following error: "FATAL ERROR: Obsolete biblio ref: [ElementTraversal] is replaced by [DOM]." - anything obvious I'm missing?
+
+[08:24:56.0000] <annevk>
+benjamingr__: no, it'll be sorted later today
+
+[08:27:07.0000] <annevk>
+benjamingr__: if you pull again it should be okay
+
+[08:40:29.0000] <benjamingr__>
+Great, thanks anne!
+
+[09:31:19.0000] <benjamingr__>
+I have an initial set of changes - they are probably wrong and I don't want to waste your time, would it be OK if I opened a draft PR for feedback and guidance :]?
+
+[09:44:35.0000] <Domenic>
+benjamingr__: go for it
+
+[09:49:43.0000] <benjamingr__>
+yay, thanks! https://github.com/whatwg/dom/pull/919
+
+[10:12:23.0000] <annevk>
+So I noticed that PR Previews no longer have the usual "not a standard" disclaimer
+
+[10:12:43.0000] <annevk>
+I guess that regressed when we fixing things up for Review Drafts and Commit Snapshots? Sigh
+
+[10:12:49.0000] <annevk>
+I guess I can have a look tomorrow
+
+[10:16:15.0000] <benjamingr__>
+Thanks for the review Domenic ! I'll read this carefully and try to address the comments (it's already evening here, so probably tomorrow so I'm focused and make fewer mistakes) :]
+
+[10:16:37.0000] <Domenic>
+benjamingr__: awesome, sounds like a plan!
+
+[10:17:06.0000] <Domenic>
+annevk: oh eek, yeah I wonder how that happened. Hopefully an easy fix...
+
+
+2020-11-10
+[02:25:59.0000] <annevk>
+tobie: could it be that there are changes to PR Preview that are not in GitHub?
+
+[02:26:18.0000] <annevk>
+tobie: we no longer see the warnings with our specifications, but there's nothing that suggests we would have removed them
+
+[02:26:37.0000] <annevk>
+tobie: although now that I ask you, I am starting to suspect Bikeshed as that is often a source of regressions
+
+[02:40:56.0000] <annevk>
+TabAtkins: could there have been a change in Bikeshed that would mean that warnings no longer show up everywhere?
+
+[03:05:21.0000] <annevk>
+/me files https://github.com/tabatkins/bikeshed/issues/1818
+
+[08:45:23.0000] <annevk>
+Domenic: JakeA: what's a good label for AbortController/AbortSignal? "topic: aborting"?
+
+[08:45:52.0000] <JakeA>
+annevk: works for me
+
+[13:07:17.0000] <croraf>
+Is this a push or pull underlying source: https://www.typescriptlang.org/play?#code/DYUwLgBAlhC8EAYDcAoFBjA9gOwM6QCcQBDAE2ICNQBlMI4gWzgmxAHcIAlE8qkW+gwA82AK4MKIAgD4AFAG80ECPmIEwsrNjqZgoAgEoIi5cq35o2qQDdiwZrnABJKwVvBZso7GnGIWnT0pADoQbABHURAo2SgDJGgAakSEgF8AGggARgRc+KVTRzAAFSgGEExRDS84XxNTM1A1FzAbO1jXd3yGsxxA-WD0YExHL1QGjOzcvPGIVJRU-IwcC3pSKWY1yho6EgZggHNwbjIpMeW8XRBg4YPZNakDC9WeZhqfYxRey9AbzDuAORrKDYA4A7oQL4QB4EYJrLzBMAACzCsihylk7ii3
+
+[13:07:17.0000] <croraf>
+jq-hWVz+dyxIHi0AAZhBMXYosFSDgQHBYPAyXZHEZ5NCeGM5nMofl5vD4kA
+
+[13:11:38.0000] <croraf>
+https://jsfiddle.net/croraf/a8r9hojz/
+
+[13:12:11.0000] <andreubotella>
+croraf: https://streams.spec.whatwg.org/#creating-examples
+
+[13:12:56.0000] <andreubotella>
+compare some of the push examples with 10.4
+
+[13:18:33.0000] <croraf>
+this is the push underlying source?
+
+[13:18:53.0000] <croraf>
+it generates data no matter if I listen or not
+
+[13:19:13.0000] <croraf>
+I mean it enqueues no matter if I read it or not
+
+[13:19:23.0000] <andreubotella>
+right
+
+[13:23:20.0000] <andreubotella>
+hm, now I'm wondering what happens if you have a push source without backpressure but there's no one listening
+
+[13:23:50.0000] <andreubotella>
+for a user-created stream, it can't block because it'd deadlock the tab, so it must throw, I guess
+
+[13:25:03.0000] <croraf>
+to remove a chunk from the "queue" you must read it with the reader, any other way?
+
+[13:25:48.0000] <andreubotella>
+I don't think there's any other way, but streams isn't my area of expertise
+
+[13:26:03.0000] <croraf>
+i thought you are an expert in streams :D
+
+[13:26:49.0000] <andreubotella>
+I/O queues perhaps, readable/writable streams not so much :)
+
+[13:32:36.0000] <croraf>
+push ReadableStreams seem very simple, the set up underlying source enqueues and the reader reads.
+
+[13:33:05.0000] <andreubotella>
+until you add backpressure, that is
+
+[13:33:23.0000] <andreubotella>
+then it's not so simple anymore
+
+[13:38:09.0000] <Domenic>
+andreubotella: the queue just keeps getting larger forever
+
+[13:38:40.0000] <Domenic>
+croraf: the queue can also get empty if the stream errors, or if the reader calls reader.cancel()
+
+[13:39:02.0000] <Domenic>
+Agreed that dealing with backpressure for push streams makes them harder
+
+[13:39:44.0000] <croraf>
+And what about when you make a tee. And you keep consuming one stream, but not the other.
+
+[13:40:22.0000] <croraf>
+Does it tee() make 2 buffers
+
+[13:41:44.0000] <andreubotella>
+Domenic: the queue getting larger forever doesn't seem ideal, but I guess if no one's reading from the stream it's very likely that it was dropped, in which case the GC could collect the items
+
+[13:42:35.0000] <Domenic>
+croraf: tee() makes two streams, each of which have their own queue, indeed.
+
+[13:45:40.0000] <croraf>
+Domenic, thanks. What happens with the queue of the original stream then. Let's say the queue has 1000 items in it already, when you make a tee.
+
+[13:47:28.0000] <Domenic>
+croraf: the chunks will generally stay in the original stream's queue. read() from either branch will pull an item from the original stream's queue into the two branches' queues (one of which will immediately be delivered to the caller of read()).
+
+[13:48:24.0000] <Domenic>
+So e.g. if you do 500 read()s on branch1 and 250 reads on branch2, the end result will be 500 chunks in originalStream, 0 chunks in branch1, and 250 chunks in branch2.
+
+[13:49:13.0000] <croraf>
+Why didnt the original stream get its chunks deleted?
+
+[13:49:23.0000] <croraf>
+Oh, it had 1000 at first
+
+[13:49:27.0000] <croraf>
+as per my example
+
+[13:49:40.0000] <Domenic>
+Indeed, only the chunks which someone asked for got pulled into the branches
+
+[13:50:36.0000] <croraf>
+Even after the tee has been created, the original source will still push on the originalStream's queue?
+
+[13:51:29.0000] <Domenic>
+Yes
+
+[13:54:23.0000] <croraf>
+thanks
+
+[14:16:32.0000] <croraf>
+Well, tee-ing a stream will consume data from its queue even though the original stream is not read with a reader.
+
+[14:17:19.0000] <croraf>
+So this is another way to remove chunks from the queue.
+
+[14:18:25.0000] <croraf>
+Which also makes me wonder what happens if you pipe the original ReadableStream to a WriteableStream or through a TransformStream
+
+[14:33:14.0000] <Domenic>
+Both teeing and piping use readers internally
+
+[14:40:43.0000] <croraf>
+That is step 3 in https://streams.spec.whatwg.org/#readable-stream-tee ?
+
+[14:43:02.0000] <Domenic>
+Correct
+
+[14:47:50.0000] <croraf>
+I'm checking https://streams.spec.whatwg.org/#readable-stream-pipe-to 15, which describes how the pipeTo works.
+
+[14:49:13.0000] <croraf>
+Basically pipeTo reads from ReadableStream (with push source) as soon as there is something available in the queue and writes to the WriteableStream.
+
+
+2020-11-11
+[23:44:33.0000] <annevk>
+The inability to moderate review spam on GitHub is rather annoying
+
+[00:00:40.0000] <annevk>
+andreubotella: https://github.com/whatwg/html/issues/3223
+
+[00:02:47.0000] <andreubotella>
+annevk: I see there'
+
+[00:03:04.0000] <andreubotella>
+I see there's a PR with missing tests, and the linked wpt PR was merged
+
+[00:03:23.0000] <andreubotella>
+I'll take a look later to see if the tests are enough
+
+[00:04:37.0000] <annevk>
+andreubotella: from https://github.com/whatwg/html/pull/3276/files I wonder if we need to invoke the percent-encoding algorithm in the URL Standard for some stuff
+
+[00:05:02.0000] <annevk>
+andreubotella: although at some point I guess we'd be getting really close to replacing the RFC completely
+
+[00:05:20.0000] <annevk>
+which maybe we should just do, it's not a very complicated format
+
+[00:09:57.0000] <andreubotella>
+I was thinking this would probably need its own percent-encode set, but it's quite an odd one, what with not including \x1B or the non-ASCII bytes
+
+[00:11:11.0000] <andreubotella>
+well, we couldn't use percent-encode after encoding anyway because the entity references wouldn't have to be percent-encoded
+
+[00:11:20.0000] <andreubotella>
+I'll think about it
+
+[00:12:21.0000] <annevk>
+andreubotella: well, that's what percent-encode after encoding does, it doesn't percent-encode when the encode or fail returns fail
+
+[00:12:35.0000] <annevk>
+or fail algorithm*
+
+[00:13:11.0000] <annevk>
+Those other bits are indeed weird though, so maybe it needs its own thing
+
+[07:54:57.0000] <croraf>
+I'm checking this example: https://streams.spec.whatwg.org/#example-rs-push-backpressure . There is a note in the code snippet
+
+[07:55:08.0000] <croraf>
+"This is called if the internal queue has been emptied, but the stream’s consumer still wants more data."
+
+[07:55:32.0000] <croraf>
+I don't understand why this part after the comma (,) is present. Seems like it is irrelevant.
+
+[07:55:53.0000] <croraf>
+What would it mean "the stream's consumer still wants more data" technically?
+
+[07:56:29.0000] <andreubotella>
+if the queue is empty and the consumer isn't gonna read anymore, you don't need to push more data into the queue
+
+[08:21:56.0000] <croraf>
+How you know that the consumer isn't gonna read anymore?
+
+[08:23:14.0000] <croraf>
+The pull is gonna be called as soon as the queue has been emptied below the highWaterMark, without any other condition.
+
+[08:23:16.0000] <croraf>
+andreubotella,
+
+[08:23:59.0000] <Domenic>
+If the consumer doesn't call read(), then they don't want more data
+
+[08:24:39.0000] <Domenic>
+I.e. if the consumer doesn't call read(), then the queue is higher than the highWaterMark, so pull() won't be called.
+
+[08:25:57.0000] <croraf>
+Let's assume the hwm is 100 and the queue is at 50. The pull() won't be called if reader.read() is not called?
+
+[08:27:33.0000] <Domenic>
+If the queue is at 50, then the consumer wants more data
+
+[08:27:54.0000] <Domenic>
+It's only when the queue is above the HWM that the consumer doesn't want more data
+
+[08:28:23.0000] <croraf>
+The "consumer wants more data" is kind of ambiguous.
+
+[08:28:36.0000] <Domenic>
+Yes, it's a comment in an example; it's not an algorithm in a spec.
+
+[08:29:25.0000] <croraf>
+I think this comment is just confusing the matter. As far as I see it now.
+
+[08:29:58.0000] <croraf>
+As soon as queue is bellow hwm the pull is going to be called repeatedly. This is the only thing that is relevant, I think.
+
+[08:30:00.0000] <Domenic>
+You're probably best off ignoring it then :)
+
+[08:31:14.0000] <croraf>
+What does it mean that the pull() is called repeatedly.
+
+[08:31:40.0000] <Domenic>
+Ultimately, I think you're best off reading the algorithms to answer these questions.
+
+[08:32:55.0000] <benjamingr__>
+https://streams.spec.whatwg.org/#queuing-strategies read how queuing works
+
+[08:35:55.0000] <croraf>
+Thanks benjamingr__ I read it, I don't think it answers my question.
+
+[08:36:19.0000] <benjamingr__>
+then I recommend you do what domenic suggested and go through the algorithm carefully
+
+[08:43:57.0000] <croraf>
+Thanks benjamingr__ , can you point me to which algorithm to consult for clarifying what it means "be called repeatedly" from https://streams.spec.whatwg.org/#dom-underlyingsource-pull
+
+[08:53:37.0000] <andreubotella>
+I think I had a somewhat wrong impression of how the hwm and pull worked
+
+[10:39:25.0000] <croraf>
+Why isn't in here https://streams.spec.whatwg.org/#rs-class-definition the underlyingSource of the constructor, defined as being of type UnderylingSource?
+
+[10:43:13.0000] <croraf>
+OK, I just ran into a Note explaining why.
+
+
+2020-11-12
+[05:38:06.0000] <MikeSmith>
+Domenic: could use your help clarifying things around https://github.com/mdn/browser-compat-data/pull/6939#issuecomment-726078462 ( ReadableByteStreamController, ReadableStreamBYOBReader, ReadableStreamBYOBRequest_
+
+[10:20:40.0000] <benjamingr__>
+Very random question: is there any conceptual reason stuff like `onload` on Window is on the window itself but `onabort` for example is an event handler on the prototype? (concretely `Object.keys(window).some(x => x === 'onload')` but not `Object.keys((new AbortController()).signal).some(x => x === 'onabort')` since it's on the prototype)
+
+[11:10:21.0000] <Domenic>
+benjamingr__: Window itself is special and everything lives on it directly.
+
+[11:10:29.0000] <Domenic>
+I think all global objects are special?
+
+[11:11:33.0000] <Domenic>
+Now, why are global objects special...
+
+[11:11:48.0000] <Domenic>
+My guess is that it's because Window has a messed up prototype chain including the "global scope pollutor"
+
+[11:12:42.0000] <Domenic>
+although I'm not sure why that would impact, e.g., WorkerGlobalScope.
+
+[12:16:21.0000] <benjamingr__>
+Fun ^^ thanks
+
+
+2020-11-13
+[02:49:52.0000] <annevk>
+WorkerGlobalScope might have been impacted because JS engines didn't have other types of globals at the time, but not sure
+
+[06:10:20.0000] <GPHemsley>
+yall are not having nearly as much fun with this as I had hoped
+
+[06:15:16.0000] <annevk>
+GPHemsley: it was hard to come up with a joke-y reply and then someone started to take it seriously
+
+[06:16:56.0000] <annevk>
+GPHemsley: whatwg/encoding also somewhat routinely gets serious requests for stuff like this, which takes some of the fun out as well
+
+[06:25:17.0000] <annevk>
+GPHemsley: but hey, the page might get fixed, there's that ;-)
+
+[06:25:58.0000] <GPHemsley>
+:-P
+
+[06:27:52.0000] <GPHemsley>
+annevk: I do have some (more) serious archival-related concerns about changing the encoding of a historical document, though
+
+[06:28:41.0000] <GPHemsley>
+(mostly outside the scope of the WHATWG)
+
+[06:30:11.0000] <GPHemsley>
+side note, my original thought was to register an encoding with the IETF registry, but it seems that hasn't been updated since 2018
+
+[06:30:35.0000] <annevk>
+W3C keeps things in version control I think, but also, any such concerns should extend to the metadata, which likely has changed
+
+[06:31:02.0000] <GPHemsley>
+there was a relatively-recent working draft revision of the relevant RFC, but that seems to have been abandoned
+
+[06:31:11.0000] <GPHemsley>
+annevk: true
+
+[06:34:56.0000] <annevk>
+GPHemsley: pointer?
+
+[06:35:12.0000] <annevk>
+GPHemsley: the IANA registry is considered obsolete by the web
+
+[08:21:41.0000] <andreubotella>
+annevk: The changes in https://github.com/whatwg/html/pull/3276 related to percent-encoding don't seem to be tested, with Firefox not following them in at least some cases
+
+[08:25:36.0000] <andreubotella>
+oh, I missed https://github.com/web-platform-tests/wpt/pull/8618
+
+[08:27:45.0000] <annevk>
+andreubotella: it seems these did land in /FileAPI/file/
+
+[08:31:12.0000] <andreubotella>
+all I'm seeing in FileAPI/file is about making sure filenames effectively use encode
+
+[08:32:47.0000] <annevk>
+Oh okay
+
+[09:04:36.0000] <GPHemsley>
+from 2015: https://tools.ietf.org/html/draft-iana-charset-reg-procedure-01
+
+[09:04:42.0000] <GPHemsley>
+annevk: ^
+
+[09:05:57.0000] <GPHemsley>
+annevk: it appears the intent was to split the registry in categories such that it can continue to register legacy encodings
+
+[10:09:27.0000] <annevk>
+GPHemsley: ooh, yeah, I've seen that I think
+
+[10:09:52.0000] <annevk>
+GPHemsley: too little, too late
+
+
+2020-11-14
+[00:32:30.0000] <benjamingr__>
+annevk: did you end up filing a firefox bug for https://github.com/whatwg/dom/pull/919 ? (If not, should I?)
+
+[07:31:30.0000] <croraf>
+https://html.spec.whatwg.org/multipage/web-sockets.html says in the note "This interface does not allow for raw access to the underlying network. For example, this interface could not be used to implement an IRC client without proxying messages through a custom server." Why does an IRC client need the "raw access to the underlying network" and cannot be implemented using websockets?
+
+[07:33:00.0000] <andreubotella>
+websockets aren't TCP or UDP sockets
+
+[07:33:33.0000] <andreubotella>
+you can implement some version of IRC on top of websockets, but you can't connect to an IRC server using the IRC protocol with them
+
+[07:37:49.0000] <croraf>
+If you implement IRC on top of websockets why cannot you connect to the IRC server?
+
+[07:38:24.0000] <andreubotella>
+if you implement IRC on top of websockets, sure you can
+
+[07:38:39.0000] <andreubotella>
+but you won't be able to connect to freenode with websockets without setting up a proxy
+
+[07:40:14.0000] <croraf>
+Aha, I see, because you need to connect to the websockets server first, and freenode network does not provide that.
+
+[07:42:40.0000] <andreubotella>
+IRC is usually defined as a protocol that sits on top of TCP, and that's probably what the note meant
+
+[07:43:03.0000] <andreubotella>
+no reason why you can't port it to sit on top of websockets, I guess
+
+[11:22:59.0000] <croraf>
+I'm reading the html web-sockets spec https://html.spec.whatwg.org/multipage/web-sockets.html#dom-websocket-close . A note says that the messages enqueued with send will be sent prior to starting the Websocket closing handshake. But where can this be seen in the algorithm?
+
+[11:30:20.0000] <croraf>
+Also in https://html.spec.whatwg.org/multipage/web-sockets.html#dom-websocket-send it does not really specify what happens with the data that is sent when the websocket is in CLOSING. The bufferedAmount is still increased, but I don't see if this data is sent or not?
+
+
+2020-11-15
+[19:54:11.0000] <Krinkle>
+TIL that `Function.prototype` is a callable noop function
+
+[19:54:23.0000] <Krinkle>
+H/T https://github.com/mathiasbynens/he/blob/36afe179/tests/tests.js#L4
+
+[14:52:50.0000] <croraf>
+Krinkle, many strange things in ECMA spec: https://tc39.es/ecma262/#sec-properties-of-the-function-prototype-object
+
+[14:54:31.0000] <croraf>
+What do you mean by H/T ?
+
+[15:02:40.0000] <astearns>
+croraf: it means "hat tip" which in this case is like "I learned this from"
+
+
+2020-11-16
+[16:03:46.0000] <croraf>
+astearns, aha, like "thanks/respect to"
+
+[17:55:57.0000] <Krinkle>
+croraf: thx, nice little historical quirk
+
+[17:56:05.0000] <Krinkle>
+(Hat tip indeed)
+
+[03:53:59.0000] <andreubotella>
+the navigate algorithm doesn't require browsers to treat a navigation as a download if the resource has "binary" bytes, regardless of the mime type, right?
+
+[03:55:02.0000] <andreubotella>
+all browsers seem to do just that, and it's biting me in the ass when I'm trying to test control characters on multipart/form-data
+
+[03:56:03.0000] <annevk>
+andreubotella: the interaction of navigation and MIME sniffing is not that great I think, so it might well be wrong
+
+[03:56:26.0000] <annevk>
+andreubotella: you wouldn't navigate to a multipart/form-data response though, right?
+
+[03:57:32.0000] <andreubotella>
+the test infrastructure from https://github.com/web-platform-tests/wpt/pull/8618 has echo-response.py as the form's action, with an iframe as the target, and then reads from the iframe
+
+[03:59:05.0000] <andreubotella>
+s/echo-response/echo-content/
+
+[04:00:02.0000] <annevk>
+andreubotella: I guess I don't really understand how that helps, but multipart/form-data alone should be enough for a download
+
+[04:01:04.0000] <andreubotella>
+ /fetch/api/resources/echo-content.py sets Content-Type: text/plain
+
+[04:01:26.0000] <andreubotella>
+but anyway, I can find some other way to test those cases
+
+[04:02:07.0000] <annevk>
+andreubotella: oh I see, it tries to serialize what it sees on the server
+
+[04:02:53.0000] <annevk>
+andreubotella: perhaps the server should just do \x notation for control bytes and bytes >0x7F
+
+[04:04:34.0000] <andreubotella>
+annevk: yeah, I think I'll do that
+
+[04:05:50.0000] <andreubotella>
+btw, any clue why wpt.fyi has safari crashing on some tests that pass on a webkit nightly I built on my (linux) machine?
+
+[04:05:57.0000] <andreubotella>
+https://wpt.fyi/results/FileAPI/file/send-file-form-iso-2022-jp.tentative.html?label=experimental&label=master&aligned
+
+[04:08:45.0000] <annevk>
+andreubotella: no, but they have touched their encoding impl recently so I'll alert someone
+
+[04:16:58.0000] <annevk>
+andreubotella: via gsnedders: https://bugs.webkit.org/show_bug.cgi?id=218112
+
+[04:20:58.0000] <gsnedders>
+andreubotella: specifically, it's a macOS only crash, related to CFNetwork, and doesn't occur in WebKitTestRunner but only in Safari
+
+[04:21:18.0000] <andreubotella>
+I see
+
+[11:44:38.0000] <Domenic>
+annevk: it seems folks ignored my preference to use a non-versioned reference for WCAG in https://github.com/whatwg/html/issues/5761#issuecomment-664499216 ... not sure if we just want to merge https://github.com/whatwg/html/pull/6149 or suggest the contributor change.
+
+[12:09:01.0000] <annevk>
+Domenic: oh that’s my bad I think
+
+[12:09:34.0000] <annevk>
+Domenic: I would ask
+
+[12:09:58.0000] <annevk>
+Happy to do so myself tomorrow
+
+[12:32:05.0000] <Domenic>
+Sounds good, will let you do it :)
+
+
+2020-11-17
+[04:51:50.0000] <krijn_>
+Wow, is this thing still on? :)
+
+[04:56:09.0000] <annevk>
+krijn_: nog steeeds ja 😊
+
+[05:11:39.0000] <krijn_>
+I think I've found a weird use case for img/srcset/sizes, that hasn't been discussed in https://github.com/whatwg/html/issues/2973 or https://github.com/ResponsiveImagesCG/picture-element/issues/86 yet. But I can't imagine I'm the first to bump into this, so I thought I'd ask the smart people..
+
+[05:12:10.0000] <krijn_>
+Is work on h descriptors still being done?
+
+[05:12:51.0000] <annevk>
+zcorpan: ^
+
+[05:12:57.0000] <annevk>
+yoav: ^
+
+[05:13:13.0000] <krijn_>
+Like reading my mind :)
+
+[05:16:58.0000] <krijn_>
+The GitHub issue mentions `object-fit: contain`, but I'm now running into an issue with `object-fit: scale-down` on a `width: 100%; height: [calc/vh];` image, and I can't come up with the correct sizes attribute. Possibly because it doesn't exist, more likely because I'm too dumb.
+
+[05:18:13.0000] <krijn_>
+(Is it still ok to ask plain old HTML questions? Or should everything be padded with React boilerplate nowadays?)
+
+[06:01:26.0000] <jgraham>
+Hasn't HTML been replaced by hooks? ;)
+
+[06:03:46.0000] <krijn_>
+Hooks, hooks.. Rings a bell
+
+[06:04:34.0000] <yoav>
+hey krijn_!
+
+[06:04:50.0000] <krijn_>
+Long time!
+
+[06:04:57.0000] <yoav>
+indeed!!
+
+[06:06:39.0000] <yoav>
+h descriptors for srcset and height-limited sizes are both things that you'd need for height limited images, but also things we never specified and implemented...
+
+[06:07:07.0000] <krijn_>
+Yeah, that's what I found out ;'(
+
+[06:08:29.0000] <krijn_>
+So what's best in that case? Just add the largest known image width to the sizes attribute?
+
+[06:08:56.0000] <krijn_>
+Kind of defeats the point of using srcset in the first place, I guess
+
+[06:09:00.0000] <yoav>
+Might be interesting to file an issue against HTML (not React nor Hooks!) to document what you're unable to do, so that we can try to get folks to invest time in solving that
+
+[06:09:25.0000] <krijn_>
+Would https://github.com/whatwg/html/issues/2973 be the right issue?
+
+[06:09:38.0000] <krijn_>
+I'm not sure if adding h descriptors would be enough in my case
+
+[06:09:51.0000] <yoav>
+oh, yeah. That'd indeed be the issue to pile on to
+
+[06:10:23.0000] <krijn_>
+object-fit: scale-down; makes it a whole lot more complicated
+
+[06:13:01.0000] <yoav>
+Is it because your potential display dimensions can be either based on the container or on the image?
+
+[06:13:24.0000] <krijn_>
+Yep
+
+[06:14:43.0000] <yoav>
+yeah, I can see how that complicates things
+
+[06:15:44.0000] <krijn_>
+Dm'd you a link, np if you don't have the time to look into it :)
+
+[07:15:23.0000] <annevk>
+littledan: how about no primordials, gotta build your realm up from scratch
+
+[07:15:57.0000] <littledan>
+annevk: We could do that too; that's the current proposal, but it sounded like Mozilla and Chrome were unhappy about that
+
+[07:16:20.0000] <annevk>
+littledan: I thought the current proposal did have encodeURI, Array, and friends
+
+[07:16:22.0000] <littledan>
+or do you mean nothing at all, not even JS globals?
+
+[07:16:49.0000] <littledan>
+some of the JS globals are pointed to by JS syntax. Array is one of these
+
+[07:18:49.0000] <annevk>
+Ah yeah, anyway, going more minimal might be an interesting alternative
+
+[07:18:56.0000] <annevk>
+And is kinda what we wanted for worklets in the past
+
+[07:19:27.0000] <annevk>
+We still do I suppose, but it's too late now
+
+[07:20:02.0000] <andreubotella>
+looking at it from the perspective of something like jsdom, how would you even create an Array global in a new realm?
+
+[07:21:40.0000] <andreubotella>
+well, I guess you could implement everything in user-land, at a runtime cost
+
+[07:22:01.0000] <jgraham>
+The alternate point of view is Web Extensions and WebDriver where we want to allow extensions/test authors to create an isolated realm with access to the DOM but without needing to worry about the behaviour of content script (e.g. changing the prototypes, or adding expandos or global variables or whatever)
+
+[07:22:39.0000] <jgraham>
+So that's a kind of maximalist use case where you want pretty much everything the document realm can access
+
+[07:22:58.0000] <annevk>
+Array might be over the top, but there's a lot of primordials you don't really need to be there (including all the new library kind of things)
+
+[07:31:32.0000] <annevk>
+jgraham: that's pretty interesting too; I guess what you really want is some kind of control over what gets exposed there, but that will get complicated quickly if you want to go beyond minimal/maximal
+
+[07:50:51.0000] <littledan>
+if you have a Realm through the Realm API, then you can either do something like `realm.globalThis.Array`, or `(await realm.import(module { export default Array }).default`
+
+[07:51:11.0000] <littledan>
+or, `realm.globalThis.eval("Array")`
+
+[07:51:19.0000] <littledan>
+those are sort of the three ways to get at things within the context of Realms
+
+[07:51:40.0000] <littledan>
+I imagine they'd all be usable from something like jsdom
+
+[07:52:18.0000] <littledan>
+I imagine this API would work for extensions as well
+
+[07:52:44.0000] <annevk>
+I think the question was in response to my suggestion
+
+[07:52:55.0000] <littledan>
+oops
+
+[07:53:30.0000] <littledan>
+annevk: I could see going this minimalist route, but I don't know if everyone would be convinced that we can exclude Web APIs from the minimal set
+
+[07:54:05.0000] <littledan>
+it seemed like there was particular interest in including a separate copy of Web APIs by default; maybe I misunderstood
+
+[07:54:48.0000] <annevk>
+littledan: I'm not aware of all the sides here, but I think Domenic's point was that it was jarring that TextEncoder would not be there, but i18n APIs would be, for instance
+
+[07:55:17.0000] <annevk>
+littledan: similar to atob() vs encodeURI()
+
+[07:55:46.0000] <littledan>
+sure, I can see that point. I think it would also be *slightly* faster to create a Realm if there is less in it
+
+[07:55:47.0000] <annevk>
+littledan: I imagine if there was something more principled, such as all features needed for parsing, that objection would fade, but who knows
+
+[07:57:14.0000] <annevk>
+Mark would prolly appreciate not having Date in there
+
+[07:59:37.0000] <littledan>
+there's a lot of APIs to consider. It's an interesting thing to think through, where the line should go
+
+[08:00:08.0000] <littledan>
+I can think of a bunch of different reasonable policies
+
+[08:00:56.0000] <littledan>
+One possible dividing line would be, "does this do I/O", but that is also vague
+
+[08:07:35.0000] <andreubotella>
+either way, having a subset of the web APIs available in a realm would mean creating a new global from the point of view of WebIDL's "Exposed" attribute
+
+[08:08:36.0000] <littledan>
+Yes, it seems straightforward from that perspective
+
+[14:39:15.0000] <MikeSmith>
+TabAtkins: about ::file-selector-button, do you know if there’s a reason the spec update for it has not been made yet?
+
+[14:39:20.0000] <MikeSmith>
+https://github.com/w3c/csswg-drafts/issues/5049#issuecomment-729255718
+
+
+2020-11-18
+[03:15:39.0000] <annevk>
+andreubotella: it seems that only Chrome does newline normalization
+
+[03:17:06.0000] <andreubotella>
+annevk: The send-file-form-controls.tentative.html tests are passing on webkit on Linux, so webkit is doing newline normalization when building the multipart/form-data payload, not when constructing the entry list.
+
+[03:18:28.0000] <annevk>
+andreubotella: okay, I do recall the spec having newline normalization for some form stuff
+
+[03:18:41.0000] <andreubotella>
+https://html.spec.whatwg.org/#append-an-entry
+
+[03:22:09.0000] <annevk>
+andreubotella: yeah, just found that, perhaps Infra should define Windows-normalize newlines
+
+[03:23:48.0000] <annevk>
+I also wonder if there's no coverage for that already
+
+[03:24:08.0000] <andreubotella>
+I skimmed the tests, and there didn't seem to be anything, but maybe I missed something
+
+[03:25:33.0000] <annevk>
+Yeah, not seeing anything either
+
+[03:54:02.0000] <andreubotella>
+I'm not sure exactly when FormData was introduced, but webkit's behavior is making me thing about how new features can make what was previously a web-inobservable detail web-observable
+
+[03:55:37.0000] <annevk>
+andreubotella: yeah, we/I didn't do enough due diligence back then; I think I also didn't realize all the implications when adding fetch() support for it
+
+[03:58:30.0000] <annevk>
+It's pretty old, https://www.w3.org/TR/2010/WD-XMLHttpRequest2-20100907/#the-formdata-interface is the earliest draft I could find
+
+[03:59:28.0000] <annevk>
+And unfortunately I think we lost history twice, once when migrating from CVS and once when migrating from Mercurial
+
+[04:30:27.0000] <andreubotella>
+annevk: hopefully these comments I just added clarify the escapes
+
+[04:47:56.0000] <annevk>
+andreubotella: do you plan to file bugs for the non-tentative tests?
+
+[04:48:09.0000] <annevk>
+andreubotella: and do you need me to land the PR? Any preferred commit message, the original one?
+
+[04:51:25.0000] <andreubotella>
+annevk: The original commit message works for me
+
+[04:51:59.0000] <andreubotella>
+and I'll file bugs for the newline normalization
+
+[04:52:13.0000] <andreubotella>
+the rest of failures in non-tentative tests are the safari crash
+
+[07:09:04.0000] <andreubotella>
+annevk: https://bugzilla.mozilla.org/show_bug.cgi?id=1657844
+
+[07:09:04.0000] <andreubotella>
+https://bugs.webkit.org/show_bug.cgi?id=219086
+
+
+2020-11-19
+[19:29:21.0000] <MikeSmith>
+For GitHub, anybody know of a tool that can show a graph of contributor growth for a particular repo?
+
+[19:29:27.0000] <MikeSmith>
+I mean, show how many new contributors were added each week (for this year, last year, etc.)
+
+[19:30:24.0000] <MikeSmith>
+Context is that for https://github.com/mdn/browser-compat-data, I think we have been getting new contributors at the rate of at least one or two a week — but I don’t know how to confirm that
+
+[19:30:44.0000] <MikeSmith>
+last time I remember checking, I think we had 722 contributors there, and now today we already have 727
+
+[20:02:58.0000] <Krinkle>
+MikeSmith: closest thing that comes to mind is git-shortlog which, if invoked with a summary "one author per line + commit count", gives you back something where `wc -l` is the number of distinct contributors. If you then invoke this a couple times with limited date ranges (`main@{3 weeks ago}` etc.) you can get the total as of Jan 2020, then Feb 2020 etc and see how quickly it rises.
+
+[23:58:09.0000] <annevk>
+happy b-day zcorpan_ \o/
+
+[01:15:29.0000] <MikeSmith>
+Krinkle: thanks yeah so I may write a script to automate something like that. But it’d just be surprising to me if somebody else hadn’t already. It seems like something a lot of projects would want. A Google search doesn’t turn up anything at all though. But maybe I’m just not thinking of the right words
+
+[01:17:34.0000] <MikeSmith>
+..instead only lots of vanity stuff like https://github.com/sallar/github-contributions-chart for views of one’s own individual contributions
+
+[01:19:40.0000] <jgraham>
+It's possible that there aren't many projects using "number of new contributors" as a metric (or just that people made one-off scripts for that which they didn't release)
+
+[01:23:55.0000] <annevk>
+For HTML we looked at the total number of contributors at times, it seems it's at 262 now which is pretty cool
+
+[01:28:15.0000] <jgraham>
+I also remember this is hard to get right because there's usually some people with >1 email address and cases where the email address is mangled
+
+[01:28:46.0000] <jgraham>
+So just using the git data you need to do significant project-specific normalisation
+
+[01:29:02.0000] <MikeSmith>
+yeah the e-mail thing can be addressed using .mailmap
+
+[01:30:47.0000] <MikeSmith>
+but as far as maybe not many projects are using "number of new contributors" as a metric, it would seem odd to me for any project to not be interested in measuring project growth
+
+[01:31:35.0000] <MikeSmith>
+and number of unique contributors seems like an obvious thing to want to track over time, as an indicator of growth
+
+[01:32:59.0000] <MikeSmith>
+well also the rate
+
+[01:33:42.0000] <MikeSmith>
+I mean, the rate at which the project is getting PRs from new contributors
+
+[01:35:59.0000] <annevk>
+I dunno, sustained contributions are more interesting than the one-off fixes to me, but the one-off fixes are still nice
+
+[01:37:42.0000] <annevk>
+That is, with "good first issue" we attract a lot of contributors and can help people learn how to patch things, but it's rare for them to stay and tackle bigger things
+
+[01:41:22.0000] <MikeSmith>
+yeah good point
+
+[01:43:18.0000] <MikeSmith>
+but for a project like MDN the long tail of one-off fixes can grow pretty big and actually be more interesting
+
+[01:43:52.0000] <MikeSmith>
+part of the context for me for this now is that MDN content will be all be moving to github
+
+[01:44:08.0000] <MikeSmith>
+https://github.com/mdn/content/issues/117
+
+[02:15:11.0000] <annevk>
+benjamingr__: re https://github.com/web-platform-tests/wpt/pull/26472 I suspect smaug____ means dispatching another event from the listener that triggers another listener
+
+[02:15:32.0000] <annevk>
+benjamingr__: however, I'm not entirely sure what the tricky signal cases would be in such a setup
+
+[02:16:40.0000] <annevk>
+maybe the nested event's listener cancels a listener the outer event would have triggered afterwards?
+
+[02:18:48.0000] <benjamingr__>
+So I have a `foo` listener that adds a `bar` listener, dispatches a `bar` event and that `bar` listener calls `.abort()` which makes sure a second `.foo` listener is removed?
+
+[02:19:09.0000] <benjamingr__>
+I'm not entirely sure why that's tricky with regards to signals either - but if that's the case I'm happy to add such a test if you think it's a good idea to have one.
+
+[02:20:03.0000] <annevk>
+benjamingr__: might be best to wait for smaug____ to get in and answer
+
+[02:20:12.0000] <benjamingr__>
+ack
+
+[02:20:15.0000] <annevk>
+(but yeah, that's what I had in mind)
+
+[02:20:50.0000] <MikeSmith>
+talking with Dom right now and he pointed me to https://dontcallmedom.github.io/github-community-monitor/
+
+[02:20:53.0000] <annevk>
+benjamingr__: to be fair, I also did not anticipate Chrome's bug of capture no longer working
+
+[02:25:14.0000] <smaug____>
+benjamingr__: I was thinking playing with the same event type
+
+[02:25:19.0000] <smaug____>
+but nested events
+
+[02:25:41.0000] <benjamingr__>
+@annevk Me neither - I wouldn't have tested for it initially and only found it by reading the implementation code and going through the spec trying to find differences. I have no idea what other inconsistencies may exist in other browsers or how EventTarget is implemented there so I'm happy to add tests for things people think are worth testing.
+
+[02:25:50.0000] <smaug____>
+of course need to ensure the test doesn't end up to enless recursion loop
+
+[02:26:34.0000] <annevk>
+The penalty for not implementing signal quickly will be endless loops on WPT :p
+
+[02:27:56.0000] <benjamingr__>
+smaug____: Something like this? https://gist.github.com/benjamingr/f20d50ba6e02192debab93907a20f3ee
+
+[02:28:14.0000] <benjamingr__>
+Haha, yeah don't run it on stock chrome/firefox it will probably run into an endless loop ^^
+
+[02:28:28.0000] <benjamingr__>
+(also missing a dispatchEvent to fire things off at the end)
+
+[02:30:37.0000] <smaug____>
+the first event listener would add more listeners and dispatch nested event
+
+[02:31:06.0000] <benjamingr__>
+With the same event name?
+
+[02:31:07.0000] <smaug____>
+The key is that while an event is being dispatch and handled, another listener is added and another event is dispatched
+
+[02:31:11.0000] <smaug____>
+yes
+
+[02:34:18.0000] <benjamingr__>
+I pressed enter and my browser just froze in a really weird way ^^ serves me right - something like this smaug____ https://gist.github.com/benjamingr/7ca1c3e50d2961173f3d12fee4945e14 ?
+
+[02:34:44.0000] <benjamingr__>
+wait no that's a fork bomb lol
+
+[02:34:54.0000] <benjamingr__>
+The listener is added each time, no wonder it froze my browser
+
+[02:35:16.0000] <benjamingr__>
+The "outer" listener needs to be added with `once`
+
+[02:36:40.0000] <benjamingr__>
+ok, updated to once, is that what you had in mind?
+
+[02:38:53.0000] <smaug____>
+I guess that could work. Is does test some of the nested handling
+
+[02:42:18.0000] <benjamingr__>
+I'll add it then :] I'm happy to change the test (or other tests) - note I don't have a lot of (well, any really) experience authoring WPTs so feedback and improvement suggestions are definitely appreciated and feedback will be swiftly applied.
+
+[02:44:22.0000] <smaug____>
+it is also good to have some tests initially and then while implementing the feature one can add more
+
+[02:45:20.0000] <benjamingr__>
+sounds good to me :]
+
+[02:46:11.0000] <smaug____>
+Perhaps better to test that nested dispatching only if the browser supports signal as an option for addEventListener
+
+[02:49:26.0000] <annevk>
+I think it's fine, I'd really rather not do feature testing in tests, timeout exists
+
+[02:50:51.0000] <benjamingr__>
+ack, I think it will exit with a `RangeError` rather than do an infinite loop anyway
+
+[02:51:05.0000] <smaug____>
+RangeError?
+
+[02:59:44.0000] <benjamingr__>
+Yes, though that might be an implementation detail? I think that it pushes the next invocation on the call stack which eventually runs out of space so eventually you get a stack overflow
+
+[03:00:05.0000] <benjamingr__>
+That's what Firefox/Chrome do with the above code anyway, I haven't checked Safari
+
+[03:00:59.0000] <annevk>
+JavaScript only defines OOM for ArrayBuffer allocation, iirc
+
+[03:03:55.0000] <annevk>
+benjamingr__: you should add an assert after dispatching the final event (though prolly only run the assert when count > 5)
+
+[03:07:30.0000] <smaug____>
+/me finds some ancient test he had for recursion http://mozilla.pettay.fi/moztests/events/event_loop.html
+
+[03:07:52.0000] <smaug____>
+from pre-Chrome era
+
+[03:28:09.0000] <shu>
+annevk: i've been thinking about actually getting some normative prose in there about small allocation OOMs
+
+[03:29:05.0000] <annevk>
+shu: cool cool
+
+[03:29:36.0000] <shu>
+it's implied in this one non-normative note in the regexp section
+
+[03:29:46.0000] <annevk>
+heh
+
+[07:41:45.0000] <zcorpan_>
+Thanks, annevk!
+
+[08:57:43.0000] <Krinkle>
+MikeSmith: related - https://wikimedia.biterg.io/app/kibana , https://insights.lfx.linuxfoundation.org/projects/ojsf%2Fojsf-jquery/dashboard
+
+[08:57:53.0000] <Krinkle>
+but a lot more overhead, and might still not exactly give you that metric :)
+
+[08:58:47.0000] <MikeSmith>
+/me looks at Krinkle links
+
+[08:59:30.0000] <MikeSmith>
+ah nice
+
+[09:02:03.0000] <MikeSmith>
+Krinkle: added a comment at https://github.com/mdn/content/issues/117#issuecomment-730508435 with those links
+
+[09:06:26.0000] <Krinkle>
+The biterg one is open source (runs something called Grimoirelab). I would assume the LF one is open source as well, but I haven't yet managed to find its source
+
+[11:35:08.0000] <zcorpan_>
+https://css-tricks.com/using-details-for-menus-and-dialogs-is-an-interesting-idea/ - is this appropriate use of <details>? I was unsure first, but it doesn't seem wrong. Also wonder if any screen readers get confused, but assume it at least is accessible enough to be workable
+
+[13:50:25.0000] <croraf>
+If you check the the definition of "value" in the attributes table here: https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input
+
+[13:50:30.0000] <croraf>
+it is just plain wrong?
+
+[13:52:56.0000] <MikeSmith>
+zcorpan_: it doesn’t violate any conformance requirements?
+
+[13:54:15.0000] <zcorpan_>
+MikeSmith: don't think so?
+
+[13:54:54.0000] <zcorpan_>
+<summary> has role=button as implicit role https://w3c.github.io/html-aria/#el-summary
+
+[13:54:57.0000] <MikeSmith>
+zcorpan_: yeah the markup doesn’t at least, as far as I can see
+
+[13:55:52.0000] <MikeSmith>
+croraf: what’s plain wrong about it?
+
+[13:56:10.0000] <zcorpan_>
+github uses <div> inside <summary>, but that could as well be a <span>
+
+[13:56:14.0000] <MikeSmith>
+croraf: it links to https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input#htmlattrdefvalue and what that says also does not seem plain wrong
+
+[13:56:23.0000] <MikeSmith>
+zcorpan_: yeah
+
+[13:57:54.0000] <zcorpan_>
+"The details element represents a disclosure widget from which the user can obtain additional information **or controls**."
+
+[13:58:04.0000] <croraf>
+MikeSmith, It says "Current value of the form control. Submitted with the form as part of a name/value pair."
+
+[13:58:54.0000] <croraf>
+This is not what value attribute is. It might be the initial value of the form control, but not the current value, which is the value that is submitted when the form is submitted.
+
+[14:00:37.0000] <zcorpan_>
+croraf: you're right. the description in https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input#htmlattrdefvalue is more accurate
+
+[14:01:04.0000] <MikeSmith>
+croraf: OK, then sounds worth editing the article, or else using the Feedback link to raise a https://github.com/mdn/sprints/issues issue to request a fix
+
+[14:01:58.0000] <croraf>
+Even the thing you linked, the detailed description says in the first sentence: "The input control's value."
+
+[14:02:57.0000] <croraf>
+And in the next sentence "When specified in the HTML..." The thing that is specified in the HTML is the attribute, which is not the same thing as "value" property of the HTMLInputElement. So they are also confusing these 2 things.
+
+[14:08:18.0000] <zcorpan_>
+croraf: yes, it could certainly be clarified. please edit it :)
+
+[14:08:36.0000] <croraf>
+zcorpan_, thanks for confirmation
+
+[14:09:03.0000] <zcorpan_>
+np. thanks for checking!
+
+[14:16:43.0000] <croraf>
+I'm checking the select element HTML spec: https://html.spec.whatwg.org/#the-select-element
+
+[14:17:59.0000] <croraf>
+The only thing I see regarding the events is in the middle of that section, starting with: "When the user agent is to send select update notifications, queue an element task on the user interaction task source given the select element to run these steps:"
+
+[14:18:47.0000] <croraf>
+I don't see from that which events can "select" trigger and when.
+
+[14:20:25.0000] <croraf>
+Also I'm 99% sure that changing the "value" property using JS doesn't trigger any event, but where does this say in the spec.
+
+[14:29:27.0000] <croraf>
+I guess there are common events fired on all elements, like "click", "mouseenter" and similar described somewhere in the spec. And the particular events "input" and "change" denoted in this section.
+
+[14:29:54.0000] <zcorpan_>
+croraf: you can click the definition (the bold part) to get a list of references to that term
+
+[14:31:14.0000] <zcorpan_>
+croraf: the 3 cases are all result of user interaction, afaict
+
+[14:35:30.0000] <croraf>
+zcorpan_, aha, sorry, I skipped the paragraphs mentioning "multiple" but now I see that they say "If multiple attribute is absent..." :D
+
+[14:35:55.0000] <croraf>
+I think they explain my question.
+
+[14:47:05.0000] <croraf>
+Yes, these paragraphs explain the input and change events. I guess other events (like click) are handled in a common way as described somewhere for HTMLElements, because HTMLSelectElement inherits from HTMLElement.
+
+[14:50:03.0000] <croraf>
+This section https://html.spec.whatwg.org/#global-attributes mentiones global eventHandler attributes, but I haven't really found the section that describes how, when and which events are dispatched from HTMLElement
+
+
+2020-11-20
+[00:45:29.0000] <annevk>
+Okay, so in Firefox/Safari import() delays the load event and Chrome it does not... Chrome is technically correct, but I don't think this was considered at all
+
+[02:00:24.0000] <MikeSmith>
+https://blog.archive.org/2020/11/19/flash-animations-live-forever-at-the-internet-archive/
+
+[04:05:05.0000] <annevk>
+(Turns out the existing module script test suite already tests that for import(), though it's unclear if it does so intentionally.)
+
+[04:50:08.0000] <croraf>
+Anybody knows in the devtools what does it mean when the element's tag is highlighted?
+
+[04:54:43.0000] <croraf>
+For example I select one element in the devtools, and I make an action in the page. The selection is not removed, and the element highlights, but not it nor its children get modified. It can be that equivalent element remounted with the exact same state?
+
+[04:54:56.0000] <croraf>
+But why the selection in the devtools persists then :|
+
+[04:56:25.0000] <croraf>
+I tried getting the element using findElementById and then body.contains(el) before and after and it is true
+
+[05:47:27.0000] <jgraham>
+croraf: It's unclear which devtools you mean, and in any case this isn't the best place for devtools help
+
+[08:05:01.0000] <croraf>
+jgraham, ok, I meant devtools in general, not sure if it is standardized somewhere.
+
+[08:24:59.0000] <annevk>
+Domenic: so response.text() can already end up aborted due to fetch() being aborted, but yeah, maybe it makes sense to have both; that might also help when you get a Response from a cache or some such
+
+[08:25:19.0000] <Domenic>
+Ah true, less urgent then I guess
+
+[14:03:06.0000] <domfarolino>
+annevk: Are you OK with merging https://github.com/w3c/webappsec-referrer-policy/pull/142?
+
+
+2020-11-21
+[01:24:12.0000] <annevk>
+domfarolino: go ahead, I’ll be mostly absent next week FWIW
+
+[02:01:28.0000] <benjamingr__>
+Hey, did you ever end up filing a bug for https://github.com/whatwg/dom/pull/919 in firefox @annevk ? If not - should I?
+
+[02:01:28.0000] <benjamingr__>
+I feel like I already asked this and forgot the response 😅
+
+[03:06:55.0000] <annevk>
+benjamingr__: I did not, feel free to file; I think I suggested to wait for the tests, but we prolly have enough now? Can review week after next
+
+[03:07:14.0000] <benjamingr__>
+Great thanks
+
+[03:07:49.0000] <annevk>
+benjamingr__: really appreciate your input and work on all these API improvements
+
+[03:07:56.0000] <benjamingr__>
+:D
+
+[03:29:39.0000] <domfarolino>
+Got it, thanks for the heads up
+
+[12:08:09.0000] <coreyfarrell>
+I'm confused about CharacterData, https://developer.mozilla.org/en-US/docs/Web/API/CharacterData seems to say that it should implement the ChildNode interface but https://dom.spec.whatwg.org/#characterdata says it just inherits Node.
+
+[12:10:31.0000] <coreyfarrell>
+Firefox and Chromium seem to agree with the MDN docs, I couldn't find any bug report at github.com/whatwg/dom.  honestly expected to at least see it proposed on the whatwg repo
+
+
+2020-11-22
+[05:08:55.0000] <annevk>
+coreyfarrell: https://dom.spec.whatwg.org/#interface-childnode
+
+[05:09:32.0000] <annevk>
+(I think there’s an open issue on making this clear in both places.)
+
+[05:10:27.0000] <coreyfarrell>
+annevk: ah thank you, I looked at that section but missed that the classes which include the interface was listed under the interface.
+
+
+2020-11-23
+[04:46:22.0000] <ondras>
+hm, this is incorrect?
+
+[04:46:24.0000] <ondras>
+new (class extends HTMLAudioElement {})
+
+[04:46:27.0000] <ondras>
+(throws in ff)
+
+[06:58:38.0000] <ondras>
+can someone please recommend a good place to discuss Web Audio API stuff?
+
+
+2020-11-24
+[03:40:38.0000] <smaug____>
+oh, some addEventListener + abortController tests got added to wpt already before there is that API in the spec
+
+[03:41:11.0000] <smaug____>
+I guess that is fine, though a bit redundant when we're getting quite a bit more tests soon, I hope
+
+[03:42:32.0000] <smaug____>
+(https://github.com/web-platform-tests/wpt/pull/26462 landed before https://github.com/web-platform-tests/wpt/pull/26472)
+
+[08:12:21.0000] <smaug____>
+benjamingr__: FYI, I'm just implementing addEventListener + signal in Gecko
+
+[08:14:19.0000] <benjamingr__>
+That's awesome thanks for the update ^^
+
+[13:56:22.0000] <smaug____>
+I hope all the engines can deal with the ownership cycles signal causes
+
+
+2020-11-25
+[16:13:31.0000] <Krinkle>
+interesting bug or feature: url(https:/w/skins/Vector/resources/skins.vector.styles/images/user-avatar.svg?b7f58)
+
+[16:13:40.0000] <Krinkle>
+apparently both Firefox and Chrome accept this
+
+[16:13:59.0000] <Krinkle>
+it's not quite a path url, nor is it a qualified url. it's got a protocol, and a full path, but no domain
+
+[16:14:09.0000] <Krinkle>
+and... it's taken to mean fill in the current domain
+
+[16:44:36.0000] <Krinkle>
+> new URL('https:/w/foo')
+
+[16:44:36.0000] <Krinkle>
+URL { host: "w", origin: "https://w", protocol: "https", href: "https://w/foo" }
+
+[16:44:52.0000] <Krinkle>
+seems to normalize as if there are two slashes, and treating first directory as domain
+
+[16:45:09.0000] <Krinkle>
+which isn't unreasonable either but not what browsers actually do it seems
+
+[16:45:14.0000] <Krinkle>
+at least, not in CSS url() context
+
+[16:45:37.0000] <andreubotella>
+Krinkle: what you're seeing in CSS url() is equivalent to new URL("https:/w/foo", "https://example.com")
+
+[16:45:56.0000] <Krinkle>
+confirmed, Firefox also does this for <a href="https:/w/foo'"> goes to /w/foo
+
+[16:46:18.0000] <Krinkle>
+andreubotella: ooh, interesting!
+
+[16:46:33.0000] <andreubotella>
+https://url.spec.whatwg.org/#scheme-state, steps 6 and 7
+
+[16:46:42.0000] <Krinkle>
+I didn't know that argument existed, but also - I wonder what quirk demands that the slash parsing itself varies based on there being a base
+
+[16:47:12.0000] <andreubotella>
+2.6 and 2.7 I mean
+
+[16:48:11.0000] <Krinkle>
+right, so it specifically calls for this where having a base informs how this (arguably, error) scenario is handled.
+
+[16:48:41.0000] <Krinkle>
+if you go to Wikipedia now, and inspect the "person" icon at the top right, you'll find this (accidentally) in action.
+
+[16:49:04.0000] <Krinkle>
+slipped passed our QA and testing :)
+
+[16:50:04.0000] <Krinkle>
+Thanks for the spec lookup, appreciate it!
+
+[16:50:11.0000] <andreubotella>
+I can see how it would :)
+
+[16:50:28.0000] <andreubotella>
+I'm not sure what the reasoning was, try filing an issue
+
+[16:52:55.0000] <Krinkle>
+the case where there is a base URL, I think it's behaving quite reasonably. I mostly think of relative URls as filling in from the left, but sure why not fill in the middle. also web-compat probably makes it hard to break now e.g. if these mistakes exist in the wild.
+
+[16:53:37.0000] <Krinkle>
+for the base-less case, there might be an argument for it to throw or something, treating the first directory as the origin seems likely to mask mistakes and seems less likely to be intentional. But then again, it's very close to a real URL if you added just one more slash.
+
+[16:53:50.0000] <Krinkle>
+I can see how these two different worlds collided into a single spec :)
+
+[16:54:56.0000] <Krinkle>
+I don't know if we curerntly have a notion of "I want proper" and "I want whatever you can give me" as a distinction in the spec. E.g. one for resolving the address bar, and one for programmatic use of 'new URL' where you might want stricter
+
+[16:55:28.0000] <andreubotella>
+the URL parser doesn't throw, no matter how malformed the input
+
+[16:55:43.0000] <Krinkle>
+right, I see. ok, that seems reasonable then
+
+[16:55:46.0000] <andreubotella>
+and I suspect introducing something like that now for new URL would break sites
+
+[16:55:51.0000] <Krinkle>
+yeah
+
+[16:56:10.0000] <Krinkle>
+I've got a big backlog full of issues due to decodeURIComponent() sometimes throwing for malformed URIs
+
+[16:56:36.0000] <Krinkle>
+e.g. when people mess with percent encoding or some kind of script breaking a url.
+
+[16:56:48.0000] <Krinkle>
+instantly breaks out of deep code paths requiring local try-catch all over
+
+[19:33:57.0000] <derpadmin>
+what is the best way to send a notification that is compatible with a maximum of mobile devices? service worker?
+
+[19:34:58.0000] <derpadmin>
+Notification constructor did not work for me on chrome/samsung browsers on android
+
+[19:35:03.0000] <derpadmin>
+worked in firefox
+
+[19:35:09.0000] <derpadmin>
+and not IOS of course
+
+[20:51:06.0000] <Krinkle>
+https://whatwebcando.today/local-notifications.html
+
+[20:51:19.0000] <Krinkle>
+derpadmin: yeah, PWA and offline SW landed
+
+[20:51:29.0000] <Krinkle>
+But notifications and background sync not yet it seems
+
+[20:52:37.0000] <derpadmin>
+thanks Krinkle
+
+[20:53:06.0000] <derpadmin>
+I had a hard time wrapping my head around the 3 different way to do it
+
+[20:53:21.0000] <derpadmin>
+I succeeded but failed
+
+[20:53:32.0000] <derpadmin>
+failed on success as they say :)
+
+[20:55:12.0000] <Krinkle>
+Not even listed at WebKit status it seems :( - https://webkit.org/status/#?search=noti
+
+[20:55:27.0000] <Krinkle>
+Yeah..
+
+[21:09:28.0000] <derpadmin>
+I have an error with the example
+
+[21:09:49.0000] <derpadmin>
+it is basically the same example I was reading on codelabs.developers.google.com
+
+[21:10:19.0000] <derpadmin>
+Service Worker registration error: TypeError: reg is undefined
+
+[21:10:41.0000] <derpadmin>
+trying to copy paste and try the code in another server now
+
+[21:10:45.0000] <derpadmin>
+as is
+
+[21:40:03.0000] <derpadmin>
+did you managed to made the example code you linked me run Krinkle ?
+
+[21:40:58.0000] <Krinkle>
+derpadmin: I have not, I didn't realize there was sample code there
+
+[21:41:08.0000] <Krinkle>
+probably not the best source for that sort of thing :)
+
+[21:42:45.0000] <derpadmin>
+well, it is pretty much the example floating around for service workers
+
+[21:42:55.0000] <derpadmin>
+ServiceWorkerRegistration.showNotification
+
+[21:43:02.0000] <derpadmin>
+trying with this syntax now
+
+[01:09:24.0000] <benjamingr__>
+> There is an XXX in the .webidl, since nullability of signal is unclear in the spec pr.
+
+[01:09:24.0000] <benjamingr__>
+smaug___ can you clarify that? I just used the same format `fetch` uses for the signal as prior art. I think it means the signal _may_ be null? I might be misunderstanding
+
+[01:11:06.0000] <benjamingr__>
+Discussion happened here: https://github.com/whatwg/dom/pull/919#discussion_r520717577
+
+[06:04:53.0000] <annevk>
+benjamingr__: I think for fetch() it’s nullable so passing a Request works; might no longer be needed if we can make getters return undefined more easily, but doesn’t seem worth changing at this point…
+
+[07:45:57.0000] <smaug____>
+benjamingr__: I think the spec pr had a question about it
+
+[07:46:56.0000] <smaug____>
+so I'll tweak the Gecko patch once the spec has been updated
+
+[07:47:07.0000] <smaug____>
+(tweak it if needed)
+
+[07:47:25.0000] <smaug____>
+well, at least remove XXX comment if nothing else
+
+[07:48:26.0000] <smaug____>
+is there any use case for signal to be nullable?
+
+[08:04:56.0000] <benjamingr__>
+so n00b question: nullable means you don't have to pass it or you may pass literal `null`?
+
+[08:06:45.0000] <smaug____>
+nullable means that you can pass null
+
+[08:52:11.0000] <annevk>
+benjamingr__: optional is the default for dictionary members
+
+[08:56:27.0000] <benjamingr__>
+Oh then it probably shouldn't be nullable but it it should be optional
+
+[11:12:25.0000] <smaug____>
+it is optional by default
+
+[11:12:47.0000] <smaug____>
+non-optional would need 'required'
+
+[11:30:10.0000] <benjamingr__>
+OK, I think that's just a misunderstanding on my part - I'll fix it in the spec - should I also add a WPT to ensure passing `null` is not allowed?
+
+[12:43:53.0000] <smaug____>
+benjamingr__: that sounds reasonable
+
+
+2020-11-26
+[02:36:06.0000] <csarven>
+What is the definition of "web content" in https://fetch.spec.whatwg.org/ ? Is it defined elsewhere?
+
+[04:05:27.0000] <annevk>
+csarven: there's no formal definition, but it means stuff that runs in a browser
+
+[08:08:31.0000] <csarven>
+annevk: I'm not sure if I'm interpreting this correctly: "Its processing model is defined here as the ABNF defined in HTTP is not compatible with web content." -- unclear what's not compatible.
+
+
+2020-11-27
+[16:58:08.0000] <MikeSmith>
+csarven: I think that can be taken to mean there are many documents on the web which have Content-Type headers which are not valid according to the ABNF in he HTTP spec
+
+[16:59:25.0000] <MikeSmith>
+... with the implication that if an implementation parses those Content-Type headers according to the HTTP-spec ABNF, the result is not what the authors of those documents expect
+
+[17:01:09.0000] <MikeSmith>
+... and so with the further implication that browsers parse those Content-Type headers in the way defined in the Fetch spec, in order to avoid breaking compatiblity/expectations for that content
+
+[17:02:30.0000] <MikeSmith>
+or in other words, if browsers were to instead parse those Content-Type headers strictly in conformance with the HTTP-spec ABNF, that would break the existing behavior for many documents on the web
+
+[08:15:09.0000] <annevk>
+Yeah, that, simple example would be `text/html;`, though newer HTTP versions might fix that so I prolly need to come up with a new example
+
+[09:13:56.0000] <smaug____>
+gsnedders: you might recall what https://github.com/web-platform-tests/wpt/blob/master/html/browsers/browsing-the-web/history-traversal/unset_context_name.html is about
+
+[09:14:26.0000] <smaug____>
+that doesn't seem to be run, since it isn't really a test file.
+
+[09:14:33.0000] <smaug____>
+https://github.com/web-platform-tests/wpt/blob/master/html/browsers/browsing-the-web/history-traversal/unset_context_name-1.html is run as its own
+
+[09:14:39.0000] <smaug____>
+(or am I missing something)
+
+[09:14:55.0000] <smaug____>
+https://wpt.fyi/results/html/browsers/browsing-the-web/history-traversal?label=experimental&label=master&aligned does report only -1.html one
+
+[09:16:01.0000] <gsnedders>
+smaug____: definitely don't ask my about jgraham's ancient tests :)
+
+[09:16:30.0000] <smaug____>
+hey, only 7 years
+
+[09:17:02.0000] <gsnedders>
+smaug____: they're from years before that, given by seven years ago Presto was dead
+
+[09:17:12.0000] <smaug____>
+I see
+
+[09:17:17.0000] <smaug____>
+even older
+
+[09:17:31.0000] <smaug____>
+(are we getting old? No no no.)
+
+[10:02:03.0000] <jgraham>
+I think it's supposed to be about whether window.name is preserved after a cross-origin navigation
+
+[10:02:15.0000] <jgraham>
+It obviously doesn't work at all as written
+
+[10:10:11.0000] <Domenic>
+Are we sure the file isn't included from some other file?
+
+[10:10:26.0000] <Domenic>
+Looks like no...
+
+[10:49:02.0000] <jgraham>
+Those tests were never finished; the project got cancelled...
+

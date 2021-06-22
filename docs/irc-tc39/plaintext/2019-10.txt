@@ -1,0 +1,3846 @@
+2019-10-01
+[19:20:08.0000] <jmdyck>
+devsnek: tx
+
+[07:18:29.0000] <alsoMylesBorins>
+is anyone having issues connecting to IRC on a non standard port?
+
+[07:39:19.0000] <bnb>
+nope
+
+[07:45:48.0000] <MylesBor_>
+odddd
+
+[15:39:41.0000] <littledan>
+devsnek: That's a way to look at it, but people tend to think of sync vs async as something categorical that must be right, not an optimization
+
+[15:39:58.0000] <littledan>
+oh sorry I was responding to a really old comment because I was scrolled up
+
+[15:40:32.0000] <devsnek>
+littledan: what were you responding to out of curiosity
+
+
+2019-10-02
+[20:26:49.0000] <Jessidhia>
+hmm, the spec language is confusing me, but it looks like `OptionalChain [ Expression ]`, `OptionalChain . IdentifierName` and `OptionalChain Arguments` prevent short-circuiting?
+
+[20:33:34.0000] <devsnek>
+Jessidhia: unsure how much channel history you have, but there's a big long convo between me and rkirsling about it
+
+[20:33:51.0000] <Jessidhia>
+hmm, nvm; for example `IdentifierName ?. IdentifierName Arguments` would parse as `OptionalExpression(MemberExpression(PrimaryExpression) OptionalChain(OptionalChain(?. IdentifierName) Arguments)`, and the OptionalExpression would short-circuit if the MemberExpression is not non-nullish
+
+[20:34:01.0000] <devsnek>
+also.... https://github.com/engine262/engine262/blob/master/src/parse.mjs#L147-L185
+
+[20:36:35.0000] <Jessidhia>
+I just saw this comment on a (now-locked) issue in typescript and had to do a double take to make sure I understood things right https://github.com/microsoft/TypeScript/issues/16#issuecomment-524498719
+
+[20:37:34.0000] <devsnek>
+unsure why they used ?. for setAttribute
+
+[20:37:37.0000] <devsnek>
+but that is the syntax
+
+[20:38:32.0000] <Jessidhia>
+yeah, that is the syntax; the double-take is that (assuming they always expected an Element there, if present) it looks as if it doesn't short-circuit
+
+[20:54:21.0000] <rkirsling>
+Jessidhia: I think that part is just the part that requires getting the word out about
+
+[20:55:41.0000] <Jessidhia>
+yeah, trying to make sense of things; it now looks to me `OptionalChain` is there more for grammar reasons to prevent `MemberExpression`/`CallExpression` from matching than to actually have any bearing on the semantics; the real "meat" is `OptionalExpression`
+
+[20:57:03.0000] <rkirsling>
+yeah, both of us initially found it tricky to read too 😓
+
+[20:57:55.0000] <Jessidhia>
+heh
+
+[20:58:54.0000] <rkirsling>
+which isn't to say I had a better suggestion for an equivalent organization (my understanding is that it was originally even more complicated)
+
+[20:59:02.0000] <devsnek>
+its basically just a copy of MemberExpression
+
+[20:59:39.0000] <rkirsling>
+but it boils down to that, lexically, an OptionalChain is a *normal* access/chain starting with exactly one ?
+
+[21:01:20.0000] <rkirsling>
+and then the OptionalExpression connects that to its LHS, meaning that there's ultimately the same number of those nodes too
+
+[21:01:43.0000] <ljharb>
+Jessidhia: maybe someone on the TS team can edit that comment to remove the unnecessary `?.` on setAttribute
+
+[21:01:47.0000] <rkirsling>
+but OptionalChain is what makes the whole chain evaluation (and thus short-circuiting) semantics possible
+
+[21:02:06.0000] <rkirsling>
+also wrt TS in particular, this seems to be in order: https://github.com/microsoft/TypeScript/pull/33294
+
+[21:02:16.0000] <devsnek>
+tfw you notice a typo `OptionalExpressoin`
+
+[21:02:48.0000] <rkirsling>
+devsnek: wait where lol
+
+[21:02:55.0000] <devsnek>
+oh my code
+
+[21:02:56.0000] <devsnek>
+not ts
+
+[21:03:00.0000] <rkirsling>
+ahh :P
+
+[21:03:20.0000] <rkirsling>
+anyway the "Optional Chains" section of that PR description is relevant
+
+[21:03:24.0000] <rkirsling>
+there is a typo though
+
+[21:03:54.0000] <rkirsling>
+`a?.b(); // call chain` should be something like `a?.().b; // call chain` instead
+
+[21:04:02.0000] <rkirsling>
+(^ cc rbuckton )
+
+[21:05:24.0000] <rkirsling>
+er also "optional expression" in that description is not the spec OptionalExpression but that's inevitable
+
+[21:07:05.0000] <rkirsling>
+the spec nodes simply don't correspond to the "pieces" of the expression from a user's perspective (or, hell, even from an implementer's perspective)
+
+[21:07:31.0000] <Jessidhia>
+e.g. this is how I'd represent the "a.b?.c.d?.e.f" example in JSX, if it helps https://www.irccloud.com/pastebin/kYP9Kd4z/
+
+[21:09:04.0000] <rkirsling>
+mmm but like `?.e` isn't a node in itself
+
+[21:09:46.0000] <rkirsling>
+errrr wait
+
+[21:10:04.0000] <devsnek>
+?.e is an OptionalChain node with nothing on the left-hand side
+
+[21:10:10.0000] <rkirsling>
+agh sorry I'd forgotten which way that recurses
+
+[21:11:37.0000] <Jessidhia>
+like, I had seen OptionalChain as greedily eating anything to its left, which it does, but it "stops" once its left-hand-side no longer parses as an OptionalChain, at which point it matches OptionalExpression instead
+
+[21:11:42.0000] <rkirsling>
+yeah your snippet is correct, apologies
+
+[21:12:06.0000] <devsnek>
+and then you can just jump over the entire chain
+
+[21:12:13.0000] <devsnek>
+by not evaluating it
+
+[21:12:16.0000] <Jessidhia>
+yeah
+
+[21:12:27.0000] <rkirsling>
+yeah
+
+[21:12:57.0000] <rkirsling>
+it's all for the good of the surface semantics 😅
+
+[21:13:01.0000] <Jessidhia>
+OptionalChain will greedily evaluate everything but because it lets OptionalExpression itself evaluate the LHS _first_, it's OptionalExpression that does the work of not running the OptionalChain
+
+[21:13:42.0000] <rkirsling>
+right.
+
+[21:13:55.0000] <devsnek>
+its crazy how much simpler this all is in actual implementations
+
+[21:14:02.0000] <rkirsling>
+it actually is
+
+[21:14:11.0000] <Jessidhia>
+the way I see it, OptionalChain pretty much could just be MemberExpression/CallExpression if not for the fact that you need it to stop matching at "the boundary"
+
+[21:14:16.0000] <rkirsling>
+(except for JSC's function call node menagerie)
+
+[21:14:36.0000] <rkirsling>
+yeah
+
+[21:16:46.0000] <rkirsling>
+er wait what if the `?.` token were raised to being part of each OptionalExpression production
+
+[21:17:30.0000] <rkirsling>
+uh nope that's only half of a thought and not even a whole one, never mind
+
+[21:19:02.0000] <Jessidhia>
+yeah, I just tried to see if I could make it fit but then `MemberExpression '?.' MemberExpression` would fail if the Identifier on the right side of the '?.' was a reserved name
+
+[23:20:00.0000] <Jessidhia>
+/me hmm, probably the most obvious follow-up proposal to this would be adding a `?:` version of `PropertyName: BindingElement` 🤔
+
+[23:21:55.0000] <Jessidhia>
+`const { a: { b?: { c } } } = d` which would skip evaluating the pattern on the RHS of `b?:` if it's null/undefined, while still creating the `c` binding
+
+[23:22:43.0000] <Jessidhia>
+you can currently do that by declaring a `= {}` initializer for the elements you want to be optional (`{ b: { c } = {} }`) but that creates a throwaway object for the sole purpose of avoiding a TypeError
+
+[23:26:29.0000] <Jessidhia>
+hm, that has more consequences than I thought. Clearly `c` can't stay in TDZ after the `const` runs to completion so it needs to be initialized with something (well, `undefined` here). But if something in a destructuring pattern would "receive" an `undefined`, it can evaluate the Initializer if present. Even if there was short circuiting these initializers would still need to run. 🤔
+
+[23:27:43.0000] <Jessidhia>
+I have no idea what the equivalent could be for an array pattern. A `?` suffix?
+
+[23:33:35.0000] <Jessidhia>
+const [a, { b }?] = c
+
+[23:34:48.0000] <Jessidhia>
+and this opens another question... throw if iterating `c` produces less than 2 elements, or treat it as the null/undefined case?
+
+[23:41:42.0000] <Jessidhia>
+oh, iterator destructuring with insufficient values no longer throws? I thought it did at one point
+
+[06:02:32.0000] <ljharb>
+afaik it only throws if you try to iterate a non iterable
+
+[07:29:10.0000] <Jessidhia>
+yeah, I vaguely remember it throwing if the iterable ended prematurely, but maybe it was a bug or I'm misremembering
+
+[08:54:49.0000] <drousso>
+bterlson i just encountered that :(
+
+[08:55:15.0000] <drousso>
+bterlson (I also dont have access to the delegates channel)
+
+[09:04:01.0000] <devsnek>
+littledan: ljharb: there's an unused `status` variable from the uint32 change
+
+[09:05:07.0000] <jmdyck>
+(Note to self: look for unused variables.)
+
+[09:05:28.0000] <devsnek>
+:)
+
+[09:05:46.0000] <devsnek>
+there's something rather poetic about eslint catching spec bugs
+
+[09:06:56.0000] <littledan>
+devsnek: sounds like a great thing to follow up on in an editorial PR. Good catch
+
+[09:07:24.0000] <devsnek>
+ljharb: unflagged globalThis in engine262 🎉
+
+[09:07:42.0000] <jmdyck>
+mind you, there'll be a lot of 'false' positives: a lot of SDO defns ignore the parameter(s)
+
+[09:10:51.0000] <ljharb>
+devsnek: yay
+
+[09:11:01.0000] <ljharb>
+devsnek: and for the unused var, please do file a PR :-D
+
+[09:15:26.0000] <devsnek>
+aggregate error's toString is going to kill so many error formatting things
+
+[09:15:50.0000] <devsnek>
+things that check if o.toString === Error.prototype.toString, doing Error.prototype.toString.call(o), etc
+
+[09:20:41.0000] <devsnek>
+mathiasbynens: is there any difference between Error.prototype.toString and AggregateError.prototype.toString?
+
+[09:21:39.0000] <ljharb>
+devsnek: the message it's supposed to produce should be different; namely that the errors should be represented somehow
+
+[09:21:56.0000] <devsnek>
+is https://tc39.es/proposal-promise-any/ outdated?
+
+[09:22:06.0000] <devsnek>
+rn toString is the same exact steps as far as i can tell
+
+[09:23:41.0000] <ljharb>
+i think it recently got changed to end up being the same
+
+[09:23:48.0000] <ljharb>
+althooooo
+
+[09:24:01.0000] <ljharb>
+if errors moves to a slot, then Error.prototype.toString could be modified to check for that slot
+
+[09:24:14.0000] <ljharb>
+(even if it's just mentioning it in a note telling implementers to include it in the message somehow)
+
+[09:24:38.0000] <devsnek>
+that seems ideal to me
+
+[13:12:00.0000] <devsnek>
+ljharb: https://github.com/tc39/ecma262/pull/1717/files
+
+[13:12:06.0000] <devsnek>
+this is likely a hacktoberfest pr
+
+[13:12:08.0000] <devsnek>
+not spam
+
+[13:12:22.0000] <ljharb>
+based on hacktoberfest's rules, that's still not a PR that should count
+
+[13:12:29.0000] <devsnek>
+thats absolutely untrue
+
+[13:12:33.0000] <ljharb>
+and this is a problem every year with hacktoberfest; these PRs are spam
+
+[13:12:39.0000] <devsnek>
+spelling/linting/etc are valuable
+
+[13:12:49.0000] <ljharb>
+devsnek: https://hacktoberfest.digitalocean.com/details#quality-standards
+
+[13:12:51.0000] <ljharb>
+this isn't either
+
+[13:13:08.0000] <ljharb>
+it's at best, a stylistic preference that is unsolicited and not previously confirmed with maintainers
+
+[13:13:16.0000] <devsnek>
+i think you're being a bit harsh
+
+[13:13:25.0000] <devsnek>
+my first pr to node fixed the spelling of a single word
+
+[13:14:04.0000] <michaelficarra>
+ugh this is the first time I'm hearing of Hacktoberfest and it sounds terrible
+
+[13:15:33.0000] <devsnek>
+its not that terrible :(
+
+[13:16:00.0000] <devsnek>
+plus a lot of schools and stuff are getting into it now
+
+[13:16:03.0000] <devsnek>
+like hour of code
+
+[13:17:08.0000] <ljharb>
+devsnek: nah spelling of words is fine
+
+[13:17:30.0000] <devsnek>
+its not like we have a huge volume of active prs either
+
+
+2019-10-03
+[00:14:13.0000] <haxjs>
+Does anyone know who create https://github.com/ES-Placeholder ?
+
+[06:33:20.0000] <ljharb>
+lol no, but that's a mildly clever hack
+
+[10:22:36.0000] <devsnek>
+mathiasbynens: is the spec text on AggregateError.prototype.toString correct?
+
+[16:21:51.0000] <jorendorff>
+Hi everyone! `for (async of []) {}` and `for (async of => {}; ; ) {}` are both legal, right?
+
+[16:22:15.0000] <jorendorff>
+asking for a friend who's an LALR parser generator
+
+[16:25:48.0000] <ljharb>
+jorendorff: like with a variable name of `async`?
+
+[16:25:58.0000] <jorendorff>
+Yes, in the first case
+
+[16:26:03.0000] <jorendorff>
+In the second case it's the conditional keyword
+
+[16:26:15.0000] <ljharb>
+the second seems like an async arrow, yeah
+
+[16:26:25.0000] <jorendorff>
+yeah, i agree. Node and es6draft accept both
+
+[16:26:39.0000] <jorendorff>
+But I think this isn't LALR(1)
+
+[16:27:23.0000] <ljharb>
+no idea what LALR is
+
+[16:27:45.0000] <ljharb>
+but i believe JS may not exactly be LR(1) because of cover grammars, or something
+
+[16:27:45.0000] <jorendorff>
+Not worth explaining, maybe
+
+[16:27:53.0000] <ljharb>
+(those words sound like the right ones)
+
+[16:28:17.0000] <jorendorff>
+Oh, the cover grammars are a workaround to make it LR(1)
+
+[16:28:22.0000] <jorendorff>
+Well shoot
+
+[16:28:54.0000] <ljharb>
+also i feel like waldemar said in his presentation that annex b also makes it not work properly
+
+[16:29:09.0000] <ljharb>
+and also that there's some "transformations" he has to apply for like else/else if, i think? to be able to validate it
+
+[16:29:16.0000] <ljharb>
+(i'm clearly not the one to ask)
+
+[16:30:04.0000] <rkirsling>
+see presentation here:
+
+[16:30:04.0000] <rkirsling>
+https://docs.google.com/presentation/d/e/2PACX-1vRPvLtLI7ln2yVRm2wYU2j3ByAJwpDjQmJSS4okYBnWN8OgTnZk7kFz5t2ARvpIEjUg_rG_aYVEcANr/pub?start=false&loop=false&delayms=3000
+
+[16:30:49.0000] <ljharb>
+thanks! i knew those words i said came from somewhere
+
+[16:31:03.0000] <rkirsling>
+:D
+
+
+2019-10-04
+[17:17:19.0000] <jmdyck>
+So was there a decision on merging Annex B into the main body?
+
+[17:59:01.0000] <devsnek>
+jorendorff: at the moment i think we're LALR(2) because of the `let [` lookahead
+
+[17:59:21.0000] <devsnek>
+i wouldn't be surprised if there's a 3-token lookahead somewhere though
+
+[17:59:37.0000] <jorendorff>
+devsnek: believe it or not, that's not the same kind of lookahead as the lookahead in "LALR"
+
+[18:00:19.0000] <devsnek>
+weird
+
+[18:00:23.0000] <jorendorff>
+it's weird
+
+[18:00:34.0000] <devsnek>
+*wikipedias*
+
+[18:00:41.0000] <jorendorff>
+i am honestly at a loss to explain LALR and LR in a few words
+
+[18:01:17.0000] <jorendorff>
+but the kind of lookahead you're talking about is good old common-sense lookahead, and LR and LALR use a ... definitely different notion of lookahead to build their parser tables
+
+[18:01:23.0000] <jorendorff>
+not runtime lookahead at all!
+
+[18:02:25.0000] <devsnek>
+oh i see
+
+[18:02:52.0000] <jorendorff>
+I wrote email to Waldemar ... because I think this example means ES isn't LR(1) anymore, and I think it was before --- even with the `let [` thing
+
+[18:03:22.0000] <devsnek>
+just combining states
+
+[18:03:44.0000] <devsnek>
+i guess this technically makes it less usable than a traditional LR
+
+[18:08:25.0000] <jmdyck>
+(Personally, I don't think it makes sense to talk about the ES grammar being LR(k) or LALR(k) for some k, because it's not even a CFG to begin with.)
+
+[18:35:02.0000] <jorendorff>
+jmdyck: it certainly is not a CFG
+
+[18:35:09.0000] <jorendorff>
+in the formal sense
+
+[18:35:53.0000] <jorendorff>
+I think it still makes sense to talk about it being LR(k)
+
+[18:36:17.0000] <jmdyck>
+LR(k) isn't defined for non-CFG
+
+[18:37:13.0000] <jorendorff>
+i think many non-formal statements are valuable
+
+[18:37:21.0000] <jorendorff>
+for example, it was hot today
+
+[18:37:47.0000] <jmdyck>
+sure,
+
+[18:37:48.0000] <jorendorff>
+how could a statement about LR-ness be valuable for the ES grammar, well
+
+[18:37:59.0000] <jorendorff>
+suppose someone was trying to make a shift-reduce parser for ES
+
+[18:38:57.0000] <jorendorff>
+it's useful to say, here are the things you're going to have to hack
+
+[18:39:01.0000] <jorendorff>
+ASI for sure
+
+[18:39:21.0000] <jorendorff>
+div-vs-regexp and the like
+
+[18:39:35.0000] <jmdyck>
+non-formal statements are valuable, but saying that a grammar is LR(k) isn't a non-formal statement. Or, it's misleading if you intend it in a non-formal sense.
+
+[18:40:24.0000] <jorendorff>
+I think saying that any real-world programming language is LR(k) ends up being an informal statement at some point. some languages more informal than others
+
+[18:41:50.0000] <jmdyck>
+in practice, that's probably true. I don't approve. :(
+
+[18:42:03.0000] <jorendorff>
+ok, here's the other thing
+
+[18:42:19.0000] <jmdyck>
+(unless you then go on to detail the ways in which you're being informal)
+
+[18:42:28.0000] <jorendorff>
+I think LR is a thin veneer of formality over an algorithm
+
+[18:43:18.0000] <jmdyck>
+No, the algorithm itself *is* formal.
+
+[18:43:20.0000] <jorendorff>
+the only property of LR grammars that matters to anyone is that they can be parsed by LR parsers
+
+[18:43:39.0000] <jorendorff>
+contrast regular languages -- there's actually some math there
+
+[18:43:48.0000] <jorendorff>
+I agree the algorithm itself is formal
+
+[18:44:20.0000] <jorendorff>
+in the sense that contrasts with "informal"
+
+[18:44:53.0000] <jorendorff>
+but not in the sense that has to do with forms of things, either the language or the grammar
+
+[18:45:34.0000] <jorendorff>
+anyway, think of it this way, i was just eliding all the ways in which i'm being informal, relying on the reader to infer it (waves hands carelessly)
+
+[18:45:41.0000] <jorendorff>
+which, if the reader is Waldemar, is easily done
+
+[18:49:14.0000] <jmdyck>
+yeah, that's okay.
+
+[18:55:35.0000] <jmdyck>
+But if people are talking about "LR(1)", and they *necessarily* are using the term informally, but they don't bother to agree on the informal meaning, that can lead to problems.
+
+[19:09:08.0000] <jmdyck>
+re your examples, after the lexical parser returns the IdentifierName 'async', the parser doesn't (initially) know whether to treat it as an Identifier (in a LeftHandSideExpression) or a keyword (in an AsyncArrowFunction)
+
+[19:09:33.0000] <jmdyck>
+and the next token ('of') doesn't resolve the conflict
+
+[19:11:56.0000] <jmdyck>
+but the one after ('[' or '=>') does.
+
+[19:15:29.0000] <jorendorff>
+I don't think I understand what you're getting at
+
+[19:15:56.0000] <jmdyck>
+I'm just going over the problem, restating your point maybe.
+
+[19:16:23.0000] <jorendorff>
+rright, the handling of IdentifierNames in the spec is one of the weird parts
+
+[19:16:53.0000] <jmdyck>
+(the whole interface between syntactic and lexical is weird)
+
+[19:16:55.0000] <jorendorff>
+the two grammars don't fit together the way I thought they did
+
+[19:17:01.0000] <jorendorff>
+yes, exactly that
+
+[19:17:20.0000] <jorendorff>
+I knew about the weirdness around regexp, but even without that there's other weirdness
+
+[19:18:13.0000] <jorendorff>
+/me thinks
+
+[19:19:14.0000] <jorendorff>
+yeah, I think that weirdness doesn't really come into play in my problem though
+
+[19:19:25.0000] <jorendorff>
+I mean, ... it's there, but it isn't essential
+
+[19:20:02.0000] <jorendorff>
+if we somehow specified the language with a very clean interface between the two grammars, and a production "Identifier : `async`"
+
+[19:20:13.0000] <jorendorff>
+and another production "Identifier : `of`"
+
+[19:20:16.0000] <jorendorff>
+then we would still have this issue
+
+[19:21:18.0000] <jmdyck>
+if the issue is that one token of lookahead doesn't suffice, then yeah.
+
+[19:21:36.0000] <jorendorff>
+I think shift-reduce parsers inherently work one token at a time
+
+[19:22:27.0000] <jorendorff>
+In LR(k) parsers, the k is a static kind of lookahead (relevant at parser table generation time), not a run-time lookahead
+
+[19:23:33.0000] <jmdyck>
+no, the lookahead is relevant at parse-time too.
+
+[19:25:14.0000] <jorendorff>
+Can you explain that?
+
+[19:25:47.0000] <jmdyck>
+an LR parsing table gives you an action based on (a) your current state and (b) the current k symbols of lookahead
+
+[19:26:27.0000] <jorendorff>
+That doesn't make sense to me because LR(0) is a thing
+
+[19:27:31.0000] <jmdyck>
+LR(0) means the parser always knows what to do without looking at any lookahead symbols.
+
+[19:27:54.0000] <jorendorff>
+That would mean the parser always knows what to do without looking at the input.
+
+[19:29:54.0000] <jorendorff>
+I mean, LR(0) tables and LR(1) tables are both keyed on (state, next input symbol) so to me it looks like they both operate 1 symbol at a time
+
+[19:30:15.0000] <devsnek>
+👀
+
+[19:33:56.0000] <jorendorff>
+ok, i've found multiple sources supporting your statement about what LR(2) means
+
+[19:35:07.0000] <jmdyck>
+I think the 'action' depends on k symbols of lookahead, but the 'goto' always depends on 1 symbol, which isn't a lookahead, it's the symbol on the top of the stack
+
+[19:35:16.0000] <jorendorff>
+it's a nonterminal symbol, too
+
+[19:35:30.0000] <jmdyck>
+yeah
+
+[19:35:37.0000] <jorendorff>
+only one production ever gets reduced at a time, so that makes sense for the goto table
+
+[19:36:13.0000] <jorendorff>
+I guess LR(0) is not "LR(k) for k = 0" but ... something special
+
+[19:36:38.0000] <jmdyck>
+no, i think it is LR(k) for k=0
+
+[19:37:08.0000] <devsnek>
+only the current symbol
+
+[19:37:11.0000] <devsnek>
+nothing ahead
+
+[19:39:51.0000] <jmdyck>
+e.g., i think a basic lisp syntax would be LR(0):
+
+[19:40:39.0000] <jorendorff>
+ok, then i'm very confused, because parser tables for LR(0) and LR(1) look the same. They both have an action table where each column is labeled with one terminal symbol
+
+[19:40:47.0000] <jmdyck>
+you can shift the next symbol without knowing what it is, until you're in a state resulting from shifting a ')', in which case you reduce regardless of the next symbol.
+
+[19:41:26.0000] <jmdyck>
+hmm. sounds wrong for LR(0).
+
+[19:41:32.0000] <jmdyck>
+link to example?
+
+[19:42:44.0000] <devsnek>
+man its crazy how much simpler writing an actual parser is than figuring out what LALR(2) means
+
+[19:42:57.0000] <jorendorff>
+jmdyck: oh, sure
+
+[19:43:58.0000] <jorendorff>
+jmdyck: random CS lecture, the first one i found https://www.cs.colostate.edu/~cs453/yr2014/Slides/12-LR0-SLR.ppt.pdf
+
+[19:45:14.0000] <jorendorff>
+what you said about lisp is very appealing
+
+[19:45:55.0000] <devsnek>
+this looks like actual gibberish
+
+[19:46:07.0000] <devsnek>
+like the output of failed encoding
+
+[19:47:14.0000] <jorendorff>
+jmdyck: but I still don't think you can build me a parser table without the `)` token being in a different column from the others
+
+[19:47:42.0000] <jmdyck>
+hmm
+
+[19:48:13.0000] <jorendorff>
+jmdyck: another example LR(1) definitely handles one token of input at a time,
+
+[19:48:15.0000] <jorendorff>
+oops
+
+[19:48:26.0000] <jorendorff>
+another example, https://en.wikipedia.org/wiki/LR_parser#Action_and_goto_tables
+
+[19:49:00.0000] <jmdyck>
+certainly, the "unit of shifting" is 1 token, regardless of k
+
+[19:50:27.0000] <jorendorff>
+yes
+
+[19:50:33.0000] <jorendorff>
+another example, https://www.cs.bgu.ac.il/~comp151/wiki.files/ps6.html
+
+[19:52:39.0000] <jorendorff>
+LR(0) definitely has a parser table that dispatches on one token at a time—the next token. SLR, LR(1), and LALR(1), definitely the same.
+
+[19:56:25.0000] <jorendorff>
+ok, it's easy to find stuff on the internet that says something else, but i still don't see how that makes any sense
+
+[19:56:36.0000] <jorendorff>
+I retract what I said earlier about LR(1) having a formal definition
+
+[19:56:49.0000] <jmdyck>
+them's fighting words
+
+[19:58:15.0000] <jorendorff>
+actually LR(1) might be the only one with a formal definition
+
+[19:58:20.0000] <jorendorff>
+nobody agrees about the others
+
+[19:58:37.0000] <devsnek>
+you have to just give up and write real parsers
+
+[20:03:27.0000] <jmdyck>
+In the LR(0) tables, I think you'll always see that, for any given state, the action (reduce by some production or shift) is the same regardless of symbol. So you can take the action without looking at the next symbol. But the state you go to will depend on the symbol.
+
+[20:04:42.0000] <jmdyck>
+So I think maybe the LR(0) tables are being presented to make them look more like k=1 tables.
+
+[20:06:21.0000] <jmdyck>
+"But the state you go to will depend on the symbol." -> "But the state you go to after shifting a symbol *will* depend on the symbol."
+
+[20:08:05.0000] <jmdyck>
+i.e., you could present an LR(0) table with only one column for action, but you'd need some terminal columns for goto.
+
+[20:08:12.0000] <jorendorff>
+Right, that is what I meant by distinguishing between run-time and static lookahead
+
+[20:08:21.0000] <jorendorff>
+aaaaghh whoa
+
+[20:08:22.0000] <jorendorff>
+no
+
+[20:09:22.0000] <jorendorff>
+i have to go, it's the middle of the night here
+
+[20:10:27.0000] <jorendorff>
+LR(0) tables do have the particular regularity you've observed—to my mind, caused by the fact that the table generation algorithm has 0 tokens of lookahead after each LR item
+
+[20:11:06.0000] <jorendorff>
+but those tables are exactly the same format as LR(1) tables and the same parser code consumes both
+
+[20:11:30.0000] <jorendorff>
+'night
+
+[20:12:20.0000] <jmdyck>
+well yeah, you can format LR(0) tables so than an LR(1) parser can handle them.
+
+[20:12:39.0000] <jmdyck>
+(every LR(0) grammar is an LR(1) grammar)
+
+[20:13:46.0000] <jorendorff>
+I'm not sure it's a "you can format" thing: that is the only way they are ever presented
+
+[20:20:25.0000] <devsnek>
+ljharb: that last commit has %FunctionPrototype% in it
+
+[20:20:25.0000] <shu>
+a jorendorff in #tc39!
+
+[20:20:27.0000] <shu>
+glad to have you
+
+[20:20:36.0000] <devsnek>
+ljharb: apologies for not noticing
+
+[20:21:00.0000] <ljharb>
+whoops
+
+[20:21:04.0000] <ljharb>
+devsnek: thanks, will fix
+
+[20:28:46.0000] <ljharb>
+devsnek: https://github.com/tc39/ecma262/pull/1720
+
+[20:45:57.0000] <rkirsling>
+shu: seems like you were too late
+
+[20:46:53.0000] <rkirsling>
+what an amusing conversation that makes me realize how little I know about parsing in spite of feeling like I know a good amount lol
+
+[20:49:14.0000] <rkirsling>
+(I mean really it's that I learned the Chomsky hierarchy from the views of linguistics and theoretical CS but didn't actually study compilers in school...hehe)
+
+[21:09:55.0000] <jmdyck>
+I not sure where the action/goto formulation of parsing tables comes from. Knuth didn't use it when he defined LR. Might be Aho + Ullman.
+
+[21:18:29.0000] <jmdyck>
+Hm, I feel like I got nerd-sniped (https://www.xkcd.com/356/)
+
+[21:39:39.0000] <jmdyck>
+possibly self-inflicted.
+
+[21:40:51.0000] <rkirsling>
+:D
+
+[01:11:46.0000] <jorendorff>
+It is maybe worth pointing out that the "[lookahead <! { ... 'let` `[`}]"  restriction in ExpressionStatement can be implemented in LR(1)
+
+[01:12:04.0000] <jorendorff>
+*"[lookahead <! { ... `let` `[`}]"
+
+[05:16:15.0000] <jmdyck>
+jorendorff: How do you figure?
+
+[05:58:14.0000] <jorendorff>
+You just don't need 2 tokens of lookahead at runtime, or 2 tokens of lookahead past the end of any production while building the tables
+
+[06:00:38.0000] <jorendorff>
+Well this is weird: "Knuth proved that it reaches its maximum language recognition power for k=1 and provided a method for transforming LR(k), k > 1 grammars into LR(1) grammars." curiouser and curiouser
+
+[06:25:57.0000] <jmdyck>
+So are you making the distinction that you don't need 2 tokens of lookahead at the end of any production, but ExpressionStatement does need 2 tokens of lookahead at the start of the production?
+
+[06:33:01.0000] <jmdyck>
+i.e., are you saying that, as long as the lookahead-restrictions involving two-token lookaheads never occur at the end of a production, they can be "implemented in LR(1)"?
+
+[07:10:47.0000] <jmdyck>
+jorendorff: here's an example (like I suggested last night) of an LR(0) table where the 'action' is a single column (determined by state) and the 'goto' has columns for terminals too: https://web.stanford.edu/class/archive/cs/cs143/cs143.1128/lectures/05/Slides05.pdf (page 256)
+
+[07:16:52.0000] <jmdyck>
+And Grune has an LR(0) table that's sort of intermediate between that and the usual presentation of LR(1) tables: https://dickgrune.com/Books/PTAPG_1st_Edition/BookBody.pdf (Figure 9.22). [One column for the reduce actions, but the shift actions are duplicated over multiple columns.]
+
+[07:44:01.0000] <jmdyck>
+(oo, lots of merges...)
+
+[09:43:20.0000] <Bakkot>
+jmdyck: re: moving annex B into main body: https://github.com/tc39/ecma262/issues/1595#issuecomment-538255071
+
+[09:48:07.0000] <jorendorff>
+jmdyck: I see. ...I still don't see how a "runtime" description of the k in LR(k) can produce LR(0) and LR(1) ... I might need to read Knuth's paper to have a hope
+
+[09:48:15.0000] <jorendorff>
+I found it, it's 33 pages
+
+[09:50:43.0000] <jorendorff>
+jmdyck: oh, i meant to ask. obviously ES is not specified using a CFG. but the language described by the spec grammar (i.e. before taking early errors and cover grammars into account) is a CF language, right? i.e. there exists some CFG that recognizes it
+
+[09:58:00.0000] <jmdyck>
+Bakkot: yeah, hm.
+
+[09:58:05.0000] <jmdyck>
+(but tx)
+
+[09:58:55.0000] <jmdyck>
+jorendorff: I'm iffy on whether Knuth's paper will help.
+
+[09:59:04.0000] <jorendorff>
+...same
+
+[09:59:09.0000] <jorendorff>
+but it should contain a definition of LR(k)
+
+[09:59:21.0000] <jorendorff>
+and i'm interested in seeing a syntactic definition
+
+[09:59:30.0000] <jorendorff>
+not having seen one before
+
+[10:00:59.0000] <jmdyck>
+not sure what you mean by a "syntactic definition".
+
+[10:01:49.0000] <jmdyck>
+if you mean "anything confirming to this (meta)syntax is a LR(k) grammar, and vice versa", I don't think that's possible
+
+[10:02:33.0000] <jmdyck>
+*conforming
+
+[10:06:00.0000] <jmdyck>
+re: "runtime" description of the k in LR(k): The parser can look at up to k of the next input symbols to make a decision about what to do next: shift the next symbol, or reduce by a particular production. If it chooses to shift, then it shifts exactly 1 symbol and uses that (plus the current state) to determine what state to go to.
+
+[10:06:51.0000] <jmdyck>
+I believe that description is correct for k >= 0.
+
+[10:08:25.0000] <jmdyck>
+re "the language described by the spec grammar is a CF language": No.
+
+[10:09:21.0000] <jmdyck>
+Or actually, I'm not sure.
+
+[10:09:27.0000] <jmdyck>
+But I doubt it.
+
+[10:11:17.0000] <jmdyck>
+You could prove it's a CF language by giving a CFG that's provably equivalent to the spec grammar, but I suspect that would be tough.
+
+[10:12:00.0000] <devsnek>
+i'm curious, what is gained from this analysis
+
+[10:12:17.0000] <jmdyck>
+(dunno, I'm just answering the question)
+
+[10:12:20.0000] <devsnek>
+lol
+
+[10:12:30.0000] <devsnek>
+to me, as long as we know the grammar is correct and doesn't require infinite lookahead, that seems good enough
+
+[10:12:44.0000] <jmdyck>
+"correct" in what sense?
+
+[10:13:12.0000] <devsnek>
+like correctly describes javascript in an unambiguous way
+
+[10:13:25.0000] <devsnek>
+if/else notwithstanding
+
+[10:16:33.0000] <jmdyck>
+so you mean "correct" in the sense of "faithfully expresses the idea that tc39 has in its head"?
+
+[10:17:14.0000] <devsnek>
+more or less
+
+[10:17:17.0000] <jmdyck>
+as opposed to "there is a way to objectively judge the correctness of this description"?
+
+[10:17:25.0000] <devsnek>
+that is the point of the spec after all
+
+[10:18:41.0000] <jmdyck>
+Well, I have some sympathy with your viewpoint.
+
+[10:20:26.0000] <jmdyck>
+The question then is: how can we increase our confidence that this description *does* (unambiguously, and with finite lookahead) express what tc39 intends?
+
+[10:21:04.0000] <rkirsling>
+^ this question is a good one for sure
+
+[10:21:07.0000] <devsnek>
+indeed
+
+[10:21:41.0000] <devsnek>
+but do we need to know the specific k for LR(k) to do that
+
+[10:22:09.0000] <jmdyck>
+nah
+
+[10:27:41.0000] <jmdyck>
+Presumably one reason to bring LR(k) into the discussion is: *if* you can show that a grammar is (say) LR(2), then right away you know that it's unambiguous and requires finite lookahead to parse.
+
+[11:39:46.0000] <devsnek>
+rkirsling: interestingly: https://gc.gy/37919385.png
+
+[11:39:56.0000] <devsnek>
+jsc and xs disagree here
+
+[11:40:07.0000] <devsnek>
+oops
+
+[11:40:10.0000] <devsnek>
+rwaldron: ^
+
+[11:40:14.0000] <devsnek>
+sorry ross
+
+[11:40:35.0000] <rkirsling>
+:p
+
+[12:00:43.0000] <devsnek>
+do abstract modules have imports? from what i can tell they don't
+
+[12:44:03.0000] <keith_mi_>
+Does anyone know the best way to generate a prettified spec diff from a git diff?
+
+[12:44:25.0000] <keith_mi_>
+/me Is looking into https://github.com/tc39/ecma262/pull/1585
+
+[12:44:29.0000] <keith_mi_>
+but reading the diff is annoying
+
+[13:21:33.0000] <Bakkot>
+keith_miller: I don't know about generating a spec diff, but you can at least look at the rendered PR
+
+[13:21:50.0000] <keith_miller>
+How do I do that?
+
+[13:21:56.0000] <Bakkot>
+by clicking "Show all checks" at the bottom and then "details" next to netlify's check
+
+[13:22:26.0000] <keith_miller>
+Oh cool, thanks
+
+[13:22:46.0000] <Bakkot>
+(this is a relatively new thing, thanks to I think devsnek)
+
+[13:24:19.0000] <ljharb>
+was in my editor update on Tuesday, keith_miller :-p
+
+[13:26:35.0000] <devsnek>
+keith_miller: i'm working on a way to show the diff in it too, but so far its an unsolved problem
+
+[13:26:53.0000] <devsnek>
+if you ever see green and red in proposals, some poor human had to put those in by hand
+
+[13:27:01.0000] <keith_miller>
+ljharb: I was late... >.>
+
+[13:27:17.0000] <ljharb>
+lol no worries
+
+[13:27:38.0000] <rkirsling>
+poor humans
+
+[13:28:02.0000] <keith_miller>
+devsnek: no worries. This is still great!
+
+[13:28:19.0000] <keith_miller>
+poor humans indeed :(
+
+[13:30:08.0000] <Bakkot>
+I still want to get automatic linking to the rendered spec in the PR message, like prettier has (see bottom of e.g. https://github.com/prettier/prettier/pull/6148 )
+
+[13:31:27.0000] <Bakkot>
+(bottom of the OP, that is)
+
+[13:31:54.0000] <devsnek>
+i was thinking about that
+
+[13:33:40.0000] <ljharb>
+Bakkot: open to it, but things that edit the OP are a race condition that can get annoying
+
+[13:33:47.0000] <Bakkot>
+ljharb: it doesn't edit the OP
+
+[13:33:49.0000] <Bakkot>
+it's just in the template
+
+[13:34:02.0000] <Bakkot>
+https://github.com/prettier/prettier/blob/master/.github/PULL_REQUEST_TEMPLATE.md
+
+[13:34:12.0000] <ljharb>
+ah right, the referer thing
+
+[13:35:28.0000] <devsnek>
+in the html spec they edit it in
+
+[13:35:47.0000] <Bakkot>
+I like prettier's approach better I think
+
+[13:37:19.0000] <ljharb>
+it puts the grossness in a different place :-p
+
+[13:48:08.0000] <TabAtkins>
+Oh phew, relying on the referer there is an interesting hack.
+
+
+2019-10-05
+[20:58:43.0000] <devsnek>
+when did finalization groups start requiring registration tokens to be objects?
+
+[20:58:52.0000] <devsnek>
+i'm not sure how i'm even supposed to use this anymore
+
+
+2019-10-06
+[00:55:03.0000] <puppy0cam>
+I frequently have issues with ES module imports, especially when it relates to extending classes. While top level await would be useful, it also comes at the cost of losing the performance benefit gained by statically declaring the imports, and may cause problems when accessing the modules.
+
+[00:55:04.0000] <puppy0cam>
+not able to reasonly know which one can be executed first. I have created a gist to highlight the problem at https://gist.github.com/puppy0cam/fd1606a3b712a50a5195aab8ba1447e9
+
+[00:55:10.0000] <puppy0cam>
+Currently you can work around the problem by having an internal module that exports the contents of all your other modules in the correct order. This is not an ideal situation, as it can cause tree shaking and other static analysis tools from working effectively. It can lead to warnings in an IDE due to ESLint's sort-imports rule (see
+
+[00:55:11.0000] <puppy0cam>
+https://eslint.org/docs/rules/sort-imports) requiring imports to be sorted alphabetically.
+
+[00:55:18.0000] <puppy0cam>
+Instead of forcing the JavaScript engine to guess which module should be executed first, there should be syntax that allows you to tell the engine that it is safe to execute an import after the current module is done executing.
+
+[00:55:25.0000] <puppy0cam>
+Just as you can defer a script's execution in the browser, a script should be able to defer an imported module to after it has already loaded.
+
+[00:55:52.0000] <puppy0cam>
+sorry for the random wall of text lol
+
+[09:55:19.0000] <ljharb>
+puppy0cam: the issue there imo is that you have circular dependencies
+
+[09:55:34.0000] <ljharb>
+a superclass isn't supposed to know anything about its subclasses
+
+[10:03:36.0000] <devsnek>
+js engines don't guess what the order to execute is
+
+[10:03:38.0000] <devsnek>
+its well defined
+
+[13:07:17.0000] <rkirsling>
+jmdyck: so, as the follow-up to https://github.com/tc39/ecma262/pull/1302 and parallel change to https://github.com/tc39/ecma402/issues/54, I'm gonna do the `"foo"` -> *"foo"* change, but I'm debating the best approach. I started to go through the 1400+ cases one-by-one, but I'm now thinking it may be easier to change all of 'em at once and then examine the diff for things that feel wrong
+
+[13:08:19.0000] <rkirsling>
+I remember you'd mentioned that there are lots of algorithmic cases where ~foo~ could be used instead of a string value, but I think that could probably be an even further follow-up
+
+[13:08:24.0000] <rkirsling>
+(or at least a subsequent commit)
+
+[13:10:55.0000] <jmdyck>
+(That latter was the last para of https://github.com/tc39/ecma262/pull/1592#issuecomment-503663404 )
+
+[13:11:32.0000] <rkirsling>
+right! there it is
+
+[13:11:54.0000] <rkirsling>
+also yeah, ljharb requested a section be added to notation conventions about this
+
+[13:12:56.0000] <jmdyck>
+I was thinking it'd be good to do the change-to-tilde first because that would avoid changing some things twice.
+
+[13:13:26.0000] <rkirsling>
+that is true
+
+[13:13:53.0000] <rkirsling>
+as long as 402 is free to move in parallel, I don't object to that
+
+[13:14:36.0000] <jmdyck>
+402?
+
+[13:15:33.0000] <rkirsling>
+see my second link above -- the Intl spec also was confused about what the convention should be and figured it'd be easiest to follow establishment of a clear convention in 262
+
+[13:16:12.0000] <jmdyck>
+oh *ecma*402
+
+[13:16:26.0000] <rkirsling>
+er yeah sorry 😅 not a PR number
+
+[13:16:43.0000] <rkirsling>
+I think with PR 1302 landed we basically know what we want, it's just that the enactment is pending
+
+[13:19:51.0000] <jmdyck>
+(I'm wondering how much `"foo"` will be left.)
+
+[13:21:22.0000] <rkirsling>
+not much, I imagine... it actually makes me wonder where the existing convention came from
+
+[13:22:07.0000] <jmdyck>
+you mean the pre-1592+1302 convention?
+
+[13:22:11.0000] <rkirsling>
+was there originally no specific stylistic distinction for values?
+
+[13:22:12.0000] <rkirsling>
+yeah
+
+[13:23:47.0000] <rkirsling>
+hmm even the ES5 spec has `this` in bold serif font though
+
+[13:25:03.0000] <jmdyck>
+IIRC, the first 'github' version was marked up to achieve the same styling as the Word-based version.
+
+[13:25:21.0000] <rkirsling>
+makes sense
+
+[13:26:47.0000] <rkirsling>
+...that we did that, not the convention itself :p
+
+[13:35:02.0000] <jmdyck>
+So the Word-based version used bold sans-serif for some values, and bold monospace for other (string) values
+
+[13:35:46.0000] <ljharb>
+rkirsling: i'd say do the tilde conversions first, in parallel with the notational conventions prose
+
+[13:36:43.0000] <rkirsling>
+k
+
+[13:36:59.0000] <rkirsling>
+can you clarify the scope of that prose?
+
+[13:37:02.0000] <jmdyck>
+(re "this" ES5 has it in bold serif *and* in bold sans.)
+
+[13:37:45.0000] <rkirsling>
+are we just describing "notation for ES values versus arbitrary ES code"? or do we want to pluck that whole table from the ecmarkup docs?
+
+[13:38:08.0000] <rkirsling>
+jmdyck: interesting...I only caught the serif one.
+
+[13:38:23.0000] <rkirsling>
+(I imagine it was even trickier to catch such things at that time)
+
+[13:38:33.0000] <jmdyck>
+(it might be serif in algs, sans in non-alg text)
+
+[13:39:15.0000] <ljharb>
+rkirsling: something that, if someone asked "how do i format this", would help direct them
+
+[13:39:21.0000] <jmdyck>
+(because algs are default serif, non-algs are default sans)
+
+[13:41:27.0000] <jmdyck>
+(in ES5)
+
+[16:00:33.0000] <rkirsling>
+this `hint String` notation passed to ToPrimitive is...interesting
+
+[16:08:20.0000] <devsnek>
+it's like an atom
+
+[16:27:10.0000] <puppy0cam>
+ljharb In my usecase, the superclass is meant to serve as a fallback in the event that there is no subclass equivalent available due to new subclasses being implemented by the server but not the library. It is also meant to make sure that they are properly distinguished and instanceof can be used to determine if it is an allowed type without
+
+[16:27:11.0000] <puppy0cam>
+checking the instanceof from the subclass.
+
+[16:28:08.0000] <ljharb>
+puppy0cam: it seems like if the server and client don't have the same support, it should be an error
+
+[16:32:19.0000] <rkirsling>
+in abstract operations that describe the types of their parameters, I don't know what to call ~foo~
+
+[16:32:48.0000] <rkirsling>
+ecmarkup documentation say "specification types and their instances"
+
+[16:33:14.0000] <rkirsling>
+it's basically an enum value but the enum is anonymous
+
+[16:33:58.0000] <ljharb>
+puppy0cam: but either way i'd think you want a separate function to handle that, and not the superclass.
+
+[16:35:23.0000] <devsnek>
+rkirsling: like an atom
+
+[16:35:40.0000] <rkirsling>
+yeah but I don't think we use that word
+
+[16:35:43.0000] <puppy0cam>
+I guess I could do a custom [Symbol.hasInstance] method, but I do find that custom ones are far slower than the inbuilt one.
+
+[16:37:11.0000] <ljharb>
+puppy0cam: alternatively not rely on `instanceof` in the first place :-)
+
+[16:37:38.0000] <devsnek>
+rkirsling: aren't there other places that use strings?
+
+[16:37:42.0000] <devsnek>
+like toPrimitive
+
+[16:38:04.0000] <rkirsling>
+I'm turning them into ~foo~s by request
+
+[16:38:08.0000] <devsnek>
+oh
+
+[16:38:14.0000] <devsnek>
+lol I would've gone the other way
+
+[16:38:54.0000] <rkirsling>
+I mean anytime we expose something previously-unexposed they'd need to become strings
+
+[16:39:18.0000] <rkirsling>
+but otherwise it distinguishes the spec-use-only values well, I suppose
+
+[16:42:15.0000] <jmdyck>
+rkirsling: FunctionInitialize has "_kind_ which is one of (Normal, Method, Arrow)"
+
+[16:42:44.0000] <jmdyck>
+CreateDynamicFunction has ```_kind_ is either `"normal"`, `"generator"`, `"async"`, or `"async generator"` ```
+
+[16:42:55.0000] <rkirsling>
+ahh nice
+
+[16:42:57.0000] <rkirsling>
+thanks
+
+[16:43:42.0000] <jmdyck>
+ForIn/OfHeadEvaluation: The value of _iterationKind_ is either ~enumerate~, ~iterate~, or ~async-iterate~.
+
+[16:44:06.0000] <jmdyck>
+ForIn/OfBodyEvaluation: similar syntax
+
+[16:45:52.0000] <jmdyck>
+hm, spec bug: sometimes Normal, Method, Arrow have tildes, sometimes they don't
+
+[16:49:56.0000] <devsnek>
+why don't we just use strings like CreateDynamicFunction
+
+[16:52:24.0000] <jmdyck>
+so not use tildes ever?
+
+[16:52:50.0000] <rkirsling>
+those are the two options, basically
+
+[16:53:13.0000] <rkirsling>
+(I don't really have much of an opinion between the two)
+
+[16:56:20.0000] <rkirsling>
+jmdyck: fixed said bug
+
+[16:56:38.0000] <rkirsling>
+(er, added fixes to what I'm doing)
+
+[16:57:03.0000] <rkirsling>
+I'm still gonna do this on top of the `` -> ** change, I think
+
+[16:57:24.0000] <rkirsling>
+that's how I'm going through this so that I can evaluate each relevant case in turn
+
+[16:57:49.0000] <rkirsling>
+and I don't think it would be worth rebasing back off of it
+
+
+2019-10-07
+[17:03:18.0000] <jmdyck>
+I don't think I got all the referents there.
+
+[17:07:04.0000] <jmdyck>
+"do this" = fix the lack-of-tildes bug, or convert `"foo"` to ~foo~ where appropriate?
+
+[17:13:19.0000] <rkirsling>
+sorry
+
+[17:13:59.0000] <rkirsling>
+do convert-to-tilde as a commit on top of convert-to-value, and then include the fix for lack-of-tildes in there
+
+[17:17:48.0000] <jmdyck>
+re "why don't we just use strings [for enumerated spec-values]?": Ultimately, that's a question for the editors. It could be that they like  tilde-values, or they're just a leftover from the Word era that isn't worth the churn of eliminating. Personally, I think ~foo~ is a nice way to convey that we're dealing with a small enumeration of user-invisible values.
+
+[18:42:52.0000] <rkirsling>
+```
+
+[18:42:52.0000] <rkirsling>
+1. If _F_ contains any code unit other than `"g"`, `"i"`, `"m"`, `"s"`, `"u"`, or `"y"` or if it contains the same code unit more than once, throw a *SyntaxError* exception.
+
+[18:42:52.0000] <rkirsling>
+1. If _F_ contains `"u"`, let _BMP_ be *false*; else let _BMP_ be *true*.
+
+[18:42:52.0000] <rkirsling>
+```
+
+[18:42:56.0000] <rkirsling>
+that's an interesting case
+
+[18:43:02.0000] <rkirsling>
+_F_ is a string there
+
+[18:43:19.0000] <rkirsling>
+seems like "contain a code unit" should be `g`, `i`, ...
+
+[18:43:40.0000] <rkirsling>
+but then "contain" in the sense of substring should be our *"u"*
+
+[18:43:43.0000] <rkirsling>
+I believe
+
+[18:52:32.0000] <rkirsling>
+ugh maybe there isn't actually precedent for "contain (a substring)" and they should all be like `u`
+
+[18:54:03.0000] <jmdyck>
+Well, `g` could denote a terminal symbol or a very short piece of ES code. To denote a code unit, we'd normally say something like "the code unit 0x67 (LATIN SMALL LETTER G)"
+
+[18:56:40.0000] <rkirsling>
+oof
+
+[18:57:20.0000] <jmdyck>
+yeah.
+
+[18:57:24.0000] <rkirsling>
+there are a bunch of cases that I'm separating out for this, regex flags just turns out to be the largest such thing
+
+[18:58:07.0000] <rkirsling>
+so we can handle it holistically once I have it up, I guess
+
+[19:04:12.0000] <jmdyck>
+... but it's fairly clear that "the code unit `"g"`" would mean "the sole code unit of the String value `"g"`" (or *"g"*).
+
+[19:06:59.0000] <jmdyck>
+re precedent for "contain (a substring)": String.prototype.matchAll recently got "If ? ToString(_flags_) does not contain *"g"*, ..."
+
+[19:11:38.0000] <jmdyck>
+but I don't think there's any precendent where the substring has more than one code unit.
+
+[20:07:15.0000] <rkirsling>
+I see
+
+[20:07:33.0000] <rkirsling>
+what would you be inclined to do with the lines above?
+
+[20:09:22.0000] <rkirsling>
+does 'code unit `"g"`' feel different from 'code unit *"g"*'?
+
+[20:09:49.0000] <rkirsling>
+(either way, I can easily separate that part into its own patch)
+
+[20:10:00.0000] <rkirsling>
+(own PR even)
+
+[20:58:15.0000] <jmdyck>
+I think just changing the backticks to stars would be okay.
+
+[21:05:30.0000] <rkirsling>
+I was just about to submit a PR but maybe I could just have you tell me whether you'd keep any of the changes here: https://github.com/tc39/ecma262/commit/05f1480042e9e69e4c493e5f81f4d45d196e82f6
+
+[21:06:31.0000] <jmdyck>
+(looking...)
+
+[21:06:58.0000] <rkirsling>
+the regex flag-related changes are the oddest, probably
+
+[21:09:17.0000] <rkirsling>
+I guess my overall worry was just about whether we're being goofy about whether the quote character is a code unit in itself
+
+[21:12:25.0000] <jmdyck>
+SV is weird because it's defined to return a sequence of code units, which is basically indistinguishable from a String, but is meant to not be a String, but should probably just be a string. (See https://github.com/tc39/ecma262/issues/828)
+
+[21:12:55.0000] <jmdyck>
+(continuing to look...)
+
+[21:17:12.0000] <jmdyck>
+re line 12999: It's plausible.
+
+[21:22:29.0000] <jmdyck>
+30942 also plausible.
+
+[21:23:44.0000] <rkirsling>
+hmm, I didn't realize the background on SV there...
+
+[21:27:20.0000] <jmdyck>
+Other than those two, I'm dubious.
+
+[21:28:06.0000] <rkirsling>
+thanks for looking
+
+[21:29:10.0000] <rkirsling>
+I submitted it as https://github.com/tc39/ecma262/pull/1724 after all just 'cause I didn't want to overcomplicate our IRC discussion
+
+[22:14:52.0000] <rkirsling>
+okay, submitted https://github.com/tc39/ecma262/pull/1725 as well
+
+[22:16:37.0000] <rkirsling>
+I think after those, we'll be able to literally replace-all on `"[^"\s]+"`
+
+[22:17:04.0000] <rkirsling>
+and now...I am exhausted lol
+
+
+2019-10-08
+[08:24:13.0000] <annevk>
+ljharb: https://github.com/w3c/webcomponents/issues/839#issuecomment-539560744 misses a lot of nuance and I'm not sure really helps move that conversation forward
+
+[08:25:01.0000] <ljharb>
+your opinion is noted
+
+[08:25:27.0000] <ljharb>
+i don’t think suggesting new syntax is particularly productive either
+
+[08:27:47.0000] <ljharb>
+i just really don’t understand the concern; if i import from a url, i have delegates trust to that url. What does it matter if it changes from json to js to html, as long as the export matches my expectations?
+
+[08:29:53.0000] <ljharb>
+if the web doesn’t have json modules, people will just transform their json to a module exporting an object literal. How is that safer?
+
+[09:19:58.0000] <annevk>
+Oh you’re not even talking about type=module
+
+[09:20:38.0000] <annevk>
+If you don’t see the diff between JSON and JSONP I’m not sure I can help
+
+[09:25:56.0000] <ljharb>
+annevk: (type=module is a reflection of the philosophy i'm irritated about) i totally do see the difference between json and jsonp. that's why it's so important to have ergonomic json modules.
+
+[09:26:32.0000] <ljharb>
+annevk: but what i don't see is the risk here. if i `import` from a URL, i have already given over control to that URL - if it changes from JSON to JS, that's no more risky than it changing from "good JS" to "malicious JS".
+
+[09:28:51.0000] <Bakkot>
+ljharb: sure but possibly I would not have trusted that URL if it was JS
+
+[09:29:33.0000] <Bakkot>
+granting someone the ability to serve me data need not imply granting it the ability to run code in the context of my site
+
+[09:29:58.0000] <ljharb>
+i think that that's going to be a pretty rare use case where someone knows about the hazards, decides to trust the third party URL because it's json, and also knows enough to guard against prototype pollution from that json.
+
+[09:30:20.0000] <ljharb>
+perhaps a better expectation is to not let its format affect your trust
+
+[09:30:44.0000] <Bakkot>
+... prototype pollution from json hasn't been a risk since ES5 changed object literal evaluation from set to define, no?
+
+[09:30:52.0000] <ljharb>
+no
+
+[09:31:01.0000] <Bakkot>
+I maybe do not understand what you mean to refer to then
+
+[09:31:02.0000] <ljharb>
+there were hundreds of CVEs a year or two ago for libraries that suffered from it
+
+[09:31:17.0000] <ljharb>
+serialization libraries that didn't special-case `__proto__`, mainly
+
+[09:31:19.0000] <Bakkot>
+I mean prototype pollution _in general_ is a thing, but not just from reading json?
+
+[09:31:21.0000] <Bakkot>
+yeah but like
+
+[09:31:23.0000] <Bakkot>
+that is a different problem
+
+[09:31:26.0000] <ljharb>
+perhaps
+
+[09:31:34.0000] <annevk>
+No it is
+
+[09:31:42.0000] <ljharb>
+but still, for those rare cases where you trust json but not JS, something like CSP or SRI seems appropriate
+
+[09:32:25.0000] <Bakkot>
+speaking as someone who has spent too many hours in the last two weeks dealing with banks trying to add CSP to their websites, I am extremely hesitant to consider it a solution to anything if there is any other possible solution at all
+
+[09:32:47.0000] <Bakkot>
+and SRI doesn't work for data which changes, which it JSON often does
+
+[09:32:54.0000] <ljharb>
+re SRI fair point
+
+[09:33:08.0000] <ljharb>
+but even some out of band thing that says "this url must be json" seems fine to me
+
+[09:33:41.0000] <annevk>
+Terrible ergonomics
+
+[09:33:43.0000] <ljharb>
+will people importing json from a third party source does really be something that will be so common that this is an attack vector?
+
+[09:33:47.0000] <Bakkot>
+like I don't think "I trust this third party to serve me json but not JS" is a remotely rare case
+
+[09:33:56.0000] <ljharb>
+well sure, there's no good ergonomics to be had here
+
+[09:33:56.0000] <Bakkot>
+ljharb: ... yes?
+
+[09:34:03.0000] <ljharb>
+k
+
+[09:34:13.0000] <annevk>
+Yeah, I disagree with the rare assertion too
+
+[09:34:21.0000] <ljharb>
+i have no data to back it, that's why i asked
+
+[09:34:36.0000] <annevk>
+Also from a sec perspective you don’t want to grant more priv than needed
+
+[09:34:54.0000] <ljharb>
+could it be kind of CORS-like? same domain Just Works, different domain requires an allow list somewhere?
+
+[09:34:56.0000] <Bakkot>
+like by default I would trust just about any third party to serve me json (esp. if I can time out) and very very few third parties to serve me JS (and there SRI can give me a lot more confidence)
+
+[09:35:16.0000] <annevk>
+👍🏻
+
+[09:42:13.0000] <ljharb>
+i guess i do agree with your default
+
+[09:42:25.0000] <ljharb>
+what about the corsish suggestion?
+
+[10:43:32.0000] <jmdyck>
+rkirsling: In https://github.com/tc39/ecma262/pull/1724#pullrequestreview-298512273, is the "you" directed to me or ljharb?
+
+[10:45:30.0000] <rkirsling>
+jmdyck: ah, I meant you, sorry for being unclear
+
+[10:47:50.0000] <jmdyck>
+okay, i just realized I misread your comment.
+
+[11:42:09.0000] <rkirsling>
+jmdyck: just to be clear, I certainly don't mean that the difference between "code unit" and "code point" is unmeaningful, I just wondered whether there's any gain from talking about regexp flags as `u` in one place and *"u"* in another
+
+[11:43:14.0000] <rkirsling>
+your clarification about source text versus string value makes sense, but I still am unable to review the lines in that commit and understand which bucket each is meant to fall into
+
+[11:43:20.0000] <jmdyck>
+but it sounded like the postulated issue would be wider-ranged than that
+
+[11:43:47.0000] <jmdyck>
+s/postulated/proposed/
+
+[11:44:15.0000] <rkirsling>
+ah, um, it might be taken to be if I created it as such, yeah
+
+[11:44:25.0000] <rkirsling>
+sort of a natural scope creep
+
+[11:44:45.0000] <jmdyck>
+("re-evaluate usage of "code unit" and "code point" throughout the spec")
+
+[11:44:49.0000] <rkirsling>
+yeah
+
+[11:45:06.0000] <rkirsling>
+basically I'm only really meaning to deal with any blockers wrt stylization of string values
+
+[11:45:10.0000] <rkirsling>
+of course
+
+[11:46:00.0000] <rkirsling>
+I felt like it would be better to separate the thing as a new issue versus dealing with the status quo in a way that lacks diligence
+
+[11:46:08.0000] <rkirsling>
+but perhaps that's not the case
+
+[11:46:48.0000] <rkirsling>
+actually I think the only line I'm still confused about is the very last one
+
+[11:47:10.0000] <rkirsling>
+> Any LineTerminator code points in the value of the `"source"` property of a RegExp instance must be expressed using an escape sequence. Edition 5.1 only required the escaping of `"/"`.
+
+[11:47:45.0000] <rkirsling>
+seems like `/` is a code point but I must be missing something
+
+[11:49:06.0000] <jmdyck>
+Hm
+
+[11:49:20.0000] <jmdyck>
+that sentence seems a bit confused.
+
+[11:54:08.0000] <jmdyck>
+But yes, I agree, that `/` is a code point too.
+
+[11:56:42.0000] <jmdyck>
+No wait.
+
+[12:02:00.0000] <jmdyck>
+yup, i still agree.
+
+[14:10:14.0000] <rkirsling>
+ljharb: I didn't mean controversial :( I just was trying to avoid doing too much in one PR
+
+[14:10:41.0000] <ljharb>
+rkirsling: i mean, it's not like i'll block the pr on it, but adding a paragraph of prose at the top doesn't seem like it'd be too much
+
+[14:11:10.0000] <rkirsling>
+kk
+
+[14:11:46.0000] <rkirsling>
+I can do that
+
+[14:18:37.0000] <ljharb>
+yay ty
+
+[16:42:43.0000] <ljharb>
+bterlson: rbuckton jmdyck: any chance yall know a way to prevent auto-linking of a given dfn? https://github.com/tc39/ecma262/issues/1730
+
+[16:44:19.0000] <Bakkot>
+insert a zero-width non-joiner? :P
+
+[16:44:27.0000] <jmdyck>
+Well, I suppose you could say "Li&zwnbsp;st"
+
+[16:45:39.0000] <jmdyck>
+but seriously, i think it needs ecmarkup to avoid auto-linking in some contexts
+
+[16:47:25.0000] <ljharb>
+yeah i was assuming some kind of markup to disable it
+
+[16:47:38.0000] <jmdyck>
+actually, if you said "Mailing list archives", that would avoid the auto-link.
+
+[16:47:50.0000] <ljharb>
+seems hacky
+
+[16:48:11.0000] <jmdyck>
+not as hacky as "Li&zwnbsp;st", but yeah.
+
+[16:49:38.0000] <akirose>
+listserv
+
+[16:59:49.0000] <jmdyck>
+Looking at the ecmarkup code, I don't see a way to spot-disable autolinking.
+
+
+2019-10-09
+[17:00:30.0000] <rkirsling>
+can you escape the L itself?
+
+[17:01:56.0000] <ljharb>
+i tried, ecmarkup's too smart for that
+
+[17:01:56.0000] <jmdyck>
+Well, you could write it as "&#x4C;", but that's still pretty hacky.
+
+[17:02:05.0000] <ljharb>
+i'll just use the zero width space for now
+
+[17:02:45.0000] <jmdyck>
+Oh, ecmarkup probably gets normalized text.
+
+[17:04:46.0000] <rkirsling>
+oh phew, I implemented the matchAll update and it broke a whole bunch of other tests -- looks like V8 encountered this too but hasn't reported it
+
+[17:04:47.0000] <rkirsling>
+https://bugs.chromium.org/p/v8/issues/detail?id=9800#c9
+
+[17:05:26.0000] <jmdyck>
+Wikipedia says 'word joiner' (U+2060) is preferred over 'zero width no-break space' (U+FEFF): https://en.wikipedia.org/wiki/Word_joiner
+
+[17:07:30.0000] <ljharb>
+rkirsling: it's entirely possible i missed some when i updated test262
+
+[17:07:40.0000] <ljharb>
+rkirsling: but IsRegExp uses Symbol.match, not Symbol.matchAll
+
+[17:12:09.0000] <rkirsling>
+uh so what I mean is that the spec checks for presence of "g" before looking up Symbol.matchAll
+
+[17:13:39.0000] <rkirsling>
+like in https://github.com/tc39/test262/blob/master/test/built-ins/String/prototype/matchAll/regexp-get-matchAll-throws.js
+
+[17:14:02.0000] <rkirsling>
+we've thrown a TypeError before that's even relevant
+
+[17:14:48.0000] <shu>
+rkirsling: i was about to file the upstream bug to test262
+
+[17:15:08.0000] <shu>
+ljharb: i also don't understand your message on the v8 issue
+
+[17:15:12.0000] <rkirsling>
+shu: yay
+
+[17:18:57.0000] <Bakkot>
+ljharb: oh god, I wasn't serious about the zero-width character thing
+
+[17:19:04.0000] <Bakkot>
+at least just use an HTML comment or something
+
+[17:23:17.0000] <Bakkot>
+sidebar: anyone know how screen readers deal with the various ZWJ (etc) characters?
+
+[17:24:39.0000] <shu>
+rkirsling: it's also your understanding that those tests should be throwing `TypeError` instead of `Test262Error`, right?
+
+[17:29:00.0000] <rkirsling>
+shu: correct
+
+[18:54:52.0000] <ljharb>
+Bakkot: lol fair, that's better
+
+[18:55:18.0000] <ljharb>
+rkirsling: it's still relevant whether matchAll is present or not
+
+[18:55:35.0000] <ljharb>
+rkirsling: we're saying that "String.prototype.matchAll should not be called with anything that lacks a g flag"
+
+[18:58:27.0000] <rkirsling>
+?
+
+[18:59:21.0000] <rkirsling>
+for the test I linked, S.p.matchAll throws due to receiving a non-global regex before it checks Symbol.matchAll, is the idea
+
+[18:59:50.0000] <ljharb>
+ah, you're saying the test doesn't actually test that
+
+[19:00:16.0000] <rkirsling>
+yeah in order to keep testing the path it was originally testing, we'd need to make it /./g, I think
+
+[19:00:27.0000] <ljharb>
+got it
+
+[19:00:30.0000] <ljharb>
+i can make a quick pr
+
+[19:03:01.0000] <ljharb>
+https://github.com/tc39/test262/pull/2399
+
+[19:05:53.0000] <rkirsling>
+cool
+
+[19:06:16.0000] <rkirsling>
+I think https://github.com/tc39/test262/blob/master/test/built-ins/String/prototype/matchAll/flags-undefined-throws.js has the additional issue of expecting Test262Error without actually using it anywhere
+
+[19:07:16.0000] <rkirsling>
+I'd evidently been too preoccupied with the others to notice myself, but it's also mentioned in the Chromium thread
+
+[19:08:23.0000] <ljharb>
+oops, i'll fix that too, thanks
+
+[19:55:27.0000] <rkirsling>
+ruh roh
+
+[19:55:38.0000] <rkirsling>
+there appears to have been a syntax error in something just merged
+
+[19:56:41.0000] <rkirsling>
+(ecmarkup rendering is broken on master)
+
+[19:57:51.0000] <ljharb>
+gmm
+
+[19:57:52.0000] <ljharb>
+hmm
+
+[19:57:56.0000] <ljharb>
+checking
+
+[19:58:18.0000] <ljharb>
+rkirsling: everything seems to build normally for me on master
+
+[19:59:06.0000] <ljharb>
+rkirsling: what makes you think it's broken on master?
+
+[19:59:42.0000] <rkirsling>
+https://tc39.es/ecma262/ is busted from like section 16 onward
+
+[20:00:25.0000] <ljharb>
+hmm
+
+[20:00:28.0000] <rkirsling>
+(search for underscores, say)
+
+[20:00:38.0000] <ljharb>
+right
+
+[20:00:40.0000] <jmdyck>
+oh yeah, it's not processing ecmarkdown
+
+[20:01:53.0000] <ljharb>
+doing a bisect now
+
+[20:03:48.0000] <ljharb>
+might be 693e09a4b9ce52b060ceda897b042c3f83f0a738.
+
+[20:04:26.0000] <ljharb>
+oh no wait, one sec
+
+[20:06:38.0000] <ljharb>
+seems like the HTML comment approach broke rendering
+
+[20:06:59.0000] <jmdyck>
+wah
+
+[20:07:29.0000] <jmdyck>
+but broke it at clause 16??
+
+[20:07:42.0000] <ljharb>
+i think ecmarkup is very brittle around html comments; it's happened once before
+
+[20:08:38.0000] <ljharb>
+pushing up a fix shortly.
+
+[20:13:09.0000] <ljharb>
+rkirsling: should be fixed
+
+[20:14:16.0000] <rkirsling>
+confirmed!
+
+[20:14:26.0000] <rkirsling>
+thanks for the speedy recovery
+
+
+2019-10-10
+[23:12:12.0000] <devsnek>
+MylesBorins: what happens in TLA if the last expression in a stm returns a promise
+
+[23:12:33.0000] <devsnek>
+like is that adopted by the promise returned from Evaluate()
+
+[23:12:47.0000] <devsnek>
+or does Evaluate not see that at all
+
+[23:25:03.0000] <rkirsling>
+ljharb: wow, I'm trying to accept your suggestion and it keeps saying "This diff has recently been updated."
+
+[23:25:22.0000] <rkirsling>
+have you ever seen that happen?
+
+[23:25:36.0000] <devsnek>
+I'm so confused
+
+[23:25:47.0000] <ljharb>
+yeah, github has a bug with accepting suggestions when the PR author and suggester both have write access
+
+[23:25:50.0000] <ljharb>
+you may have to do it manually
+
+[23:25:54.0000] <devsnek>
+should the source text "Promise.reject();" fail after TLA lands
+
+[23:25:56.0000] <rkirsling>
+😱
+
+[23:26:02.0000] <ljharb>
+devsnek: no
+
+[23:26:14.0000] <devsnek>
+cuz rn it does in V8 at least
+
+[23:26:24.0000] <ljharb>
+seems like a pretty massive bug to me
+
+[23:26:36.0000] <devsnek>
+any engine that gives the return value to the caller of Evaluate
+
+[23:27:10.0000] <devsnek>
+it probably does in engine262 too
+
+[23:27:20.0000] <ljharb>
+TLA is only about syntactic await, not about promises
+
+[23:27:45.0000] <ljharb>
+`({ then() { throw 42; } });` shouldn't fail either
+
+[23:28:08.0000] <devsnek>
+I mean I agree with you
+
+[23:28:16.0000] <devsnek>
+I'm just really confused about what to do
+
+[23:28:28.0000] <ljharb>
+file bugs :-p
+
+[23:28:48.0000] <devsnek>
+I guess the engines could return { result: v } objects
+
+[23:28:53.0000] <devsnek>
+so they can't be unwrapped
+
+
+2019-10-11
+[07:15:44.0000] <jorendorff>
+ljharb: Do you think you could find some time to look at https://github.com/tc39/ecma262/pull/1694 ?
+
+[08:31:23.0000] <ljharb>
+jorendorff: sure, can do today. I was hoping the others that had opinions in the thread would review too, cc mathiasbynens aklein
+
+
+2019-10-13
+[21:34:07.0000] <puppy0cam>
+I find it annoying when I am trying to run check that something isn't an instanceof. For example, I would have to wrap the condition in an extra set of brackets `if (!(value instanceof Class))` as `if (!value instanceof Class)` changes `value` to a boolean before the instanceof check which makes the statement effectively `if (false instanceof
+
+[21:34:08.0000] <puppy0cam>
+Class)`. It would be nice we we could use syntax like `if !(value instanceof Class)` for the comparison. It's a small nitpick but would be appreciated.
+
+[22:45:21.0000] <devsnek>
+puppy0cam: you could do === false instead
+
+
+2019-10-14
+[07:05:18.0000] <rkirsling>
+hmm, currently we write '*this* value' everywhere, but I suppose it should actually be '`this` value' (similar to how it's '`super` property' and not '*"super"* property')
+
+[07:20:26.0000] <rkirsling>
+^ what do you think, jmdyck? (no rush, I'm in Spain right now so my time zone is different than usual)
+
+[07:27:13.0000] <jmdyck>
+I agree that asterisks aren't really appropriate, because 'this' doesn't denote a particular language value. But the backticks aren't really appropriate either, because we're not talking about a chunk of source text.
+
+[07:30:04.0000] <jmdyck>
+So I think I'd be inclined to leave it be.
+
+[07:42:35.0000] <rkirsling>
+okay
+
+[07:43:23.0000] <rkirsling>
+it appears to still be inconsistent, but it's 449 cases of *this* versus 40 of `this`
+
+[07:44:44.0000] <jmdyck>
+Well, some of the backticked ones actually *are* talking about a chunk of source text.
+
+[07:45:30.0000] <jmdyck>
+(or a grammatical symbol / terminal symbol / token / IdentifierName)
+
+[07:45:46.0000] <rkirsling>
+right
+
+[07:45:48.0000] <rkirsling>
+~lexical~ means that `this` refers to the *this* value of a lexically enclosing function.
+
+[07:45:57.0000] <rkirsling>
+is meaningfull
+
+[07:46:00.0000] <rkirsling>
+-l
+
+[07:46:20.0000] <jmdyck>
+yup
+
+[07:47:04.0000] <rkirsling>
+it's just '`this` object' / '`this` binding' that seems off
+
+[07:47:33.0000] <rkirsling>
+er well
+
+[07:47:41.0000] <rkirsling>
+maybe the latter is debatable, hmm.
+
+[07:48:12.0000] <jmdyck>
+(all occurrences of /the .this. value/ use asterisks, so that's consistent at least)
+
+[07:51:30.0000] <rkirsling>
+...I actually did those as a tack-on change in #1302 😅
+
+[07:51:54.0000] <rkirsling>
+but hadn't considered it holistically until now
+
+[07:55:06.0000] <rkirsling>
+yeah, reconsidering your point, I think the 7 cases of '`this` object' vs. 19 cases of '*this* object' is my only real concern
+
+[08:00:45.0000] <jmdyck>
+" the `this` object " appears to be a shorthand for " the *this* value (which is an object) ", so it makes sense to change those backticks to asterisks.
+
+[08:01:47.0000] <rkirsling>
+right, that was my view too
+
+[08:01:53.0000] <rkirsling>
+I'll make a quick PR
+
+[08:06:16.0000] <jmdyck>
+yeah, I'm not seeing any meaningful distinction between " *this* object " and " `this` object ".
+
+[08:07:43.0000] <rkirsling>
+https://github.com/tc39/ecma262/pull/1736
+
+[08:22:41.0000] <jorendorff>
+> When the same left hand sides occurs with both [+U] and [~U] guards it is to control the disambiguation priority.
+
+[08:22:53.0000] <jorendorff>
+oh,  right
+
+[08:33:44.0000] <jmdyck>
+"oh, right" = "that 'left' should be 'right'" ?
+
+[08:35:44.0000] <jorendorff>
+I'm confused about B.1.4. It replaces ClassAtomNoDash[U] with ClassAtomNoDash[U, N], adding a parameter...
+
+[08:37:45.0000] <jorendorff>
+but I don't see where the call sites are updated, to say what should be passed to this new parameter.
+
+[08:39:03.0000] <jmdyck>
+yeah, that was brought up at some point. I think I refer to it in the commit where I fix it.
+
+[08:40:52.0000] <jorendorff>
+oh. shoot. is there a url that just always has the current github `master` rendered?
+
+[08:41:11.0000] <jorendorff>
+i guess tc39.es/ecma262 isn't really that
+
+[08:41:29.0000] <jmdyck>
+Here's the commit: https://github.com/tc39/ecma262/pull/1651/commits/c7198ea4608ebf5d9a1ec36ff049945d01efabee
+
+[08:43:35.0000] <jmdyck>
+So the point of your confusion comes up here: https://github.com/tc39/ecma262/issues/1081#issuecomment-381123153
+
+[08:49:13.0000] <jmdyck>
+Looks to me like tc39.es/ecma262 is a render of the current master.
+
+[08:50:08.0000] <jmdyck>
+(my fix hasn't been merged, if that's what you were thinking)
+
+[09:56:55.0000] <jorendorff>
+jmdyck: makes sense. thanks
+
+
+2019-10-15
+[21:35:41.0000] <devsnek>
+bradleymeck: were you the one who had a repl parse goal proposal
+
+[21:55:59.0000] <ljharb>
+yes
+
+[22:39:21.0000] <devsnek>
+when does GetBindingValue() with S (strict) set to false happen?
+
+[22:39:30.0000] <devsnek>
+or rather, when does it happen such that it matters
+
+[22:39:51.0000] <devsnek>
+i see it branched in object environment records
+
+[22:40:02.0000] <devsnek>
+if strict is false, it should return undefined instead of throwing a reference error
+
+[22:40:09.0000] <devsnek>
+but i have no idea in what circumstance this happens
+
+[06:30:37.0000] <jmdyck>
+devsnek: there are 5 places where the _S_ arg is explicitly *false*, plus the call in GetValue where it's false if IsStrictReference(_V_) returns false.
+
+[06:37:36.0000] <bradleymeck>
+devsnek: if I'm reading that engine262 stuff correctly, this would mean `> let f = () => a; let a = 1;` `> const a = 2; f()` would end up with `f()` returning `2`?
+
+[07:18:33.0000] <devsnek>
+bradleymeck: that matches my understanding as well
+
+[07:19:06.0000] <bradleymeck>
+seems fine to me, though some people want this weird undo hack, or to ensure each input is like reading top down in a file
+
+[07:19:23.0000] <bradleymeck>
+i'm mostly avoiding that drama while i'm on other things
+
+[07:19:33.0000] <bradleymeck>
+but i can probably merge the writeup you did
+
+[08:16:06.0000] <devsnek>
+jmdyck: is it possible to define something like "InputCouldContinue" where it returns true on something like `{ a: 1`
+
+[09:08:35.0000] <jmdyck>
+devsnek: hm.
+
+[09:10:06.0000] <devsnek>
+jmdyck: in node, we can sort of do this https://gc.gy/38860803.png
+
+[09:10:12.0000] <devsnek>
+line continuation
+
+[09:10:21.0000] <devsnek>
+by detecting the error message "unexpected end of input" or whatever
+
+[09:11:12.0000] <jmdyck>
+It seems like the semantics isn't so much that input *could* continue, because input can always continue. Rather input *must* continue, i.e. this is not a complete expression/statement/whatever-construct-you're-prepared-to-take.
+
+[09:14:00.0000] <jmdyck>
+re whether it's possible to define: probably, but I imagine it'd be fairly prose-y. The existing spec would give you very little to build on/ work with.
+
+[09:16:40.0000] <jmdyck>
+It's not something the current spec needs or has a natural place for. Parsing is pretty much a black box as far as the spec is concerned, so you'd have to invent a new black box.
+
+[09:17:39.0000] <devsnek>
+jmdyck: not needed at the moment, i was thinking of maybe defining it with repl
+
+[09:17:55.0000] <devsnek>
+so hosts have a standard mechanism to detect that input must continue
+
+[09:22:59.0000] <bakkot>
+jmdyck: I think you could do it with a relatively small amount of prose. `if the sequence of tokens cannot be recognized with the goal symbol Whatever with no tokens left over, but is the prefix of some such sequence..."
+
+[09:23:57.0000] <jmdyck>
+yup, something like that.
+
+[09:26:07.0000] <jmdyck>
+you could also just have HostGetCompleteThing and leave the details of dealing with incomplete things to the implementation
+
+[09:26:34.0000] <devsnek>
+could also just not specify it at all
+
+[09:26:42.0000] <devsnek>
+but its pretty useful imo
+
+[09:27:00.0000] <jmdyck>
+Is there that much you want to require of repls in the face of incomplete input?
+
+[09:27:27.0000] <devsnek>
+it would probably be too much to outright require them to do multi-line input
+
+[09:40:14.0000] <bradleymeck>
+devsnek: does this really differ from early error detection?
+
+[09:40:25.0000] <devsnek>
+unsure what you mean
+
+[10:32:36.0000] <bradleymeck>
+devsnek: how does it differ from a REPL etc. just holding onto src and seeing if it parses
+
+[10:32:59.0000] <bradleymeck>
+if it doesn't parse, just append next input
+
+[10:33:02.0000] <devsnek>
+bradleymeck: it rejects things that will never parse correctly
+
+[10:33:14.0000] <devsnek>
+like `1 2 3`
+
+[10:33:25.0000] <bradleymeck>
+so its just a classifier on early errors?
+
+[10:33:36.0000] <devsnek>
+that's how node implements it
+
+[10:33:42.0000] <devsnek>
+by error messages
+
+[10:34:44.0000] <bradleymeck>
+i'd just add a field to Early errors then? not make spec say input can continue, but that input afterwards will NEVER be valid
+
+[10:45:27.0000] <jmdyck>
+early errors operate on parsed (i.e. syntactically well-formed) input though
+
+[10:58:06.0000] <jwalden>
+apropos of nothing, what was the good reason to disallow immediately-adjacent numeric separators?  syntactically I can't say I care one way or another, but it appears that forbidding 1__2 does require extra effort on the tokenizing side over just allowing arbitrary numbers of separators be interspersed in numeric literals
+
+[10:58:26.0000] <jwalden>
+I want to say C++ has the same no-adjacent requirement, but I'm not certain why they have it that way either
+
+[11:19:38.0000] <bradleymeck>
+jmdyck: but a variety of early errors ensure further tokens won't help e.g. `with({}) {}` in strict mode, so if you parse the syntax until you get to something that doesn't parse, look for the early error and see if it will never be valid, in general this isn't necessarily helpful though with things like `function foo() {` effectively preventing and new input from being within a properly formed construct
+
+[11:29:11.0000] <TabAtkins>
+jwalden: I'm guessing the main reason is: it looks bad and isn't necessary?
+
+[11:29:28.0000] <jwalden>
+/me shrugs
+
+[11:29:41.0000] <jwalden>
+it hardly seems *that* terrible to me, but eh
+
+[11:43:54.0000] <jmdyck>
+bradleymeck: If you get to something that doesn't parse (and ASI doesn't rescue you), why would you need to look for an early error to know that it will never be valid?
+
+[11:52:52.0000] <bradleymeck>
+jmdyck: thats a good question, there might be zero early errors that are reasoned about in this context
+
+[11:53:51.0000] <bradleymeck>
+something that is syntactically valid but errors though would be stuff like `> const x = 1; const x = 2;` though at least the REPL goal intentionally is meant to allow that
+
+[11:55:51.0000] <jmdyck>
+So the repl 'disables' some early errors?
+
+[11:57:05.0000] <jwalden>
+some repls (SpiderMonkey is one) will "undo" the effects of a subsequent redeclaration in a separate line entered, warn, and just not do anything
+
+[11:57:21.0000] <bradleymeck>
+jmdyck: effectively
+
+[11:57:29.0000] <jwalden>
+I do believe they all will complain about redeclarations that are in the same entered line (i.e. the same Script)
+
+[11:57:38.0000] <bradleymeck>
+it specifies what happens though
+
+[11:58:00.0000] <bradleymeck>
+repls vary and a lot even ship JS parsers and don't directly put input into their VMs and do source transforms ahead of time
+
+[11:58:14.0000] <bradleymeck>
+i know top level await in some REPLs disables const because of it
+
+[11:58:19.0000] <bradleymeck>
+which is :magic:
+
+[11:59:26.0000] <bradleymeck>
+the main point of when I proposed a REPL goal is to just give expectable behavior, even if it seems a bit odd
+
+[11:59:52.0000] <bradleymeck>
+what that behavior is can be shifted around a bit
+
+[12:10:00.0000] <devsnek>
+jmdyck: i found that with one change, the spec works pretty well for rels
+
+[12:10:04.0000] <devsnek>
+repls*
+
+[12:10:13.0000] <devsnek>
+in particular, an environment where HasLexicalDeclaration always returns false
+
+[12:10:33.0000] <devsnek>
+so its not really disabling early errors
+
+[12:18:38.0000] <jmdyck>
+cool
+
+
+2019-10-16
+[08:16:19.0000] <Lcfvs>
+Hi all
+
+[08:17:44.0000] <bradleymeck>
+hi
+
+[08:17:52.0000] <Lcfvs>
+Why, in JS, we don't have an array hybrid method like every (stopping iteration at a certain point), to filter them?
+
+[08:36:56.0000] <ljharb>
+Lcfvs: how would you indicate "stopping"?
+
+[08:38:19.0000] <Lcfvs>
+ljharb like a filter, by a falsy value
+
+[08:39:39.0000] <ljharb>
+Lcfvs: so not like filter, more like "takeUntil"?
+
+[08:40:20.0000] <Lcfvs>
+yeah, it's the name I got in head: until
+
+[08:40:22.0000] <Lcfvs>
+^^
+
+[08:42:03.0000] <ljharb>
+Lcfvs: for that it sounds like `const i = arr.findIndex(predicate); i >= 0 ? arr.slice(0, i) : arr.slice()` or something would do it
+
+[08:45:03.0000] <Lcfvs>
+yep, something like that... as a native method?
+
+[08:47:17.0000] <ljharb>
+i imagine just that nobody's proposed it yet
+
+[08:47:31.0000] <ljharb>
+but it'd need lots of prior art and a compelling argument why a native method was better than a two-liner, i think
+
+[08:49:02.0000] <Lcfvs>
+yeah, I'm just launching the idea :)
+
+[09:00:05.0000] <devsnek>
+if an error occurs while i'm using an iterator, that iterator should be closed right?
+
+[09:01:10.0000] <ljharb>
+devsnek: i think for..of and spread are supposed to close it; i don't think there's any guarantee that it will be closed in general tho
+
+[09:01:21.0000] <devsnek>
+in my proposal, i don't close it
+
+[09:01:25.0000] <devsnek>
+https://tc39.es/proposal-iterator-helpers/#sec-iteratorprototype-map
+
+[09:01:42.0000] <devsnek>
+i'm trying to figure out if i need to replace all these calls with ?
+
+[09:03:19.0000] <bradleymeck>
+you can also make something unclosable by making .return not callable if i remember right
+
+[09:04:19.0000] <devsnek>
+maybe i'll need an IfAbruptCloseIterator lol
+
+[09:04:37.0000] <bradleymeck>
+for (let x of Object.assign(iter, {return:null})) ... would be kind of funny to have that as a helper somehow
+
+[09:05:19.0000] <ljharb>
+devsnek: it seems like it'd be a consistency issue to *not* call return if iteration errors, yeah
+
+[10:28:24.0000] <bakkot>
+devsnek: it depends on whether the error comes from the iterator protocol or not
+
+[10:29:01.0000] <bakkot>
+e.g. if the error is that "next" is an accessor which throws, you don't attempt to close the iterator. but if you you're doing, say, `.map(foo)`, and `foo` throws, you need to close the iterator
+
+[10:31:58.0000] <devsnek>
+bakkot: that you for clarifying!
+
+[10:41:06.0000] <ljharb>
+aha, gtk
+
+
+2019-10-17
+[15:50:50.0000] <shu>
+devsnek: i now think my analysis of #1685 was incorrect and we need to revert it
+
+[15:51:11.0000] <shu>
+namely, the analogy with AsyncGeneratorStart and GeneratorStart doesn't work
+
+[15:51:53.0000] <devsnek>
+the change would be correct with that line removed
+
+[15:52:07.0000] <devsnek>
+engine262 is running fine
+
+[15:53:59.0000] <shu>
+devsnek: well, there's the added weirdness of what it means to push a non-copied execution context onto the stack twice
+
+[15:54:45.0000] <devsnek>
+🤷🏻
+
+[15:54:55.0000] <devsnek>
+that part is definitely weird
+
+[15:55:22.0000] <shu>
+devsnek: i originally thought the change would be correct because you don't need to duplicate the asyncContext
+
+[15:55:54.0000] <devsnek>
+i think ideally we would just rework the [[Call]] for ecmascript functions
+
+[15:56:02.0000] <devsnek>
+so that the actual dispatch is the one doing the pushing and popping
+
+[15:56:05.0000] <shu>
+devsnek: but you still do, because right now we're pushing a reference to the running (even after removing the erroneous 2nd push) context
+
+[15:56:15.0000] <shu>
+devsnek: no, that wouldn't fix the issue, let me try to explain the issue to see if it makes sense
+
+[15:56:38.0000] <shu>
+you have an `async function f()` and call `f()`, which is synchronous up until the first `await`, if any
+
+[15:56:43.0000] <devsnek>
+right
+
+[15:57:15.0000] <shu>
+in the case there is an `await`, the execution context of `f` needs to manually remove its execution context from the stack after resuming from the `await`
+
+[15:57:26.0000] <shu>
+err, after running to completion after resuming from all awaits
+
+[15:57:54.0000] <devsnek>
+right
+
+[15:58:05.0000] <shu>
+in the case there is no `await`, it shouldn't manually remove its own execution context, because the [[Call]] itself pops it
+
+[15:58:10.0000] <shu>
+that's why it's copied and re-pushed
+
+[15:58:24.0000] <shu>
+it's annoying to deal with "was there an await or not" case otherwise
+
+[15:58:29.0000] <shu>
+with a single execution context
+
+[15:58:40.0000] <shu>
+the generator contexts don't need to duplicate and repush because they start suspended
+
+[15:58:49.0000] <shu>
+so there is always at least one suspension point
+
+[15:59:58.0000] <shu>
+the current state, with your change merged, is that we re-push something that doesn't have its own "code evaluation state", which is incorrect
+
+[16:00:15.0000] <devsnek>
+i'm still not following where the incorrect behaviour is
+
+[16:00:24.0000] <devsnek>
+like i get the current logic is odd
+
+[16:01:26.0000] <shu>
+okay, let's walk through an `async function f() { }`
+
+[16:02:11.0000] <shu>
+PrepareForOrdinaryCall allocates a new execution context, let's call that `asyncContext`
+
+[16:02:22.0000] <devsnek>
+yeah
+
+[16:02:42.0000] <shu>
+right before we call `f();`, the execution stack is `[originalContext]`
+
+[16:03:14.0000] <devsnek>
+yep
+
+[16:03:49.0000] <shu>
+in [[Call]], PrepareForOrdinaryCall pushes `asyncContext` onto the stack, so now the stack is `[originalContext, asyncContext]`
+
+[16:04:09.0000] <shu>
+eventually, via OrdinaryCallEvaluateBody, we get to `AsyncFunctionStart`
+
+[16:04:32.0000] <shu>
+(assuming the second push in `AsyncFunctionStart` is removed)
+
+[16:04:57.0000] <devsnek>
+yeah
+
+[16:04:59.0000] <shu>
+`AsyncFunctionStart` pushes `asyncContext` onto the stack again and resumes it, so now the stack is `[originalContext, asyncContext, asyncContext]`
+
+[16:05:21.0000] <shu>
+since there's no awaits, the resumed `asyncContext` tries to remove itself from the context stack
+
+[16:05:24.0000] <devsnek>
+wait are you talking about with clones or not
+
+[16:05:32.0000] <shu>
+i'm talking about the current version that is merged
+
+[16:05:39.0000] <shu>
+so no language around "copy an execution context"
+
+[16:05:42.0000] <devsnek>
+ok yeah, with the duplicate push
+
+[16:05:49.0000] <devsnek>
+there are two asyncContexts on the stack
+
+[16:06:03.0000] <shu>
+well, the bug in the current version is that there would actually be 3 asyncContexts
+
+[16:06:11.0000] <shu>
+but assume we removed the obviously buggy 2nd push, there are 2 asyncContexts
+
+[16:06:19.0000] <devsnek>
+there should only be one push
+
+[16:06:27.0000] <devsnek>
+step 6
+
+[16:06:35.0000] <shu>
+right, in AsyncFunctionStart
+
+[16:06:41.0000] <devsnek>
+step 3 shouldn't exist
+
+[16:06:49.0000] <devsnek>
+so you'd have `[originalContext, asyncContext]`
+
+[16:06:54.0000] <devsnek>
+then evaluation is resumed
+
+[16:06:58.0000] <shu>
+ah but no, but `asyncContext` is already pushed via `PrepareForOrdinaryCall`
+
+[16:07:05.0000] <devsnek>
+yeah
+
+[16:07:14.0000] <devsnek>
+that's how asyncContext got there
+
+[16:07:14.0000] <shu>
+so there are now 2 asyncContexts at the top of the stack
+
+[16:07:24.0000] <devsnek>
+i'm not seeing the thing you're talking about
+
+[16:07:34.0000] <devsnek>
+where is the third push
+
+[16:07:50.0000] <shu>
+the extra buggy push is making this hard to talk about
+
+[16:08:01.0000] <devsnek>
+pretend step 3 doesn't exist
+
+[16:08:03.0000] <shu>
+let's pretend step 3 of AsyncFunctionStart doesn't exist, yes
+
+[16:08:19.0000] <shu>
+do you agree that before we even get to AsyncFunctionStart, asyncContext is already on the stack
+
+[16:08:23.0000] <devsnek>
+yes
+
+[16:08:33.0000] <shu>
+okay, then we get to step 6
+
+[16:08:42.0000] <shu>
+now the stack is [originalContext, asyncContext, asyncContext]
+
+[16:08:45.0000] <devsnek>
+nope
+
+[16:08:55.0000] <shu>
+why not?
+
+[16:09:11.0000] <devsnek>
+no matter what, after a resumed evaluation, it removes itself from the stack
+
+[16:09:16.0000] <devsnek>
+in this case its 2.b
+
+[16:09:27.0000] <shu>
+what resumed evaluation?
+
+[16:09:30.0000] <shu>
+asyncContext is never suspended
+
+[16:09:33.0000] <devsnek>
+step 4 resumes evaluation
+
+[16:09:39.0000] <shu>
+and what step suspends it?
+
+[16:10:08.0000] <devsnek>
+Await() or the steps in 2
+
+[16:10:17.0000] <shu>
+the example has no awaits
+
+[16:10:22.0000] <devsnek>
+ok so the steps in step 2
+
+[16:10:27.0000] <shu>
+what steps in 2?
+
+[16:10:41.0000] <devsnek>
+code evaluation state steps
+
+[16:10:45.0000] <shu>
+step 2 is what happens upon resumption
+
+[16:10:49.0000] <devsnek>
+yeah
+
+[16:10:50.0000] <shu>
+it doesn't suspend the running execution context
+
+[16:11:32.0000] <devsnek>
+return and throw automatically suspend evaluation
+
+[16:11:36.0000] <devsnek>
+in this case
+
+[16:11:54.0000] <devsnek>
+i didn't add step 5
+
+[16:12:18.0000] <shu>
+i think you're confused, let's start at step 1
+
+[16:12:40.0000] <shu>
+the stack at Step 1 is `[originalContext, asyncContext]`, yes?
+
+[16:12:44.0000] <devsnek>
+yeah
+
+[16:13:26.0000] <shu>
+Step 2 says, *when asyncContext is resumed*, do all these substeps, but doesn't do anything with asyncFunctionBody or touch the stack, so the stack is still `[originalContext, asyncCOntext]`, yes?
+
+[16:13:39.0000] <devsnek>
+yep
+
+[16:13:49.0000] <shu>
+step 3 doesn't exist, so we skip
+
+[16:13:55.0000] <devsnek>
+yep
+
+[16:14:08.0000] <shu>
+Step 4 now tries to resume something that isn't suspended to begin with
+
+[16:14:13.0000] <shu>
+what does that even do
+
+[16:14:22.0000] <devsnek>
+i didn't change that
+
+[16:14:33.0000] <devsnek>
+i just removed a clone
+
+[16:14:57.0000] <shu>
+right
+
+[16:15:27.0000] <devsnek>
+i take step 4 to mean "run the code evaluation state"
+
+[16:16:00.0000] <devsnek>
+which either gets to 2.b or Await step 10
+
+[16:16:16.0000] <devsnek>
+er 2.c
+
+[16:17:41.0000] <shu>
+ah okay, i see, it's very different if line 3 doesn't exist or line 6 doesn't exist
+
+[16:17:54.0000] <shu>
+this is still very strange
+
+[16:18:02.0000] <devsnek>
+i think it also depends on how you see the evaluation of abstract ops
+
+[16:18:10.0000] <shu>
+i don't think that's up to interpretation?
+
+[16:18:26.0000] <devsnek>
+they certainly don't operate on the stack
+
+[16:18:29.0000] <devsnek>
+since they define the stack
+
+[16:18:45.0000] <shu>
+as it stands now, there are two fixes: either revert, or remove 2.c, 3, and 6
+
+[16:19:15.0000] <devsnek>
+i don't think 2.c and 6 should be removed
+
+[16:19:33.0000] <devsnek>
+if you're super against this, i guess reverting isn't terrible
+
+[16:21:54.0000] <shu>
+you have some mental model of this that i do not around resuming non-suspended contexts
+
+[16:22:19.0000] <devsnek>
+i think the whole "suspended" terminology is a bit odd to begin with
+
+[16:22:56.0000] <devsnek>
+i think there might've even been some idea to rework how that is specified a while ago
+
+[16:23:56.0000] <devsnek>
+anyway, please ping me if you end up reverting it so i can update engine262 appropriately
+
+[16:24:58.0000] <shu>
+sure
+
+[16:25:07.0000] <shu>
+i think it comes down to i don't know how step 4 can mean the "run the code evaluation state"
+
+[16:25:21.0000] <shu>
+when you're already running the code evaluation state of the current context
+
+[16:25:38.0000] <devsnek>
+hmm
+
+[16:26:13.0000] <shu>
+generators don't have this problem because they start suspended, so there's no inline resumption like this
+
+[16:26:31.0000] <shu>
+and this is what copying handles
+
+[16:26:36.0000] <devsnek>
+what if we just moved the initial evaluation out of the code evaluation state
+
+[16:26:36.0000] <shu>
+there is probably a way to do this without copying
+
+[16:26:45.0000] <shu>
+let's see...
+
+[16:26:51.0000] <devsnek>
+moving step 2.a i mean
+
+[16:27:23.0000] <shu>
+just 2.a, or all substeps?
+
+[16:27:41.0000] <devsnek>
+hmm
+
+[16:27:46.0000] <devsnek>
+i guess we'd have to duplicate the substeps
+
+[16:28:00.0000] <devsnek>
+actually i don't hate that idea
+
+[16:28:10.0000] <shu>
+you can't even duplicate the substeps, how would Await know where to resume in the duplicated substeps?
+
+[16:29:18.0000] <devsnek>
+yeah i guess that would break the references elsewhere
+
+[16:29:19.0000] <devsnek>
+oh well
+
+[16:33:27.0000] <shu>
+i think your interpretation of step 4 requires the step 2 substeps be a thunk-like thing that can run without affecting the currently running AsyncFunctionStart
+
+[16:33:54.0000] <shu>
+and the closest thing we have to that abstraction *is* an execution context, thus the duplication
+
+[16:38:05.0000] <devsnek>
+i'd imagine that's what anba was thinking
+
+[16:43:07.0000] <shu>
+devsnek: if you are happy with that reasoning, it does certainly seem to warrant a NOTE in that step
+
+[16:43:25.0000] <devsnek>
+yeah that's fine
+
+
+2019-10-19
+[20:01:32.0000] <devsnek>
+i've been using torque a bit recently, and honestly `tail` as a keyword is pretty nice
+
+
+2019-10-21
+[08:01:30.0000] <jorendorff>
+Does `077.213`match NumericLiteral?
+
+[08:01:42.0000] <jorendorff>
+I mean with Annex B.1.1 enabled
+
+[08:02:09.0000] <jorendorff>
+To me it looks like it does match NumericLiteral and its value is 63.213, a half-octal half-decimal literal
+
+[08:02:31.0000] <jorendorff>
+nope, wait
+
+[08:02:50.0000] <jorendorff>
+that's not right, it doesn't match
+
+[08:03:40.0000] <jorendorff>
+I think it is true that `078.213` matches but `077.213` does not
+
+[09:36:08.0000] <rkirsling>
+oh hey, that kind of bears on the sensibility of this decision: https://github.com/tc39/proposal-numeric-separator/issues/49
+
+[09:57:45.0000] <gibson042>
+The only |NumericLiteral| production that allows a fractional component is |DecimalLiteral|, which must start with either `.` or |DecimalIntegerLiteral|. |DecimalIntegerLiteral| is expanded by B.1.1 to include |NonOctalDecimalIntegerLiteral|, whose three productions are collectively described by /^0[0-7]*[89][0-9]*$/ (i.e., a leading zero followed by a nonempty sequence of digits that includes at least one 8 or 9). So `078.213` match
+
+
+2019-10-22
+[10:38:49.0000] <devsnek>
+can we just take a moment to appreciate this https://bocoup.com/blog/launching-test262-results-on-mdn
+
+[10:40:48.0000] <rkirsling>
+devsnek: !!!
+
+[10:44:54.0000] <devsnek>
+rwaldron: it probably isn't obvious to a lot of people how engines relate to browsers
+
+[10:45:01.0000] <devsnek>
+might be worth renaming or something
+
+[10:45:32.0000] <devsnek>
+also the issue of like, chrome has import but node doesn't, even though both are on the same V8 version
+
+[10:47:22.0000] <ljharb>
+also, the test262 results only apply to the latest version of the engines, which don't necessarily match what's shipped in browsers/node
+
+[10:50:54.0000] <bakkot>
+MDN already has the "shipped in browsers" thing reasonably well covered
+
+[10:51:13.0000] <bakkot>
+"how is progress coming on new features" is a distinct thing
+
+[10:51:21.0000] <bakkot>
+which test262 gives you
+
+[10:51:51.0000] <ljharb>
+fair. it's still not clear to most what engine ends up in which browser/node
+
+[10:52:37.0000] <devsnek>
+bakkot: s/new feature/random odd thing from es1/
+
+[10:52:48.0000] <bakkot>
+ljharb: the actually implementation has "SpiderMonkey (Firefox)"
+
+[10:52:56.0000] <bakkot>
+if you look at e.g. https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/globalThis#Browser_compatibility
+
+[11:04:33.0000] <ljharb>
+oh cool, fair enough
+
+[11:04:43.0000] <ljharb>
+looks great then :-)
+
+
+2019-10-24
+[04:37:09.0000] <rkirsling>
+er, is this error really correct? https://github.com/tc39/test262/blob/master/test/language/statements/for-of/dstr/obj-prop-elem-target-obj-literal-optchain-prop-ref.js
+
+[04:37:39.0000] <rkirsling>
+it's not a syntax error with `.` instead of `?.`
+
+[04:51:40.0000] <rkirsling>
+yeah there are eight bogus ones, reported here: https://github.com/tc39/test262/pull/2270#issuecomment-545880743
+
+[10:57:40.0000] <jwalden>
+bah
+
+[10:57:41.0000] <jwalden>
+my wifi is flaky, hopping back on
+
+[11:15:07.0000] <jwalden>
+...and I probably just dropt again
+
+[11:17:49.0000] <jwalden>
+...and again
+
+[13:36:18.0000] <devsnek>
+test262 says that adding a toJSON to BigInt.prototype should be used if a bigint value is passed to JSON.stringify
+
+[13:36:21.0000] <devsnek>
+but in https://tc39.es/ecma262/#sec-serializejsonproperty
+
+[13:36:27.0000] <devsnek>
+toJSON is only looked for if the value is an object
+
+[14:00:46.0000] <devsnek>
+rkirsling: what's the flag for jsc
+
+[14:00:59.0000] <rkirsling>
+--useBigInt=1
+
+[14:01:10.0000] <rkirsling>
+I don't know how to easily pass that through eshost
+
+[14:01:37.0000] <devsnek>
+eshost config has arguments options
+
+[14:01:41.0000] <rkirsling>
+(actually just put up a patch so that we can pass it through to test262-runner: https://bugs.webkit.org/show_bug.cgi?id=203301)
+
+[14:01:49.0000] <rkirsling>
+ah cool
+
+[14:02:07.0000] <devsnek>
+like https://gc.gy/39655923.png
+
+[14:02:31.0000] <rkirsling>
+nice
+
+
+2019-10-25
+[19:22:43.0000] <jmdyck>
+Who are the 262 editors now? Or is that a secret until the October minutes are published? It's kind of weird to be getting reviews and comments from people without knowing which of them is an editor.
+
+[19:27:24.0000] <ljharb>
+jmdyck: it's just me
+
+[19:27:38.0000] <ljharb>
+jmdyck: the next meeting will confirm some potential candidates
+
+[19:27:43.0000] <jmdyck>
+not even zenparsing now?
+
+[19:27:52.0000] <ljharb>
+he stepped down prior to the last meeting
+
+[19:28:09.0000] <ljharb>
+jmdyck: but either way i'd say, the only time "editor status" should matter is in settling a lack of consensus
+
+[19:28:32.0000] <ljharb>
+and at this point anything in that category will probably be something i get agreement on from all the potential editors as well, to avoid future churn
+
+[19:30:48.0000] <jmdyck>
+yeah, well, there's some lack of consensus on the Lexical Environment / Environment Record stuff.
+
+[19:31:03.0000] <ljharb>
+indeed
+
+[19:31:17.0000] <ljharb>
+hopefully next week we can take some time to look at it
+
+[19:31:20.0000] <ljharb>
+there's no rush :-)
+
+[19:31:28.0000] <ljharb>
+(but thanks for being patient, i know they've been open awhile)
+
+[19:33:32.0000] <jmdyck>
+next week sounds fine.
+
+[19:34:46.0000] <jmdyck>
+I'm not in a particular rush either, although resolving merge conflicts is a bit of a pain. (But I wrote a script to make it easier.)
+
+[19:35:49.0000] <ljharb>
+fair
+
+[19:45:17.0000] <jmdyck>
+Personally, I think #1697 is a better solution than #1477. And with syg's objection to 1477, I'm not sure if I'd be happy if 1477 were accepted.
+
+[20:43:44.0000] <shu>
+jmdyck: thank you for your work on both. i am positive on 1697 (unlike awb)
+
+[20:45:55.0000] <shu>
+jmdyck: my thinking is that outside of a few places where scoping has static semantics (like redeclaration checks), everything bindings related in ecma262 is done at runtime, and Environment is a fine name for the spec structure that implements bindings
+
+[20:46:30.0000] <shu>
+(the sleight of hand, as with the rest of the spec, is of course that static lexical scoping is reconstructible, but it's not specced that way)
+
+[12:56:55.0000] <devsnek>
+https://usercontent.irccloud-cdn.com/file/onAtEZDj/Screenshot_20191025-125630.jpg
+
+[12:57:07.0000] <devsnek>
+eshost on android is mysterious
+
+[12:57:21.0000] <devsnek>
+especially loving that fatal success from jsc
+
+[16:23:08.0000] <devsnek>
+has anyone ever been bothered that Reflect.construct can't pass an existing this value
+
+[16:24:30.0000] <devsnek>
+i guess the MOP can't really do that either
+
+
+2019-10-27
+[18:21:58.0000] <devsnek>
+does anyone know how well unicode's ID and/or XID classes relate to js identifiers
+
+[20:07:05.0000] <rkirsling>
+devsnek: what do you mean? we literally defer to them: https://tc39.es/ecma262/#prod-IdentifierName
+
+[20:07:30.0000] <devsnek>
+oh cool
+
+[20:07:43.0000] <devsnek>
+so _ is just straight up not a valid identifier start?
+
+[20:08:25.0000] <devsnek>
+(from ID_Start i mean)
+
+[20:08:36.0000] <devsnek>
+i was just trying to make an identifier regex
+
+[20:08:50.0000] <devsnek>
+and i started with \p{ID_Start}\p{ID_Continue}*
+
+[20:09:08.0000] <devsnek>
+i guess i have to manually add in _ and $
+
+[22:22:32.0000] <rkirsling>
+oh. I hadn't actually realized that.
+
+[22:24:01.0000] <rkirsling>
+also, is no browser shipping unicode property escapes?
+
+[22:25:30.0000] <rkirsling>
+because `/\p{ID_Start}/.test('a')` doesn't work anywhere
+
+[07:31:25.0000] <bakkot>
+rkirsling: unicode property escapes only work in unicode regexes
+
+[07:31:48.0000] <bakkot>
+(because `\p` already means `p` in non-unicode regexes)
+
+[08:36:10.0000] <rkirsling>
+bakkot: oh duh, there we go
+
+[13:25:47.0000] <devsnek>
+if anyone has opinions about the process of flat-mapping, can they review https://github.com/tc39/proposal-iterator-helpers/issues/55
+
+
+2019-10-28
+[09:38:09.0000] <shu>
+rbuckton: the https://tc39.es/proposal-regexp-match-indices/ rendering is out of date, mind updating it?
+
+
+2019-10-29
+[04:19:59.0000] <littledan>
+Relevant for those of us who attend TC39 meetings: https://www.theguardian.com/education/2019/oct/29/hypocrisy--guilt-jet-off-to-academic-conferences-plane-travel
+
+[07:36:03.0000] <bradleymeck>
+that also might tie into the idea of fewer but longer meetings as well
+
+[07:50:55.0000] <rkirsling>
+and the idea of not expecting every delegate to be involved in every single discussion
+
+[08:42:28.0000] <devsnek>
+i like how w3/whatwg does travel, not so much for normative decisions, more for an opportunity for everyone to realize they're still friends
+
+[08:56:54.0000] <rkirsling>
+officializing things in person is good
+
+[08:58:00.0000] <rkirsling>
+actually sidebar discussions at meetings also underscore how fruitful it can be to talk to people in person
+
+[08:58:12.0000] <devsnek>
+yeah the "hall topics"
+
+[09:13:29.0000] <ljharb>
+also we’ve been planning meetings specifically with an eye for inclusion which necessitates more plane travel for many veteran delegates
+
+[09:15:18.0000] <ljharb>
+the nuance and complexity here seems overwhelming :-/
+
+[09:55:46.0000] <bradleymeck>
+i do think the concrete scheduling for review/updates are also used as a way to mitigate workload timing, so a more async / living standard approach would be quite different to how TC39 has operated historically
+
+[09:57:20.0000] <rkirsling>
+and yet, we now have a living standard
+
+[10:02:40.0000] <bradleymeck>
+rkirsling: kind of? we don't have separate proposals landing changes without going through the central body
+
+[10:03:07.0000] <bradleymeck>
+we still have the choke point which isn't something i'd say is the same
+
+[10:04:41.0000] <ljharb>
+nor is it objectively worse to have the choke point, i'll add
+
+[10:06:07.0000] <bradleymeck>
+correct
+
+[10:23:24.0000] <rkirsling>
+oh I see what you're saying. but yeah I think the single target (or well, two targets including 402) is a good thing...
+
+[11:27:36.0000] <TabAtkins>
+(I'm definitely of the opinion that 6 meetings per year is *bonkers* and y'all should definitely move to fewer meetings, and come up with a way to achieve consensus without f2f contact; either regular telcons or just announcement + deadlines on the list.)
+
+[11:31:34.0000] <rkirsling>
+somebody with extensive experience with such alternative ways of doing things might be able to help push us in that direction... ;)
+
+[11:34:42.0000] <TabAtkins>
+Happy to do so if someone could tell me how I could help. ^_^
+
+[13:44:44.0000] <akirose>
+> ljharb> the nuance and complexity here seems overwhelming :-/
+
+[13:44:44.0000] <akirose>
+I'd say overwhelming covers it p well yes
+
+[14:16:19.0000] <devsnek>
+we should just have GitHub allow anyone to push to ecma 262
+
+[14:16:26.0000] <devsnek>
+anarchy always wins in the end
+
+[14:51:39.0000] <rkirsling>
+https://thumbs.gfycat.com/DismalFancyEastsiberianlaika-size_restricted.gif
+
+[16:13:03.0000] <akirose>
+never bet against the anarchists
+
+[16:14:31.0000] <ljharb>
+we'll really have to worry if the anarchists get organized
+
+
+2019-10-30
+[17:43:43.0000] <akirose>
+har har except being an anarchist as it turns out is mostly meetings
+
+[17:46:16.0000] <shu>
+what's the difference between an anarchist and a bureaucrat then
+
+[17:46:40.0000] <akirose>
+(seriously this fantastically-reported piece from 2016 is basically about meetings)
+
+[17:47:11.0000] <akirose>
+shu: motivation. action. interest in people over power.
+
+[17:47:13.0000] <rkirsling>
+that is such a good joke set up but I can't say what the answer would be
+
+[17:47:29.0000] <akirose>
+https://crimethinc.com/2016/05/13/feature-born-in-flames-died-in-plenums-the-bosnian-experiment-with-direct-democracy-2014
+
+[17:48:20.0000] <rkirsling>
+but yeah in that sense I don't think it's anarchism that devsnek was talking about lol
+
+[17:48:34.0000] <shu>
+the monarchy will come back one day, you'll see
+
+[17:49:42.0000] <rkirsling>
+you'll be back, soon you'll see 🎶
+
+[17:50:30.0000] <akirose>
+touché
+
+[17:52:00.0000] <devsnek>
+in my biased opinion it would be pretty cool if tc39 de-emphasized in-person meetings
+
+[17:54:34.0000] <shu>
+yeah, more remote with fewer in-person would be nice
+
+[17:55:18.0000] <devsnek>
+i mean more like embracing stuff like github and discourse in a normative way
+
+[17:57:21.0000] <shu>
+there're two axes: remote and sync. stuff like github is remote+async, which will be hard to adopt directly
+
+[17:57:26.0000] <devsnek>
+yeah
+
+[17:57:42.0000] <shu>
+remote+async would be great eventually
+
+[17:57:46.0000] <devsnek>
+i just really enjoy how engaged i can be in whatwg only through async channels
+
+[17:58:11.0000] <shu>
+if we can shift to more remote+sync first, then remote+async is more realistic
+
+[17:58:30.0000] <devsnek>
+there's a bit of that, like decorators calls and stuff
+
+[17:59:01.0000] <shu>
+for sure, and the other calls and how the Intl work meets separately
+
+[17:59:13.0000] <shu>
+there's still more we can spin out
+
+[17:59:48.0000] <shu>
+at the same time i think it'll always be nice to have local+sync, just not... every 2 months
+
+[18:00:00.0000] <shu>
+"it'll always be nice" = i don't want it to go away
+
+[18:00:57.0000] <devsnek>
+yea
+
+[18:01:17.0000] <devsnek>
+web has those meetings every once in a while
+
+[18:02:50.0000] <rkirsling>
+regular interval is also a strength
+
+[18:03:01.0000] <rkirsling>
+half as many might be just right, say
+
+[22:14:01.0000] <shu>
+ljharb: wait a second now, since when do all AOs return completion values?
+
+[22:14:47.0000] <ljharb>
+shu: since always afaik. https://tc39.es/ecma262/#sec-implicit-completion-values
+
+[22:15:41.0000] <ljharb>
+there's also always implicit `.[[Value]]` unwrapping, but the ! and ? make that explicit. and since explicit > implicit, hence the drive to prefix every AO call.
+
+[22:18:36.0000] <shu>
+huh. i had always thought that restriction was about the runtime algorithm steps
+
+[22:18:56.0000] <shu>
+but if an AO were more like a predicate, that implicit completion value was not there
+
+[22:19:19.0000] <ljharb>
+some AOs are predicates, but not all of them
+
+[22:19:35.0000] <shu>
+right, of course
+
+[22:19:49.0000] <shu>
+i think we internalized very different meanings of "Unless it is otherwise obvious from the context"
+
+[22:21:13.0000] <ljharb>
+how so?
+
+[22:21:28.0000] <ljharb>
+oh like, the "is" prefix makes it obvious to you, and i'm not differentiating that way?
+
+[22:22:08.0000] <shu>
+not exactly, i thought *not* using ! or ? was the contextual hint that you were calling a predicate-like AO
+
+[22:22:17.0000] <ljharb>
+ah
+
+[22:22:33.0000] <shu>
+but given that section and i think the occurrences of ! is against my understanding
+
+[22:22:36.0000] <ljharb>
+not using the prefix is generally for when you're checking if the completion is abrupt, generally for async/await type stuff
+
+[22:22:36.0000] <shu>
+i am happy to continue with yours
+
+[22:22:41.0000] <ljharb>
+👍
+
+[22:23:04.0000] <ljharb>
+fwiw i'm totes on board with an overall shift to avoid implicit completion values in the common cases - just based on how it is now, i prefer the explicit prefixes
+
+[22:23:16.0000] <shu>
+i don't think it's very high priority
+
+[22:23:24.0000] <shu>
+can hash it out some more at the next call
+
+[22:24:56.0000] <ljharb>
+agreed
+
+[05:57:34.0000] <jmdyck>
+shu, ljharb: The spec doesn't say that every AO returns a completion record, only that runtime semantics algorithms always return a cr.
+
+[06:02:13.0000] <jmdyck>
+Even with that restriction, it's still problematic, see https://github.com/tc39/ecma262/issues/496#issuecomment-491603203
+
+[07:45:05.0000] <ljharb>
+jmdyck: every AO is a runtime semantic, to my reading
+
+[08:07:33.0000] <jmdyck>
+"every AO is a runtime semantic": including the ones labelled "Static Semantics" ?
+
+[08:08:07.0000] <shu>
+jmdyck: indeed, that was my original understanding as well
+
+[08:08:12.0000] <shu>
+jmdyck: what are your opinions here?
+
+[08:09:04.0000] <jmdyck>
+shu: you can get some of my opinions from the linked issue, I think.
+
+[08:09:36.0000] <jmdyck>
+won't have time till later today.
+
+[10:12:49.0000] <ljharb>
+jmdyck: ok, sure, that's fair. but how can i know at the callsite whether an AO is runtime or static
+
+[10:41:45.0000] <jmdyck>
+ljharb: currently, you can't. Conceivably, you could with a naming convention or a syntax change.
+
+[10:42:54.0000] <ljharb>
+to reiterate, the property i think is important, is that at the callsite - without knowing anything about the abstract operation i'm invoking - i can know whether it will not, or might, throw
+
+[10:43:10.0000] <ljharb>
+i'm open to any proposals that preserve that property :-)
+
+[10:46:24.0000] <jmdyck>
+and presumably you'd like that property for other operations, e.g. syntax-directed
+
+[10:47:14.0000] <ljharb>
+ideally yes
+
+[10:48:19.0000] <rkirsling>
+so basically you're asking for constexpr and noexcept
+
+[10:48:20.0000] <rkirsling>
+lol
+
+[10:50:31.0000] <jmdyck>
+ljharb: 'throw' only, or any abrupt completion?
+
+[10:50:48.0000] <ljharb>
+s/throw/abrupt
+
+[10:51:00.0000] <jmdyck>
+ok
+
+[10:52:50.0000] <jmdyck>
+and what about cases of: this invocation might throw, but if it does, you shouldn't immediately return (so '?' doesn't apply) ?
+
+[10:54:08.0000] <ljharb>
+that's always up to the caller
+
+[10:54:16.0000] <ljharb>
+but yes that's the third state
+
+[10:54:23.0000] <ljharb>
+!, ?, or "inspect the completion value"
+
+[10:54:41.0000] <ljharb>
+theoretically any unprefixed AO rn should be inspecting the completion value
+
+[10:55:34.0000] <jmdyck>
+theoretically, i'd disagree.
+
+[10:56:13.0000] <jmdyck>
+well, it depends on which "should" you mean.
+
+[10:56:37.0000] <bakkot>
+"Any reference to a Completion Record value that is in a context that does not explicitly require a complete Completion Record value is equivalent to an explicit reference to the [[Value]] field of the Completion Record value unless the Completion Record is an abrupt completion."
+
+[10:56:56.0000] <bakkot>
+i.e., not inspecting the completion value is permitted by the current conventions in the spec
+
+[10:57:14.0000] <bakkot>
+I agree this is bad and we should prioritize fixing it and the implicit wrapping, one way or another
+
+[11:01:15.0000] <jmdyck>
+shu: another related opinion of mine is in issue 497, particularly  https://github.com/tc39/ecma262/issues/497
+
+[11:01:54.0000] <ljharb>
+jmdyck: what i mean is, if it's not inspecting the completion record value, i'd want a prefix on it
+
+[11:02:15.0000] <ljharb>
+there's tons of possible improvements/fixes we can make, for sure
+
+[11:03:34.0000] <shu>
+rkirsling: i actually would be 100% fine with constexpr and noexcept
+
+[11:05:35.0000] <jmdyck>
+ljharb: how do you feel about "Return Foo(...)" where Foo might return an abrupt completion?
+
+[11:05:53.0000] <ljharb>
+i'd still like to know it might throw
+
+[11:06:01.0000] <jmdyck>
+that's what I figured
+
+[11:08:03.0000] <jmdyck>
+so is this a goal or non-goal?: to be able to tell if an algorithm might return abruptly, simply by scanning for certain punctuation (e.g. '?')
+
+[11:09:31.0000] <ljharb>
+the last part isn't required, it's just likely the most concise way to do it
+
+[11:09:51.0000] <ljharb>
+a naming convention or a keyword or whatever would qualify too, i'm sure
+
+[11:10:16.0000] <bakkot>
+personally I don't think that's necessary; in particular, I am fine with algorithms whose return values are not completion records being invoked without `?`, and with algorithms whose return values are completion records which will be explicitly consumed as such being invoked without `?`
+
+[11:10:41.0000] <ljharb>
+i find that very confusing
+
+[11:10:45.0000] <bakkot>
+... how so?
+
+[11:10:58.0000] <ljharb>
+the common case is "ReturnIfAbrupt", ie, ?
+
+[11:11:07.0000] <ljharb>
+it's very very rare to inspect the completion value
+
+[11:11:13.0000] <bakkot>
+Not that rare, but sure, yes
+
+[11:11:15.0000] <ljharb>
+the current scenario rewards the rare case
+
+[11:11:27.0000] <ljharb>
+i mean, we could count, but i doubt it'd be often
+
+[11:11:48.0000] <jorydotcom>
+@shu you did the logo for TC39, yeah?
+
+[11:11:50.0000] <bakkot>
+... I don't think "rewards" is really the right way to think about it?
+
+[11:11:56.0000] <shu>
+jorydotcom: i did, yes
+
+[11:12:00.0000] <bakkot>
+we are not optimizing for smallest specification size here
+
+[11:12:11.0000] <ljharb>
+bakkot: sure, we should be optimizing for readability and correctness, not size
+
+[11:12:17.0000] <bakkot>
+right
+
+[11:12:19.0000] <shu>
+bakkot: why not largest specification size??
+
+[11:12:22.0000] <ljharb>
+lol
+
+[11:12:35.0000] <jorydotcom>
+super duper, I'm co-chairing with TC53 with Peter Hoddie & wondered if we could use your design but update it for TC53?
+
+[11:12:36.0000] <bakkot>
+shu: not convinced we aren't, given how rapidly its grown
+
+[11:13:15.0000] <shu>
+jorydotcom: of course, it should be covered by however it's licensed, let's see...
+
+[11:13:22.0000] <bakkot>
+(I laid out my position a little more fully in this comment, and still agree with it: https://github.com/tc39/ecma262/issues/1572#issuecomment-502902552 )
+
+[11:13:43.0000] <jorydotcom>
+@shu i always like to ask regardless :D
+
+[11:14:19.0000] <shu>
+jorydotcom: appreciate it!
+
+[11:14:42.0000] <jorydotcom>
+@shu it's really lovely work, thanks again for making those dif marks
+
+[11:15:46.0000] <shu>
+jorydotcom: thanks :) i still gotta get on designing another batch of hats...
+
+[11:20:00.0000] <rkirsling>
+I never did get a sticker 😢
+
+[11:34:50.0000] <jmdyck>
+ljharb: so for the goal of being able to tell "locally" that an algorithm can return abruptly, that would be addressed by simply declaring for each algorithm whether it can return abruptly. But that's not enough (for you), right? You'd like to be able to tell (locally) which steps in the algorithm could cause such a return.
+
+[11:36:14.0000] <jmdyck>
+("locally" = "without having to examine other algorithms")
+
+[11:38:34.0000] <devsnek>
+i'd like to completely rework our markup
+
+[11:38:53.0000] <devsnek>
+and use static analysis to tell if things throw, and error the build if they aren't explicitly unwrapped or ?/!
+
+[11:41:13.0000] <bakkot>
+static types in the spec would be great, but are much, much more work than the above change, I think
+
+[11:41:49.0000] <devsnek>
+we could just pause all normative changes for a year and rewrite the spec :P
+
+[11:42:32.0000] <jmdyck>
+bakkot: "the above change" = the comment you linked to?
+
+[11:42:38.0000] <devsnek>
+imagine if it was multiple files so you could actually see diffs on github and it wouldn't crash some editors
+
+[11:43:52.0000] <bakkot>
+jmdyck: sorry, yes. that or any similar approach involving being careful about how we write things and removing implicit conversions
+
+[11:43:59.0000] <jmdyck>
+isn't the single-file/multi-file orthogonal to static analysis?
+
+[11:44:38.0000] <bakkot>
+devsnek: ... which editors crash on it? I feel like a text editor ought to be able to open a text file, even a large one
+
+[11:44:46.0000] <devsnek>
+i dunno
+
+[11:44:49.0000] <devsnek>
+i use vim and it works fine
+
+[11:44:59.0000] <devsnek>
+but i've heard people complain about it
+
+[11:45:12.0000] <jmdyck>
+(2.6MB isn't that big)
+
+[11:45:38.0000] <devsnek>
+i hear some editors don't use mmaping
+
+[11:46:36.0000] <jmdyck>
+self-plug re static analysis: see PR #545 and my ecmaspeak-py repo.
+
+[11:46:57.0000] <devsnek>
+yeah, not ideal though
+
+[11:47:08.0000] <bakkot>
+jmdyck: yeah, 545 seems great
+
+[11:47:17.0000] <jmdyck>
+tx
+
+[11:47:26.0000] <bakkot>
+(given ecmarkup support, obviously)
+
+[11:47:36.0000] <devsnek>
+yea
+
+[11:47:40.0000] <devsnek>
+its very good
+
+[11:48:04.0000] <jmdyck>
+i recently added a comment about alternatives that don't require ecmarkup support
+
+[11:48:13.0000] <ljharb>
+jmdyck: yes, locally
+
+[11:49:53.0000] <devsnek>
+ecma262 is like 800 pages ish right?
+
+[11:51:21.0000] <jmdyck>
+And re 545, note that the commit/diff in that PR isn't the 'final' product, for that you have to go to https://github.com/jmdyck/ecma262/tree/op_headers2 . (I said that in a comment somewhere, but it's been buried.)
+
+[11:52:52.0000] <ljharb>
+devsnek: what is a "page"
+
+[11:53:06.0000] <devsnek>
+idk
+
+[11:53:13.0000] <ljharb>
+is it a piece of a tree about the size of my ipad
+
+[11:53:24.0000] <devsnek>
+maybe like
+
+[11:54:27.0000] <devsnek>
+an A4 or 8.5x11 paper
+
+[11:54:47.0000] <jmdyck>
+PDF on ecma site says 764 pages
+
+[11:55:02.0000] <jmdyck>
+https://www.ecma-international.org/publications/files/ECMA-ST/ECMA-262.pdf
+
+[11:56:42.0000] <ljharb>
+i can make that larger or smaller by tweaking the css prior to making the pdf tho :-p
+
+[12:26:47.0000] <shu>
+rkirsling: i think i have one stashed somewhere, ping me to look for it before december
+
+[12:29:52.0000] <rkirsling>
+shu: :D
+
+[13:49:10.0000] <MylesBorins>
+Node.js modules team just reach consensus on unflagging ESM in Node.js 13 !!!
+
+[13:50:59.0000] <devsnek>
+🎉
+
+[15:18:31.0000] <zenparsing>
+@MylesBorins really cool - congrats!
+
+[15:22:19.0000] <TabAtkins>
+@MylesBorins HELL YEAH
+
+[15:47:05.0000] <chicoxyzzy>
+that's so cool! congrats!
+
+
+2019-10-31
+[19:09:48.0000] <bakkot>
+anyone know what this is talking about? https://github.com/tc39/proposals/issues/254
+
+[19:12:00.0000] <rkirsling>
+was just gonna ask
+
+[19:12:20.0000] <rkirsling>
+is there even such a thing as a "github theme"?
+
+[19:17:23.0000] <devsnek>
+no idea
+
+[19:43:26.0000] <ljharb>
+nope
+
+[20:27:00.0000] <ryzokuken>
+question: is it allowed (or even a good idea) to mix the `e` and `n` notations for numbers?
+
+[20:27:34.0000] <ryzokuken>
+I guess it'll definitely be nice to represent huge bigint literals.
+
+[20:28:31.0000] <ryzokuken>
+FWIW, I tried to exploit `1e11 + 0n` but got slapped in the face with a `TypeError: Cannot mix BigInt and other types, use explicit conversions`.
+
+[20:36:30.0000] <ljharb>
+ryzokuken: i don't think it's allowed
+
+[20:36:59.0000] <ryzokuken>
+yeah, I just figured that out :P
+
+[20:37:05.0000] <ryzokuken>
+question is, should it be?
+
+[20:37:15.0000] <ryzokuken>
+can't decide if it's a bad idea or not.
+
+[20:37:39.0000] <ljharb>
+i'd love to use it, like `1e11n` etc
+
+[20:37:47.0000] <ljharb>
+but at this point it'd need a separate approval
+
+[20:42:12.0000] <ryzokuken>
+ljharb: would it make a half-decent proposal, or do you think it's going to be hard to convince people to approve it since `BigInt(1e11)` is less convenient but gets the job done?
+
+[20:42:38.0000] <ljharb>
+i'm not really sure
+
+[20:42:52.0000] <ryzokuken>
+my issue is, unlike a bunch of other things, it is going to be impossible to do it in userland.
+
+[20:43:25.0000] <ljharb>
+but since `BigInt(1e33) + 1n` works but `1e33 + 1` doesn't, i don't think "userland" matters
+
+[20:43:51.0000] <ryzokuken>
+Yeeeeeeeah.
+
+[20:44:04.0000] <ryzokuken>
+I wish I could just `1e33n + 1n`, you know.
+
+[20:54:55.0000] <rkirsling>
+does that have prior art though?
+
+[20:56:07.0000] <rkirsling>
+I thought exponent notation is basically associated with IEEE-754, even when there's no fractional part involved
+
+[20:56:24.0000] <ryzokuken>
+rkirsling: uhh, honestly, I didn't give any thought to it, but I could look into it...
+
+[20:57:53.0000] <ljharb>
+it's still useful to avoid repetition of zeroes
+
+[20:58:01.0000] <rkirsling>
+'cause I'm not sure if there's precedence for that in languages with int64 literals
+
+[21:03:07.0000] <ljharb>
+there's precedent on my graphing calculator
+
+[21:36:30.0000] <rkirsling>
+...BASIC has BigInt?
+
+[21:37:26.0000] <ljharb>
+basic?
+
+[21:44:26.0000] <rkirsling>
+unless graphing calculators these days use a different language
+
+[21:47:09.0000] <rkirsling>
+anyway, at a glance, I can't find a language which permits exponent notation in an integer literal
+
+[21:47:35.0000] <ljharb>
+i'm talking about the TI-83
+
+[21:55:01.0000] <rkirsling>
+seems like TI-83 BASIC may have *only* had floating point numbers
+
+[21:55:32.0000] <ljharb>
+i don't mean in programming, i mean like in the normal interface
+
+[21:56:49.0000] <rkirsling>
+the math that you're trying to do with a graphing calculator is not restricted to integers though...
+
+[21:57:43.0000] <ljharb>
+that's true
+
+[21:58:02.0000] <ljharb>
+but i think i could do 1.3e4, etc
+
+[21:59:47.0000] <rkirsling>
+which is floating point :P
+
+[22:00:28.0000] <rkirsling>
+even in dynamic languages, there's a clear notion of an integer literal: https://rosettacode.org/wiki/Literals/Integer
+
+[22:00:51.0000] <rkirsling>
+whatever this Frink language is seems to have the only real example I can find:
+
+[22:00:58.0000] <rkirsling>
+1ee39 // (exact exponent, an integer with exact value 10^39)
+
+[01:36:27.0000] <wingo>
+in scheme there's #e1e9, which is a bigint rather than 1e9 which is a float
+
+[08:00:30.0000] <rkirsling>
+wingo: oho, interesting
+
+[08:17:37.0000] <devsnek>
+some good number constants here https://esolangs.org/wiki/Brainfuck_constants
+
+[08:25:10.0000] <rkirsling>
+lol
+
+[11:10:01.0000] <chicoxyzzy>
+would it be possible in theory to add concurrent collections to ECMAScript on top of shared memory and value types proposal?
+
+[11:19:50.0000] <bakkot>
+chicoxyzzy: the only type of shared memory in JS is bytes, so what would it mean to have a concurrent collection?
+
+[11:32:38.0000] <chicoxyzzy>
+bakkot: value types have fixed memory layout so I guess it should be possible to create something like ConcurrentQueue or ConcurrentStack from C#. Maybe very limited, say ConcurrentQueue<int64>
+
+[11:33:04.0000] <bakkot>
+chicoxyzzy: wait, why would value types have fixed memory layout?
+
+[11:34:11.0000] <chicoxyzzy>
+oh I'm wrong probably. It's about struck types https://github.com/tschneidereit/proposal-typed-objects/blob/master/explainer.md#types
+
+[11:34:23.0000] <chicoxyzzy>
+struct*
+
+[12:52:11.0000] <devsnek>
+https://github.com/tc39/ecma262/issues/1755#issuecomment-548532220 is because I told that person a library of mine only supports the current node lts
+
+[13:33:33.0000] <ljharb>
+devsnek: lol so they just posted on a random thing you'd filed?
+
+[13:35:39.0000] <devsnek>
+it would seem so
+
+[14:23:33.0000] <TabAtkins>
+So Python 3.8 added syntax for indicating positional-only and keyword-only parameters https://docs.python.org/3/whatsnew/3.8.html
+
+[14:24:03.0000] <TabAtkins>
+And the syntax would actually slot into JS nicely (with the only difference being that we default to positional-only).
+
+[14:25:30.0000] <TabAtkins>
+In 3.8, `def foo(a, b, /, c, d, *, e, f)`, `a` and `b` can only be passed by position, not name; `e` and `f` can only be passed by keyword, not position, and `c` and `d` have the default behavior of allowing either.
+
+[14:26:05.0000] <jorendorff>
+https://tc39.es/proposal-iterator-helpers/ contains some calls to IteratorStep with one argument, and some with two. What's that about?
+
+[14:51:57.0000] <bakkot>
+TabAtkins: I feel like destructuring is a strictly superior solution to named parameters
+
+[14:52:16.0000] <bakkot>
+I guess with the exception that it does not allow something to be passed as either named or positional, but in honesty I am not sure it is good to allow that
+
+[14:52:25.0000] <TabAtkins>
+I still deeply miss position-or-keyword, yeah.
+
+[14:52:30.0000] <TabAtkins>
+favorite part of python invocations
+
+[14:53:13.0000] <bakkot>
+that's always seemed kind of contrary to the "one and only one obvious way" philosophy
+
+[14:55:41.0000] <devsnek>
+jorendorff: it's the value that next() is called eith
+
+[14:56:42.0000] <bakkot>
+devsnek: afaict IeratorStep does not take a second argument
+
+[14:56:49.0000] <bakkot>
+either in the spec or in the proposal
+
+[14:57:05.0000] <devsnek>
+uhhhh
+
+[14:57:06.0000] <devsnek>
+hmm
+
+[14:57:08.0000] <jorendorff>
+oh, i see
+
+[14:57:13.0000] <jorendorff>
+yeah, there's a piece missing
+
+[14:57:20.0000] <devsnek>
+bakkot: I will look into that :)
+
+[14:57:27.0000] <jorendorff>
+or a second proposal adds it, or something
+
+[14:58:14.0000] <TabAtkins>
+bakkot: That's a general philosophy, not a straitjacket. ^_^
+
+[14:58:39.0000] <devsnek>
+i also prefer destructuring
+
+[14:58:47.0000] <devsnek>
+I like building from primitives
+
+[14:59:26.0000] <bakkot>
+TabAtkins: of course, but it feels weird to have a feature whose purpose is solely to allow multiple ways of doing most things
+
+[14:59:46.0000] <bakkot>
+when I am writing python I never know which style to prefer, and it's cognitive friction when switching between codebases
+
+[15:00:17.0000] <devsnek>
+trailing commas is enough
+
+[15:00:38.0000] <devsnek>
+figuring out if a function uses named or destructuring would be painfuo
+
+[15:00:44.0000] <devsnek>
+painful*
+
+[15:01:28.0000] <jorendorff>
+i wonder if JS users want this
+
+[15:02:52.0000] <devsnek>
+I do find python arguments really cool though
+
+[15:03:10.0000] <devsnek>
+in languages without a single object primitive like js it's a godsend
+
+[15:04:01.0000] <TabAtkins>
+devsnek: What do you mean? Python's got {} just like JS.
+
+[15:04:49.0000] <devsnek>
+does py have destructuring?
+
+[15:04:59.0000] <TabAtkins>
+no
+
+[15:05:08.0000] <devsnek>
+and dictionary lookups use strings not identifiers right
+
+[15:05:15.0000] <TabAtkins>
+yes...?
+
+[15:05:27.0000] <TabAtkins>
+/me is unsure what this has to do with "languages without a single object primitive"
+
+[15:05:36.0000] <devsnek>
+oh it's not related to that sentence
+
+[15:05:42.0000] <devsnek>
+I was just trying to remember
+
+[15:05:51.0000] <jorendorff>
+Python's `{}` is not like JS's `{}`
+
+[15:06:04.0000] <jorendorff>
+it's more like `new Map(...)` in JS
+
+[15:06:14.0000] <TabAtkins>
+Ah yeah then. Correct, but for the argument case it doesn't matter, since argnames are strings.
+
+[15:06:36.0000] <jorendorff>
+ok
+
+[15:06:53.0000] <devsnek>
+one thing I really want from py is function annotations
+
+[15:07:01.0000] <devsnek>
+both the comments and the type expressions
+
+[15:08:40.0000] <TabAtkins>
+yus
+
+[15:10:53.0000] <devsnek>
+time to make an AI that merges languages together
+
+[15:10:59.0000] <devsnek>
+and run it on elang and py
+
+[15:11:09.0000] <devsnek>
+and thus js 2.0 shall be born
+

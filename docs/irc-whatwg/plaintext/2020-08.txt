@@ -1,0 +1,1718 @@
+2020-08-01
+[17:46:38.0000] <Krinkle>
+(eg by using a single-match or last-match on replacing </body> to insert both your data script and the execution script that consumes it)
+
+[17:47:02.0000] <Krinkle>
+I believe the browser stack middleware for unit test capture works that way as well.
+
+
+2020-08-03
+[15:13:46.0000] <MikeSmith>
+TabAtkins: thanks much for raising https://github.com/whatwg/html/issues/5778
+
+[15:13:55.0000] <TabAtkins>
+thanks for inspiring it ^_^
+
+[16:13:44.0000] <MikeSmith>
+TabAtkins: added a comment https://github.com/whatwg/html/issues/5778#issuecomment-668284945
+
+
+2020-08-04
+[18:45:05.0000] <Krinkle>
+I'm trying to determine whether it is expected that there appears to be no way for a line break in a data attribute to also become a line break in CSS generated content. e.g. using ::after { display:block; content: attr(title);}. I'm using &#013; which Firefox/Safari/Chrome agree to render as line break in the native tooltip, but Chrome/Safari collapse it to a space and Firefox eats it away.
+
+[18:45:36.0000] <Krinkle>
+I  tried white-space: pre; as well as it seems fair to collapse whitespace by default the  same as it  would  if it were a real element, but no dice.
+
+[01:08:44.0000] <annevk>
+MikeSmith: TabAtkins: looking at the output of https://github.com/whatwg/fetch/pull/1065 replacing aside with div doesn't really help
+
+[01:09:25.0000] <annevk>
+MikeSmith: TabAtkins: is the only way forward to disable MDN boxes?
+
+[04:04:09.0000] <JakeA>
+annevk: Any idea how a browsing context set (https://html.spec.whatwg.org/multipage/browsers.html#browsing-context-set) can contain more than one tlbc? Creating a new tlbc creates a new group (https://html.spec.whatwg.org/multipage/browsers.html#creating-a-new-top-level-browsing-context), so it feels like the set can only ever contain one item
+
+[04:05:50.0000] <annevk>
+JakeA: create a popup
+
+[04:05:59.0000] <annevk>
+JakeA: "auxiliary"
+
+[04:06:22.0000] <annevk>
+JakeA: i.e., <a target=x> or window.open()
+
+[04:09:18.0000] <JakeA>
+ah, cheers, it always catches me out that auxiliary browsing contexts are also top-level browsing contexts, but aren't created via "create a new top-level browsing context"
+
+[04:09:52.0000] <annevk>
+JakeA: I guess that is a little weird
+
+[04:10:19.0000] <annevk>
+JakeA: I suspect we'll rename create a new top-level browsing context to create a new browsing session eventually
+
+[04:10:33.0000] <annevk>
+although... that would also need to happen for auxiliary, so no
+
+[04:11:48.0000] <JakeA>
+annevk: I'm seeing if I can decouple session history from browsing contexts right now. I'll add notes for things that trip me up along the way.
+
+[04:12:19.0000] <annevk>
+JakeA: so what we want is that session history is 1:1 with a top-level bc
+
+[04:12:25.0000] <annevk>
+including auxiliary
+
+[04:13:03.0000] <annevk>
+so a browsing session holds a (auxiliary) top-level bc and survives COOP and such
+
+[04:15:06.0000] <JakeA>
+annevk: doesn't session history need to sit above tlbc, since a browsing session's history can contain many tlbcs?
+
+[04:15:51.0000] <annevk>
+JakeA: yeah, 1:1 was wrong, it's 1:M
+
+[04:17:07.0000] <JakeA>
+annevk: Yeah, I'm going to try moving browsing contexts to session history items, and move session history to some concept of a "navigable"
+
+[04:17:30.0000] <JakeA>
+Where frames have a "navigable", and the top level navigable is a browsing session
+
+[04:18:11.0000] <annevk>
+JakeA: do frames need a thing of their own at all? Or can the session entry contain some kind of tree?
+
+[04:18:40.0000] <annevk>
+I think in impls session entries are across the entire top-level bc (and therefore a tree to capture navigations in frames)
+
+[04:19:12.0000] <JakeA>
+annevk: I think it's better if frames have their own thing, then removal of the frame can also remove those session history items
+
+[04:19:44.0000] <annevk>
+Yeah, that is needed
+
+[04:19:48.0000] <JakeA>
+Session history seems like more of a timeline to me
+
+[04:20:02.0000] <annevk>
+JakeA: it might be worth doing a writeup somewhere and get smaug____ to take a look
+
+[04:20:16.0000] <JakeA>
+annevk: smaug____: ta-da https://github.com/whatwg/html/issues/5767
+
+[04:33:49.0000] <JakeA>
+Here's a PR for the bit that confused me https://github.com/whatwg/html/pull/5780
+
+[04:41:49.0000] <annevk>
+I'll have a look in a bit
+
+[06:01:43.0000] <annevk>
+JakeA: thanks; I'll ping some folks internally
+
+[06:12:33.0000] <JakeA>
+ta!
+
+[06:16:31.0000] <MikeSmith>
+annevk: I will take a look at the validation errors right now
+
+[06:17:31.0000] <annevk>
+MikeSmith: that's great, thanks!
+
+[06:45:31.0000] <MikeSmith>
+annevk: so the cause is a bug in my Bikeshed code for placing the annos; the code is meant to detect whether the target it’s annotating has an dt ancestor, but I can see that code is not actually detecting the dt ancestor as expected. So I’ll step through it now it see why. But if I can can’t get it figured out soon, I’ll make a patch/PR for turning of the MDN panels for now, for WHATWG bikeshed
+
+[06:45:36.0000] <MikeSmith>
+specs
+
+[07:10:38.0000] <annevk>
+MikeSmith: it does seem not all WHATWG specs are affected
+
+[07:21:49.0000] <MikeSmith>
+annevk: yeah it only affects specs that have dfn inside dt element
+
+[07:22:12.0000] <MikeSmith>
+anyway, I found the bug
+
+[07:22:44.0000] <MikeSmith>
+will raise a PR witha  patch
+
+[08:50:39.0000] <smaug____>
+the biggest thing to fix in session history is the whole joint session history concept
+
+[08:51:56.0000] <smaug____>
+(I don't understand what this DOMContentLoaded thingie is about)
+
+[08:51:57.0000] <JakeA>
+smaug____: My suggestion is to replace it with 'steps'. Where the top-level thing dictates which step the history should be at, and from that each navigable can determine which of their session history entries that corresponds to
+
+[08:54:21.0000] <smaug____>
+I don't see 'steps' in https://github.com/whatwg/html/issues/5767
+
+[08:54:50.0000] <JakeA>
+smaug____: See the "details" in "Specifying the history as a 'timeline'"
+
+[08:55:53.0000] <smaug____>
+last time I checked all the implementations had list of trees as the implementation.
+
+[08:55:58.0000] <smaug____>
+Perhaps that has changed since
+
+[08:56:12.0000] <smaug____>
+but if that is still the case, might be worth to use that in the spec too
+
+[08:56:44.0000] <smaug____>
+perhaps "the single history timeline has to be enforced through algorithms." means that?
+
+[08:59:06.0000] <JakeA>
+Implementations are bad here tho
+
+[08:59:21.0000] <JakeA>
+so I don't find matching implementations compelling 😀
+
+[08:59:34.0000] <smaug____>
+Edge had the most reasonable behavior
+
+[08:59:43.0000] <smaug____>
+or perhaps it was IE
+
+[09:00:08.0000] <JakeA>
+Interesting, I didn't test that. What did it do different to Firefox?
+
+[09:02:03.0000] <smaug____>
+trying to recall... it had something to do with DOM mutations
+
+[09:04:20.0000] <JakeA>
+With the timeline/steps model, I focused on enforcing the single history timeline across contexts, while still making things tidy up nicely when contexts are removed (which was one nice thing about the joint session history)
+
+[09:11:11.0000] <smaug____>
+Can't find now the testcase for IE
+
+[09:11:26.0000] <smaug____>
+I did notice that at some point Chrome has changed behavior
+
+[09:11:50.0000] <smaug____>
+http://mozilla.pettay.fi/moztests/history2/Start.html behaves rather oddly now at the last step
+
+[09:11:52.0000] <JakeA>
+Yeah, it's much more sensible now, but still not as good as Firefox when it comes to removed contexts
+
+[09:12:15.0000] <smaug____>
+I guess Chrome behaves now like Presto used to
+
+[09:16:50.0000] <JakeA>
+Fwiw I created https://iframe-session-history.glitch.me/ to test the browsers, but it's pretty manual since I was exploring the various behaviours
+
+[11:13:46.0000] <Domenic>
+annevk: any ideas on next steps for X-Frame-Options? I'd love to get something merged... maybe if implementers aren't being too responsive, we could just merge the spec and tests as-is and then file bugs, and see if that drives further refinements?
+
+[11:38:33.0000] <annevk>
+Domenic: yeah, dveditz said he was gonna look, I can ping one more time tomorrow
+
+[14:43:24.0000] <Krinkle>
+about those line breaks in pseudo elements, I have a repro at https://codepen.io/Krinkle/pen/bGpbjBa?editors=1000 which also shows the  difference between Chrome/Safari  and Firefox, where Firefox eats the line break.
+
+
+2020-08-05
+[19:39:52.0000] <MikeSmith>
+TabAtkins: https://github.com/tabatkins/bikeshed/pull/1742 has the fix for the problem that’s breaking the WHATWG spec builds
+
+[00:02:04.0000] <annevk>
+MikeSmith: TabAtkins: I went ahead and merged that
+
+[00:02:41.0000] <MikeSmith>
+annevk: makes sense, thanks
+
+[00:02:51.0000] <MikeSmith>
+can still be reviewed post-merge
+
+[00:03:14.0000] <MikeSmith>
+but it a was pretty simple fix, for a silly-oversight kind of thing
+
+[00:03:23.0000] <annevk>
+It also has resolved the build issues
+
+[00:03:45.0000] <MikeSmith>
+yay 🎉
+
+[00:03:51.0000] <MikeSmith>
+sorry for having broken the build
+
+[00:04:13.0000] <MikeSmith>
+I really should have anticipated the problems, and tested more myself
+
+[00:06:14.0000] <annevk>
+This wasn't too bad, I guess part of the problem is that while Bikeshed does have WHATWG regression tests, they are not going through the same build process
+
+[00:12:28.0000] <MikeSmith>
+right
+
+[00:15:47.0000] <MikeSmith>
+and also in general, Bikeshed's own test automation doesn't include running the HTML checker
+
+[00:18:06.0000] <MikeSmith>
+and it probably shouldn't in general, because I'm guessing it might run into a lot of errors with with other specs
+
+[00:19:26.0000] <MikeSmith>
+but, I dunno, maybe we could make it run the checker for WHATWG specs at least
+
+[00:20:51.0000] <MikeSmith>
+...since we know those are otherwise valid, that would help catch any Bikeshed changes that introduced validity regressions
+
+[03:46:23.0000] <annevk>
+That would be a pretty cool enhancement
+
+[05:06:59.0000] <MikeSmith>
+question about math parsing test:
+
+[05:07:22.0000] <MikeSmith>
+<math><tr><td><mo><tr>
+
+[05:07:23.0000] <MikeSmith>
+Expected:
+
+[05:07:23.0000] <MikeSmith>
+| <math math>
+
+[05:07:23.0000] <MikeSmith>
+|   <math tr>
+
+[05:07:23.0000] <MikeSmith>
+|     <math td>
+
+[05:07:25.0000] <MikeSmith>
+|       <math mo>
+
+[05:07:27.0000] <MikeSmith>
+Got:
+
+[05:07:30.0000] <MikeSmith>
+| <math math>
+
+[05:07:32.0000] <MikeSmith>
+|   <math tr>
+
+[05:07:35.0000] <MikeSmith>
+|     <math td>
+
+[05:07:37.0000] <MikeSmith>
+|       <math mo>
+
+[05:07:40.0000] <MikeSmith>
+|   <math tr>
+
+[05:07:42.0000] <MikeSmith>
+...
+
+[05:07:45.0000] <MikeSmith>
+Does that look familiar to anybody?
+
+[05:07:47.0000] <MikeSmith>
+gsnedders maybe?
+
+[05:08:14.0000] <MikeSmith>
+the validator.nu Java parser seems to be failing that test
+
+[05:08:45.0000] <gsnedders>
+MikeSmith: no idea, scarcely touched parsing in years
+
+[05:09:47.0000] <MikeSmith>
+gsnedders: ok yeah I reckon others who worked on html5lib tests probably also haven’t touched it in years
+
+[05:10:25.0000] <gsnedders>
+hsivonen just wrote a PR!
+
+[05:10:36.0000] <MikeSmith>
+for html5lib?
+
+[05:10:43.0000] <gsnedders>
+html5lib-tests, yeah
+
+[05:10:58.0000] <MikeSmith>
+aha
+
+[05:11:05.0000] <MikeSmith>
+well I guess I should look at that
+
+[05:11:18.0000] <gsnedders>
+sorry I can't be much help!
+
+[05:12:07.0000] <MikeSmith>
+no worries
+
+[05:14:04.0000] <MikeSmith>
+hmm all browsers also fail that math-parsing test
+
+[05:14:32.0000] <MikeSmith>
+https://software.hixie.ch/utilities/js/live-dom-viewer/?%3C!DOCTYPE%20html%3E%0A%3Cmath%3E%3Ctr%3E%3Ctd%3E%3Cmo%3E%3Ctr%3E
+
+[05:15:10.0000] <MikeSmith>
+...if I am looking at the Live DOM Viewer results correctly
+
+[05:18:50.0000] <gsnedders>
+Firefox Nightly is giving the expected above?
+
+[05:19:52.0000] <MikeSmith>
+gsnedders: oh, yes — I was just misreading it (looking at actual instead of expected)
+
+[05:19:53.0000] <annevk>
+So does Chrome Canary afaict
+
+[05:20:13.0000] <annevk>
+(Safari TP does too)
+
+[05:20:20.0000] <MikeSmith>
+yeah, sorry I had just flipped the actual/expected
+
+[05:20:49.0000] <annevk>
+Curious that validator.nu does it wrong as I believe Firefox's code is still generated from that
+
+[05:31:36.0000] <MikeSmith>
+annevk: yeah that is also I what I don’t understand either
+
+[05:32:20.0000] <MikeSmith>
+I think there are some differences that are introduced when the Java code is translated to the C++ code for Firefox
+
+[05:32:40.0000] <MikeSmith>
+but this case would be a pretty big surprising difference
+
+[05:39:35.0000] <MikeSmith>
+hmm isn’t https://github.com/whatwg/html/commit/8cf34ad2ac651329f2c682f16e11faa5cbad839c “Handle foster-parenting of <math> and <svg> elements” the relevant change?
+
+[05:40:16.0000] <MikeSmith>
+and if so I can’t find that was ever implemented in the Java code
+
+[05:41:09.0000] <annevk>
+MikeSmith: maybe the code bases did diverge then, hsivonen would know best
+
+[05:41:19.0000] <MikeSmith>
+ok
+
+[08:03:50.0000] <annevk>
+JakeA: so I looked a bit at your thing and I think it works, but it seems to me that you need to store the navigables as a tree on the (top-level) session entry
+
+[08:04:37.0000] <annevk>
+JakeA: in particular the previous document can be gone at which point all you have is a session history entry to try to rebuild it, including the history positions of its frames
+
+[08:06:02.0000] <JakeA>
+annevk: doesn't the DOM already make them a tree? The navigable is owned by the iframe
+
+[08:06:51.0000] <annevk>
+JakeA: well but if you reparse it from the network, how do you know what to restore it too?
+
+[08:09:55.0000] <JakeA>
+annevk: ahh yes, in that case the "restorable session history" forms a tree
+
+[08:12:03.0000] <annevk>
+JakeA: okay, so I think you and smaug____ might be on the same page then
+
+[08:12:47.0000] <annevk>
+JakeA: for the bfcache case you could indeed have a "simpler" session entry, with more logic in the document itself
+
+[08:13:26.0000] <JakeA>
+annevk: yeah, right now "restorable state" is either a Document or a serialisable "restorable session history"
+
+[08:13:59.0000] <JakeA>
+So that enforces that the history item doesn't need a Document and serialisable state at the same time
+
+[08:15:31.0000] <JakeA>
+I'll keep noodling on the spec then. I might so a first pass that doesn't do the restorable state stuff, so that's a 'smaller' thing to review and land. But I'll try to prove that the restorable state stuff can be layered on top of that.
+
+[08:15:46.0000] <annevk>
+JakeA: maybe the document should have a weak ref to the BC
+
+[08:16:20.0000] <annevk>
+JakeA: well, it already has a ref so maybe that's enough
+
+[08:16:30.0000] <JakeA>
+annevk: yeah, I was thinking there needs to be a weakmap where the document is the key and the BC is the value
+
+[08:17:05.0000] <annevk>
+Yeah maybe, I guess I'm not entirely sure what happens to the document's ref when it's navigated away
+
+[08:17:27.0000] <JakeA>
+annevk: I want the reference the history entry has to the BC to be weak, so the BC can be destroyed when documents are no longer using it.
+
+[08:17:59.0000] <JakeA>
+annevk: it stays in the history entry if it's bfcache restorable
+
+[08:18:33.0000] <annevk>
+JakeA: well but if the document has it the history entry wouldn't have to worry about it
+
+[08:18:56.0000] <annevk>
+JakeA: and it could be unset when the document is collected
+
+[08:19:18.0000] <JakeA>
+annevk: yeah, I could manually unset it. Maybe I'm over complicating it by trying to make it weak
+
+[08:19:42.0000] <JakeA>
+I was trying to avoid having to manually unset it, but the weak ref thing might be more complex than it's worth
+
+[08:20:06.0000] <annevk>
+We already have some amount of destructer-type things
+
+[08:23:38.0000] <annevk>
+I'm pretty positive on this now; hoping folks internally will share their feedback, if any, soonish
+
+[08:25:26.0000] <JakeA>
+I'll push the 'right' Chrome folks to do the same. There's been general positivity so far, but just need to get higher up navigation folks to give it the thumbs up
+
+[08:29:29.0000] <annevk>
+JakeA: I do think we'll probably want to experiment more with our options for the API itself; in terms of less cross-origin leakage and such
+
+[08:29:58.0000] <annevk>
+JakeA: but having a solid foundation will only help with that
+
+[08:30:30.0000] <annevk>
+(mostly saying that, e.g., history.length === nr of steps might not be the final answer here)
+
+[08:31:08.0000] <JakeA>
+annevk: yeah, I think Chrome does some stuff here like "history.back does nothing if called from a sandboxed iframe and the navigation would be external to the iframe", which seems sensible at a very minimum. But yes, might want to lock this and .length down further
+
+[08:43:01.0000] <Domenic>
+annevk: any further bikeshedding on the various cross-origin isolation booleans welcome. https://github.com/whatwg/html/pull/5752#issuecomment-669264642
+
+[09:06:08.0000] <annevk>
+Domenic: I suggested cross-origin isolated capability in the original issue
+
+[09:06:21.0000] <Domenic>
+Not bad
+
+[12:02:09.0000] <innovati>
+Honest question: Is there any use case for <embed> today that's not served better by other tags like <svg>, <video>, <audio>, <iframe>, etc? When is <embed> advantageous?
+
+[13:38:28.0000] <TabAtkins>
+I have never once used <embed> or seen it used in any tutorial more recent than the last decade.
+
+[16:25:21.0000] <innovati>
+I remember <embed> from the Flash days, and understand that theoretically that's how support for different types of data can be plugged into the browser…are there still people doing that these days with other plugins/formats? It seems like a lot of stuff like that gets supported in DOM, <svg> or <canvas> these days
+
+
+2020-08-06
+[23:52:18.0000] <annevk>
+littledan: if you do something like realmGlobal.document = new FakeDocument();, wouldn't that FakeDocument have the wrong global associated with it?
+
+[00:08:46.0000] <annevk>
+/me filed https://github.com/tc39/proposal-realms/issues/268
+
+[03:17:52.0000] <littledan>
+Thanks for the ping annevk , following up on the issue. I am not sure if I understand the concern.
+
+[10:27:44.0000] <annevk>
+Domenic: so does HTML dispatch a load event for network errors for <iframe>? I thought it didn't define that yet
+
+[10:28:09.0000] <Domenic>
+annevk: yeah it does, I remember when I wrote tests for <embed> I looked it up and it already does for <iframe>... lemme find it
+
+[10:28:11.0000] <annevk>
+(otherwise, why would 125 be open)
+
+[10:28:41.0000] <Domenic>
+> iframe is already specified to fire a load event when any document is created, including a network error document (created via https://html.spec.whatwg.org/#read-ua-inline)
+
+[10:28:55.0000] <Domenic>
+https://github.com/whatwg/html/pull/4247#issuecomment-657715522
+
+[10:29:24.0000] <Domenic>
+annevk: well, I figured 125 was open because it's useful to know the difference between loads and errors
+
+[10:29:56.0000] <Domenic>
+So https://github.com/whatwg/html/issues/125#issuecomment-561164029 I guess
+
+[10:31:31.0000] <annevk>
+I see, I guess some other tests need updating then and I should make more of an effort to get Firefox to align
+
+[10:33:07.0000] <annevk>
+Oh wow "When a Document in an iframe is marked as completely loaded, the user agent must run the iframe load event steps." that's some action-at-a-distance
+
+[10:39:06.0000] <Domenic>
+Hmm yeah... looks like 10-15 references to "completely loaded".... I bet we could just make those into normal function calls.
+
+[10:39:34.0000] <Domenic>
+Seems like we need to keep the boolean
+
+[10:39:54.0000] <Domenic>
+I'll open a tracking issue for that
+
+
+2020-08-07
+[11:09:51.0000] <bradleymeck>
+is there an example of a non-special scheme URL that has a IPv6 host encoded within its string representation and not supplied by env?
+
+
+2020-08-08
+[21:57:14.0000] <tmg>
+hello, I'm looking for a reference to the parsing rules for <br> that say, essentially, if followed by "\n" do not generate a TextNode("\n")
+
+
+2020-08-10
+[20:00:37.0000] <devsnek>
+is there some secret way to tell browsers that when they resize they should try to keep the content that was being viewed on screen
+
+[20:47:29.0000] <domfarolino>
+I wish
+
+[02:05:27.0000] <JakeA>
+Mozilla folks: Is there some way to put iframes in a different thread/process to the main page?
+
+[02:05:34.0000] <JakeA>
+(in Firefox)
+
+[02:06:32.0000] <jgraham>
+JakeA: Enable fission
+
+[02:07:10.0000] <jgraham>
+https://wiki.mozilla.org/Project_Fission
+
+[02:08:38.0000] <jgraham>
+(or the COOP/COEP stuff I suppose)
+
+[03:16:02.0000] <JakeA>
+cheers!
+
+[04:03:03.0000] <MikeSmith>
+gsnedders: jgraham: annevk: in the html5lib test suite, do you recall why there is a need for some tests to have the doubleEscaped thing, where code points are written with, e.g., "\\u0000" rather than just "\u0000"?
+
+[04:15:55.0000] <gsnedders>
+MikeSmith: IIRC some JSON parsers not coping with null, plus also the whole "does JSON allow lone surrogates" fun
+
+[04:37:41.0000] <JakeA>
+annevk: Serious question: Could we just spec `history.length` as a blocking cross-process getter, like `localStorage`, and write it off as 'legacy'?
+
+[05:06:59.0000] <MikeSmith>
+gsnedders: ah OK, thanks
+
+[05:08:02.0000] <MikeSmith>
+gsnedders: so if I were to pre-process the test files to globally replace "\\uNNNN" with "\uNNNN", I wouldn’t be breaking any of the tests?
+
+[05:08:43.0000] <MikeSmith>
+I mean, if I did that, the tests would still be testing the same thing they are intended to test?
+
+[05:18:21.0000] <gsnedders>
+MikeSmith: p sure; I think in theory "\\\uNNNN" should have different behaviour, but I doubt anyone does that
+
+[05:18:36.0000] <MikeSmith>
+yeah
+
+[05:18:38.0000] <MikeSmith>
+thanks!
+
+[05:30:28.0000] <zcorpan>
+Hello whatwg
+
+[05:36:37.0000] <gsnedders>
+hello zcorpan
+
+[05:43:26.0000] <MikeSmith>
+heya zcorpan
+
+[05:43:58.0000] <zcorpan>
+Has something interesting happened in the past 4 weeks? :)
+
+[05:45:39.0000] <gsnedders>
+I started a new job? :)
+
+[05:51:27.0000] <zcorpan>
+ah yes gsnedders! Congrats \o/
+
+[10:55:40.0000] <annevk>
+JakeA: maybe, doesn’t sound like what we want long term, but reasonable given it’s the status quo
+
+[11:00:52.0000] <Domenic>
+You could probably define it as sync cross-agent-cluster-blocking but also approximate. E.g. "An implementation-defined approximation of the value computed as follows: ... NOTE: this is implementation-defined because in multi-process browsers, the above algorithm requires synchronous inter-process communication, which isn't always feasible."
+
+[13:39:59.0000] <annevk>
+I would prefer trying to tie it to the top-level origin/site, fwiw
+
+[14:19:32.0000] <gsnedders>
+JakeA: what's most usage of history.length like? how much is just checking if it's non-empty?
+
+[14:20:56.0000] <gsnedders>
+also how much cross-origin (v. the top-level) usage is there, which AFAIK is only as far as current plans for multi-process go? how much would break if it lied?
+
+
+2020-08-11
+[23:00:31.0000] <mridul_>
+Hi
+
+[05:58:45.0000] <jrmykolyn>
+Hello all. New to IRC and I'm hoping that someone can help answer a question about the WHATWG participation agreement?
+
+[05:58:52.0000] <jrmykolyn>
+I see that the options for signing the agreement are either as an individual that is not currently working in development/programming/software or as a representation of an entity that does. In cases where someone works for multiple entities at the same time, are they free to just pick one?
+
+[06:14:13.0000] <andreubotella>
+Client: HexChat 2.14.3 • OS: GNOME master (Flatpak runtime) • CPU: AMD Ryzen 7 3700X 8-Core Processor (4.19GHz) • Memory: Physical: 15.3 GiB Total (10.3 GiB Free) Swap: 7.7 GiB Total (7.7 GiB Free) • Storage: 334.8 GB / 477.6 GB (142.8 GB Free) • VGA: 10de:1f82 @ Advanced Micro Devices, Inc. [AMD] ISYTEC - Integrierte Systemtechnik GmBH • Uptime: 33m 28s
+
+[06:14:50.0000] <andreubotella>
+my bad, my irc client was misbehaving
+
+[06:16:58.0000] <andreubotella>
+jrmykolyn: the way I understand it, the agreement is a way to keep track of potential patent owners which might've changed the standard to incorporate their patents, forcing every browser vendor to pay them
+
+[06:17:25.0000] <andreubotella>
+so that should be all of the entities you work for
+
+[06:18:05.0000] <andreubotella>
+but the definition of "field of web technologies" was recently narrowed, and it basically only covers browsers and other web clients and servers, not website development
+
+[06:18:10.0000] <andreubotella>
+https://github.com/whatwg/sg/pull/129
+
+[06:35:05.0000] <jrmykolyn>
+andreubotella: Thanks for following up. I'll have a look at the 'field of web technologies' document that you shared.
+
+[06:36:10.0000] <jrmykolyn>
+This is hypothetical now, but let's say person A works for vendor 1 and vendor 2. Person A must sign the participant agreement on behalf of both vendors in order to contribute?
+
+[07:02:30.0000] <Domenic>
+jrmykolyn: that seems correct, indeed. If they only signed for vendor 1, then they could act on behalf of vendor 2 to get a patented-by-vendor-2 technology into the standard, and thus cause serious problems for the ecosystem.
+
+[07:13:24.0000] <jrmykolyn>
+Domenic: Great, thanks for jumping in. It sounds like I need to review the document that andreubotella shared.
+
+[08:34:57.0000] <jrmykolyn>
+Domenic and andreubotella: Alright, I think the update introduced in that pull request clarifies quite a bit.
+
+[08:38:20.0000] <jrmykolyn>
+My current understanding is that someone who works as a professional developer/programmer/software engineer may sign the participant agreement _as an individual_ so long as their employer(s) are not 'web technology vendors'.
+
+[12:01:40.0000] <The-Compiler>
+Hey! Are there some test cases somewhere for parsing javascript: URLs, i.e. https://wiki.whatwg.org/wiki/URL_schemes#javascript:_URLs ?
+
+[12:01:43.0000] <The-Compiler>
+it's easy to invent my own but I feel like I can't be the first person to do this
+
+[12:12:05.0000] <Domenic>
+The-Compiler: not sure exactly what you mean by parsing, but there are some tests for javascript: URLs in general in https://github.com/web-platform-tests/wpt/tree/master/html/browsers/browsing-the-web/navigating-across-documents
+
+[12:12:35.0000] <Domenic>
+However this area is pretty under-specified and tested; see all the open issues in https://github.com/whatwg/html/labels/topic%3A%20javascript%3A%20URLs
+
+[12:13:21.0000] <Domenic>
+Parsing JS URLs should be the same as parsing all other URLs (https://url.spec.whatwg.org/; see tests link in the header) but the tricky part is executing them
+
+[12:13:45.0000] <Domenic>
+For that see https://html.spec.whatwg.org/#javascript-protocol ; I am guessing you are most interested in steps 2.1-2.3
+
+[12:14:22.0000] <The-Compiler>
+Domenic: parsing as in "getting the javascript source", it was a bit unexpected that e.g. query and fragment are also added so that ? and # works unescaped
+
+[12:14:54.0000] <Domenic>
+Right, per the above algorithm it's just "everything after the leading 'javascript:', percent-decoded"
+
+[12:15:15.0000] <Domenic>
+See also https://github.com/whatwg/url/issues/385
+
+[12:21:10.0000] <The-Compiler>
+Domenic: okay, that seems like a better source than some probably outdated wiki page, thanks :)
+
+[12:21:59.0000] <Domenic>
+Hmm, right, yeah, I'll get that page updated
+
+
+2020-08-12
+[17:59:25.0000] <EveryOS>
+I had gotten a bit confused. I was reading #the-style-element, which linked to #associated-css-style-sheet, and I noticed it required `HTMLStyleElement` to implement `linkStyle`. I hadn't realized that Web IDL put includes at the bottom, so I was like "where is linkStyle implemented". Eventually, I figured it out.
+
+[02:21:26.0000] <JakeA>
+annevk: Domenic: gsnedders: Turns out it's used on >30% of page loads, so I guess sync IPC is a no-go (https://www.chromestatus.com/metrics/feature/timeline/popularity/2719). I pitched some ideas about what 'approximate' values we could use here https://github.com/whatwg/html/issues/2018#issuecomment-671887516
+
+[02:32:41.0000] <MikeSmith>
+jgraham: annevk: so it turns out that Firefox is actually failing that html5lib test I mentioned here about a week ago
+
+[02:32:51.0000] <MikeSmith>
+https://freenode.logbot.info/whatwg/20200805#c4645508
+
+[02:33:29.0000] <MikeSmith>
+when I mentioned it last week I hadn’t realized it’s a testing fragment parsing, not normal parsing
+
+[02:34:18.0000] <MikeSmith>
+so the actual test that’s failing is, parsing of <math><tr><td><mo><tr> with <tr> as the context
+
+[02:34:59.0000] <MikeSmith>
+https://github.com/html5lib/html5lib-tests/blob/master/tree-construction/math.dat#L12
+
+[02:35:33.0000] <MikeSmith>
+actually, that test and 3 other <math> fragment-parsing tests
+
+[02:35:44.0000] <MikeSmith>
+https://wpt.live/html/syntax/parsing/html5lib_innerHTML_math.html
+
+[02:36:40.0000] <MikeSmith>
+https://wpt.fyi/results/html/syntax/parsing/html5lib_innerHTML_math.html?label=master&label=experimental&aligned
+
+[02:41:30.0000] <MikeSmith>
+...
+
+[02:41:51.0000] <MikeSmith>
+so now I wonder why those failures hadn’t been noticed
+
+[02:42:17.0000] <MikeSmith>
+or else if they had been noticed, why there’s not an open Firefox bug about fixing them
+
+[02:43:03.0000] <MikeSmith>
+and I wonder if for Firefox CI, they’re flagged as expected failures (and if so, why)
+
+[02:51:59.0000] <jgraham>
+MikeSmith: https://searchfox.org/mozilla-central/source/testing/web-platform/meta/html/syntax/parsing/html5lib_innerHTML_math.html.ini
+
+[02:52:44.0000] <jgraham>
+Looks like we added expected: FAIL on a sync in 2018
+
+[02:53:34.0000] <jgraham>
+It's hard to get people to look at all the expected failures, although we're getting better (layout team in particular are doing a great job)
+
+[02:56:40.0000] <MikeSmith>
+jgraham: ah thanks
+
+[02:57:30.0000] <MikeSmith>
+well as far as looking at the failures, I’m checking the source now
+
+[02:59:19.0000] <MikeSmith>
+I think it has to be some problem with the code not putting the tree builder into the right insertion mode for the context node
+
+[03:00:20.0000] <MikeSmith>
+...because it’s getting the same test right if it’s run with a different context node
+
+[03:01:06.0000] <MikeSmith>
+specifically, that test works if the context element is td, but fails if the context element is tr
+
+[03:03:06.0000] <jgraham>
+hsivonen: ^
+
+[03:08:57.0000] <zcorpan>
+I try to use BroadcastChannel in a test. Find that it is still not implemented in WebKit. Find https://bugs.webkit.org/show_bug.cgi?id=161472#c4
+
+[03:12:38.0000] <MikeSmith>
+I think Ryosuke mentitioned the same thing in an issue-tracker discussion yesterday
+
+[03:14:43.0000] <MikeSmith>
+or maybe that was another feature, in which case it’s a general issue blocking multiple features
+
+[05:30:31.0000] <smaug____>
+MikeSmith: I think hsivonen is going to merge some changes from the validator to Gecko, to ensure the behavior is the same
+
+[05:36:18.0000] <MikeSmith>
+smaug____: I think I know the ones he’s planning to merge (they’re changes I wrote), but for this math fragment-parsing case, there’s no change yet — the Java (validator) parser also has the same bug, unfixed
+
+[05:43:40.0000] <smaug____>
+I see
+
+[13:39:04.0000] <shu>
+where in the HTML spec is the meaning of "resolve a promise" defined?
+
+[13:41:06.0000] <shu>
+ah, is it using the one in webidl? https://heycam.github.io/webidl/#resolve
+
+[13:41:16.0000] <domfarolino>
+shu: https://heycam.github.io/webidl/#resolve
+
+[13:41:23.0000] <shu>
+cool, thanks
+
+[13:41:23.0000] <domfarolino>
+Ah you found it
+
+[13:41:43.0000] <domfarolino>
+Yeah I think that's it
+
+[13:42:03.0000] <TabAtkins>
+ah dang y'all beat me
+
+[13:42:39.0000] <shu>
+i am glad irccloud doesn't autolink repo pictures
+
+[13:43:36.0000] <domfarolino>
+lol
+
+[14:19:54.0000] <EveryOS>
+https://www.irccloud.com/pastebin/iqADohBo/
+
+[14:20:07.0000] <EveryOS>
+Oof, accidentally posted as snippet
+
+[14:26:56.0000] <Domenic>
+If you abandon back-compat, you can indeed get a much simpler parser
+
+[14:27:29.0000] <Domenic>
+https://ygg01.github.io/xml5_draft/ is one such example, especially if you subtract all the DOCTYPE states.
+
+[14:30:57.0000] <EveryOS>
+Oh, that's cool
+
+[14:33:44.0000] <EveryOS>
+Huh, Processing Instruction state? That must be something from XML that is not in HTML
+
+[14:45:31.0000] <EveryOS>
+Tbh I think that, as far as parsing HTML5, the complexity is in the Insertion Modes
+
+[14:45:31.0000] <EveryOS>
+Yes, there are more Tokenization states than Insertion Modes
+
+[14:45:31.0000] <EveryOS>
+But the Insertion modes have large branches for different tokens
+
+[14:45:31.0000] <EveryOS>
+And also, the logic used in Insertion Modes is much more complex than that of Tokenization States,  and can even call into other algorithims
+
+[14:49:31.0000] <EveryOS>
+https://usercontent.irccloud-cdn.com/file/OruABbaj/image.png
+
+[14:49:39.0000] <EveryOS>
+The blue boxes are TODO statements
+
+[14:49:56.0000] <EveryOS>
+I have many more in the insertion state point than my tokenization point
+
+[14:54:13.0000] <Domenic>
+Good point, if you have a less complex language, then tree construction becomes trivial once you've tokenized.
+
+
+2020-08-13
+[13:42:17.0000] <Domenic>
+JakeA: lol look what I found https://html.spec.whatwg.org/#current-entry-of-the-joint-session-history "Since each Document in a browsing context might have a different event loop, the actual state of the joint session history can be somewhat nebulous. For example, two sibling iframe elements could both traverse from one unique origin to another at the same time, so their precise order might not be well-defined;
+
+[13:42:17.0000] <Domenic>
+similarly, since they might only find out about each other later, they might disagree about the length of the joint session history."
+
+[13:51:16.0000] <a-ja>
+IOW ¯\_(ツ)_/¯
+
+
+2020-08-14
+[03:57:13.0000] <JakeA>
+Domenic: yeah, it's very messy. Order will always be racey if two iframe navigate at the same time, but yeah the length thing is just broken
+
+
+2020-08-15
+[03:59:21.0000] <lyntree>
+Hello All, Can I ask if there is an email list so I can sign up to for this https://html.spec.whatwg.org/ at all? Can't seem to find one and don't fancy twitters updates. Just a simple email with updates to HTML?
+
+[06:05:49.0000] <annevk>
+lyntree: the git log would be your best bet or GitHub if you also want discussion
+
+[06:06:16.0000] <annevk>
+lyntree: maybe GitHub offers feeds for logs, not sure
+
+[06:06:46.0000] <annevk>
+We still need to fix the Twitter integration 😟
+
+
+2020-08-17
+[18:43:57.0000] <GPHemsley>
+why did wpt-pr-bot set me (and only me) as the assignee on this PR? https://github.com/web-platform-tests/wpt/pull/25010
+
+[18:45:30.0000] <GPHemsley>
+I guess I'm ASCIIbetically first?
+
+[18:45:46.0000] <GPHemsley>
+https://github.com/web-platform-tests/wpt/blob/master/url/META.yml
+
+[22:21:13.0000] <Domenic>
+GPHemsley: it picks a random reviewer from the list of potential reviewers, and makes them the "assignee", so as to avoid all the reviewers thinking that some other reviewer will do it
+
+[07:32:33.0000] <JakeA>
+https://html.spec.whatwg.org/multipage/browsers.html#fully-active - this can't be used in synchronous code right? Stepping up through documents would be cross thread/process
+
+[07:33:04.0000] <JakeA>
+(it is used in synchronous code, but I'm trying to figure out if it's valid)
+
+[07:33:24.0000] <Domenic>
+JakeA: that feels like one of the things that's proactively pushed out to each process
+
+[07:33:51.0000] <Domenic>
+It's used all over the place as a precondition for sync stuff
+
+[07:34:04.0000] <JakeA>
+Domenic: should that be done in the spec (via posting tasks) or is it ok to hand-wave it?
+
+[07:34:31.0000] <Domenic>
+JakeA: OK to hand-wave... at least, it would be very far down on my list of priorities to make all the syncing implementations explicit
+
+[07:35:02.0000] <JakeA>
+cool
+
+[12:36:29.0000] <Mek>
+What is the latest thinking/recommendations on API namespacing; i.e. webidl namespaces (hardly used? not currently supported by blink bindings) vs global singletons (i.e. self.caches, self.indexedDB) vs properties of Navigator (i.e. navigator.storage) vs just exposing some methods directly on the global with no namespacing?
+
+[12:38:01.0000] <Domenic>
+Mek: I like exposing directly on the global.
+
+[12:38:36.0000] <Domenic>
+I dislike Navigator
+
+[12:38:54.0000] <Domenic>
+Namespaces seem good when you have a bunch of functions or constants but they can get overstretched pretty fast...
+
+
+2020-08-18
+[03:45:49.0000] <zcorpan>
+structured fields has weird rules for what whitespace is allowed where
+
+[03:46:51.0000] <annevk>
+zcorpan: did you file an issue?
+
+[03:47:02.0000] <zcorpan>
+not yet
+
+[03:47:07.0000] <annevk>
+zcorpan: I suspect that might still be possible to tweak, albeit a bit late in the game
+
+[04:06:56.0000] <zcorpan>
+annevk: is email the way to report issues?
+
+[04:07:27.0000] <annevk>
+zcorpan: no
+
+[04:07:40.0000] <annevk>
+zcorpan: https://github.com/httpwg/http-extensions/issues
+
+[04:07:48.0000] <zcorpan>
+annevk: thanks
+
+[04:30:21.0000] <zcorpan>
+https://github.com/httpwg/http-extensions/issues/1251
+
+[06:36:43.0000] <annevk>
+zcorpan: I'm not sure I understand some comments around COOP and SFV
+
+[06:37:08.0000] <annevk>
+zcorpan: are you saying that some values with whitespace are no longer valid?
+
+[06:39:12.0000] <annevk>
+zcorpan: in particular I don't see why \tsame-origin would be invalid
+
+[06:41:24.0000] <zcorpan>
+annevk: right. that's what the issue i filed is about. it changed in https://github.com/httpwg/http-extensions/pull/1002 and then in https://github.com/httpwg/http-extensions/pull/1173
+
+[06:41:47.0000] <zcorpan>
+only SP is allowed, except in lists and dictionaries, which allows OWS around the comma
+
+[06:42:03.0000] <annevk>
+zcorpan: I think that's a misunderstanding
+
+[06:42:13.0000] <annevk>
+zcorpan: SFV only defines header values
+
+[06:42:25.0000] <annevk>
+zcorpan: and per HTTP, you get the value after removing surrounding whitespace
+
+[06:42:41.0000] <annevk>
+zcorpan: so the \t is gone by the time SFV takes a look at it
+
+[06:42:54.0000] <zcorpan>
+annevk: then why does SFV trim a leading SP?
+
+[06:43:18.0000] <annevk>
+zcorpan: well, you got me there
+
+[06:47:00.0000] <annevk>
+zcorpan: where does it say that?
+
+[06:47:14.0000] <annevk>
+zcorpan: I don't see that in the item/token parser
+
+[06:47:56.0000] <zcorpan>
+annevk: https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#text-parse step 2 (also step 6 for trailing SP)
+
+[06:48:32.0000] <annevk>
+thanks
+
+[08:10:04.0000] <Domenic>
+Oooh, https://greenbytes.de/tech/webdav/rfc7230.html is a nicely-formatted page...
+
+[09:44:13.0000] <Domenic>
+Navigation is starting to look not-terrible...
+
+[10:06:42.0000] <annevk>
+Yeah, lots of nice minor improvements there (in part enabled by openly acknowledging some XXX and not going after those)
+
+[10:06:50.0000] <annevk>
+well, not blocking on those
+
+
+2020-08-19
+[02:49:09.0000] <annevk>
+Anyone here familiar with the TypeScript community? Is https://github.com/heycam/webidl/issues/60#issuecomment-676033407 intentional?
+
+[02:54:51.0000] <jgraham>
+https://stackoverflow.com/questions/58885485/why-does-typescript-have-both-void-and-undefined
+
+[02:56:48.0000] <jgraham>
+(top answer seems to be from someone who works in TS)
+
+[02:58:46.0000] <annevk>
+That's useful, but I don't think it helps explain the example
+
+[02:59:14.0000] <annevk>
+It explains why void has usage in TypeScript (which is pretty different from what IDL used it for, afaict)
+
+[03:05:24.0000] <jgraham>
+I expect the reason is that once you are treating undefined as a type, and you have a rule that functions which return void can't return a value of any specific type, allowing them to actually contain "return undefined" because that's what js does is actually more work
+
+[03:06:48.0000] <jgraham>
+and is at least arguably wrong, since the return value isn't accessible in well typed code
+
+[03:17:15.0000] <annevk>
+jgraham: the case under discussion is that the return type is undefined and there's an error because there's no return statement
+
+[03:17:42.0000] <annevk>
+jgraham: a function whose return type is void is allowed to return undefined in TypeScript
+
+[03:22:42.0000] <jgraham>
+Oh yeah, sorry I misread the example
+
+[03:24:20.0000] <jgraham>
+I'm mildly surprised that the case with void and an explicit return works, but pretty unsurprised that the case with undefined and no return doesn't work
+
+[03:28:10.0000] <annevk>
+jgraham: it's weird though as void with return 3 does not work, only return undefined works
+
+[03:36:25.0000] <jgraham>
+Maybe `return undefined` is internally the same as bare `return` and the latter is needed for early return in void functions
+
+[03:40:08.0000] <cybai>
+looks like using `undefined` as return type will force developers to write `return undefined` explicitly
+
+[03:40:17.0000] <cybai>
+https://www.typescriptlang.org/play?#code/GYVwdgxgLglg9mABFApgZygCgJQC5HgAmKwMYKhiA3gFCKIQJpwA2KAdC3AOaYBEACxQBPPtgDcdRACcUUENKRESZCpIC+NIA
+
+[03:41:22.0000] <annevk>
+cybai: yeah, the question is if that's intentional, and if it is, why?
+
+[03:42:50.0000] <cybai>
+annevk: oh, I see the question
+
+[03:50:48.0000] <jgraham>
+Note that bare `return` also works in that case
+
+[03:51:56.0000] <jgraham>
+Again suggesting that `return` and `return undefined` are treated as equivalent.
+
+[04:48:25.0000] <cybai>
+I just found this issue (https://github.com/microsoft/TypeScript/issues/36288) to suggest allowing `undefined` as return type in non-returning functions but there's no clue if the current behavior is intentional or not in the issue
+
+[13:13:51.0000] <Domenic>
+annevk: when you have time it might be good to review/merge the imperative shadow DOM API PRs on DOM and HTML.
+
+[14:22:43.0000] <Domenic>
+annevk: JakeA: and any others who love the navigation algorithm: thoughts and bikesheds on https://github.com/whatwg/html/issues/5847 welcome.
+
+
+2020-08-20
+[04:55:32.0000] <annevk>
+I'm not sure I'll have the time today, still have a massive backlog somehow
+
+[07:06:32.0000] <annevk>
+Domenic: so it would really help if someone else reviewed the imperative shadow DOM APIs too
+
+[07:06:53.0000] <annevk>
+I don't get the impression rniwa looked at it in detail, but I might have missed something
+
+[07:13:54.0000] <annevk>
+Domenic: isn't https://github.com/w3c/webcomponents/issues/871#issuecomment-675863258 showing the diff?
+
+[07:31:50.0000] <Domenic>
+annevk: that's a proposed test case, but not a spec diff.
+
+[07:32:04.0000] <Domenic>
+I don't believe there's a spec diff that would change the result of that; certainly not the one suggested upthread.
+
+[07:32:24.0000] <Domenic>
+annevk: I can do a second pass on imperative shadow DOM once you've done yours
+
+[07:33:05.0000] <annevk>
+Domenic: I just did again on the DOM side
+
+[07:33:38.0000] <annevk>
+Domenic: I thought making attachInternals check the custom element state would do the trick
+
+[07:33:50.0000] <annevk>
+That is something HTMLConstructor modifies
+
+[07:34:05.0000] <Domenic>
+annevk: yes, but it modifies it at the same time as the element definition comes into being, which is already checked.
+
+[07:36:07.0000] <annevk>
+Doesn't the definition come into being when you invoke define()?
+
+[07:38:39.0000] <annevk>
+Looking at the algorithms it definitely seems like you could get to an element that doesn't have its custom element state changed from script when define() is invoked
+
+[07:39:57.0000] <Domenic>
+Hmm, well, I might be wrong; looking forward to seeing the proposal.
+
+[07:42:12.0000] <annevk>
+https://github.com/whatwg/infra/issues/320#issuecomment-676736001 sounds pretty neat
+
+[07:49:59.0000] <annevk>
+It's taken a bit of time to get here, but I just landed a contribution from MikeSmith \o/
+
+[07:51:41.0000] <Domenic>
+Sooo happy
+
+[07:54:59.0000] <MikeSmith>
+this party’s got a double E at the end again 🎉
+
+[07:55:03.0000] <MikeSmith>
+https://www.youtube.com/watch?v=5opqN7DmGK8
+
+[07:55:10.0000] <MikeSmith>
+thanks y’all
+
+[08:28:58.0000] <annevk>
+zcorpan: hmm, so I wonder if response.headers.set is messing with the value somehow and if instead we should write out the headers in raw
+
+[08:29:10.0000] <annevk>
+zcorpan: did you look at server responses already?
+
+[08:29:29.0000] <annevk>
+although I'm not sure why that would result in a timeout
+
+[08:30:33.0000] <annevk>
+Oh, maybe that would timeout if the python script ended up throwing
+
+[13:52:47.0000] <zcorpan>
+annevk: yes, the server response looks ok. no error, \t comes through as 0x09
+
+
+2020-08-21
+[23:28:43.0000] <annevk>
+Not sure then 😟
+
+[04:51:03.0000] <JakeA>
+I'm never quite sure in specs when I should use "the" vs "a new". Eg "Let foo be the empty string", "Let bar be a new map". My assumption is to use  "the" for immutable types that are ===, and "a new" otherwise.
+
+[04:51:40.0000] <JakeA>
+The empty string === the empty string. This is fine with strings, but seems wrong with maps since they can be mutated.
+
+[04:53:58.0000] <annevk>
+JakeA: I'm pretty sure I've been inconsistent around lists at least
+
+[04:54:22.0000] <annevk>
+JakeA: these days I might use the shorthand << >> (but with the Unicode characters) instead
+
+[04:54:41.0000] <annevk>
+JakeA: and yeah, there's only one empty string
+
+[04:55:08.0000] <annevk>
+However, we mutate strings too, so...
+
+[04:55:57.0000] <JakeA>
+Hah, I guess string mutations should be a new string each time
+
+[04:57:21.0000] <annevk>
+Maybe, https://url.spec.whatwg.org/#concept-url-serializer
+
+[04:58:51.0000] <andreubotella>
+ideally, this would depend of a concept of equality/identity: if you create two strings/maps and populate them somehow, can they be equal?
+
+[04:58:52.0000] <annevk>
+And more importantly: https://github.com/whatwg/infra/issues/91
+
+[04:58:55.0000] <andreubotella>
+for strings, presumably so
+
+[04:59:41.0000] <annevk>
+Equality is defined on a per-type basis
+
+[05:01:27.0000] <JakeA>
+I've definitely used "if a is b" on types that don't define equality, and I expect referential equality
+
+[05:02:25.0000] <annevk>
+Yeah, that's fair (and should maybe be documented as a thing)
+
+[05:02:41.0000] <JakeA>
+I'll write up an issue for infra
+
+[05:02:58.0000] <annevk>
+And is also why sometimes it's useful to have "equals" for things like hosts or URLs as they are not "is" but are "equals" to each other
+
+[05:03:15.0000] <JakeA>
+Agreed
+
+[05:03:36.0000] <andreubotella>
+There's also the fact that I don't think anyone is comfortable with strings being mutable, but as discussed before, something like a StringBuilder would be more cumbersome
+
+[05:04:33.0000] <JakeA>
+Seems easy to write: Set foo to foo concatenated with "hello"
+
+[05:12:33.0000] <annevk>
+Yeah, we could probably rewrite some things along those lines, might be more straightforward than some of the alternatives considered in that issue
+
+[05:14:39.0000] <andreubotella>
+I was thinking that this was closely tied to https://github.com/whatwg/infra/issues/319, since if we define strings as lists, that would probably mean they couldn't be immutable
+
+[05:15:41.0000] <andreubotella>
+and on the other hand, if they're not lists but we define conversions back and forth, and maybe add a few helper operations, it could make building modified strings easier
+
+[05:19:49.0000] <JakeA>
+Filed https://github.com/whatwg/infra/issues/326
+
+
+2020-08-23
+[02:48:55.0000] <ice9>
+i need to verify something and need your help (it's not related to ipfs exactly) anyone got a min? it's related to media security
+
+[02:49:06.0000] <ice9>
+i mean not related the this channel's topic
+
+[02:49:09.0000] <ice9>
+anyone interested?
+
+
+2020-08-26
+[04:36:48.0000] <annevk>
+MikeSmith: are you interested in making a wattsi fix for https://github.com/whatwg/html/pull/5855?
+
+[04:50:18.0000] <zcorpan_>
+annevk: about the COEP parsing tests, firefox times out for ["","require-corp"] (2 headers). SFV says "Parsers MAY fail when processing a field value spread across multiple field lines", but Fetch says to join headers with 0x2C 0x20 before passing to SFV parsing
+
+[04:50:56.0000] <zcorpan_>
+annevk: i think it times out because the error page doesn't fire a load event on the iframe
+
+[04:52:02.0000] <zcorpan_>
+annevk: so... do we say this is a bug (or 2 bugs) in firefox?
+
+[05:02:57.0000] <annevk>
+zcorpan_: frames not firing a load event due to network errors is a known Firefox bug
+
+[05:03:40.0000] <annevk>
+zcorpan_: so in absence of other data I'd say that's one (known) bug
+
+[05:09:47.0000] <zcorpan_>
+annevk: ok, thanks. then we have lack of interop on how to handle multiple COEP headers, where chromium I think does what the fetch spec says, and firefox gives a network error
+
+[05:10:12.0000] <zcorpan_>
+I can file in bugzilla
+
+[05:19:54.0000] <MikeSmith>
+annevk: yes I can work on it tomorrow my time
+
+[05:21:24.0000] <annevk>
+zcorpan_: oh yeah, COEP shouldn't be a network error, it just results in no policy
+
+[05:21:29.0000] <annevk>
+zcorpan_: thanks
+
+[05:25:49.0000] <zcorpan_>
+annevk: hmm, right. It's not the page that sets the COEP headers that result in a network error. It's the iframe embedded within that lacks CORP that is blocked and doesn't get a 'load' event
+
+[05:27:05.0000] <annevk>
+zcorpan_: does that mean COEP is incorrectly enforced?
+
+[05:27:20.0000] <zcorpan_>
+annevk: yes
+
+[05:28:18.0000] <zcorpan_>
+that is more clearly a bug
+
+[05:28:26.0000] <annevk>
+Hopefully the switch in parser will address that, but that seems worth of a bug, yes
+
+[05:28:34.0000] <annevk>
+worthy*
+
+[05:32:23.0000] <zcorpan_>
+ok https://bugzilla.mozilla.org/show_bug.cgi?id=1661252
+
+[08:34:39.0000] <annevk>
+Domenic: did you see the whenDefined PR? It's pretty small and ready to go
+
+[08:35:29.0000] <Domenic>
+annevk: I remember it going by, but I was hoping others could handle it since I was weakly -1 on the idea
+
+[08:36:02.0000] <Domenic>
+If that feels like a dereliction of duty I can make it work
+
+[08:36:50.0000] <annevk>
+Domenic: the main problem is that I made some commits, but I could still merge it
+
+[08:36:59.0000] <Domenic>
+Fair enough, I'll review
+
+[08:55:28.0000] <Domenic>
+annevk: Ah I remember what I was waiting for. WebReflection definitely works in the field of web technologies; they need their employer to sign up
+
+[08:57:52.0000] <annevk>
+Domenic: I checked with the SG and hey said no (and not just myself)
+
+[08:59:30.0000] <annevk>
+I might have missed something though
+
+[08:59:44.0000] <Domenic>
+Hmm
+
+[09:00:25.0000] <Domenic>
+Well they do make the decisions, but he spends so much time trying to influence web standards...
+
+
+2020-08-27
+[21:49:34.0000] <MikeSmith>
+annevk: about the wattsi issue, today I have only been able to make enough time so far to look only briefly. I will have more time tonight
+
+[21:55:45.0000] <annevk>
+MikeSmith: thanks for taking a look
+
+[00:43:49.0000] <annevk>
+zcorpan_: you around? Looking at your CSP + COOP tests and it might help to go through them together
+
+[02:31:50.0000] <MikeSmith>
+annevk: about the wattsi issue, can you tell me explicitly what you want the behavior to be?
+
+[02:32:17.0000] <MikeSmith>
+currently it halts and emits an error if there’s an *empty* span in a heading
+
+[02:32:22.0000] <MikeSmith>
+that is,    <h5 id="rel-alternate"><span id="link-type-alternate"></span>
+
+[02:33:03.0000] <MikeSmith>
+but it does not emit an error if there’s a non-empty span
+
+[02:33:05.0000] <MikeSmith>
+   <h5 id="rel-alternate"><span id="link-type-alternate">foo</span>
+
+[02:33:18.0000] <MikeSmith>
+so you want it to be the other way around?
+
+[02:35:36.0000] <annevk>
+MikeSmith: that's surprising since we already have empty spans in headings I believe
+
+[02:36:00.0000] <annevk>
+MikeSmith: e.g., <h5 id="image-map-processing-model"><span id="processing-model"></span>Processing model</h5>
+
+[02:38:29.0000] <MikeSmith>
+hmm OK
+
+[02:38:58.0000] <MikeSmith>
+so that is in the source but not causing an error?
+
+[02:39:08.0000] <annevk>
+MikeSmith: that's in there right now, yes
+
+[02:39:12.0000] <MikeSmith>
+OK
+
+[02:39:33.0000] <annevk>
+MikeSmith: which is why it was surprising that adding it elsewhere didn't work
+
+[02:39:40.0000] <MikeSmith>
+yeah
+
+[02:40:13.0000] <MikeSmith>
+so I will step through the code execution and see what’s happening differently for those two cases
+
+[03:05:54.0000] <annevk>
+<3
+
+[04:07:07.0000] <annevk>
+Python 3 really makes you appreciate "don't break the web"
+
+[05:17:29.0000] <zcorpan_>
+annevk: I'm here now
+
+[05:18:06.0000] <zcorpan_>
+happy to go through them
+
+[05:45:52.0000] <zcorpan_>
+annevk: reading your comment https://github.com/web-platform-tests/wpt/pull/21111#issuecomment-681730038 again, I think it finally clicked for me. I misremembered how Window/WindowProxy works on navigation. `popup` is the old window which still has the CSP sandbox applied
+
+[05:50:21.0000] <annevk>
+zcorpan_: yup
+
+[05:50:40.0000] <annevk>
+zcorpan_: and the subtlety with the whole thing is that the CSP is applied to the document/window and not the browsing context
+
+[05:51:54.0000] <zcorpan_>
+annevk: yeah. I'll fix the test and try to explain this with comments
+
+[08:44:30.0000] <Domenic>
+annevk: was "do not merge yet" on https://github.com/whatwg/html/pull/5868 just about tests, or is there more to resolve?
+
+[08:45:15.0000] <annevk>
+Domenic: I was hoping to have at least a response from the CSS WG to the concerns raised by Richard
+
+[08:45:27.0000] <Domenic>
+Makes sense
+
+[08:45:34.0000] <annevk>
+well, not the whole CSS WG, but someone who can answer
+
+[08:46:00.0000] <Domenic>
+As I said, I'd like to not hold this up indefinitely (like what happened with list marker styles, which are still out of sync between HTML and CSS), but we can give it a few days.
+
+[08:46:33.0000] <annevk>
+Yeah, that makes sense, but it's only a couple hours old at this point
+
+[09:04:49.0000] <astearns>
+ annevk I haven't looked very close at Richard's comment, but if Emilio's response is enough that's good enough for me
+
+
+2020-08-28
+[21:51:05.0000] <MikeSmith>
+annevk: so the reason wattsi doesn’t report an error for <h5 id="image-map-processing-model"><span id="processing-model"></span>Processing model</h5> but does for the following:
+
+[21:51:10.0000] <MikeSmith>
+  <h5 id="rel-alternate"><span id="link-type-alternate"></span>Link type "<dfn data-export=""
+
+[21:51:13.0000] <MikeSmith>
+  data-dfn-for="link/rel,a/rel,area/rel" data-dfn-type="attr-value"><code
+
+[21:51:15.0000] <MikeSmith>
+  data-x="rel-alternate">alternate</code></dfn>"</h5>
+
+[21:52:40.0000] <MikeSmith>
+... is that the second case has not only that <span id="link-type-alternate"></span> but also the <dfn><code data-x="rel-alternate">…
+
+[21:53:12.0000] <MikeSmith>
+which ends up as two IDs in the generated output
+
+[21:54:07.0000] <MikeSmith>
+and in that ase, wattsi is not reporting the <span id="link-type-alternate"></span> as an error — instead it’s reporting the error when it gets to that <dfn><code data-x="rel-alternate">
+
+[21:54:30.0000] <MikeSmith>
+...
+
+[21:55:12.0000] <MikeSmith>
+given all that, what do you want to do in this case?
+
+[21:56:26.0000] <MikeSmith>
+maybe you want it so that we report the error for that <dfn><code data-x="rel-alternate"> *only* if the preceding ID-ed element — the <span id="link-type-alternate"></span> — is non-empty?
+
+[21:57:13.0000] <annevk>
+Yeah that sounds reasonable
+
+[22:15:11.0000] <MikeSmith>
+annevk: well that turns out to be relatively hard, I think
+
+[22:15:29.0000] <MikeSmith>
+unless there’s something I am missing
+
+[22:15:56.0000] <MikeSmith>
+...because in the current code, there is nothing that’s saving any state about each node
+
+[22:16:01.0000] <MikeSmith>
+hmm
+
+[22:16:21.0000] <MikeSmith>
+well now that I say that out loud, I realize it’s obviously wrong
+
+[22:17:20.0000] <MikeSmith>
+...because it is at least saving the state information “this heading already has a span or dfn that results in an ID”
+
+[22:32:10.0000] <MikeSmith>
+annevk: also maybe you already know that, but I think the purpose of that code is solely for the TOC, and what to select for the markup output for that heading in the TOC
+
+[22:32:35.0000] <MikeSmith>
+anyway, I’ll get a patch together today
+
+[23:30:57.0000] <MikeSmith>
+annevk: so I am back to realizing is that current code intentionally does not error for <h5 id="rel-alternate"><span id="link-type-alternate">SOME TEXT CONTENT</span>Link type "<dfn data-export="" — but does for <h5 id="rel-alternate"><span id="link-type-alternate"></span>Link type "<dfn data-export=""
+
+[23:31:56.0000] <MikeSmith>
+that is, if the “nested” span or dfn has text content, no error; but if it has not text content, error
+
+[23:32:43.0000] <MikeSmith>
+it’s not an oversight or mistake; all the relevant code there was intentionally written to handle those cases in that way
+
+[23:32:53.0000] <MikeSmith>
+I do not understand why
+
+[23:33:29.0000] <MikeSmith>
+but what I was suggesting earlier above is effectively the exact opposite of what the current code was intentionally written to do
+
+[23:34:11.0000] <MikeSmith>
+therefore it seems pretty odd to just completely flip it opposite
+
+[23:35:11.0000] <MikeSmith>
+what seems less odd is to just drop the one condition/check that’s actually causing the error to be reported
+
+[23:35:18.0000] <MikeSmith>
+that is, what I suggested in https://github.com/whatwg/html/pull/5855#issuecomment-679079688
+
+[23:36:16.0000] <MikeSmith>
+in testing locally, doing that causes the rendered output for that heading in both the ToC and spec body to be exactly the same
+
+[23:36:35.0000] <MikeSmith>
+the target of the href remains the same
+
+[23:36:41.0000] <MikeSmith>
+too
+
+[23:38:14.0000] <MikeSmith>
+but the worry is that if we drop the check, there’s some other real problem case that check was (I guess) intended to catch that it won’t catch any more in the future
+
+[23:39:45.0000] <MikeSmith>
+and without having a regression test for that, it’s just kind of an act of faith that it’s not gonna be breaking something in the output later in some subtle/surprising/hard-to-catch way
+
+[23:40:12.0000] <MikeSmith>
+but in spite of that I think we should just go ahead and drop the check
+
+[23:41:09.0000] <MikeSmith>
+because it’s more important to unbreak the build than it is to worry about some potential problem that many not be a real problem for us in practice anyway
+
+[00:05:58.0000] <annevk>
+MikeSmith: that sounds reasonable; there's also some magic with headings and <dfn> which is why I didn't put the ID on the <dfn>, but we could do that too as an alternative
+
+[00:06:23.0000] <annevk>
+MikeSmith: note that master is not broken so it's not breaking the build really
+
+[00:06:42.0000] <MikeSmith>
+well true (about not breaking master)
+
+[00:07:48.0000] <MikeSmith>
+as far as the alternative, I leave that up to you — but for now, I went ahead and raised https://github.com/whatwg/wattsi/pull/133 for just dropping the error
+
+[05:29:32.0000] <annevk>
+domfarolino: hey, are you around by any chance?
+
+[05:29:59.0000] <annevk>
+If you're still in Tokyo I guess it's not the best time...
+
+[07:33:30.0000] <MikeSmith>
+in Bikeshed, is there a literal `event` definition type?
+
+[07:33:50.0000] <MikeSmith>
+I don’t see it listed at https://tabatkins.github.io/bikeshed/#dfn-types
+
+[07:33:59.0000] <Domenic>
+I feel like I've seen it used...
+
+[07:34:21.0000] <MikeSmith>
+yeah
+
+[07:34:53.0000] <MikeSmith>
+ah wait, I guess it’s covered under https://tabatkins.github.io/bikeshed/#dfn-for
+
+[07:35:01.0000] <MikeSmith>
+> "attribute", "constructor", "method", "const", "event", "serializer", "stringifier", and "iterator" definitions must define what interface they’re relative to.
+
+[07:35:48.0000] <TabAtkins>
+It's still missing from that first list
+
+[07:35:53.0000] <TabAtkins>
+But yeah, https://github.com/tabatkins/bikeshed/blob/master/bikeshed/config/dfnTypes.py#L20
+
+[07:36:58.0000] <MikeSmith>
+/me looks
+
+[07:37:12.0000] <MikeSmith>
+aha!
+
+[07:37:17.0000] <MikeSmith>
+cool, thanks
+
+[07:37:27.0000] <MikeSmith>
+always trust the actual code
+
+[07:55:45.0000] <annevk>
+Domenic: do you know who deals with popups at Chrome? With https://github.com/whatwg/html/issues/5872 we have the opportunity to take some more special cases away or at least finally formalize how this legacy system ought to work
+
+[07:56:43.0000] <annevk>
+Domenic: arai already wrote a pseudo-spec and I think they'd be willing to turn that into something more concrete
+
+[07:57:14.0000] <Domenic>
+I'll ask around...
+
+[07:58:46.0000] <annevk>
+Domenic: yeah, I was expecting that it might be tricky, but I'll remain hopeful for now 😊
+
+[08:45:20.0000] <domfarolino>
+annevk: hey, am around now
+
+[08:45:51.0000] <domfarolino>
+My location is complicated lol. Consider me in pacific time
+
+[08:47:45.0000] <jgraham>
+/me concludes domfarolino has a very precisely known velocity
+
+[09:41:46.0000] <annevk>
+domfarolino: was wondering about default referrer policy and wpt as we have some patches for that; and also the state of it as the discussion feels unresolved
+
+[09:42:27.0000] <domfarolino>
+annevk: I still need to review the PR. I think everyone's aligned on changing the default policy. Going further than that is I think a point of further discussion?
+
+[09:42:35.0000] <domfarolino>
+annevk: oh are there WPTs up to change the default?
+
+[13:17:59.0000] <annevk>
+domfarolino: well the discussion is in the PR; and yeah, we have some patches in Bugzilla for wpt
+
+[13:19:21.0000] <domfarolino>
+I think a lot of the discussion was also in the PrivacyCG thread.
+
+[13:19:30.0000] <domfarolino>
+annevk: Cool, if you need me to review any WPTs let me know
+
+[14:59:50.0000] <hober>
+Seeing this in Bikeshed: The following refs show up multiple times in their spec, in a way that Bikeshed can't distinguish between. Either create a manual link, or ask the spec maintainer to add disambiguating attributes (usually a for='' attribute to all of them)
+
+[14:59:52.0000] <hober>
+spec:html; type:dfn; for:/; text:browsing context
+
+[15:00:05.0000] <hober>
+the two definitions are apparently https://html.spec.whatwg.org/multipage/browsers.html#browsing-context and https://html.spec.whatwg.org/multipage/browsing-the-web.html#navigation-params-browsing-context
+
+[15:08:44.0000] <hober>
+I imagine that latter one should have a for=''
+
+
+2020-08-29
+[22:36:10.0000] <annevk>
+I think it should have its own type, Domenic + TabAtkins ^^
+
+[22:37:40.0000] <TabAtkins>
+Looks like the latter are algorithm arguments?
+
+[00:04:03.0000] <annevk>
+TabAtkins: yup
+
+[09:04:48.0000] <Domenic>
+The latter is not an algorithm argument
+
+[09:04:50.0000] <Domenic>
+It's a struct member
+
+[09:04:55.0000] <Domenic>
+It should have a for=""
+
+[09:05:06.0000] <Domenic>
+Actually no
+
+[09:05:08.0000] <Domenic>
+It should not be exported
+
+[09:05:11.0000] <Domenic>
+And indeed it is not exported
+
+[09:05:16.0000] <Domenic>
+So I guess this is a scraper problem?
+
+[13:00:40.0000] <annevk>
+Domenic: HTML is default exported iirc
+
+[13:01:02.0000] <Domenic>
+That can't be right... there's so many specs with large HTML anchors blocks.
+
+
+2020-08-31
+[23:46:30.0000] <annevk>
+Domenic: from what I remember it does export for the dfn type; and what specifications put in their blocks isn't always informative as editors sometimes don't even try
+
+[08:11:28.0000] <MikeSmith>
+gsnedders: for https://github.com/html5lib/html5lib-tests/pull/130 are you waiting for others to chime in? Or still pondering yourself?
+
+[09:10:15.0000] <Krinkle>
+Is/was anyone here involved with CommonJS specs and/or the running of the commonjs.org site? The wiki doesn't support HTTPS currently (it has TLS on but invalid cert) which makes the site difficult to access.
+
+[09:10:41.0000] <Krinkle>
+Unrelatedly I was also wondering if perhaps WHATWG would be a good place to perhaps incubute/host some of those pages to keep them alive somewhere other than archive.org
+
+[09:16:24.0000] <annevk>
+ondras perhaps, looking at http://www.commonjs.org/contributors/
+
+[11:21:07.0000] <ondras>
+hmm, I was only a wiki-user of that page when commonjs standards/drafts were actually a thing
+
+[15:29:27.0000] <Krinkle>
+ondras: I reached out to Daniel meanwhile, I think they/you might just close the group and update the site a bit by turning into a static site, preserving all the wiki URLs.
+

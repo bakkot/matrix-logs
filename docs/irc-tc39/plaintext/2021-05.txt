@@ -1,0 +1,2701 @@
+2021-05-01
+[05:32:15.0000] <DerekNonGeneric>
+is it discouraged for new proposals to depend on (or mention) other proposals that are still in the early stages? `Error.prototype.stack` seems to be taking its time and i don't know if it would be realistic to expect that proposal to reach stage 4 prior to being able to claim that a new error type should have that instance property https://github.com/tc39/proposal-error-stacks
+
+[05:39:12.0000] <DerekNonGeneric>
+i also find the other non-standard Mozilla instance properties (`fileName`, `lineNumber`, `columnNumber`) very attractive and wonder what can be done to have `NativeError` from the spec also include these https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Error#instance_properties
+
+[05:46:11.0000] <annevk>
+DerekNonGeneric: it seems fine, just refine as you go through the stages
+
+[05:46:49.0000] <annevk>
+All of those need to be standardized afaik, but they’re also tricky
+
+[05:50:45.0000] <DerekNonGeneric>
+ok, sounds like having a wishlist of instance properties/methods wouldn't be unreasonable at this point
+
+[08:23:02.0000] <ljharb>
+DerekNonGeneric: i think that a) nobody will want any such enhancements until the existing behavior of .stack is standardized, and none of these things belong on the prototype, for membranes reasons, so they'd need to be stored in internal slots and accessed via static methods
+
+[08:23:22.0000] <ljharb>
+DerekNonGeneric: `.stack` itself is eventually going to end up being legacy, effectively discouraged in favor of a static method on Error
+
+[08:24:19.0000] <ljharb>
+DerekNonGeneric: in general there's lots of flexibility around overlapping proposals, but error stacks are a bit of a special case.
+
+[08:25:49.0000] <DerekNonGeneric>
+aha!
+
+[08:26:57.0000] <DerekNonGeneric>
+ljharb, any idea what you might name this method? `getStackTrace()` or similar?
+
+[08:27:08.0000] <ljharb>
+DerekNonGeneric: yes, it's already in the proposal repo
+
+[08:27:30.0000] <ljharb>
+but i was basically told that i'd have to split the proposal, and that nothing stack-related could happen until "everything .stack currently does" had already advanced
+
+[08:28:26.0000] <ljharb>
+if all the new things in the proposal land, you wouldn't need all those individual properties, since they'd be in the pre-parsed data structure you could get.
+
+[08:29:29.0000] <DerekNonGeneric>
+indeed, a proper stack trace object would have filename, line & column number
+
+[08:30:29.0000] <DerekNonGeneric>
+ljharb, is there a rough draft of what that object might look like somewhere?
+
+[08:30:52.0000] <ljharb>
+there is a complete spec for it :-) you may want to read the proposal repo
+
+[08:31:20.0000] <ljharb>
+literally the only thing i didn't do is tightly specify how to create the _contents_ of the stack. and that's what i was told i must do before anything else.
+
+[08:31:26.0000] <ljharb>
+(eventually told)
+
+[08:34:36.0000] <DerekNonGeneric>
+woah, this is really nice
+
+[08:34:46.0000] <DerekNonGeneric>
+i had only seen the readme earlier
+
+[08:36:26.0000] <DerekNonGeneric>
+welp, this answers soo many questions (basically knocks off 4 instance properties from my wishlist)
+
+[08:39:20.0000] <DerekNonGeneric>
+> none of these things belong on the prototype, for membranes reasons
+
+[08:39:40.0000] <DerekNonGeneric>
+ljharb, care to elaborate what that ^ means?
+
+[08:40:33.0000] <DerekNonGeneric>
+sounds like a security concern
+
+[08:47:51.0000] <ljharb>
+it means that position information is an encapsulation concern, yes
+
+[08:48:17.0000] <ljharb>
+and if it’s attached to the object, then it can’t be denied/shadowed based on lexical scope
+
+[08:54:26.0000] <DerekNonGeneric>
+gotcha
+
+[08:59:36.0000] <DerekNonGeneric>
+ok, now i _really_ wanna see this API in action [ no polyfill from the looks of it 😢 ]
+
+[09:01:08.0000] <DerekNonGeneric>
+ljharb, it looks like `Error#lineNumber` & `Error#columnNumber` would come out of `GetStackFramePositionString`, but would that mean that i would have to parse this string for this specific data, right?
+
+[09:13:44.0000] <DerekNonGeneric>
+oh, the 2-element array returned by `FromStackFramePosition` is even easier, but it's unclear to me where these `position` objects come from
+
+[09:58:08.0000] <DerekNonGeneric>
+> literally the only thing i didn't do is tightly specify how to create the _contents_ of the stack
+
+[09:59:04.0000] <DerekNonGeneric>
+ljharb, when you get the chance, take a look @ the methods on Java's `StackTraceElement` https://docs.oracle.com/javase/7/docs/api/java/lang/StackTraceElement.html#getLineNumber()
+
+[12:15:51.0000] <ljharb>
+DerekNonGeneric: you’d never have to parse a string again, is the idea
+
+[12:17:00.0000] <DerekNonGeneric>
+👍
+
+[13:40:39.0000] <jmdyck>
+If two (or more) Agents share an executing thread, what does that mean? Is it just a time-sharing thing, where at most one of the Agents is executing at a given time? But the Agents are just as 'isolated' (?) as if they weren't sharing?
+
+[13:55:00.0000] <Bakkot>
+they're not quite isolated: the forward progress guarantee applies only to a collection of agents which share an executing thread, not each individual agent
+
+[14:11:04.0000] <jmdyck>
+i meant isolated in a more informational sense? execution contexts from 2 different agents that share an executing thread don't thereby have access to any more information (about each other)? An execution context can't even tell if the thread is shared?
+
+[14:12:35.0000] <Bakkot>
+other than the forward progress guarantee, yes, that's true as far as I am aware
+
+[14:12:40.0000] <jmdyck>
+"can't" = "the spec doesn't provide a way (though the implementation might)"
+
+[14:14:18.0000] <jmdyck>
+ok, thx.
+
+[14:55:10.0000] <Bakkot>
+did javascriptcore remove ptc?
+
+[14:55:16.0000] <Bakkot>
+it no longer seems to work
+
+[14:55:43.0000] <Bakkot>
+even in the most basic example, like
+
+[14:55:50.0000] <Bakkot>
+var count = 0; (function f(bound) { ++ count; if (bound <= 0) return; return f(bound - 1); })(100000); console.log(count);
+
+[14:57:23.0000] <rkirsling>
+certainly should not have changed
+
+[14:57:37.0000] <rkirsling>
+hard to point at since test262.report is not alive but
+
+[14:59:09.0000] <rkirsling>
+for instance we have no failing (or skipped) tests with `tail` in the name
+
+[14:59:18.0000] <Bakkot>
+hmmmm
+
+[14:59:53.0000] <Bakkot>
+`tco` is the thing which would be in the name, not `tail`
+
+[15:01:02.0000] <Bakkot>
+and those tests certainly fail for me if I try to run them with `jsc`
+
+[15:01:14.0000] <Bakkot>
+or at least `tco-call-args` does
+
+[15:01:35.0000] <Bakkot>
+( https://github.com/tc39/test262/blob/main/test/language/expressions/call/tco-call-args.js )
+
+[15:03:56.0000] <rkirsling>
+oh `tco` oops
+
+[15:04:51.0000] <rkirsling>
+that particular test should not fail, weird
+
+[15:04:51.0000] <Bakkot>
+oh, apparently the test is strict-only
+
+[15:05:00.0000] <Bakkot>
+it passes if I run it in strict mode
+
+[15:05:06.0000] <Bakkot>
+odd, I did not realize tco was strict-only
+
+[15:05:39.0000] <Bakkot>
+anyway yeah that appears to be what was happening
+
+[15:05:46.0000] <Bakkot>
+only works (in jsc) in strict mode
+
+[15:05:55.0000] <rkirsling>
+cool
+
+[15:05:56.0000] <Bakkot>
+and yeah that's per spec
+
+[15:05:59.0000] <Bakkot>
+ok all is well
+
+[15:06:02.0000] <rkirsling>
+phew!
+
+[15:06:07.0000] <rkirsling>
+fwiw these ones do fail
+
+[15:06:11.0000] <rkirsling>
+test/language/expressions/call/tco-cross-realm-class-construct.js
+
+[15:06:11.0000] <rkirsling>
+test/language/expressions/call/tco-cross-realm-class-derived-construct.js
+
+[15:06:11.0000] <rkirsling>
+test/language/expressions/call/tco-cross-realm-fun-call.js
+
+[15:06:11.0000] <rkirsling>
+test/language/expressions/call/tco-cross-realm-fun-construct.js
+
+[15:06:11.0000] <rkirsling>
+test/language/expressions/call/tco-non-eval-function-dynamic.js
+
+[15:06:11.0000] <rkirsling>
+test/language/expressions/call/tco-non-eval-function.js
+
+[15:06:11.0000] <rkirsling>
+test/language/expressions/call/tco-non-eval-global.js
+
+[15:06:12.0000] <rkirsling>
+test/language/expressions/call/tco-non-eval-with.js
+
+[15:06:20.0000] <rkirsling>
+but they're a little more specific
+
+[15:07:29.0000] <Bakkot>
+hah, the cross-realm aspect was actually the thing I was just looking into
+
+[15:14:04.0000] <Bakkot>
+I think `test/language/expressions/call/tco-cross-realm-class-construct.js` and `test/language/expressions/call/tco-cross-realm-class-derived-construct.js` are wrong as of https://github.com/tc39/ecma262/pull/2216, actually
+
+[15:15:27.0000] <Bakkot>
+all four of the `tco-cross-realm` ones, in fact
+
+[15:15:56.0000] <Bakkot>
+the test could be repaired by using a revoked proxy instead of a class to produce the type error
+
+[15:16:10.0000] <Bakkot>
+but tbh I feel like the spec should change there; the behavior being asserted in these tests is _very_ strange
+
+[16:14:37.0000] <Bakkot>
+https://github.com/tc39/test262/issues/2978
+
+[16:14:53.0000] <Bakkot>
+this might be the single most esoteric issue I've ever written up, which is frankly saying something
+
+[16:18:45.0000] <rkirsling>
+lolol
+
+[16:19:12.0000] <rkirsling>
+incidentally, would the correction make current JSC behavior correct? or are we off in a different way?
+
+[16:22:21.0000] <Bakkot>
+the correction to the tests I suggest in the issue, or the correction to the spec I hint at?
+
+[16:22:47.0000] <Bakkot>
+if the first: no, you're off in a different way: JSC always derives the realm for the error in this case from the proxy, not its caller
+
+[16:22:56.0000] <Bakkot>
+if the second: it depends on which of two possible fixes we went with
+
+[16:24:42.0000] <Bakkot>
+you can observe the bug without tail calls being involved in e.g. https://gist.github.com/bakkot/c386c597938d3462a083865f2fe4df58
+
+[16:24:54.0000] <Bakkot>
+there's may well be a test262 you xfail as well
+
+[16:47:23.0000] <rkirsling>
+uh well since you ultimately suggested a spec fix I guess that's what I meant
+
+[16:47:29.0000] <rkirsling>
+but was just generally curious
+
+[16:47:37.0000] <rkirsling>
+doesn't surprise me that it's not just "A or B"
+
+[16:52:19.0000] <Bakkot>
+safari's behavior is reasonable and is probably the one I'd go with if I felt like trying to tweak this part of the spec
+
+
+2021-05-02
+[20:29:12.0000] <jmdyck>
+Bakkot, you there?
+
+[20:31:01.0000] <Bakkot>
+jmdyck pong
+
+[20:31:26.0000] <jmdyck>
+i just did a quick analysis of private-env-is-own-type but then found I couldn't do a review.
+
+[20:31:58.0000] <jmdyck>
+so I could just tell you what I found, there's not much.
+
+[20:32:55.0000] <Bakkot>
+please do
+
+[20:33:25.0000] <jmdyck>
+L9860: Return a new -> Return the
+
+[20:33:48.0000] <jmdyck>
+(we never say "a new" before a record-constructor)
+
+[20:34:06.0000] <jmdyck>
+(the "the" is optional)
+
+[20:34:28.0000] <jmdyck>
+L21589: Assert: this -> Assert: This
+
+[20:34:59.0000] <jmdyck>
+L21591: 1. Let _name_ be NewPrivateName(_dn_) -> append period
+
+[20:35:11.0000] <jmdyck>
+(Doesn't ecmarkup find those?)
+
+[20:35:33.0000] <jmdyck>
+L21592: Append a new -> Append the
+
+[20:35:38.0000] <jmdyck>
+(as above)
+
+[20:35:51.0000] <Bakkot>
+L21589 there's a lint for but it's not released
+
+[20:36:15.0000] <jmdyck>
+L24738: For each element _binding_ in _pointer_.[[Names]], do ... "in" -> "of"
+
+[20:36:15.0000] <Bakkot>
+L21591 it did find and I fixed but apparently forgot to push
+
+[20:36:27.0000] <jmdyck>
+which seems odd, but that's the convention.
+
+[20:37:35.0000] <jmdyck>
+That's all.
+
+[20:38:38.0000] <Bakkot>
+thanks, pushed
+
+[20:38:47.0000] <jmdyck>
+I didn't run a type analysis because I'd have to write code for the new forms, and I didn't feel like it.
+
+[20:39:06.0000] <jmdyck>
+But I probably will once the stuff gets into 1668.
+
+[20:39:09.0000] <Bakkot>
+yup, no rush
+
+[20:39:17.0000] <Bakkot>
+I'm reasonably confident in the typings here
+
+[20:39:35.0000] <Bakkot>
+1668 is the highest priority of the editor group, so hopefully it'll all be in master soon enough
+
+[20:40:30.0000] <jmdyck>
+(pulled and re-analyzed, looks good.)
+
+[20:40:41.0000] <Bakkot>
+thanks much, as always
+
+[20:41:34.0000] <jmdyck>
+yw
+
+[20:43:44.0000] <jmdyck>
+you were talking about landing 1668 before 545... you might want to land some others before 545 too.
+
+[20:43:55.0000] <Bakkot>
+any you have in mind?
+
+[20:44:18.0000] <jmdyck>
+not off the top of my head.
+
+[20:44:47.0000] <Bakkot>
+I don't think there's any other outstanding large PRs which are approximately ready
+
+[20:45:04.0000] <Bakkot>
+and I'll keep support for the existing convention in ecmarkup, so the outstanding ones will still work
+
+[20:45:10.0000] <jmdyck>
+just that the source for 545 is programmatically generated, so it doesn't care what lands before it, whereas the converse is probably not true.
+
+[20:45:49.0000] <Bakkot>
+yeah, that's the motivation for getting 1668 in
+
+[20:46:09.0000] <Bakkot>
+but there's nothing else outstanding which is both nontrivial and ready, I think
+
+[20:46:25.0000] <jmdyck>
+ok
+
+[20:46:26.0000] <Bakkot>
+the plan is I'll just rebase outstanding PRs as they become ready
+
+[20:48:40.0000] <jmdyck>
+what's the status on #1867 B.1.{1,2} ?
+
+[20:48:52.0000] <jmdyck>
+anything happen at the meeting?
+
+[20:49:25.0000] <jmdyck>
+I guess it's still a few more days till the notes come out.
+
+[20:49:30.0000] <Bakkot>
+nothing at this meeting
+
+[20:49:33.0000] <Bakkot>
+it wasn't up for anything
+
+[20:49:50.0000] <Bakkot>
+it's had consensus reaffirmed as of the previous meeting, so nothing else for plenary there
+
+[20:50:05.0000] <Bakkot>
+the status is, it's waiting on me to add support for the `legacy` attribute in ecmarkup, used in https://github.com/tc39/ecma262/pull/2125/
+
+[20:50:26.0000] <jmdyck>
+michaelf said "we will request committee consensus to apply the term "legacy" here."
+
+[20:50:27.0000] <Bakkot>
+and then 2125 can land, and 1867 can use it
+
+[20:50:32.0000] <Bakkot>
+oh, did he
+
+[20:50:33.0000] <Bakkot>
+hm
+
+[20:50:37.0000] <Bakkot>
+well, we forgot to do that, apparently
+
+[20:50:43.0000] <jmdyck>
+https://github.com/tc39/ecma262/pull/1867#discussion_r605252863
+
+[20:50:48.0000] <Bakkot>
+I don't know that we need consensus for it given that they were _already_ called "legacy", though
+
+[20:51:48.0000] <Bakkot>
+I'll bring it up with him
+
+[20:51:53.0000] <ljharb>
+unless we're going to automatically make anything from annex b legacy - and we need consensus to make it *not* legacy - then i think the expectation was that each item would be decided specifically as it's hoisted out
+
+[20:51:53.0000] <jmdyck>
+thx
+
+[20:52:24.0000] <Bakkot>
+ljharb these differ from the rest of annex b in that they were explicitly called out as like `LegacyOctalIntegerLiteral`
+
+[20:53:22.0000] <ljharb>
+ah, true enough
+
+[20:53:47.0000] <ljharb>
+not the same legacy necessarily, but i think there's effectively a zero chance anyone would object to calling them legacy now
+
+
+2021-05-03
+[08:56:15.0000] <Bakkot>
+jmdyck: re the weird Return in GeneratorYield (and etc), what's the basic idea of the PR you have in mind?
+
+[08:56:57.0000] <jmdyck>
+restructure them to use a Resume step
+
+[08:58:03.0000] <Bakkot>
+as in "resume the context which is now the top of the stack providing X as the value"?
+
+[08:58:11.0000] <Bakkot>
+(or some better phrasing than that)
+
+[08:58:54.0000] <jmdyck>
+yup
+
+[08:59:04.0000] <Bakkot>
+cool, sounds good
+
+[08:59:42.0000] <jmdyck>
+currently, we only use "Resume" steps on the one 'side'. Seems like it would be useful to use them on the other side too.
+
+[08:59:59.0000] <jmdyck>
+Don't have good names for the 'sides' though.
+
+[09:01:05.0000] <jmdyck>
+(just for the discussion, I don't think it'll come up in spec-text)
+
+[09:04:25.0000] <Bakkot>
+I would say "we only use Resume when pushing a context, not when popping a context", probably
+
+[10:42:48.0000] <jmdyck>
+Bakkot: In AsyncGeneratorYield, the call to AsyncGeneratorResolve is causing me headaches. It's just so weird.
+
+[10:57:00.0000] <jmdyck>
+(I'm using 'setup' and 'generative' to name the two sides.) AsyncGeneratorResolve executes *after* the stack-pop, so the 'setup' EC is the running EC, but it executes *before* the Return that will transfer control back to the setup side.
+
+[10:58:59.0000] <jmdyck>
+So I thought, just move it from pre-transfer to post-transfer (i.e., call it after the Resume step in AsyncGeneratorResumeNext). But then the other transfers to that point aren't going to be happy.
+
+[11:03:58.0000] <jmdyck>
+So then I thought, well, in the "use Resume" world, you can still execute AsyncGeneratorResumeNext between the pop and the resume, so do that. But in the "use Resume" world, the steps in the "set the code evaluation state" become post-Resume steps (at AsyncGeneratorYield's top level) (so that they Return to the natural place).
+
+[11:05:36.0000] <jmdyck>
+Which means they'd happen *after* the call to AsyncGeneratorResolve, but in the status quo they're set up *before* the call to AsyncGeneratorResolve. Which *does* make a difference, it seems.
+
+[11:06:43.0000] <Bakkot>
+hmmmmm
+
+[11:08:33.0000] <jmdyck>
+AsyncGeneratorYield calls AsyncGeneratorResolve calls  AsyncGeneratorResumeNext which Resumes _genContext_
+
+[11:08:39.0000] <Bakkot>
+if I'm reading these algorithms correctly, `AsyncGeneratorYield` suspends the generator context, and then does AsyncGeneratorResolve, which does AsyncGeneratorResumeNext, which... un-resumes gencontext?
+
+[11:08:41.0000] <Bakkot>
+yeah, that
+
+[11:08:46.0000] <Bakkot>
+er, *un-suspends
+
+[11:09:25.0000] <Bakkot>
+I will need to read up on this part of the spec in more detail
+
+[11:09:32.0000] <Bakkot>
+haven't dug into async generators in the spec before
+
+[11:10:41.0000] <jmdyck>
+so there can be two executions of AsyncGenYield for the same context that are 'live' at the same time?
+
+[11:11:18.0000] <jmdyck>
+well, not 'live', but... i don't know.
+
+[11:12:05.0000] <Bakkot>
+I don't think they're both live
+
+[11:12:14.0000] <Bakkot>
+it suspends, and then resumes, but it's the same context
+
+[11:12:54.0000] <Bakkot>
+I guess the immediate-resumption behavior makes sense if you have multiple calls to `.next` which happen while it's busy `await`ing something
+
+[11:13:07.0000] <Bakkot>
+but I will need to trace through more carefully
+
+[11:13:11.0000] <jmdyck>
+does control ever get back to the first one?
+
+[11:18:16.0000] <Bakkot>
+I think yes - step 9 of the second AsyncGeneratorYield returns to the first one
+
+[11:18:28.0000] <Bakkot>
+if I'm following it correctly
+
+[11:23:16.0000] <jmdyck>
+But AsyncGeneratorResumeNext would be the op that most recently resumed genContext.
+
+[11:24:08.0000] <jmdyck>
+(when the second AGY executes step 9 Return)
+
+[11:26:02.0000] <Bakkot>
+right, so, to be precise control moves to step 19 of the first AsyncGeneratorResumeNext call, and then at step 21 it returns to the end of step 9 of the first AsyncGeneratorResolve call, and then in step 10 of that AO returns to the end of step 9 of the first AsyncGeneratorYield call
+
+[11:26:55.0000] <Bakkot>
+(previous messages should begin with "upon executing step 9 of the second AsyncGeneratorYield call")
+
+[11:26:59.0000] <Bakkot>
+*message
+
+[11:30:32.0000] <jmdyck>
+but before step 19 of AGRN, there was a transfer to and a transfer back from genContext
+
+[11:31:25.0000] <Bakkot>
+agreed, but why is that a problem?
+
+[11:32:14.0000] <Bakkot>
+I guess because it makes the "had most previously resumed evaluation" part inaccurate?
+
+[11:32:52.0000] <jmdyck>
+well, that's one thing.
+
+[11:33:53.0000] <jmdyck>
+it's weird to me that AsyncGeneratorYield can invoke AsyncGeneratorResolve without transferring control to the setup side.
+
+[11:36:00.0000] <jmdyck>
+So the whole AGR -> AGRN -> Resume step is happening on the generative side?
+
+[11:36:08.0000] <Bakkot>
+yeah
+
+[11:36:13.0000] <Bakkot>
+consider `g = (async function*f(){ await new Promise(res => setTimeout(res, 10)); console.log('a'); yield 0; console.log('b'); yield 1; console.log('c'); })(); g.next(); g.next(); console.log('start');`
+
+[11:36:32.0000] <Bakkot>
+this example prints `start`, and then `a, b`
+
+[11:36:58.0000] <Bakkot>
+because the generator had a queued `next` after the `await` completed
+
+[11:37:15.0000] <Bakkot>
+so it does both at the same time, without transferring control back
+
+[11:38:23.0000] <Bakkot>
+that is, it does both the initialization and the first `yield` without transferring control back
+
+[11:50:50.0000] <jmdyck>
+g.next resolve to AsyncGenerator.prototype.next, right?
+
+[11:51:03.0000] <Bakkot>
+yes
+
+[11:56:28.0000] <jmdyck>
+each calls AsyncGenEnqueue, which appends a request to generator.[[AsyncGeneratorQueue]].
+
+[11:56:56.0000] <jmdyck>
+The first time, generator.[[AsyncGeneratorState]] is suspendedStart, so it calls AsyncGeneratorResumeNext
+
+[11:57:47.0000] <jmdyck>
+which pops a request of the queue
+
+[11:57:52.0000] <jmdyck>
+off
+
+[12:00:20.0000] <jmdyck>
+and then pushes genContext onto the stack and resumes it
+
+[12:01:22.0000] <jmdyck>
+so it starts to execute at step 5.a in AsyncGeneratorStart
+
+[12:03:08.0000] <jmdyck>
+which goes straight into 5.a.i, evaluating the function-body
+
+[12:04:46.0000] <jmdyck>
+the firs thing is to evaluate the AwaitExpression
+
+[12:07:05.0000] <Bakkot>
+this matches my interpretation so far; do you want me to jump in with (what I understand to be) the next few steps or would you prefer to walk through it yourself?
+
+[12:08:10.0000] <jmdyck>
+i think i need to take a break.
+
+[12:08:53.0000] <jmdyck>
+so yeah, jump in with the next few steps, and I'll get back to it later
+
+[12:12:54.0000] <Bakkot>
+so, the AwaitExpression evaluates, which invokes the Await macro, which suspends the generator's execution context, transferring control back to AsyncGenerator.prototype.next
+
+[12:13:39.0000] <Bakkot>
+control proceeds in evaluating the script itself, meaning it then does `g.next()` again, which calls AsyncGeneratorEnqueue
+
+[12:16:05.0000] <Bakkot>
+this appends a request to the AsyncGeneratorQueue, but this time state is ~executing~, so it does not call AsyncGeneratorResumeNext, and just finishes the call without doing any execution context stack juggling
+
+[12:16:20.0000] <Bakkot>
+then we do the `console.log('start')`
+
+[12:16:45.0000] <Bakkot>
+at some later point, the timeout completes, and the `new Promise` resolves
+
+[12:17:39.0000] <Bakkot>
+eliding a bit of tracing through the promise machinery, this leads to the algorithm steps in `Await Fulfilled Functions` being executed
+
+[12:20:05.0000] <Bakkot>
+this suspends the running execution context (which is, here, the context created to evaluate the "resolve" handler for the promise), and pushes and resumes the generator's context
+
+[12:20:47.0000] <Bakkot>
+control proceeds in the evaluation of the generator body until the `yield 0`, which does our first call to AsyncGeneratorYield
+
+[12:32:48.0000] <Bakkot>
+actually I get lost here I think
+
+[12:34:08.0000] <Bakkot>
+the first AsyncGeneratorYield suspends the generator context and sets up its evaluation state, then does AsyncGeneratorResolve, which pops the `AsyncGeneratorQueue` (so it is now empty) then does AsyncGeneratorResumeNext, which, since the queue is empty, immediately returns, which seems wrong
+
+[12:35:46.0000] <Bakkot>
+oh, the queue is not empty, nvm
+
+[12:36:16.0000] <Bakkot>
+the first call to `.next` added to the queue and did not remove it
+
+[12:36:41.0000] <Bakkot>
+the first AsyncGeneratorYield suspends the generator context and sets up its evaluation state, then does AsyncGeneratorResolve, which pops the `AsyncGeneratorQueue` (so it now has *one item*) then does AsyncGeneratorResumeNext
+
+[12:37:30.0000] <Bakkot>
+at this point, the queue is not empty, and the completion from the record in the queue queue is not abrupt, and the state is ~ suspendedYield~
+
+[12:38:32.0000] <Bakkot>
+so AsyncGeneratorResumeNext suspends the caller context - which, as before, is the context created to evaluate the "resolve" handler for the promise - and then pushes and resumes the generator context
+
+[12:39:52.0000] <Bakkot>
+this moves control to step 8.a of AsyncGeneratorYield
+
+[12:41:33.0000] <Bakkot>
+now we do another Await, where we are awaiting `undefined` (which was the argument to the second call to `.next`), which I'm going to skip over because it's tedious and is not the interesting part
+
+[12:42:00.0000] <Bakkot>
+and we get to 8.e of AsyncGeneratorYield, which returns control to the evaluation of the generator body
+
+[12:42:15.0000] <Bakkot>
+so we console.log('b') and proceed to the second `yield`, which does our second AsyncGeneratorYield
+
+[12:42:44.0000] <Bakkot>
+this, again, suspends the execution context stack and sets up its evaluation state, then does AsyncGeneratorResolve
+
+[12:43:01.0000] <Bakkot>
+which pops the queue - so *now* it is empty - then does AsyncGeneratorResumeNext
+
+[12:43:21.0000] <Bakkot>
+but here the queue is empty, so AsyncGeneratorResumeNext returns without touching the execution context stack
+
+[12:43:57.0000] <Bakkot>
+so we go back to the AsyncGeneratorResumeNext call we were just doing, which then goes back to the AsyncGeneratorYield call we were just doing
+
+[12:45:03.0000] <Bakkot>
+and then, in step 9 of this second AsyncGeneratorYield call, we finally go back to the last step of the _first_ call to AsyncGeneratorYield,
+
+[12:45:58.0000] <Bakkot>
+which finishes, and finally returns control to the context created to evaluate the "resolve" handler for the promise, which goes about doing whatever it was doing
+
+[12:46:20.0000] <Bakkot>
+the end
+
+[12:48:21.0000] <Bakkot>
+to be precise, I should say: "in step 9 of this second AsyncGeneratorYield call, we finally go back to step 19 of the first call to AsyncGeneratorResumeNext, which returns to AsyncGeneratorResolve, which returns to the first AsyncGeneratorYield, which finishes and returns to the resolve handler
+
+[12:48:22.0000] <Bakkot>
+"
+
+[15:38:19.0000] <aebabis>
+Hi, I have an idea for a proposal for ES. Is there anyone here I could bounce it off of?
+
+[15:39:44.0000] <Bakkot>
+aebabis https://es.discourse.group/c/ideas/7 is probably the ideal place
+
+[15:39:56.0000] <aebabis>
+Thank you
+
+[16:11:17.0000] <shu>
+Bakkot: so i have a contributor patch for v8 that allows escape async in for-of, e.g. `for (\u{61}sync of`. this seems... super gross to me?
+
+[16:11:41.0000] <shu>
+Bakkot: is this how all lookaheads restrictions work, since the tokens are pre-StringValue?
+
+[16:39:32.0000] <shu>
+i guess we already allow `for (l\u{65}t() of ...)`
+
+
+2021-05-04
+[17:10:19.0000] <Bakkot>
+yes, that's how they all work, and yes, it's extremely gross
+
+[17:11:15.0000] <Bakkot>
+the worst one is, `l\u{65}t\nx` is a reference to `let` followed by a reference to `x`, rather than a declaration of `x` the way that `let\nx` would be
+
+[17:12:14.0000] <Bakkot>
+(though technically that one isn't a consequence of lookahead restrictions, I guess)
+
+[17:16:49.0000] <shu>
+my goodness
+
+[18:23:08.0000] <jmdyck>
+Bakkot: when you say "(which is, here, the context created to evaluate the "resolve" handler for the promise)", is that an 'Await fulfilled function' ?
+
+[18:33:24.0000] <Bakkot>
+that's not what I intended to refer to, though I might be mistaken about which is actually the top of the stack at that point
+
+[18:33:41.0000] <Bakkot>
+I didn't trace the Await machinery all that carefully
+
+[18:45:58.0000] <Bakkot>
+ah, yeah, it's the one context created to run the Await fulfilled function (
+
+[18:46:14.0000] <Bakkot>
+(which lives in "onFulfilled in the Await steps)
+
+[20:36:00.0000] <jmdyck>
+sorry, you *did* mention  'Await fulfilled function' at the time.
+
+[20:39:11.0000] <jmdyck>
+so when the timeout completes, does the host invoke a 'PromiseReaction' job?
+
+[20:40:26.0000] <jmdyck>
+i.e., starting at step 1.a in NewPromiseReactionJob
+
+[20:43:57.0000] <Bakkot>
+well, not immediately, but ultimately yes
+
+[20:44:23.0000] <Bakkot>
+when the timeout completes, control goes Promise Resolve Functions -> FulfillPromise -> TriggerPromiseReactions -> HostEnqueuePromiseJob, and then at some future time, as a consequence of HostEnqueuePromiseJob, the host runs the steps in 1.a of NewPromiseReactionJob
+
+[20:46:50.0000] <jmdyck>
+so much machinery
+
+[20:46:55.0000] <Bakkot>
+yyyyyyup
+
+[20:48:15.0000] <jmdyck>
+also, before then, I'm not clear on when/where the ConciseBody is evaluated
+
+[20:49:08.0000] <Bakkot>
+the concisebody is evaluated in step 9 of the Promise constructor
+
+[20:49:20.0000] <Bakkot>
+(i.e. as part of the `new Promise` call)
+
+[20:51:36.0000] <jmdyck>
+so that would be in an execution context stacked onto the genContext
+
+[20:52:06.0000] <Bakkot>
+yes, though one which is pushed and popped without doing any unusual juggling
+
+[20:52:18.0000] <Bakkot>
+strictly speaking it's actually twice-nested, because there's an execution context pushed for the call to Promise as well
+
+[20:52:25.0000] <Bakkot>
+which then pushes the context for the arrow
+
+[20:52:40.0000] <jmdyck>
+ah yup
+
+[21:04:41.0000] <jmdyck>
+so when the Await Fulfilled Function starts, the running execution context is probably nothing much?
+
+[21:08:38.0000] <jmdyck>
+no wait, you say it's "the context created to evaluate the "resolve" handler for the promise"
+
+[21:09:13.0000] <jmdyck>
+i.e., created by the host?
+
+[21:09:51.0000] <Bakkot>
+"the context created to evaluate the "resolve" handler for the promise" isn't really precise
+
+[21:10:55.0000] <Bakkot>
+I just meant that the host will create an execution context to run the PromiseReactionJob
+
+[21:11:07.0000] <jmdyck>
+yeah, okay
+
+[06:49:56.0000] <jmdyck>
+Bakkot: re https://freenode.logbot.info/tc39/20210503
+
+[06:52:00.0000] <jmdyck>
+19:38: "so AsyncGeneratorResumeNext [at 15] suspends the caller context - which, as  before, is the context created to evaluate the "resolve" handler for the  promise - and then [17] pushes and [18] resumes the generator context"
+
+[06:55:04.0000] <jmdyck>
+but look more closely at 18: it says "Resume the suspended evaluation of genContext". But genContext's evaluation was never suspended!
+
+[06:57:04.0000] <jmdyck>
+AsyncGeneratorYield step 8 removed it from the stack, but didn't suspend it, and didn't resume the new running execution context
+
+[07:01:59.0000] <jmdyck>
+so during the execution of AsyncGeneratorResolve, [the "resolve" handler] is the running execution context, but it hasn't been resumed.
+
+[07:06:59.0000] <jmdyck>
+Well, strictly speaking, I shouldn't say "resumed", because in the current spec, the generative side doesn't "resume" the setup side. But it "returns to". So AsyncGeneratorYield at the conclusion of step 9 will "return to" the op that most recently resumed the eval of genContext (which actually isnt an operation, but the alg for an Await fulfilled function?), but that hasn't happened yet.
+
+[07:15:22.0000] <jmdyck>
+Hm.
+
+[07:22:56.0000] <jmdyck>
+re my issue #2400, I'm now thinking that the intended mental model was that the stack-manipulation step *is* an implied Resume (or however you want to refer to the generative->setup transfer of control).
+
+[07:24:18.0000] <jmdyck>
+(which of course is inconsistent with the rest of the spec, where you still need an explicit Resume after a stack-push)
+
+[07:26:55.0000] <jmdyck>
+no, that's still not it, because a Resume transfers control to a suspended algorithm, and the step after the Resume step isn't executed until/if control ever returns.
+
+[07:28:29.0000] <jmdyck>
+But when AsyncGeneratorYield step 7 does the stack-pop, it doesn't transfer control to some suspended op, we're supposed to proceed to step 8 + 9, right?
+
+[07:32:52.0000] <jmdyck>
+so between the stack-pop and the eventual return, we're still in AsyncGenYield, so control hasn't transferred anywhere, and yet we're supposed to assume that genContext has been suspended (and the setup context has been [resumed])?
+
+[09:00:27.0000] <jmdyck>
+If AsyncGeneratorYield's stack-pop *did* involve a transfer of control, it would go back to the Await fulfilled function, which would accomplish close to nothing, and the genContext would never be resumed?, so that can't be it.
+
+[09:12:19.0000] <Bakkot>
+jmdyck: my reading of the current specification is that a stack-pop is implicitly a suspend, but neither this implicit suspend nor an explicit suspend entails a transfer of control. otoh, a stack-push is _not_ implicitly a resume, and an explicit resume _is_ a transfer of control.
+
+[09:14:33.0000] <Bakkot>
+so after AsyncGeneratorYield step 7, _genContext_ is suspended, and the topmost execution context is the one below it (the one created by the host for the timeout promise's handler, in this example), but control remains in AsyncGeneratorYield
+
+[10:16:03.0000] <jmdyck>
+Bakkot: So a stack-pop is an implicit suspend, but a stack-push isn't an implicit resume; a suspend isn't a transfer of control, but a resume is. Well, that might work, but I wouldn't call it intuitively obvious.
+
+[10:16:23.0000] <Bakkot>
+agreed
+
+[10:16:39.0000] <Bakkot>
+that's just what I derive by working backwards from what the spec seems to be actually doing
+
+[10:16:56.0000] <jmdyck>
+yup.
+
+[10:17:15.0000] <Bakkot>
+I still like my "we should conflate stack manipulation and transfer of control" framing
+
+[10:17:33.0000] <Bakkot>
+though the above conversation made me realize we'd need to refactor the async generator plumbing to make it work
+
+[10:17:36.0000] <jmdyck>
+so how would that handle AsyncGenYield?
+
+[10:17:45.0000] <jmdyck>
+ah
+
+[10:23:29.0000] <Bakkot>
+which, I'm not sure how feasible that is; I'd need to actually try the rewrite to see.
+
+[10:25:09.0000] <jmdyck>
+what if the Await fulfilled function (etc), rather than pushing asyncContext onto the stack and resuming it, instead created an intermediary context and resumed that. The intermediary context would initially just push the asynccontext and resume it, BUT it would be there waiting for an explicit resume, at which point it could do the AsyncGeneratorResolve.
+
+[10:26:58.0000] <jmdyck>
+except presumably sometimes it shouldn't do AsyncGeneratorResolve
+
+[10:29:42.0000] <jmdyck>
+or maybe i take that back.
+
+[10:30:18.0000] <Bakkot>
+Await fulfilled functions are also used for regular async functions, not just async generators
+
+[10:31:16.0000] <jmdyck>
+well, there's lots of pseudocode that switches on GeneratorKind
+
+[10:31:39.0000] <Bakkot>
+true, we could switch on whether it's an async generator or async function
+
+[10:34:26.0000] <jmdyck>
+i suppose you wouldn't need the extra context, you could do it in the same context as the Await fulfilled function?
+
+[10:35:20.0000] <jmdyck>
+that might be slightly less spaghetti
+
+[10:36:28.0000] <Bakkot>
+the thing I was thinking of was more along the lines of, AsyncGeneratorResumeNext is recursive so that it can drain the queue. but we could break the recursion (by having AsyncGeneratorResolve and AsyncGeneratorReject not call it), and instead an explicit loop to drain the queue
+
+[10:37:10.0000] <Bakkot>
+you'd need two explicit loops, I guess, one in AsyncGeneratorEnqueue and one... somewhere else, to handle the case that something is enqueued while it is `await`ing
+
+[10:38:50.0000] <jmdyck>
+that sounds like more than a refactoring
+
+[10:39:08.0000] <Bakkot>
+as in you think it would have observable implications?
+
+[10:39:19.0000] <Bakkot>
+wouldn't do it if so, but I was hoping it would not be observable
+
+[10:42:13.0000] <jmdyck>
+no, i just meant it sounded like it would be difficult (for me) to verify it as preserving correctness/behavior
+
+[10:42:19.0000] <Bakkot>
+oh, sure
+
+[10:43:10.0000] <Bakkot>
+I guess maybe a simpler option would be to have AsyncGeneratorYield not do the suspend
+
+[10:43:35.0000] <jmdyck>
+wha?
+
+[10:44:15.0000] <jmdyck>
+but you figure stack-pop is an implicit suspend, how do you not do it?
+
+[10:44:30.0000] <Bakkot>
+that logic could be moved into AsyncGeneratorResumeNext, and made conditional on the queue being empty
+
+[10:45:38.0000] <Bakkot>
+so in AsyncGeneratorResumeNext, if the state is executing, it would check the queue and if it was empty then do the set-code-execution-state-and-suspend that AsyncGeneratorYield currently does, and if it is not then just execute the logic directly, instead of storing it in the code execution state
+
+[10:46:10.0000] <Bakkot>
+so that we avoid the current situation where there is a suspension and then immediate resumption a few steps later
+
+[10:46:35.0000] <jmdyck>
+i'm not really following.
+
+[10:46:48.0000] <Bakkot>
+mm, yeah, hard to describe
+
+[10:46:55.0000] <jmdyck>
+So AGYield wouldn't have the stack-pop?
+
+[10:46:55.0000] <Bakkot>
+I might make a strawman PR if I have time
+
+[10:46:58.0000] <Bakkot>
+right
+
+[10:47:03.0000] <Bakkot>
+that would be moved into the AsyncGeneratorResumeNext call
+
+[10:47:19.0000] <jmdyck>
+(or the step 8 set code eval state)
+
+[10:47:30.0000] <Bakkot>
+right
+
+[10:47:43.0000] <jmdyck>
+it would just go straight to invoking AGResolve
+
+[10:48:31.0000] <jmdyck>
+So does AGResolve
+
+[10:48:54.0000] <jmdyck>
+'s step 8 not care what the running ex context is?
+
+[10:50:30.0000] <jmdyck>
+Also there are other invocations of AGResolve: are they going to be okay with this change?
+
+[10:51:27.0000] <jmdyck>
+(and other invocations of AGResumeNext)
+
+[10:53:50.0000] <Bakkot>
+AGResumeNext currently has an assertion that the state is not ~executing~, so if the new logic were guarded on the state being ~executing~, it shouldn't affect the other callers
+
+[10:54:33.0000] <Bakkot>
+I think AGResolve does not care what the running execution context is, though I'm not 100% certain
+
+[10:54:53.0000] <Bakkot>
+anyway I haven't thought through this very far, just talking through possibilities
+
+[10:55:15.0000] <jmdyck>
+sure
+
+[10:55:20.0000] <Bakkot>
+and I haven't thought about the `.return` calls at all
+
+[10:59:08.0000] <Bakkot>
+fundamentally the bit that I don't like is that AsyncGeneratorYield pops the execution context but does not immediately return control there
+
+[10:59:34.0000] <jmdyck>
+that's been bugging me for days
+
+[11:00:30.0000] <jmdyck>
+that's why 2400 is only an issue and not a PR
+
+[11:00:43.0000] <jmdyck>
+because my brilliant idea didn't work for AGYield
+
+[11:01:23.0000] <jmdyck>
+because of the AGResolve call between the stack-pop and the control transfer.
+
+[11:05:32.0000] <jmdyck>
+Bakkot: so AGYield's step 6 "Set generator.[[AsyncGeneratorState]] to suspendedYield." would instead set it to executing?
+
+[11:06:59.0000] <jmdyck>
+hm, currently it gets set to executing late in AGResumeNext
+
+[11:13:56.0000] <Bakkot>
+ it's already executing in AGYield
+
+[11:17:19.0000] <jmdyck>
+how?
+
+[11:19:20.0000] <Bakkot>
+Currently the only way you can be executing the body of the async generator, and so perform AGYield, is via step 18 of AGResumeNext, which is immediately preceded by setting the state to ~executing~
+
+[11:21:32.0000] <jmdyck>
+oh right, there's an AGREsumeNext way back near the start if this example
+
+[11:35:15.0000] <jmdyck>
+ok, so take steps 6,7,8 from AGYield, push them down into AGResolve (at which point we have to wrap them in "If state is ~executing~" so that other invocations aren't disturbed), past AGResolve's `Call` at step 8, and down into AGResumeNext,
+
+[12:02:28.0000] <jmdyck>
+In AGResumeNext, if the queue is not empty, I'm not sure what you mean by "then just execute the logic directly, instead of storing it in the code execution state"
+
+[12:20:38.0000] <jmdyck>
+...
+
+[12:22:04.0000] <jmdyck>
+I've been looking at other calls to AGResolve. The one in AGStart is another case where we do a stack-pop without an immediate control-transfer.
+
+[12:30:31.0000] <jmdyck>
+It looks like currently, AGResolve is only invoked when the async context is suspended (not the running context). So that would make me worried about invoking it when the async context *is* the running context.
+
+[12:34:53.0000] <ryzokuken>
+is there a way to "break loop" in the spec? Can someone point me to some part of the spec that does that?
+
+[12:35:17.0000] <ryzokuken>
+I am writing a loop that I need to conditionally break out of...
+
+[12:35:23.0000] <ljharb>
+ryzokuken: what's the use case?
+
+[12:35:29.0000] <ljharb>
+ryzokuken: i'd think an AO with an early return would be clearer
+
+[12:35:42.0000] <ryzokuken>
+ljharb: gotcha
+
+[12:37:14.0000] <ryzokuken>
+ah okay that makes a whole lot of sense in hindsight, thanks ljharb
+
+[14:17:44.0000] <Bakkot>
+jmdyck: yeah, you're right: my most recent idea would end up changing the realm for the iterator result object created in AGResolve
+
+[14:17:50.0000] <Bakkot>
+so it wouldn't be strictly editorial
+
+[14:17:58.0000] <Bakkot>
+however, I am certain it would be web-compat
+
+[14:18:04.0000] <Bakkot>
+cf results in https://gist.github.com/bakkot/587234af192dcb86f6a76b024a416c1c
+
+[14:18:48.0000] <Bakkot>
+also, note that the realm for the iterator result object for _regular_ generators is always that of the generator, because the result object is created before the stack-pop
+
+[14:19:31.0000] <Bakkot>
+in that gist I believe FF's results are the ones which are correct per spec, but I wouldn't put money on it
+
+[14:22:48.0000] <jmdyck>
+https://github.com/tc39/ecma262/compare/master...jmdyck:AsyncGeneratorYield is what I had in mind
+
+[14:24:46.0000] <Bakkot>
+this doesn't work when there's no await
+
+[14:25:33.0000] <jmdyck>
+no AwaitExpression in the AsyncGeneratorBody?
+
+[14:25:40.0000] <Bakkot>
+right
+
+[14:25:42.0000] <Bakkot>
+at least, I think not
+
+[14:26:12.0000] <Bakkot>
+in that case it needs to do the AsyncGeneratorResolve steps, still
+
+[14:27:25.0000] <Bakkot>
+it doesn't need to do the AsyncGeneratorResumeNext ones, because the steps in that case will just be to return immediately (generally speaking, since the queue would be empty)
+
+[14:27:37.0000] <jmdyck>
+so if there isn't an await, then AGYield is returning to ... AGResumeNext?
+
+[14:27:47.0000] <Bakkot>
+but it needs to resolve the promise created by the first call to `.next`
+
+[14:27:50.0000] <Bakkot>
+yeah
+
+[14:35:12.0000] <jmdyck>
+in your gist, why realm.eval('foo') rather than just declaring foo?
+
+[14:35:52.0000] <jmdyck>
+s/declaring/executing/
+
+[14:36:15.0000] <Bakkot>
+as in, why the `eval`? the point is to get a generator whose realm is different from the realm of the outer context
+
+[14:36:26.0000] <jmdyck>
+ah
+
+[14:39:28.0000] <jmdyck>
+I don't really follow what it's doing, but you're saying that implementations are fairly different in the behavior they exhibit, so web devs can't be relying on a particular behavior, so tc39 is free to pick one?
+
+[14:41:30.0000] <jmdyck>
+(not "pick one of the exhibited behaviors" necessarily, but "pick a specific behavior")
+
+[14:43:52.0000] <Bakkot>
+yup
+
+[14:44:15.0000] <Bakkot>
+in terms of which realm the objects created by these AOs come from
+
+[14:44:43.0000] <Bakkot>
+we'd need consensus, still
+
+[15:13:30.0000] <jmdyck>
+so then what about the calls to AGResolve when the async context isn't the running context? Won't they create objects in a different realm from those created when the async context *is* the running context?
+
+[15:24:43.0000] <Bakkot>
+yes, unless we patched that
+
+[15:26:22.0000] <Bakkot>
+something like that already happens, though: the iterator result created during normal operation of a non-async generator comes from the generator realm, but if you call `Generator.prototype.return` on the generator after it is already completed you get an object created in the realm of your `Generator.prototype.return`
+
+[15:26:45.0000] <Bakkot>
+(which is not necessarily the same realm as the generator, since you can `.call` it across realms)
+
+[15:27:17.0000] <Bakkot>
+not just `.return` but also `.next` after the generator has completed, I should say
+
+[15:28:21.0000] <Bakkot>
+that is: the iterator result object created in step 2 of GeneratorResume is created in the realm of the caller (e.g. Generator.prototype.return), whereas the iterator result object created in step 3 of Yield is created in the realm of the generator itself
+
+[15:28:35.0000] <Bakkot>
+all this is just to say that we're already inconsistent here
+
+[15:38:03.0000] <Bakkot>
+sorry, two lines up, for Generator.prototype.return read Generator.prototype.next
+
+[16:31:42.0000] <jmdyck>
+Bakkot: and your gist shows that implementations differ even on the non-async generators?
+
+[16:39:18.0000] <Bakkot>
+yup
+
+
+2021-05-05
+[17:31:53.0000] <Bakkot>
+jmdyck: updated the gist with a summary of different engines: https://gist.github.com/bakkot/587234af192dcb86f6a76b024a416c1c#file-iterator-result-realm-js-L74-L88
+
+[17:32:25.0000] <Bakkot>
+honestly I like safari's behavior best, I think
+
+[17:36:29.0000] <jmdyck>
+"there are there" -> "there are three"
+
+[17:38:00.0000] <Bakkot>
+thanks, fixed
+
+[17:39:28.0000] <Bakkot>
+hm, also my claim that the spec unconditionally uses `.next`'s realm for the async case is maybe not true
+
+[17:40:21.0000] <Bakkot>
+at least when there is an `await` involved
+
+[17:46:20.0000] <jmdyck>
+like safari's behavior best in that it makes the most sense, or would be cleanest to specify?
+
+[17:47:02.0000] <jmdyck>
+also: "I'm not entirely about this" -> "I'm not entirely sure about this" ?
+
+[17:48:01.0000] <Bakkot>
+hah yes
+
+[17:48:18.0000] <Bakkot>
+jmdyck like it best in that it makes the most sense
+
+[17:48:21.0000] <Bakkot>
+at least for sync generators
+
+[17:49:16.0000] <Bakkot>
+for async, depends a bit on your perspective, I guess
+
+[17:50:00.0000] <Bakkot>
+either safari's behavior - "always .next's realm"- or a behavior no one actually has, "always the generator's realm", would be coherent choices, I think
+
+[17:53:22.0000] <jmdyck>
+wrt 2400, I could make a PR that applied the suggested change to Await and GeneratorYield, and that would be an improvement, I think, but that would still leave AGYield, so I think I'll wait until that's settled.
+
+[17:53:33.0000] <jmdyck>
+But it sounds like that might be a while.
+
+[17:54:07.0000] <Bakkot>
+but of those two coherent choices, I prefer using `.next`, since the code in generator itself never creates a thing which looks like `{ value, done }`, which suggests that `.next` is responsible for creating that object
+
+[17:54:09.0000] <Bakkot>
+yeah, probably
+
+[17:54:42.0000] <Bakkot>
+I'm a bit hesitant to bring this to committee, because very few people understand realms at all, and even fewer care
+
+[17:55:09.0000] <jmdyck>
+what's the alternative?
+
+[17:55:23.0000] <Bakkot>
+suffer from the spec being bad forever, basically
+
+[17:55:28.0000] <jmdyck>
+ee
+
+[17:55:36.0000] <Bakkot>
+I also do not like that option
+
+[17:55:54.0000] <Bakkot>
+if I do bring it, it will be because I have a concrete change to the specification I want to make which I think improves clarity, and which entails a normative change
+
+[18:03:47.0000] <Bakkot>
+which will probably look roughly like either your suggestion in 2400 + some tracking of realms for AGYield, and rewriting AGYield, or, otherwise, my earlier suggestion about conflating stack manipulation and transfer of control, if I can figure out how to make it work
+
+[18:54:07.0000] <jmdyck>
+I think my suggestion in 2400 would allow some refactoring that might get things close to the conflation model. (with various caveats)
+
+[19:21:07.0000] <Bakkot>
+yeah, agreed
+
+[23:07:06.0000] <DerekNonGeneric>
+ljharb, extending the generic builtin error type (`globalThis.Error`) seems like the wrong approach for `AssertionError` tbh
+
+[23:18:33.0000] <DerekNonGeneric>
+the few instance properties inherited from it that are guaranteed by the spec (`message` & `name`) do not seem to outweigh the useless, insecure, and terribly unreliable instance properties that would be inherited by it the various hosts
+
+[23:21:51.0000] <DerekNonGeneric>
+*that would be inherited by it in the various hosts
+
+[23:42:14.0000] <Bakkot>
+DerekNonGeneric: all the builtin error constructor classes inherit from Error
+
+[23:42:30.0000] <Bakkot>
+you'd need a very, very strong reason for a new one to not do so
+
+[23:56:27.0000] <DerekNonGeneric>
+Bakkot, do you think having a few pretty-strong reasons would be sufficient?
+
+[23:56:40.0000] <Bakkot>
+depends on how strong they were I guess
+
+[00:16:51.0000] <DerekNonGeneric>
+there aught to be a new `Exception` (or something) class we can inherit from w/o all the non-standard behavior. we need something that provides position information, which is a core tenet of what an assertion error _should_ be able to provide as a debugging tool
+
+[04:49:34.0000] <ljharb>
+DerekNonGeneric: that behavior isn’t something the spec can prohibit. Implementations could stick the same info on Exception.
+
+[16:54:58.0000] <DerekNonGeneric>
+it may be more likely that in a future ES202X the Error constructor inherits from Exception, which would provide all the internal properties and methods
+
+
+2021-05-06
+[19:01:10.0000] <DerekNonGeneric>
+s/interal properties/internal slots
+
+[19:23:08.0000] <DerekNonGeneric>
+not sure why the spec calls it Error Constructor and not Error Class.. guess the spec still sees classes as syntactic sugar so not sure what the proper terminology would in a proposal for this https://tc39.es/ecma262/#sec-error-constructor
+
+[19:39:12.0000] <jmdyck>
+Bakkot:  (or anyone) https://tc39.es/ecma262/#sec-initializers-in-forin-statement-heads defines an additional form for ForInOfStatement. Performing ForInOfLoopEvaluation on it ends with a call to ForIn/OfBodyEvaluation, with |BindingIdentifier| as first arg, passed to _lhs_ param.  I think this will be evaluated at 6.g.i.1 but there's no definition of Evaluation for |BindingIdentifier|. Did I miss something?
+
+[19:41:28.0000] <Bakkot>
+oh, no, that's probably just an oversight
+
+[19:42:49.0000] <Bakkot>
+it should have the same semantics as https://tc39.es/ecma262/#sec-for-in-and-for-of-statements-runtime-semantics-evaluation basically
+
+[19:43:24.0000] <jmdyck>
+thx
+
+[19:44:11.0000] <Bakkot>
+I introduced that bug in my very first ecma262 pr
+
+[19:44:17.0000] <Bakkot>
+( https://github.com/tc39/ecma262/pull/614 )
+
+[21:50:46.0000] <ljharb>
+DerekNonGeneric: the Error constructor's prototype chain almost certainly can't change at this point, ever, or it'd break the web
+
+[21:51:08.0000] <ljharb>
+DerekNonGeneric: and it's not about internal slots, it's about all the random properties that implementations are allowed to (and do) stick onto error instances
+
+[13:21:55.0000] <DerekNonGeneric>
+ljharb, is this this freedom for impls to do w/e they please unique to errors or ..? would i need to have my spec state this somewhere aswell or ..?
+
+[13:26:43.0000] <ljharb>
+DerekNonGeneric: the spec already explicitly states that impls can add any properties to anything they want
+
+[13:26:52.0000] <ljharb>
+DerekNonGeneric: meaning, all those nonstandard error properties
+
+[13:27:05.0000] <ljharb>
+DerekNonGeneric: it's not something we currently can forbid, anywhere.
+
+
+2021-05-07
+[14:41:47.0000] <jugglinmike>
+Anyone know why JSON modules allow implementers the options of simply throwing? https://github.com/tc39/proposal-json-modules/blob/74b2e89983e498b0d28ef6565658cbe4cca93e33/spec.html#L61
+
+[14:43:43.0000] <jugglinmike>
+dandclark littledan MylesBorins perhaps? ^
+
+[14:46:00.0000] <ljharb>
+jugglinmike: as opposed to which
+
+[14:47:22.0000] <jugglinmike>
+ljharb: sorry, typo in my question. It should read "the option of simply throwing"
+
+[14:47:51.0000] <jugglinmike>
+So, as opposed to not allowing that option
+
+[14:48:51.0000] <ljharb>
+jugglinmike: the whole point of the import assertions proposal is that web browsers want to disallow json module imports when the user doesn't explicitly indicate they want json, to avoid someone getting json and then silently getting JS later
+
+[14:49:30.0000] <ljharb>
+jugglinmike: so if i'm understanding your question correctly, that option is the mechanism by which an engine would be able to reject an import, based on the module and the requested type
+
+[14:54:39.0000] <jugglinmike>
+The case of disallowing json when the user doesn't explicitly indicate they want json--that doesn't seem to describe imports that use {"type":"json"}
+
+[14:55:10.0000] <ljharb>
+what i mean is, if they import with type json today and get .json, and tomorrow the server starts sending JS, browsers insist that must start erroring
+
+[14:55:39.0000] <ljharb>
+and if you import without type json today and get .json, browsers insist that must always error, to avoid the footgun referenced just prior
+
+[14:56:59.0000] <jugglinmike>
+Yeah, I've read some of the motivating discussion.
+
+[14:58:07.0000] <jugglinmike>
+But isn't the rejection (and maybe most importantly, the refusal to execute code) covered by the semantics of ParseJSONModule?
+
+[14:58:38.0000] <jugglinmike>
+In other words, if the server starts sending JS, won't the import naturally fail when it calls JSON.parse?
+
+[15:04:54.0000] <ljharb>
+not necessarily - valid json can also be js
+
+[15:05:17.0000] <ljharb>
+and browsers want to reject based on mime, not content
+
+[15:05:44.0000] <ljharb>
+in the case of something with a filesystem it’d likely be based on file extension, also not content
+
+[15:11:27.0000] <jugglinmike>
+Ahah. I think this is the piece I was missing
+
+[15:11:52.0000] <jugglinmike>
+I read through https://github.com/WICG/webcomponents/issues/839 but I didn't see how we got from there to the import assertions proposal
+
+[15:13:40.0000] <jugglinmike>
+Because in that thread, I don't think the suggestion for a "noexecute" assertion was resolved
+
+[15:16:22.0000] <jugglinmike>
+It sounds like the strict requirement on mimetype might be related, because from what I can see on that thread, it seems as though any assertion that prevents execution would satisfy the browsers' concerns
+
+[15:18:14.0000] <jugglinmike>
+There was about six months between Dan's last comment and the creation of the proposal, so I probably have to keep looking for more context
+
+[15:20:54.0000] <jugglinmike>
+Thanks for the help, ljharb!
+
+[15:57:11.0000] <ljharb>
+jugglinmike: np!
+
+
+2021-05-08
+[20:03:11.0000] <devsnek>
+tfw i have to write my own weak value map using weakrefs
+
+[10:14:46.0000] <jmdyck>
+Re regexp set notation: how does 12.8.5 allow nested square brackets?
+
+[10:29:56.0000] <Bakkot>
+jmdyck: RegularExpressionClass produces [ RegularExpressionClassChars ] and RegularExpressionClassChar allows [
+
+[10:30:16.0000] <Bakkot>
+does that answer your question because if not I did not understand it
+
+[12:07:30.0000] <jmdyck>
+Bakkot: RegularExpressionClassChar allows [ but not (unescaped) ]
+
+[12:08:21.0000] <jmdyck>
+allows `[`, but not (unescaped) `]`
+
+[12:09:57.0000] <jmdyck>
+ah, i think i get it now
+
+[12:11:29.0000] <jmdyck>
+if you have `[foo-[bar]]`, then `[foo-[bar]` is parsed as a RegularExpressionClass, and then `]` as a RegularExpressionChar
+
+
+2021-05-10
+[08:35:06.0000] <jmdyck>
+Will 2290 be merged to master at the same time as 1668?
+
+[08:58:40.0000] <Bakkot>
+no, 2290 does not have stage 4 yet
+
+
+2021-05-11
+[17:14:49.0000] <DerekNonGeneric>
+> 11:58 AM <• Bakkot> no, 2290 does not have stage 4 yet
+
+[17:15:15.0000] <DerekNonGeneric>
+jmdyck ^ that was said while you were out
+
+[17:15:48.0000] <jmdyck>
+yup, i read that in the log, thanks.
+
+[17:16:01.0000] <DerekNonGeneric>
+cool
+
+[17:36:10.0000] <ljharb>
+jmdyck: i'll ofc rebase it the moment 1668 lands tho, and it's minimal so it won't cause further conflicts
+
+[17:36:56.0000] <jmdyck>
+ok, I'll review it once you rebase.
+
+[20:18:51.0000] <devsnek>
+Bakkot: after filling in the tail call logic: https://gc.gy/88408124.png
+
+[20:19:29.0000] <devsnek>
+also after updating eshost lol https://gc.gy/88408161.png
+
+[20:36:05.0000] <Bakkot>
+devsnek neat
+
+[20:36:31.0000] <Bakkot>
+this is such a dumb edge case
+
+[20:40:30.0000] <Bakkot>
+how do you get v8 and sm to do the $262 thing?
+
+[20:46:50.0000] <Bakkot>
+I guess the answer is "update eshost" huh
+
+[20:58:43.0000] <Bakkot>
+devsnek want to try this one with the new engine262? https://gist.github.com/bakkot/7fc563fb93c2e3b76dca793f467c0ec5
+
+[20:59:00.0000] <Bakkot>
+just adds a couple more cases so you can tell if the tail call is actually relevant
+
+[21:36:47.0000] <devsnek>
+Bakkot: https://gc.gy/88412800.png
+
+[21:37:03.0000] <Bakkot>
+neat
+
+[21:37:24.0000] <Bakkot>
+engine262+ is I think correct per spec
+
+[21:37:48.0000] <devsnek>
+big wins
+
+[21:39:10.0000] <devsnek>
+idk what moddable is doing
+
+[21:43:01.0000] <Bakkot>
+xs doesn't actually create new intrinsics for $262.createRealm()
+
+[21:43:09.0000] <Bakkot>
+`xs -e 'print($262.createRealm().global.TypeError === TypeError)'` gives `true`
+
+[21:44:24.0000] <devsnek>
+weird
+
+[21:44:36.0000] <ljharb>
+doesn't that mean that it's not really providing a realm, so any tests that require it might be invalid?
+
+[21:45:05.0000] <Bakkot>
+/shrug
+
+[21:45:21.0000] <Bakkot>
+probably, depending on your interpretation
+
+[21:45:27.0000] <Bakkot>
+realms are kinda silly anyway, though
+
+[21:45:34.0000] <Bakkot>
+XS does not need to expose them
+
+[21:45:44.0000] <Bakkot>
+you only see them on the web because of iframe shenanigans
+
+[21:46:23.0000] <ljharb>
+lol, that's a longer discussion
+
+[21:46:31.0000] <devsnek>
+lul i still fail the tco tests
+
+[21:46:32.0000] <ljharb>
+iframes are indeed the reason they exist, ofc
+
+[21:46:33.0000] <devsnek>
+https://gc.gy/88413389.png
+
+[21:46:39.0000] <devsnek>
+cuz v8 runs out of stack space
+
+[21:47:15.0000] <Bakkot>
+just `--stack_size 10000` or whatever
+
+[21:47:23.0000] <ljharb>
+but i don't think it's open to interpretation; https://tc39.es/ecma262/#sec-createintrinsics seems to mandate all intrinsics be distinct property values
+
+[21:48:03.0000] <ljharb>
+*distinct values
+
+[21:48:16.0000] <devsnek>
+idk
+
+[21:48:27.0000] <devsnek>
+i don't think its black and white
+
+[21:48:45.0000] <ljharb>
+step 3 - "The value of each field is a new object value" and "All object property values are newly created object values" seems pretty black and white to me
+
+[21:49:37.0000] <devsnek>
+eh
+
+[21:49:41.0000] <devsnek>
+new is relative
+
+[21:49:45.0000] <ljharb>
+lol
+
+[21:50:00.0000] <devsnek>
+can we test tco without blowing the stack
+
+[21:50:06.0000] <ljharb>
+if so, the spec's wayyyyy looser than we all think :-p
+
+[21:50:08.0000] <devsnek>
+$262.getStackDepth when
+
+[21:50:46.0000] <Bakkot>
+I mean, no?
+
+[21:51:07.0000] <Bakkot>
+tco is not observable except in that your stack can be deeper than it otherwise would be, outside of stupid edge cases like the ones I've been playing with
+
+[21:51:24.0000] <Bakkot>
+(which everyone is inconsistent on even absent tco)
+
+[21:54:36.0000] <devsnek>
+i mean if you can get the number of frames you can assert that it is constant
+
+[21:54:47.0000] <Bakkot>
+it's not constant though
+
+[21:54:48.0000] <Bakkot>
+even absent tco
+
+[21:54:53.0000] <Bakkot>
+because not all frames are the same size
+
+[21:55:08.0000] <devsnek>
+i'm not saying getNumberOfBytesThatFramesOccupy
+
+[21:55:22.0000] <devsnek>
+i'm saying getExecutionContextStackLength
+
+[21:55:53.0000] <Bakkot>
+IIRC spidermonkey has a hard cap on the number of stack frames but v8 bases it on the actual amount of space the frames occupy
+
+[21:56:18.0000] <Bakkot>
+so your maximum stack depth is different for different functions
+
+[21:58:05.0000] <devsnek>
+i mean you don't need to call it more than once
+
+[21:58:11.0000] <devsnek>
+well
+
+[21:58:12.0000] <devsnek>
+twice
+
+[21:58:44.0000] <devsnek>
+foo = (i) => i > 3 ? getStackDepth() : foo(i + 1); assert(foo(0) === getStackDepth() + 1)
+
+[22:14:44.0000] <Bakkot>
+oh, get the _current_ stack depth, got it
+
+[22:19:20.0000] <devsnek>
+🙌🏻 https://gc.gy/88415352.png
+
+
+2021-05-12
+[11:12:03.0000] <rickwaldron>
+@MylesBorins @dandclark @littledan can you all take a look (you were summoned) https://github.com/tc39/test262/pull/2980
+
+[11:13:10.0000] <MylesBorins>
+I haven't been involved in the spec for a bit and won't be that much use unfortunately :S
+
+[11:15:59.0000] <dandclark>
+Yes, I've been meaning to dig into this, will prioritize this today/tomorrow.
+
+[11:56:13.0000] <rickwaldron>
+@dandclark thanks, I appreciate it.
+
+[12:07:49.0000] <Bakkot>
+jmdyck: we will probably merge 1668 later today
+
+[12:08:07.0000] <jmdyck>
+I'm just looking at it now
+
+[12:09:12.0000] <jmdyck>
+The lastest changes didn't raise anything new, but I figured I should have another look at the whole thing.
+
+[12:32:06.0000] <jmdyck>
+I'm finding some stuff.
+
+[12:41:10.0000] <jmdyck>
+hm, looks like stuff I raised months ago didn't get done.
+
+[12:41:29.0000] <Bakkot>
+aw, really? I could've sworn I went through all the comments
+
+[12:41:57.0000] <jmdyck>
+https://github.com/tc39/ecma262/pull/1668#pullrequestreview-584008798
+
+[12:42:30.0000] <Bakkot>
+ah, missed that because it wasn't inline, just a sec
+
+[12:43:30.0000] <Bakkot>
+hm, actually, that looks done to me
+
+[12:43:40.0000] <jmdyck>
+AssignmentTargetType looks done.
+
+[12:44:26.0000] <jmdyck>
+but I'm getting errors re ClassElementKind and ComputedPropertyContains
+
+[12:45:08.0000] <Bakkot>
+oh, it's because they didn't combine the emu-grammar tags, I expect
+
+[12:45:44.0000] <jmdyck>
+oh, yeah.
+
+[12:46:09.0000] <jmdyck>
+That's weird, I should have something that complains about non-merged emu-grammars
+
+[12:46:13.0000] <Bakkot>
+at least for ClassElementKind
+
+[12:46:21.0000] <Bakkot>
+I don't see anything obviously wrong with ComputedPropertyContains
+
+[12:48:40.0000] <Bakkot>
+oh, wait, yes I do
+
+[12:51:40.0000] <Bakkot>
+pushed
+
+[12:56:03.0000] <jmdyck>
+something weird's happening
+
+[12:56:19.0000] <jmdyck>
+not sure if I've messed up the rebase
+
+[12:58:05.0000] <jmdyck>
+at 8028, should be blank line between 2 productions.
+
+[12:58:23.0000] <jmdyck>
+more seriously, at 21147and 21148, stray end-tags
+
+[12:58:51.0000] <jmdyck>
+(Bakkot)
+
+[12:59:09.0000] <Bakkot>
+whoops
+
+[12:59:10.0000] <Bakkot>
+pushed
+
+[12:59:34.0000] <Bakkot>
+I gotta get to https://github.com/tc39/ecmarkup/issues/317 soon
+
+[13:04:03.0000] <jmdyck>
+ok, that got rid of some SDO complaints
+
+[13:06:02.0000] <jmdyck>
+and rebasing-to-master on my 1668-specific branch of ecmaspeak gets rid of some more.
+
+[13:06:50.0000] <jmdyck>
+still getting some SDO coverage stuff that isn't in master though
+
+[13:07:41.0000] <jmdyck>
+looking into it...
+
+[13:11:41.0000] <jmdyck>
+got rid of some more...
+
+[13:20:46.0000] <jmdyck>
+So the only thing left (under SDO coverage) is re the definition of EvaluateBody for Initializer (line 11270): how would EvaluateBody be invoked on an Initializer?
+
+[13:22:17.0000] <jmdyck>
+1668 doesn't appear to add any calls to EvaluateBody
+
+[13:26:39.0000] <jmdyck>
+Ah, there's a call to OrdinaryFunctionCreate that supplies an Initializer
+
+[13:27:17.0000] <jmdyck>
+as the _Body_
+
+[13:29:00.0000] <Bakkot>
+indeed
+
+[13:31:28.0000] <jmdyck>
+ok, that takes care of sdo coverage
+
+[13:34:29.0000] <jmdyck>
+that just leaves type-analysis
+
+[13:37:53.0000] <jmdyck>
+which always complains a lot
+
+[13:47:17.0000] <jmdyck>
+I think the new complaints are mostly spurious.
+
+[13:47:59.0000] <jmdyck>
+One's an editorial inconsistency that i can bring up separately.
+
+[13:56:38.0000] <Bakkot>
+sweet
+
+[13:56:40.0000] <Bakkot>
+fixed the IDs
+
+[13:56:45.0000] <jmdyck>
+thx
+
+[14:20:18.0000] <aradesh>
+i just noticed that the TRV of CodePoint is referenced twice here, but isn't defined anywhere: https://tc39.es/ecma262/#sec-static-semantics-tv-and-trv
+
+[14:22:22.0000] <aradesh>
+similarly for NotCodePoint
+
+[14:49:55.0000] <jmdyck>
+aradesh: TRV of CodePoint and NotCodePoint chain to TRV of HexDigits
+
+
+2021-05-13
+[08:53:44.0000] <ljharb>
+jmdyck: heads up that a force push alone triggers a GitHub notification
+
+[08:55:03.0000] <jmdyck>
+yeah, but I often want to explain why
+
+[08:56:48.0000] <ljharb>
+sure, fair enough :-)
+
+[08:57:07.0000] <ljharb>
+altho we can click the “force pushed” link and it’ll show the diff, which often covers it
+
+[09:27:29.0000] <Bakkot>
+not really; when the force push includes a rebase it tends to swamp any other changes included
+
+[09:33:11.0000] <ljharb>
+sure, but that tells you that the force push was to rebase. i'm not sure why it matters that the reason was to resolve conflicts, but if it's helpful for you, go for it
+
+[09:37:03.0000] <Bakkot>
+my point is that sometimes a force push is just a rebase and sometimes it is both a rebase and additional changes, and you can't tell which it is just from the diff
+
+[09:37:57.0000] <ljharb>
+sure. but a comment "to resolve conflicts" doesn't tell you that either
+
+[09:39:28.0000] <Bakkot>
+I read such a comment to imply it did not include any changes other than those necessary to get the diff to land cleanly, which does tell me that it is just a rebase
+
+[09:40:11.0000] <ljharb>
+alrighty then
+
+[09:40:48.0000] <ljharb>
+(for me that's the default assumption, and i'd expect a comment only when there are changes beyond that, that also aren't already resolving an existing review comment)
+
+[09:41:42.0000] <Bakkot>
+I do not share this assumption
+
+[09:42:11.0000] <Bakkot>
+also I want to know the difference between "just a rebase" and "a rebase which additionally changes things to resolve existing comments"
+
+[09:52:55.0000] <ljharb>
+wasn't trying to start an argument, i just figured the reason for the comments was a notification, which has been unnecessary for a year or more
+
+[09:53:26.0000] <ljharb>
+if the reason is to explain the changes, great, but i've not yet seen a comment from anyone that actually explains what changes were made, whether to resolve conflicts or existing comments
+
+[10:01:19.0000] <rickwaldron>
+@dandclark thanks for following up with that review, very much appreciated.
+
+[10:01:42.0000] <dandclark>
+No problem, sorry about the delay
+
+[11:32:12.0000] <aradesh>
+does anyone know what the TRV of a CodePoint and a NotCodePoint would be? presumably just the source text they match? they're referred in this section but not defined: https://tc39.es/ecma262/#sec-static-semantics-tv-and-trv
+
+[11:42:26.0000] <jmdyck>
+aradesh: I replied to you yesterday, but you weren't logged in: TRV of CodePoint and NotCodePoint chain to TRV of HexDigits
+
+[11:43:27.0000] <aradesh>
+jmdyck: thanks
+
+[11:43:35.0000] <jmdyck>
+yw
+
+[11:43:37.0000] <aradesh>
+:)
+
+[12:41:49.0000] <aradesh>
+i should have worked that out since CodePoint and NotCodePoint are chain productions and it says that unless otherwise stated functions on chain productions just inherit from the non-terminal on the RHS https://tc39.es/ecma262/#sec-algorithm-conventions-syntax-directed-operations
+
+[16:00:34.0000] <Bakkot>
+TabAtkins: how's proposal-seeded-random going? I'm finding myself writing a lot of deterministic prngs these days, and longing for the days when I do not have to roll me own
+
+[16:06:02.0000] <TabAtkins>
+Haven't touched it in a bit, but I want to. I'll double-check where I'm at in it; I think my next step is to write up a concrete spec text proposal and seek impl support?
+
+[16:08:22.0000] <Bakkot>
+looks like it's stage 1, so it only needs "initial" spec text (meaning you could probably have a "implementation of xoroshiro [or whatever] goes here" step) to get to stage 2
+
+[16:08:50.0000] <Bakkot>
+strictly speaking there is no "seek impl support" step in our process, it's just assumed that implementations who are not interested will block stage 2 or 3
+
+[16:10:02.0000] <Bakkot>
+(I guess you probably can get away with specifying a sufficiently well-specified PRNG by reference rather than writing down the algorithm, even in the final version, so "implementation of xoroshiro goes here" is probably fine even for the non-initial version)
+
+[16:11:52.0000] <TabAtkins>
+Oh that's great to know, that clears away a big mental blocker.
+
+[16:14:02.0000] <Bakkot>
+of course I cannot speak for the rest of the committee, but I at least would be happy with that.
+
+
+2021-05-15
+[11:49:01.0000] <jmdyck>
+Does anyone know why test262-parser-tests says `(class {a})` is 'fail'? (https://github.com/tc39/test262-parser-tests/blob/master/fail/98204d734f8c72b3.js)
+
+[12:04:29.0000] <Bakkot>
+jmdyck: because I haven't updated it since class fields landed
+
+[12:04:55.0000] <Bakkot>
+(or indeed some time before that; I haven't been doing a good job there)
+
+[14:48:36.0000] <jmdyck>
+Ah, I forgot that ES6 classes didn't have FieldDefinitions.
+
+
+2021-05-17
+[01:23:21.0000] <jschoi>
+I’ve been running into a place where popcount would be useful in some data-compression code (see https://news.ycombinator.com/item?id=20914479). I’m wondering: has anyone talked about proposing a `Math.popCount` function or something similar?
+
+[01:23:56.0000] <jschoi>
+(Yes, WebAssembly already has `i32.popcnt`, and yes it can be manually done with bit-twiddling, but hardware-accelerated popcount in JS without having to bridge to wasm would still be pretty useful for several diverse applications, from succinct data structures to Hamming distance.)
+
+[06:41:39.0000] <DerekNonGeneric>
+jschoi, _highly_ doubtful... you may want to search through https://es.discourse.group/
+
+[06:42:39.0000] <DerekNonGeneric>
+jschoi, there was also a mailing list at one point, but just got cancelled
+
+[06:43:04.0000] <DerekNonGeneric>
+jschoi, the archives are sparse too
+
+[06:44:34.0000] <jmdyck>
+https://github.com/search?q=org%3Atc39+popcount finds a few
+
+[06:47:47.0000] <DerekNonGeneric>
+interesting, thanks for that
+
+[07:07:37.0000] <jmdyck>
+In Annex B's `AtomEscape :: DecimalEscape (but only if the CapturingGroupNumber of DecimalEscape is ≤ NcapturingParens)`, the constraint requires that we know NcapturingParens, the total number of capturing left-parens in the Pattern, which we won't know until we've parsed the Pattern. So correctly parsing a part of the Pattern requires you to first parse the whole Pattern? Catch-22.
+
+[07:07:48.0000] <jmdyck>
+What do implementations do in practice?
+
+[07:09:25.0000] <jmdyck>
+It looks like engine262 doesn't use the Annex B regexp syntax.
+
+[08:52:02.0000] <Bakkot>
+jmdyck: the NcapturingParens thing doesn't actually affect which patterns match: in non-U annex B regexes, `\4` or `\90` or whatever is always legal. it's just that they mean different things depending on NcapturingParens: if the NcapturingParens is sufficiently small the first characters (and possibly the next one or two) will fall through to LegacyOctalEscape or IdentityEscape
+
+[08:52:41.0000] <Bakkot>
+this is a terrible way of specifying it, but it is unambiguous
+
+[10:37:52.0000] <jmdyck>
+Bakkot: ambiguity wasn't what I was complaining about, rather the forward reference/circularity. I agree that the constraint doesn't affect which texts match Pattern, just the resulting parse tree. So I'm wondering if implementations initially parse it as a DecimalEscape (ignoring the constraint) and then, once they know what NcapturingParens is, go back to each DecimalEscape and figure out what it really should be.
+
+[11:36:15.0000] <Bakkot>
+looks like v8 scans forward when it encounters one which is ambiguous: https://github.com/v8/v8/blob/03fcd892219928663f717fbf55c511234b4b3640/src/regexp/regexp-parser.cc#L734
+
+[11:36:22.0000] <Bakkot>
+can't speak to other engines offhand
+
+[11:41:41.0000] <jmdyck>
+cool, thx
+
+[12:03:52.0000] <jmdyck>
+apparently SpiderMonkey uses V8's regexp engine
+
+[15:19:05.0000] <shu>
+yes, though note the versions might not be in sync and SM might be a few versions behind
+
+[15:44:42.0000] <jschoi>
+jmdyck: Thanks for the pointer. Looks like there was discussion from littledan about adding them to a future BigInt v2 proposal (https://github.com/tc39/proposal-bigint/issues/20)…Could be worth making a future proposal for a non-BigInt popCount built-in, too.
+
+
+2021-05-18
+[07:33:33.0000] <devsnek>
+jmdyck: ironically ParseRegExp sometimes parses twice
+
+[07:33:54.0000] <devsnek>
+not for decimal escapes though
+
+[07:46:16.0000] <jmdyck>
+devsnek: are you talking about engine262?
+
+[07:47:00.0000] <devsnek>
+no in the spec
+
+[07:47:10.0000] <devsnek>
+I think it changes the +N flag?
+
+[07:50:44.0000] <devsnek>
+yeah it does
+
+[08:04:52.0000] <jmdyck>
+Ah, for the spec you mean ParsePattern
+
+[08:14:30.0000] <jmdyck>
+I suppose the spec could use a similar technique for dealing with the Annex B DecimalEscape constraint: parse once without the constraint, and if the result contains any DecimalEscapes, parse again, but this time with the constraint and knowing what NcapturingParens is. But I imagine you'd have to toss in another grammar parameter just switch the constraint on/off, so that would be annoying.
+
+[08:15:17.0000] <jmdyck>
+just to* switch
+
+[09:06:12.0000] <Bakkot>
+rather than parsing again I think you could just make the semantics of DecimalEscape depend on NcapturingParens
+
+[09:06:33.0000] <Bakkot>
+I'm not totally certain that works, though
+
+[09:33:07.0000] <jmdyck>
+I imagine it could be made to work. Not sure how messy it would be though.
+
+[09:33:30.0000] <jmdyck>
+Another possibility would be to use a cover grammar.
+
+
+2021-05-21
+[12:14:18.0000] <jmdyck>
+Note that https://freenode.logbot.info/tc39/ says "logbot is shutting down at the end of June 2021", which TC39 may want to do something about.
+
+[12:19:15.0000] <ljharb>
+jmdyck: it's unclear if we'll still be on freenode by then
+
+[12:19:31.0000] <ljharb>
+jmdyck: it's an item on our agenda for next week
+
+[12:19:46.0000] <jmdyck>
+planning to move elsewhere or just drop IRC?
+
+[12:20:12.0000] <ljharb>
+jmdyck: unclear. options are likely "stay on freenode", "move to libera", or "use not-irc"
+
+[12:20:56.0000] <jmdyck>
+"Libera is an all-boy English vocal group directed by Robert Prizeman." nope, probably not that.
+
+[12:21:34.0000] <ljharb>
+jmdyck: libera.chat
+
+[12:21:58.0000] <ljharb>
+jmdyck: it's where almost all the freenode staffers created. https://gist.github.com/joepie91/df80d8d36cd9d1bde46ba018af497409
+
+[12:25:46.0000] <jmdyck>
+thx for link, i hadn't heard
+
+[12:41:44.0000] <Bakkot>
+  we're squatting #tc39 and a couple others there, in case we end up deciding to go with that option
+
+
+2021-05-22
+[18:59:13.0000] <devsnek>
+😔 https://gc.gy/89353738.png
+
+[19:12:22.0000] <Bakkot>
+devsnek I assume this is just https://github.com/whatwg/console/issues/168
+
+[19:13:41.0000] <devsnek>
+Bakkot: more like https://github.com/tc39/proposal-standardized-debug
+
+[07:43:45.0000] <jmdyck>
+Hm. `Contains` has a definition for `ArrowParameters : CoverParenthesizedExpressionAndArrowParameterList`. Why doesn't it also have a definition for `PrimaryExpression : CoverParenthesizedExpressionAndArrowParameterList` ?
+
+[11:20:29.0000] <Bakkot>
+jmdyck it probably should, now that you point it out
+
+[11:20:59.0000] <jmdyck>
+ok
+
+[11:21:28.0000] <Bakkot>
+jmdyck btw do you have thoughts on moving this channel to Matrix vs to libera.chat?
+
+[11:21:36.0000] <Bakkot>
+since freenode seems like it is maybe over
+
+[11:21:55.0000] <jmdyck>
+no experience with either
+
+[11:22:39.0000] <Bakkot>
+matrix is a different protocol, libera.chat is just a different irc server
+
+[14:32:11.0000] <ondras>
+hi, I ran into an issue when playing with Private fields: https://jsfiddle.net/o5L3wua6/
+
+[14:32:25.0000] <ondras>
+apparently, the private values of A and B are separate
+
+[14:32:54.0000] <ondras>
+I suppose this must have been encountered before
+
+[14:33:26.0000] <ondras>
+but I cannot find it mentioned anywhere, or an Issue at https://github.com/tc39/proposal-class-fields/ ...
+
+[14:49:21.0000] <ondras>
+perhaps this one confirms my suspicion: https://github.com/tc39/proposal-class-fields/issues/135 - but does not really give any tips on how to approach this properly
+
+[14:51:23.0000] <Bakkot>
+ ondras if you want the field to be accessible to other classes, don't make it private
+
+[14:55:31.0000] <ondras>
+Bakkot: makes sense. thanks!
+
+[16:03:08.0000] <DerekNonGeneric>
+tbh, i'm hesistant to make a proposal to TC39 because i'm afraid you all are going to stall it indefinitely with some excuse like "we can't find consensus" or something
+
+[16:12:02.0000] <DerekNonGeneric>
+lol, just had to get that off my chest
+
+[16:17:24.0000] <DerekNonGeneric>
+not ready to fail in that arena yet, so if anyone wants to propose an AssertionError, give you permission since i have still not identified a champion and there is very little incentive for me to pursue it
+
+[16:45:41.0000] <DerekNonGeneric>
+the errors in the ES spec are extremely unspecified too (wonder what a "spec-compliant" implementation even looks like at this point)
+
+[16:47:50.0000] <DerekNonGeneric>
+you have TypeError, but no ValueError -- that whole part of the spec needs some TLC
+
+
+2021-05-23
+[18:11:29.0000] <ljharb>
+DerekNonGeneric: i think it’s a hard sell to add types like those to the language when they have virtually no usage in userland
+
+[18:37:45.0000] <DerekNonGeneric>
+>  they have virtually no usage in userland
+
+[18:38:10.0000] <DerekNonGeneric>
+ljharb, `AssertionError` has no usage in userland?
+
+[18:39:00.0000] <DerekNonGeneric>
+this is one of the most common (and most fundamental) error types in all of the JS ecosystem
+
+[18:40:10.0000] <DerekNonGeneric>
+the fact that it's missing seems wild to me
+
+[18:45:19.0000] <DerekNonGeneric>
+adding a new error type w/o even having `stack` (or whatever) standardized yet means that there is no foundation from which to build new standardized errors, so this would be a massive standardization undertaking afaict
+
+[19:21:40.0000] <ljharb>
+DerekNonGeneric: node’s assert has it but i don’t know of anyone directly caring that that’s the error type
+
+[19:22:05.0000] <ljharb>
+DerekNonGeneric: iow a standard Error with a “assertion: true” property on it would probably work just as well
+
+[19:37:26.0000] <DerekNonGeneric>
+> a standard Error with a “assertion: true” property on it would probably work just as well
+
+[19:38:03.0000] <DerekNonGeneric>
+ljharb, that is not one of the properties of an `AssertionError` according to JS ecosystem usage patterns
+
+[19:38:43.0000] <DerekNonGeneric>
+the most common are: `actual`, `expected`, and `operator` to name a few
+
+[19:39:00.0000] <ljharb>
+DerekNonGeneric: maybe i'm missing context. is this an interoperable thing already?
+
+[19:39:17.0000] <ljharb>
+or is it just a convention that a few libraries all follow similarly?
+
+[19:40:12.0000] <ljharb>
+i've used mocha and jest and jasmine and assert for many, many years, and i've never cared that the error thrown is an "AssertionError" - i only care that the test runner can catch the errors that it, itself, generates from its assertion API
+
+[19:42:37.0000] <DerekNonGeneric>
+yeah, it is a convention that several assertion libraries follow (Chai, Jest, Node Core `assert`, Mocha, etc.)
+
+[19:43:07.0000] <ljharb>
+right but do they interoperate?
+
+[19:43:32.0000] <ljharb>
+everybody using jest's assertion api is using jest's runner, almost everyone using chai or mocha's assertion api is using mocha, etc
+
+[19:43:51.0000] <ljharb>
+node's assert is probably a special case but how many people using any of those runners are using an assert-based api, as opposed to the much more common BDD-style interfaces?
+
+[19:46:49.0000] <ljharb>
+so like what i mean is, there's like, 6 developers/teams that ever need AssertionError, and to everyone else, they're completely transparent, and it _seems_ to me that virtually nobody actually relies on interoperability there
+
+[19:49:06.0000] <DerekNonGeneric>
+interop btwx test frameworks is one good justification, but probably not the strongest reason to include it in the language
+
+[19:49:39.0000] <ljharb>
+what's your strongest reason?
+
+[19:51:05.0000] <DerekNonGeneric>
+dunno, i have a few and have not really identified one of them to be the strongest reason so far
+
+[19:51:17.0000] <ljharb>
+i'd love to hear a few
+
+[19:51:30.0000] <ljharb>
+interop between test frameworks was the only one i can think of
+
+[19:52:24.0000] <DerekNonGeneric>
+well, there is also data validation
+
+[19:53:41.0000] <ljharb>
+where you'd want to rely on try/catch?
+
+[19:55:20.0000] <DerekNonGeneric>
+more like you are validating some function arguments and throw this error when you get something you don't want (could be wrong type, wrong value, range, etc.)
+
+[19:59:01.0000] <devsnek>
+until we do something interesting with errors, as far as i'm concerned, we don't even need the subclasses we currently have
+
+[20:00:01.0000] <devsnek>
+the only test suite i've worked with that cares which specific error is thrown is test262, and that's just a cycle at that point
+
+[20:01:42.0000] <ljharb>
+DerekNonGeneric: right but that's already what TypeError is
+
+[20:02:05.0000] <ljharb>
+or RangeError
+
+[20:02:15.0000] <ljharb>
+or AggregateError, i suppose
+
+[20:02:34.0000] <ljharb>
+like what does "assertion" mean here
+
+[20:03:01.0000] <ljharb>
+in the spec, an assertion is something that can't ever fail, or else the whole implementation is invalid. i feel like typically, that's what `assert()` statements are for
+
+[20:03:36.0000] <ljharb>
+so unless AssertionErrors are uncatchable (and uncatchable errors would be a huge nonstarter for a number of reasons) then i'm not sure why it'd be any different than just any kind of thrown value
+
+[20:03:52.0000] <devsnek>
+i think most engines already have uncatchable errors
+
+[20:04:05.0000] <devsnek>
+isn't that also part of mark's proposal for gc recovery
+
+[20:05:45.0000] <ljharb>
+devsnek: that part of it got strong pushback, and i don't think is still in it
+
+[20:06:08.0000] <devsnek>
+😭 i like uncatchable errors
+
+[20:07:28.0000] <ljharb>
+but you like reference assignments too
+
+[20:08:08.0000] <devsnek>
+array.at(-1) = x is a good feature
+
+[20:08:16.0000] <devsnek>
+:^)
+
+[21:21:45.0000] <jmdyck>
+13.2.5.1 says "When ObjectLiteral appears in a context where ObjectAssignmentPattern is required the following Early Error rules are not applied. In addition, they are not applied when initially parsing a CoverParenthesizedExpressionAndArrowParameterList or CoverCallExpressionAndAsyncArrowHead."
+
+[21:24:25.0000] <jmdyck>
+I'm wondering about that "In addition". Is there a case where the first sentence applies but the second one doesn't?
+
+[21:47:50.0000] <Bakkot>
+jmdyck CoverParenthesizedExpressionAndArrowParameterList derives ObjectBindingPatternm, not ObjectAssignmentPattern
+
+[21:48:06.0000] <Bakkot>
+they're just different cases
+
+[21:51:21.0000] <jmdyck>
+CoverParenthesizedExpressionAndArrowParameterList derives ( Expression ) and Expression derives ObjectLiteral, so that's an instance of the second sentence and could also be an instance of the first sentence.
+
+[21:51:32.0000] <Bakkot>
+ah, sure, I see what you're saying
+
+[21:51:51.0000] <Bakkot>
+as a concrete example, then, the inner `{}` in `({x = 0, y: {}} = z)` is a position where ObjectAssignmentPattern is required but which is not initially parsing CoverParenthesizedExpressionAndArrowParameterList or CoverCallExpressionAndAsyncArrowHead
+
+[21:52:34.0000] <jmdyck>
+thanks, I'll have a look at that tomorrow.
+
+[21:52:58.0000] <Bakkot>
+or just like any position where there's no parentheses
+
+[21:53:15.0000] <Bakkot>
+the object in `x = {} = y`, for example
+
+[07:03:16.0000] <howdoi>
+`console.tap = v => ( console.log( v ), v );` hmm
+
+[08:39:56.0000] <jmdyck>
+urgh, i'm so confused.
+
+[08:41:25.0000] <jmdyck>
+somehow I got shut out of this room, and my irc client won't let me use my freenode account
+
+[08:42:19.0000] <jmdyck>
+and I wasn't sure if this was just part of the whole freenode thing, or is an unrelated problem.
+
+[08:43:15.0000] <jmdyck>
+(I'm connecting though a web client now)
+
+[10:02:51.0000] <jmdyck1>
+test on freenode
+
+[10:03:13.0000] <ljharb>
+yo
+
+[10:08:35.0000] <jmdyck1>
+Well, that was a waste of about 3 hours. Not sure what caused it, or what fixed it.
+
+[10:46:18.0000] <jmdyck1>
+Bakkot: re your first example:
+
+[10:46:18.0000] <jmdyck1>
+[1] ({x = 0, y: {}} = z) is a CoverParenthesizedExpressionAndArrowParameterList that covers ...
+
+[10:46:18.0000] <jmdyck1>
+[2] a ParenthesizedExpression, in which {x = 0, y: {}} is a LeftHandSideExpression that covers ...
+
+[10:46:18.0000] <jmdyck1>
+[3] an AssignmentPattern, in which {} is a LeftHandSideExpression that covers ...
+
+[10:46:18.0000] <jmdyck1>
+[4] an AssignmentPattern.
+
+[10:46:18.0000] <jmdyck1>
+Presumably the second sentence ("when initially parsing a CoverParenthesizedExpressionAndArrowParameterList") is only talking about [1].
+
+[10:46:18.0000] <jmdyck1>
+But for the first sentence ("when ObjectLiteral appears in a context where ObjectAssignmentPattern is required"), are you saying this only applies to [3] (and thus [1] is indeed additional)?
+
+[10:46:20.0000] <jmdyck1>
+Certainly `{}` is an ObjectLiteral in each of [1-3], so I guess the question is whether an ObjectAssignmentPattern is "required" in [1] and [2].
+
+[12:43:13.0000] <devsnek>
+every day i grow closer to proposing if-let
+
+
+2021-05-24
+[17:09:34.0000] <Bakkot>
+jmdyck: I'm don't understand the question I'm afraid
+
+[17:10:29.0000] <Bakkot>
+my claim is that the position following `y:` is a.) a position where ObjectAssignmentPattern and b.) not initially parsing CoverParenthesizedExpressionAndArrowParameterList or CoverCallExpressionAndAsyncArrowHead (because there's no parenthesis)
+
+[17:31:14.0000] <jmdyck>
+Well, do you agree that (in the spec's processing model), `{}` is parsed 3 times as an ObjectLiteral before it's parsed as an ObjectAssignmentPattern?
+
+[17:32:50.0000] <Bakkot>
+The inner `{}`? I'm not sure if I can count to three times, but I do agree it's parsed as an ObjectLiteral first, yes
+
+[17:39:25.0000] <jmdyck>
+In the initial parse, the whole text is parsed as an instance of PrimaryExpression : CoverParenEtc, which 13.2.9.1 then requires to be covering a ParenthesizedExpression.
+
+[17:40:59.0000] <jmdyck>
+So when you do that, `{x = 0, y: {}} = z` is parsed as an Expression, in particular an AssignmentExpression
+
+[17:41:51.0000] <jmdyck>
+in which `{x = 0, y: {}}` is a LHSExpression
+
+[17:43:35.0000] <jmdyck>
+and in that parse also, the inner {} is an ObjectLiteral
+
+[17:49:45.0000] <jmdyck>
+But then that instance of `AssignmentExpression : LeftHandSideExpression = AssignmentExpression` (the one that matches `{x = 0, y: {}} = z`) is subject to 13.15.1 Early Error that requires the LHSExpression `{x = 0, y: {}}` to be covering an AssignmentPattern.
+
+[17:55:43.0000] <jmdyck>
+So parse #3 is of `{x = 0, y: {}}` as an AssignmentPattern. It's an ObjectAssignmentPattern with 2 AssignmentPropertys. In the second one, the PropertyName is `y` and the AssignmentElement is `{}`.
+
+[17:57:38.0000] <jmdyck>
+That AssignmentElement is an instance of `DestructuringAssignmentTarget : LeftHandSideExpression` in which the LHSExpr is (yet again) an ObjectLiteral, so the Early Error in 13.15.5.1 requires it to be covering an AssignmentPattern.
+
+[17:58:11.0000] <jmdyck>
+So parse #4 is of `{}` as an AssignmentPattern, and it finally is recognized as an ObjectAssignmentPattern.
+
+[18:34:50.0000] <jmdyck>
+In parse #1, `x` matches `PropertyDefinition : CoverInitializedName`, but the 13.2.5.1 Syntax Error doesn't apply, because we're "initially parsing a CoverParenthesizedExpressionAndArrowParameterList", but also (I think) because the ObjectLiteral `{x = 0, y: {}}` will eventually (in parse #3) be reparsed as an ObjectAssignmentPattern.
+
+[18:38:45.0000] <jmdyck>
+In parse #2, `x` matches `PropertyDefinition : CoverInitializedName` again, and presumably the 13.2.5.1 doesn't apply again, but not because of the "initially parsing" sentence, rather because (again) `{x = 0, y: {}}` will soon be parsed as an ObjectAssignmentPattern.
+
+[18:39:53.0000] <jmdyck>
+So now I'm wondering if the "initially parsing" sentence is actually needed.
+
+[18:42:00.0000] <jmdyck>
+Is there a case where "initially parsing" sentence applies but the "ObjectAssignmentPattern" sentence doesn't?
+
+[18:42:17.0000] <jmdyck>
+(This reverses the question I asked a few hours ago.)
+
+[19:17:40.0000] <Bakkot>
+Yes, `({}) => 0` is initially parsed as CoverParenthesizedExpressionAndArrowParameterList, but never as ObjectAssignmentPattern
+
+[19:18:18.0000] <Bakkot>
+that is, `({})` is initially parsed as CoverParenthesizedExpressionAndArrowParameterList, and `{}` is never parsed as ObjectAssignmentPattern
+
+[20:37:04.0000] <jmdyck>
+test
+
+[20:39:28.0000] <jmdyck>
+`({})` doesn't contain an instance of `PropertyDefinition : CoverInitializedName`, so the question of whether or not to apply the associated early error rule doesn't arise.
+
+[20:40:27.0000] <jmdyck>
+If I change it to `({x=1})` then that does contain an instance, so the question does arise, and presumably the answer is yes, apply the rule and raise a syntax error.
+
+[20:42:42.0000] <jmdyck>
+But is there a case where the question arises, and the "initially parsing" sentence tells us not to apply the rule, and the "ObjectAssignmentPattern" sentence doesn't?
+
+[20:50:39.0000] <jmdyck>
+(The "when initially parsing" sentence first appeared in ES6.)
+
+[22:44:48.0000] <Bakkot>
+sorry, change my example to `({x=1}) => 0`
+
+[22:44:55.0000] <Bakkot>
+there's no ObjectAssignmentPattern in that case
+
+[05:45:36.0000] <jmdyck>
+Bakkot: Ok, interesting. So the text that is initially parsed as an ObjectLiteral containing a CoverInitializedName is re-parsed as ObjectBindingPattern containing a SingleNameBinding.
+
+[07:04:36.0000] <jmdyck>
+But it seems like that's analogous to the situation where an ObjectLiteral containing a CoverInitializedName is re-parsed as an ObjectAssignmentPattern containing an AssignmentProperty.
+
+[07:07:57.0000] <jmdyck>
+So why doesn't 13.2.5.1 deal with them similarly? I.e., there's a sentence that directly handles cases where ObjectLiteral is re-parsed as an ObjectAssignmentPattern, so why not the same for cases where ObjectLiteral is re-parsed as an ObjectBindingPattern?
+
+[07:09:10.0000] <jmdyck>
+(e.g., just change "where ObjectAssignmentPattern is required" to "where ObjectAssignmentPattern or ObjectBindingPattern is required")
+
+[07:09:59.0000] <jmdyck>
+would that not handle some cases that are handled by the existing wording?
+
+[07:19:55.0000] <jmdyck>
+rephrase: Does the current wording handle some cases that wouldn't be handled by an "ObjectBindingPattern is required" wording?
+
+[07:40:11.0000] <jmdyck>
+Consider if we put your latest example in an extra pair of parens: (({x=1}) => 0)
+
+[07:41:12.0000] <jmdyck>
+I'll refer to the whole expr as "the outer" and `({x=1})` as "the inner".
+
+[07:41:55.0000] <jmdyck>
+In the initial parse, both the outer and the inner are parsed as CoverParenEtc.
+
+[07:44:30.0000] <jmdyck>
+The outer is re-parsed as a ParenthesizedExpression, in which the inner is again parsed as CoverParenEtc.
+
+[07:45:30.0000] <jmdyck>
+Then the inner is re-parsed as a ArrowFormalParameters.
+
+[07:54:14.0000] <jmdyck>
+In that middle stage, where the inner is again parsed as CoverParenEtc, the `{x=1}` is (again) parsed as an ObjectLiteral with a CoverInitializedName. Presumably the example is valid, so the 13.2.5.1 Early Error for CoverInitializedName shouldn't be applied; but does the existing wording accomplish that?
+
+[07:54:33.0000] <jmdyck>
+Obviously, the ObjectAssignmentPattern sentence isn't relevant.
+
+[08:05:04.0000] <jmdyck>
+The other sentence says that the CoverInitalizedName rule isn't applied "when initially parsing a CoverParenthesizedExpressionAndArrowParameterList ...". Does that describe this middle stage?
+
+[08:06:27.0000] <jmdyck>
+On the one hand, this isn't the first time that the inner has been parsed as a CoverParenEtc. On the other, it is the first time it's been parsed as a CoverParenEtc *within* the re-parse of the outer.
+
+[08:08:24.0000] <jmdyck>
+I don't think there's a definitive answer: the wording of "initially parsing a CoverParenEtc" isn't precise enough.
+
+[08:09:24.0000] <jmdyck>
+(For one thing, you don't parse a <nonterminal>, you parse a text.)
+
+[10:25:48.0000] <Sirisian|Work>
+Curious. Has anyone brought up renaming the object during parameter destructuring? function f({ a = 1, b = 2 }:options = {}) {} I might be missing something obvious here.
+
+[10:28:21.0000] <Bakkot>
+Sirisian|Work yes, people have asked, see e.g. https://github.com/zkat/proposal-as-patterns
+
+[10:28:47.0000] <Bakkot>
+most people seem to get by fine with just doing it in two steps, though
+
+[10:29:32.0000] <Bakkot>
+jmdyck, re "why doesn't 13.2.5.1 deal with them similarly", that I could not tell you
+
+[10:58:01.0000] <Sirisian|Work>
+You mean like: function f({ a = 1, b = 2 }) { const options = { a, b }; } ?
+
+[11:09:23.0000] <Sirisian|Work>
+Also it looks like that "as" proposal doesn't do exactly what I'd want. function({ a = 1, b = 2 } as x) { console.log(x); } with f({ c: 1 }); outputs "{ a = 1, b = 2, c = 3 }" which is consistent with that proposal.
+
+[11:09:32.0000] <Sirisian|Work>
+Looks like what I want is the pick proposal.
+
+[11:09:58.0000] <Sirisian|Work>
+function f(options.{ a = 1, b = 2 }) {}
+
+[11:10:09.0000] <Sirisian|Work>
+hmm, no.
+
+[11:10:58.0000] <ljharb>
+Sirisian|Work: so you want the equivalent of `do { const { a, b } = options; ({ a, b }) }`?
+
+[11:11:35.0000] <ljharb>
+Sirisian|Work: can you elaborate on the use case of accepting an options bag, but actively needing to omit un-named properties?
+
+[11:16:29.0000] <Sirisian|Work>
+function options(options) { Object.assign(this, { option1: 1, option2: 2 }, options); } Kind of like this, but where options is listed so the IDE can see the object in the parameters and sets defaults. I then assign all the options to this.
+
+[11:19:19.0000] <Sirisian|Work>
+function options({ option1 = 1, option2 = 2 }) { Object.assign(this, { option1, option2 }); }
+
+[11:19:37.0000] <Sirisian|Work>
+Not a huge deal really using that which is what I have now.
+
+[12:44:09.0000] <Bakkot>
+> You mean like
+
+[12:44:27.0000] <Bakkot>
+No, I meant like `function f(options = {}) { const {a = 1, b = 2} = options; ...}`
+
+[12:46:53.0000] <Sirisian|Work>
+Bakkot, ah. options wouldn't have the defaults set then.
+
+[12:47:16.0000] <Sirisian|Work>
+Which I might not have been clear about. I didn't explain myself well.
+
+
+2021-05-25
+[20:01:35.0000] <DerekNonGeneric>
+> so unless AssertionErrors are uncatchable (and uncatchable errors would be a huge nonstarter for a number of reasons) then i'm not sure why it'd be any different than just any kind of thrown value
+
+[20:02:01.0000] <DerekNonGeneric>
+ljharb, i'm not sure how to interpret this statement
+
+[20:03:13.0000] <ljharb>
+which part?
+
+[20:04:29.0000] <DerekNonGeneric>
+the part about "not sure why it'd be any different than just any kind of thrown value"
+
+[20:05:20.0000] <ljharb>
+DerekNonGeneric: ah. i'm saying that `throw AssertionError(message)` vs `throw TypeError(message)` doesn't seem that different to me
+
+[20:06:00.0000] <ljharb>
+and to me the word "assertion" or "assert" has two very strong possible meanings to me: "if this fails, immediately terminate the program" or "this is a claim being made by a test, in non-production code"
+
+[20:06:10.0000] <ljharb>
+(i said "to me" twice, lol)
+
+[20:06:39.0000] <DerekNonGeneric>
+lol
+
+[20:07:15.0000] <DerekNonGeneric>
+my proposal would not mention anything about uncatchableness
+
+[20:08:01.0000] <ljharb>
+good :-)
+
+[21:08:27.0000] <DerekNonGeneric>
+ljharb, so here is my dilemma: most AssertionErrors that i've seen have the first argument as an options bag (node does it like this) https://github.com/nodejs/node/blob/HEAD/doc/api/assert.md#new-assertassertionerroroptions
+
+[21:09:07.0000] <DerekNonGeneric>
+but the `error-cause` proposal seems to be putting the options bag in the second argument
+
+[21:09:23.0000] <ljharb>
+right
+
+[21:09:38.0000] <ljharb>
+`stackStartFn` also is a bit of a minefield
+
+[21:11:50.0000] <DerekNonGeneric>
+so.. i wonder if there have already been decisions made about the types of the positional arguments of everything extending the base Error type
+
+[21:12:35.0000] <ljharb>
+DerekNonGeneric: not necessarily. AggregateError takes `errors` first
+
+[21:19:37.0000] <DerekNonGeneric>
+i am unsure whether it would be fine to continue the convention of having the first argument as an options bag (including a `message` property) or if that would be perceived as a malformed error signature from some perspectives
+
+[21:23:23.0000] <DerekNonGeneric>
+ljharb, do you think that it would be appropriate to keep it as a single-argument options-bag?
+
+[21:25:32.0000] <ljharb>
+it’s still not clear to me what problem the proposal is solving, so it’s hard to have an intuition about the signature. for AggregateError, the argument for consistency (message first) lost out to the argument for consistency (required things first, message is optional)
+
+[21:26:48.0000] <ljharb>
+given that the message would obviously have to be its own argument, for consistency, and given that it’s optional as well as the options bag, i think you could make an argument for either order - except if you’re likely to want message even when omitting the others, in which case, message first, options second?
+
+[21:27:20.0000] <DerekNonGeneric>
+ljharb, i think we can agree that interop btwx test frameworks is a very strong argument, so perhaps this is not an opportunity to redesign the api
+
+[21:27:59.0000] <ljharb>
+I don’t think it is an argument here tho, because i haven’t seen examples of AssertionError being used to interoperate
+
+[21:28:29.0000] <ljharb>
+iow “all these frameworks’ internal implementation details have the same shape” is interesting but not a strong argument to me for a built-in thing
+
+[21:29:19.0000] <ljharb>
+since it’d effectively remove a dozen lines or so from each of less than a dozen test frameworks (and node), and otherwise wouldn’t be used much at all (unless I’m missing lots of use cases, ofc)
+
+[21:31:42.0000] <DerekNonGeneric>
+yes, you are missing a lot of use cases. i have some notes about where the niche for this error is perfectly appropriate, but it's a bit rough, so i will have to share that some other time
+
+[09:05:28.0000] <ljharb>
+DerekNonGeneric: cool, looking forward to reading it
+
+[11:18:59.0000] <Sirisian|Work>
+I think I have a lot of instances of 'a?.[0] ?? null' in my code. I wonder how common that pattern is now in codebases.
+
+[11:20:30.0000] <ljharb>
+Sirisian|Work: i doubt many people do `?? null` tbh, since most code doesn't distinguish between null and undefined
+
+[11:28:31.0000] <jmdyck>
+So does https://github.com/ryzokuken/how-we-work/blob/matrix-guide/matrix-guide.md indicate that TC39 decided to go with Matrix?
+
+[11:33:08.0000] <ljharb>
+jmdyck: i don't think there was any consensus, but also no strong objections yet
+
+[11:34:16.0000] <jmdyck>
+dosn't there need to be consensus on something pretty soon?
+
+[11:35:29.0000] <Bakkot>
+fwiw the backchannel discussion at the ongoing plenary seems to have moved to matrix relatively seamlessly, so I suspect we will end up there as a basically a fait accompli
+
+[11:37:23.0000] <Bakkot>
+maybe someday someone will write a decent client for it and it will get less painful
+
+[11:41:10.0000] <DerekNonGeneric>
+someone email me the logs when it's over <3
+
+[11:41:53.0000] <DerekNonGeneric>
+maybe someday i will stop being a bum and get a job
+
+[11:44:35.0000] <rickwaldron>
+@rbuckton hi! I've been trying to get your attention through github and also irc, for several weeks now, to review this: https://github.com/tc39/test262/pull/2968
+
+[12:22:20.0000] <DerekNonGeneric>
+samth, if you do not attend these meetings, you should let me go in your place (or if you do, please send sketchnotes)
+
+[15:25:00.0000] <jmdyck>
+test
+
+
+2021-05-26
+[06:18:58.0000] <jschoi>
+What would be the best way, in a spec syntactic production, to require that there is no whitespace between two tokens `'a'` and `'b'`?
+
+[06:19:53.0000] <jschoi>
+Perhaps the best way would rather be to define a third token, `'ab'`, which the lever would longest-match…
+
+[06:20:01.0000] <jschoi>
+*lexer
+
+[06:21:28.0000] <jmdyck>
+if they had to be tokens, you might have to introduce a new annotation, e.g `a` [no whitespace here] `b`
+
+[06:21:54.0000] <jschoi>
+Ah, so there’s no precedent for such a requirement. Good to know.
+
+[06:23:20.0000] <jmdyck>
+defining `ab` looks a lot simpler.
+
+[06:28:42.0000] <jschoi>
+Yeah. For context, this is about the `x |> %==y` problem mentioned in https://github.com/js-choi/proposal-hack-pipes/issues/2#issuecomment-817187897 if `%` were chosen as the topic token. It’s not a big problem, though—we can just defined punctuators for `%==` and `%===`…
+
+[06:28:48.0000] <gibson042>
+in fact it would be kind of meaningless to prohibit between tokens, since the stated purpose of white space is "to improve source text readability and to separate tokens... White space code points may occur between any two tokens". And note also that comments can appear in the same positions.
+
+[06:29:41.0000] <jschoi>
+Yes, such a hypothetical annotation would have to disallow comments too.
+
+[06:35:26.0000] <gibson042>
+that strike me as ugly, but more importantly brittle
+
+[06:36:09.0000] <jschoi>
+Yeah, definitely. The combined token seems like the way to go.
+
+[06:37:57.0000] <gibson042>
+no, that's what I'm saying is likely to be brittle
+
+[06:38:11.0000] <jschoi>
+Ah, got it.
+
+[06:39:22.0000] <jschoi>
+A new [must be adjacent] annotation might be more preferable, huh.
+
+[06:42:52.0000] <jmdyck>
+sorry, what are a and b wrt the pipes proposal?
+
+[06:43:44.0000] <jschoi>
+This is about the Hack-pipes proposal, rather than the F#-pipes proposal. The Hack-pipes proposal has several candidate tokens for its “topic” placeholder, such as `#` and `%`.
+
+[06:44:42.0000] <jschoi>
+I like `%` because it is relatively rarely used (only modulo) and its analogy to printf.
+
+[06:44:48.0000] <jschoi>
+But fuchsia pointed out that `%===y` would split into `%=` `=` `y`.
+
+[06:45:09.0000] <jschoi>
+Er, pretend that was `%==y`. Anyways, similar problem with `%===y`.
+
+[06:46:28.0000] <jmdyck>
+which two tokens would you want to require to be adjacent?
+
+[06:47:18.0000] <jschoi>
+`%=` and `=`. Also `%=` and `==`. These would go into productions for EqualityExpression.
+
+[06:47:59.0000] <jmdyck>
+ah, so what you have as "[contiguous]" there?
+
+[06:48:31.0000] <jschoi>
+Yes, if you mean in my most recent issue comment, that’s right.
+
+[06:54:05.0000] <jmdyck>
+So is the perceived advantage of `%= [contiguous] =` over `%==` that it doesn't require any new tokens?
+
+[06:56:34.0000] <jschoi>
+Perhaps gibson042 is concerned about how flexible this would be with any future rules that involve the nullary `%`. Although…this really does seem to be a singular problem (since `%=` assignment exists) with a singular patch-up.
+
+[07:00:12.0000] <jmdyck>
+To my thinking, the 'cost' of defining two new punctuators would be way less than the cost of defining a new "[contiguous]" annotation.
+
+[07:00:33.0000] <jmdyck>
+(which is not to say that I actually like the new punctuators idea)
+
+[07:07:04.0000] <jschoi>
+At least for the Babel plugin, I will probably go with punctuators, although all token objects already track their source-text location, so it would also be trivial to check whether two tokens are adjacent in source text.
+
+[07:07:05.0000] <jschoi>
+From a browser vendor’s perspective…the punctuators are also probably simpler.
+
+[07:07:25.0000] <jschoi>
+It’s all equivalent right now anyway.
+
+
+2021-05-27
+[18:21:57.0000] <Bakkot>
+PSA: we're moving to matrix. some docs here [1], we'll have the rest of the documentation updated hopefully soon. [1] https://github.com/tc39/how-we-work/blob/master/matrix-guide.md
+

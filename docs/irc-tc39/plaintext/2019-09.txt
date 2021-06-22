@@ -1,0 +1,2925 @@
+2019-09-01
+[06:24:01.0000] <bradleymeck>
+ljharb: it would be like Object.create but copy the ECMAScriptCode of the fn as 1st arg, every so often I have to write function (..._) {return new.target?Reflect.construct... : Reflect.apply...} , and people we complaining about similar stuff on twitter
+
+[07:58:57.0000] <ljharb>
+for what use cases do you have to write that?
+
+[14:37:33.0000] <devsnek>
+in PerformEval step 18
+
+[14:37:44.0000] <devsnek>
+how come evalCtx's Function is set to null
+
+[14:37:47.0000] <devsnek>
+instead of %eval%
+
+[16:41:25.0000] <gibson042>
+> it would be super great if we could convince ecma to put a banner at the top of all their specs pointing to the non-obsolete version, but i doubt that'll fly
+
+[16:41:25.0000] <gibson042>
+ljharb: https://github.com/tc39/ecma262/pull/1335 (which would at least provide that for not-yet-published editions of ECMA-262) is still ready to go
+
+
+2019-09-02
+[18:00:26.0000] <ljharb>
+gibson042: i think we need a bit more consensus in the thread first
+
+[18:03:35.0000] <devsnek>
+ljharb: are you gonna be doing the netlify stuff at some point or see we waiting for netlify.yml to mature
+
+[18:21:39.0000] <ljharb>
+devsnek: nah we’re not blocked on it, I’m just not sure how to configure it. maybe tonight or some time in the next few days we could screen share and get it set up?
+
+[18:22:25.0000] <devsnek>
+I suppose
+
+[18:22:32.0000] <devsnek>
+it should just be that screenshot I sent you
+
+[18:35:50.0000] <ljharb>
+not sure I’m seeing the same page yet
+
+
+2019-09-03
+[18:12:15.0000] <puppy0cam>
+I'm trying to use switches, but I find that having a variable within the scope of it is rather difficult. Here is a gist (https://gist.github.com/puppy0cam/b319f59831d2da18043278e466a4f01c) for what I want to do, as well as a workaround for how you could do to somewhat achieve this. The problem with this workaround is that it exposes a variable tha
+
+[18:12:15.0000] <puppy0cam>
+t is only relevant to the body of the switch and is accessible from outside the switch body
+
+[20:10:11.0000] <ljharb>
+puppy0cam: right, you should declare it outside the switch. there's no way to have a variable in the entry to a block (like the parens of a switch, or if, or while, etc) that's only scoped to that block.
+
+[20:14:48.0000] <devsnek>
+ljharb: there's something to be said for `if (const x = ...) {}` too
+
+[20:15:10.0000] <ljharb>
+devsnek: that has the same issue
+
+[20:15:17.0000] <devsnek>
+what issue
+
+[20:15:24.0000] <ljharb>
+iow, while it might be intuitive for that to declare a var just for the block, it creates it for the outer block.
+
+[20:15:36.0000] <ljharb>
+eg `if (const x = 3) {} console.log(x)`
+
+[20:15:49.0000] <puppy0cam>
+It does seem strange that the block receives it's own scope since if you have a let in there, you could end up with errors from accessing the value before initialization as the switch skipped the initialization and went directly to the part where it is being accessed.
+
+[20:15:55.0000] <ljharb>
+oh wait
+
+[20:16:07.0000] <ljharb>
+ok nvm in `if` you can't declare a var in the parens
+
+[20:16:45.0000] <ljharb>
+either way there's no "make a var for just this block as i enter the block" syntax ¯\_(ツ)_/¯
+
+[20:17:17.0000] <devsnek>
+yeah i was just saying
+
+[20:17:22.0000] <devsnek>
+if someone were to propose such a thing
+
+[20:17:25.0000] <devsnek>
+for if/while/etc
+
+[20:17:28.0000] <devsnek>
+i would support it
+
+[20:17:36.0000] <devsnek>
+i use it a lot in rust
+
+[20:17:52.0000] <devsnek>
+in js you just end up wrapping the entire thing in a block so you feel clean
+
+[20:18:26.0000] <devsnek>
+imagine `while (let x = regex.match()) {}`
+
+[20:18:53.0000] <devsnek>
+or exec
+
+[20:19:00.0000] <devsnek>
+whichever one makes you loop
+
+[20:20:20.0000] <ljharb>
+with matchAll you don't need an exec loop anymore :-p
+
+[20:20:58.0000] <devsnek>
+fancy
+
+[20:41:22.0000] <puppy0cam>
+And there is a case of a variable being declared in the parameters to a block, for loops
+
+[20:58:37.0000] <devsnek>
+interestingly, the current way that async functions evaluate means that the stack may have two almost identical execution contexts on it before the first await
+
+[20:58:42.0000] <devsnek>
+because the context is cloned
+
+[20:58:57.0000] <devsnek>
+in theory the context doesn't need to be cloned until an await is hit, but would such a change be safe to make?
+
+[20:59:44.0000] <puppy0cam>
+it depends on whether anything will be able to access the old context
+
+[21:00:43.0000] <devsnek>
+engines have really odd stacks
+
+[21:00:55.0000] <devsnek>
+but engine262 is the only one that reveals this duplicate context
+
+[21:01:10.0000] <devsnek>
+https://gc.gy/35188265.png
+
+[21:01:22.0000] <TimothyGu>
+production engines probably have a way of eliding the duplicate one or mark them as hidden
+
+[21:01:37.0000] <devsnek>
+well my current assumption is that they just don't have cloned contexts at all
+
+[21:01:50.0000] <TimothyGu>
+lol ChakraCore with that generator shim
+
+[21:02:05.0000] <devsnek>
+as far as i can tell the context cloning is only done to fulfill a contract with Function's [[Call]]
+
+[21:02:09.0000] <devsnek>
+which pops the context when it finishes
+
+[21:02:30.0000] <devsnek>
+actually that might not be the case
+
+[21:02:37.0000] <TimothyGu>
+I mean in one sense this is equivalent to the .next() function for generators
+
+[21:02:49.0000] <devsnek>
+lol
+
+[21:03:17.0000] <devsnek>
+actually i can't figure this out
+
+[21:03:17.0000] <TimothyGu>
+https://www.irccloud.com/pastebin/rQGjAe6K/
+
+[21:03:22.0000] <devsnek>
+time to remove the clone and see what happens
+
+[21:03:34.0000] <TimothyGu>
+right?
+
+[21:03:53.0000] <devsnek>
+something bad will probably happen
+
+[21:04:07.0000] <TimothyGu>
+indeed
+
+[21:04:15.0000] <TimothyGu>
+also I made https://docs.google.com/document/d/1BRg0EvYIqKYqZ79ssgSLpRFr60sFjeX_-Ijw9VzsYvA/edit for fun
+
+[21:04:28.0000] <TimothyGu>
+fun = LinkedIn fun
+
+[21:04:33.0000] <devsnek>
+this is #tc39
+
+[21:04:37.0000] <TimothyGu>
+oops
+
+[21:04:39.0000] <devsnek>
+ll
+
+[21:04:41.0000] <devsnek>
+lol*
+
+[21:04:47.0000] <TimothyGu>
+fine I don't mind
+
+[07:23:48.0000] <bradleymeck>
+@ljharb when I have to make a copy of a fn, such as saving "original" forms of intrinsics, other are using it to add statics via prototype chain (non-proto based can use .assign)
+
+[09:04:57.0000] <ljharb>
+bradleymeck: not clear on the second half; for the first half, `.bind()`, if you don't need a receiver?
+
+[09:05:21.0000] <bradleymeck>
+ljharb: doesn't work for constructors/things using `this`
+
+[09:05:40.0000] <ljharb>
+`new C.bind()` works
+
+[09:05:46.0000] <ljharb>
+but other things using `this`, true
+
+[09:06:15.0000] <bradleymeck>
+new C.bind() can't be called later to generate new C objects
+
+[09:06:29.0000] <ljharb>
+? sure it can
+
+[09:06:47.0000] <ljharb>
+`const D = C.bind(); new D() instanceof D && new D() instanceof C`, i believe
+
+[09:07:08.0000] <ljharb>
+but essentially you want something like `.clone()`, ie, `.bind` but not touching the receiver or taking any arguments?
+
+[09:08:59.0000] <bradleymeck>
+thats what people were talking about at least
+
+[09:09:29.0000] <bradleymeck>
+i misunderstood your suggestion, saving it to a variable would mostly work, but it is terribly hard to read
+
+
+2019-09-05
+[09:36:39.0000] <devsnek>
+👀 https://gc.gy/35406382.png https://gc.gy/35406397.png
+
+[09:38:01.0000] <bradleymeck>
+intriguing
+
+[09:38:23.0000] <devsnek>
+i might end up applying this to the output of builds instead of spec.html
+
+[09:59:08.0000] <devsnek>
+does anyone know a tool to diff html
+
+[10:24:26.0000] <jmdyck>
+devsnek: pretty-print then textual diff?
+
+[10:25:03.0000] <devsnek>
+i guess if i pretty print it such that every semantic change is on its own line
+
+[10:25:09.0000] <devsnek>
+e.g. `<p>\ntext\n</p>`
+
+[10:26:55.0000] <jmdyck>
+Is the goal to be able to auto-insert <ins>/<del> markup?
+
+[10:27:01.0000] <devsnek>
+jmdyck: yes
+
+[10:27:16.0000] <jmdyck>
+gotcha
+
+[10:27:18.0000] <devsnek>
+so if i want to use text diffing, everything needs to be on a separate line
+
+[10:27:33.0000] <devsnek>
+ideally i'd use something that actually understands html
+
+[10:27:41.0000] <devsnek>
+but i can't find anything that diffs strings of html
+
+[12:59:44.0000] <TabAtkins>
+devsnek: If you want to steal, I'm very happy with my HTML pretty-printer I wrote for Bikeshed: https://github.com/tabatkins/bikeshed/blob/master/bikeshed/HTMLSerializer.py
+
+[14:55:04.0000] <devsnek>
+TabAtkins: ended up stealing htmldiff.pl, but thanks
+
+[14:55:33.0000] <TabAtkins>
+no prob
+
+
+2019-09-06
+[07:30:34.0000] <bradleymeck>
+uncurrying `this` is... painful for perf ^_^;
+
+[07:31:11.0000] <bradleymeck>
+how many proposals have ways of tackling this ? bind / pipeline seem to
+
+[07:31:18.0000] <Jessidhia>
+is it even... uncurryable?
+
+[07:31:41.0000] <bradleymeck>
+`this` is
+
+[07:31:42.0000] <Jessidhia>
+or do you mean erasing the receiver from the calls (e.g. the `(0, a.b)(...)` trick that babel uses
+
+[07:32:03.0000] <bradleymeck>
+e.g. charCodeAt => Function.call.bind(charCodeAt)
+
+[07:32:30.0000] <bradleymeck>
+nah, receiver is fine
+
+[07:33:16.0000] <Jessidhia>
+uncurrying `this` by currying `Function#call` instead 🤯
+
+[07:34:23.0000] <bradleymeck>
+i can't think of a way of tricking the receiver without mutation
+
+[07:34:30.0000] <bradleymeck>
+which also would have perf issues
+
+[07:37:36.0000] <Jessidhia>
+`const call = Function.prototype.call.bind(Function.prototype.call)`; `call(func, receiver, ...args)` 🤔
+
+[07:46:47.0000] <bradleymeck>
+Jessidhia: https://jsperf.com/uncurry-this-robustness/1 , though those benchmarks don't show the nightmare of when it is used in other functions that are being optimized
+
+[07:47:29.0000] <bradleymeck>
+basically, the VMs can't seem to figure out any of the calls being an uncurried this
+
+[07:48:06.0000] <bradleymeck>
+so they can't do optimizations that they normally would, and even worse won't do the optimizations for builtins
+
+[07:58:53.0000] <Jessidhia>
+so the engines need to be taught?
+
+[07:59:22.0000] <bradleymeck>
+its a difficult thing to analyze and probably not cheap to do so
+
+[07:59:40.0000] <bradleymeck>
+some alternative would probably be much easier in the form or a proposal
+
+[08:00:01.0000] <bradleymeck>
+even a `Function.prototype.uncurryThis` would be easier to deal with
+
+[08:00:24.0000] <bradleymeck>
+but if there are already proposals that handle this use case :shr
+
+[08:00:29.0000] <bradleymeck>
+🤷
+
+
+2019-09-07
+[08:37:45.0000] <jmdyck>
+devsnek: re 1670: if InitializEnvironment is pushing the module context onto the stack, does FunctionInitialize still need the new code to handle a null activeScriptOrModule?
+
+[08:38:32.0000] <devsnek>
+no
+
+[08:39:11.0000] <devsnek>
+that's odd
+
+[08:39:26.0000] <devsnek>
+locally I wiped the branch before I made those changes
+
+[08:40:02.0000] <devsnek>
+both commits are there hmm
+
+[08:40:09.0000] <devsnek>
+I'll remove the first commit at some point
+
+[08:40:53.0000] <jmdyck>
+ok
+
+[08:43:31.0000] <jmdyck>
+I had some edits, but looks like they were mostly for the first commit.
+
+[08:45:47.0000] <jmdyck>
+I'll run my analysis again after the first commit is gone.
+
+[08:53:54.0000] <devsnek>
+jmdyck: i removed the commit
+
+[08:57:53.0000] <jmdyck>
+tx
+
+
+2019-09-08
+[05:12:25.0000] <Dimitrian>
+https://esdiscuss.org/topic/symbols-and-symbolat and again me with new ideas...
+
+[07:55:54.0000] <devsnek>
+just read that asi hazard pr
+
+[07:55:57.0000] <devsnek>
+good stuff
+
+[10:11:42.0000] <devsnek>
+rbuckton: do you think it's fair to call the typescript compiler a compiler
+
+[10:14:18.0000] <ljharb>
+devsnek: i mean it's a transpiler (thus a compiler) and also a typechecker - how would it not be a compiler?
+
+[10:14:47.0000] <devsnek>
+some person is bugging me about how transpilers aren't compilers
+
+[10:15:44.0000] <ljharb>
+of course they are, they're a subset.
+
+[10:16:07.0000] <ljharb>
+one that many compiler nerds claim is useless to distinguish, but is distinguishable none the less :-)
+
+
+2019-09-09
+[22:38:20.0000] <Bakkot>
+devsnek: those words do not have widely-agreed-upon meanings
+
+[22:39:12.0000] <Bakkot>
+arguing about whether a thing is or is not an instance of a class which lacks a widely-agreed-upon meaning is not usually a productive thing to do
+
+[07:16:23.0000] <Jessidhia>
+if it works with a syntax representation instead of doing string substitutions it's close enough for me :think
+
+[07:16:32.0000] <Jessidhia>
+🤔
+
+[15:11:41.0000] <devsnek>
+if anyone has a void in their soul that can only be filled by championing controversial features, i got bored and made this: https://feature-private-symbols--devsnek-ecma262.netlify.com/
+
+[15:14:11.0000] <Bakkot>
+devsnek: I don't think the committee really has the appetite to spend any more time on that
+
+[15:14:51.0000] <devsnek>
+Bakkot: it fits nicely with private fields too
+
+[15:15:03.0000] <devsnek>
+don't have to argue about one or the other
+
+[15:16:22.0000] <Bakkot>
+I don't think that claim is uncontroversially true
+
+[15:17:16.0000] <devsnek>
+oh i meant you can implement private fields in terms of it
+
+[15:17:30.0000] <devsnek>
+not that people would necessarily like them both existing :P
+
+[15:21:20.0000] <Bakkot>
+ah, yeah, sure
+
+[15:22:11.0000] <Bakkot>
+anyway, I stand by previous claim re: lack of appetite to spend more time on this
+
+[15:22:28.0000] <Bakkot>
+we discussed private symbols in plenary and they were not popular
+
+[15:22:36.0000] <devsnek>
+i recall
+
+[15:22:49.0000] <devsnek>
+but iirc that was mostly because they were presented as an alternative to class fields
+
+[15:22:52.0000] <devsnek>
+instead of in addition
+
+[15:23:26.0000] <Bakkot>
+that doesn't really match my recollection; you could dig up the notes
+
+[15:23:42.0000] <devsnek>
+are you thinking of the presentation by jridgewell?
+
+[15:23:46.0000] <Bakkot>
+yeah
+
+[15:23:48.0000] <devsnek>
+ok
+
+[15:23:51.0000] <TabAtkins>
+devsnek: You just linked to your whole dang fork, but I presume from the URL that you're specifically trying to propose something about private symbols...
+
+[15:23:59.0000] <Bakkot>
+TabAtkins: https://github.com/tc39/ecma262/commit/707d17065b60fc86e3479ee60ffb77a675c40b97
+
+[15:24:15.0000] <devsnek>
+oh wow i didn't know you could do that
+
+[15:24:22.0000] <devsnek>
+that's super cool
+
+[15:24:30.0000] <Bakkot>
+(note that this commit, despite being in the main repo, is not actually committed to master)
+
+[15:24:45.0000] <devsnek>
+yeah that's a commit on my fork
+
+[15:24:47.0000] <Bakkot>
+(would generally prefer that this sort of speculative stuff happen in a fork, but whatever)
+
+[15:24:49.0000] <Bakkot>
+uh
+
+[15:24:52.0000] <Bakkot>
+no, it is not
+
+[15:24:54.0000] <Bakkot>
+it is a commit on the main repo
+
+[15:25:13.0000] <devsnek>
+i don't have any pr or branch on the main repo
+
+[15:25:21.0000] <devsnek>
+i don't even have github permissions to do that
+
+[15:25:45.0000] <devsnek>
+https://github.com/devsnek/ecma262/tree/feature/private-symbols
+
+[15:26:45.0000] <Bakkot>
+... that is very strange
+
+[15:27:01.0000] <Bakkot>
+apparently github lets you link to a commit across any fork, even if it's not in that fork
+
+[15:27:10.0000] <devsnek>
+indeed
+
+[15:27:18.0000] <Bakkot>
+weird
+
+[15:27:28.0000] <devsnek>
+oh that link is from the snapshot popup
+
+[15:27:29.0000] <devsnek>
+lol
+
+[15:27:55.0000] <devsnek>
+potentially confusing
+
+[15:28:05.0000] <TabAtkins>
+Bakkot: Hmm, interesting leak of the internal details. Technically all forks are tracked as magical branches against a single internal version of the repo on GH's servers.
+
+[15:28:16.0000] <TabAtkins>
+(Otherwise they'd be absolutely *murdered* by storage costs.)
+
+[15:28:20.0000] <devsnek>
+TIL
+
+[15:28:45.0000] <Bakkot>
+TabAtkins: neat!
+
+[15:28:47.0000] <devsnek>
+i guess that's how they make the branches view work on repos
+
+[15:28:51.0000] <devsnek>
+forks view*
+
+[15:28:53.0000] <Bakkot>
+though I might have tried to solve that with a content-addressed FS or something
+
+[15:29:08.0000] <TabAtkins>
+I'm sure they do something like that too; my knowledge is also several years old at this point.
+
+[15:30:41.0000] <devsnek>
+the api i wrote is mostly based on v8's private symbols
+
+[15:31:05.0000] <devsnek>
+except that v8's private symbols don't check for a list of private symbols in proxies
+
+[15:31:53.0000] <devsnek>
+they just pass straight through
+
+[15:32:56.0000] <shu>
+i am wholly with Bakkot about exhaustion re: private fields and symbols
+
+[15:33:30.0000] <devsnek>
+understandable
+
+[15:49:52.0000] <ljharb>
+Bakkot: yes, all commits to forks are "part" of the main repo
+
+[15:49:57.0000] <ljharb>
+Bakkot: super weird
+
+[15:55:11.0000] <TabAtkins>
+That's the sort of thing that could allow for some really hostile spoofing; make a commit with really nasty changes, then pass it around as "look what Org X allowed to be committed to their repo!".
+
+[15:55:50.0000] <devsnek>
+i've submitted security reports to github about similar stuff
+
+[15:56:08.0000] <devsnek>
+they said spoofing content uploads under the names of other orgs is not part of their security model
+
+[15:56:27.0000] <rkirsling>
+scary stuff
+
+[15:57:31.0000] <rkirsling>
+given that we live in a world where quite conceivably more people could end up just remembering the false claim rather than the truth (what's that effect called again...?)
+
+[15:58:28.0000] <devsnek>
+i can upload a file to github that takes the form of `https://github.com/Microsoft/TypeScript/files/1627252/TypeScript-3.5.2.zip`
+
+[15:58:32.0000] <devsnek>
+and then send it to people
+
+[15:58:37.0000] <devsnek>
+potentially concerning
+
+[15:58:56.0000] <Bakkot>
+yeah, that does seem... bad
+
+[15:59:10.0000] <devsnek>
+but quote from github `This is an intentional design decision and is working as expected.`
+
+[15:59:27.0000] <rkirsling>
+("continued influence effect" it would seem, btw)
+
+[15:59:38.0000] <devsnek>
+indeed
+
+[16:30:35.0000] <shu>
+now, IANAL, but seems to me that kind of spoofing could be easily used to spoof material information for public companies
+
+[16:31:13.0000] <shu>
+e.g. Microsoft/TypeScript/files/strategy_meeting_apple_merger.zip
+
+[16:31:30.0000] <shu>
+and i feel like github best consider securities fraud to be in their security model?
+
+[16:41:46.0000] <devsnek>
+i can add that to the hackerone thread
+
+
+2019-09-10
+[09:06:28.0000] <devsnek>
+rkirsling: what's the status of optional chaining in jsc?
+
+[09:09:20.0000] <rkirsling>
+devsnek: shipping with flag in STP 91
+
+[09:09:47.0000] <rkirsling>
+includes that optimization for x?.y ?? z too
+
+[09:10:37.0000] <devsnek>
+ok
+
+[09:10:53.0000] <rkirsling>
+not sure when the flag will be flipped because it's an Apple decision I'm not privy to 😄
+
+[09:11:08.0000] <rkirsling>
+how come?
+
+[09:14:36.0000] <devsnek>
+rkirsling: just updating some chromestatus stuff
+
+[09:21:53.0000] <jmdyck>
+df
+
+[09:21:54.0000] <rkirsling>
+cool
+
+[09:22:33.0000] <devsnek>
+jmdyck: are your changes for the layering stuff available anywhere
+
+[09:22:56.0000] <jmdyck>
+all in my head so far
+
+[09:23:02.0000] <devsnek>
+oh ok
+
+[09:24:49.0000] <jmdyck>
+gonna try to get to that today, but also have request from ljharb re 1670
+
+[09:38:28.0000] <jmdyck>
+why do you ask? just want to look?
+
+[09:40:12.0000] <devsnek>
+yea
+
+[09:40:36.0000] <devsnek>
+i'm sad that we're removing stuff like "how to run a script"
+
+[10:36:04.0000] <jmdyck>
+Can 2 different agents operate on a single realm?
+
+[10:48:29.0000] <devsnek>
+definitely not at the same time
+
+[10:48:38.0000] <devsnek>
+possibly one at a time
+
+[10:51:02.0000] <jmdyck>
+yeah, i didn't mean "at the same time"
+
+[10:54:38.0000] <devsnek>
+i have to modify engine262 slightly to test this lol
+
+[10:56:48.0000] <jmdyck>
+it's unclear "where" the realm exists, and who creates it, and how it becomes known/available to multiple agents
+
+[11:13:30.0000] <devsnek>
+jmdyck: seems to work so far
+
+[11:13:41.0000] <devsnek>
+i set up a repl that changes the agent on every line
+
+[11:13:44.0000] <devsnek>
+but reuses the same realm
+
+[11:14:08.0000] <devsnek>
+function declarations, promises, instances, etc all working
+
+[11:15:31.0000] <jmdyck>
+so how do you tell the agent which realm to use?
+
+[11:16:15.0000] <devsnek>
+i'm just changing the "surrounding agent"
+
+[11:16:28.0000] <jmdyck>
+hm
+
+[11:16:55.0000] <devsnek>
+i don't think anything ever holds a reference to the agent
+
+[11:19:28.0000] <jmdyck>
+In engine262, "surrounding agent" is a 'property' of what?
+
+[11:20:18.0000] <devsnek>
+uhh
+
+[11:20:24.0000] <devsnek>
+it's a variable exported from engine.mjs
+
+[11:20:34.0000] <jmdyck>
+The spec definition says that you can talk about "the surrounding agent for the code in a job", whatever that means.
+
+[11:20:41.0000] <devsnek>
+and then various things do `import { surroundingAgent } from 'engine.mjs'`
+
+[11:21:04.0000] <devsnek>
+https://github.com/engine262/engine262/blob/d7dc6bcb776e0386e370629cc8a559b74520d7aa/src/engine.mjs#L114-L118
+
+[11:21:22.0000] <rkirsling>
+whoa I just found something weird
+
+[11:21:30.0000] <devsnek>
+javascript?
+
+[11:21:43.0000] <rkirsling>
+tehehe
+
+[11:22:19.0000] <rkirsling>
+so JSC was failing tests for  `async (a = await => {}) => {}` and `async () => { (x = await /1/g) => x }` being invalid
+
+[11:22:41.0000] <rkirsling>
+but then I thought to check non-arrow functions
+
+[11:23:34.0000] <rkirsling>
+and only JSC is not complaining for `async function foo (a = await => {}) {}` but
+
+[11:24:02.0000] <rkirsling>
+everyone allows `async function foo() { function bar(a = await /1/g) {} }`?
+
+[11:26:57.0000] <ljharb>
+you can't use `await` in a function signature afaik; it's surprising to me that it works in the latter case, but it kind of makes sense since it's happening as part of the function declaration's creation
+
+[11:28:06.0000] <rkirsling>
+oh geez, that's a division operator
+
+[11:28:23.0000] <devsnek>
+await div 1 div g
+
+[11:28:44.0000] <rkirsling>
+oof. but it still seems wrong that those are different, no?
+
+[11:29:11.0000] <ljharb>
+oh right
+
+[11:29:11.0000] <ljharb>
+ha
+
+[11:29:22.0000] <ljharb>
+nah, that still seems right
+
+[11:29:34.0000] <ljharb>
+because any `await` after `async function` should be an actual await
+
+[11:29:35.0000] <devsnek>
+does anyone ever have this problem where sourcemapped stack traces are backward
+
+[11:29:54.0000] <rkirsling>
+no I mean why are functions and arrow functions different?
+
+[11:30:41.0000] <ljharb>
+rkirsling: lookahead, i assume
+
+[11:31:01.0000] <rkirsling>
+I don't care whether both are valid or invalid but `async function foo() { (a = await / 1) => {} }` is invalid
+
+[11:31:02.0000] <ljharb>
+rkirsling: `async (a = await` isn't sure it's an async function yet, or a function invocation of the `async` identifier
+
+[11:31:34.0000] <rkirsling>
+(based on eshost, at least)
+
+[11:32:12.0000] <Bakkot>
+rkirsling: async arrows forbid await in parameter expressions for exactly this reason, IIRC
+
+[11:32:19.0000] <jmdyck>
+so in engine262, at any given time, there's one surroundingAgent, and that's the 'surrounding agent' (in the spec sense) for any code that's running at that time?
+
+[11:32:27.0000] <Bakkot>
+https://tc39.es/ecma262/#sec-async-arrow-function-definitions-static-semantics-early-errors
+
+[11:32:32.0000] <Bakkot>
+It is a Syntax Error if CoverCallExpressionAndAsyncArrowHead Contains AwaitExpression is true.
+
+[11:33:44.0000] <rkirsling>
+er right but the issue I'm worried about is non-async-arrow-in-async-context
+
+[11:34:08.0000] <rkirsling>
+vs. non-async-`function`-in-async-context
+
+[11:34:25.0000] <Bakkot>
+uh
+
+[11:34:28.0000] <Bakkot>
+can you spell this out more?
+
+[11:34:33.0000] <Bakkot>
+ideally in a gist with code samples?
+
+[11:38:18.0000] <rkirsling>
+it's all above :-/
+
+[11:38:18.0000] <rkirsling>
+`async () => { (x = await / 1) => {}; }` is a syntax error for everybody but JSC (and there's a test262 test)
+
+[11:38:18.0000] <rkirsling>
+`async function foo() { (x = await / 1) => {}; }` is a syntax error for everybody but JSC
+
+[11:38:18.0000] <rkirsling>
+`async function foo() { function bar(a = await / 1) {} }` is allowed by everybody
+
+[11:38:37.0000] <ljharb>
+sounds like jsc has 2 bugs
+
+[11:38:54.0000] <ljharb>
+and the third one, i'm not sure, but it seems weird
+
+[11:38:55.0000] <Bakkot>
+rkirsling: yeah I just don't understand what you are asking about this
+
+[11:39:08.0000] <Bakkot>
+ljharb: the third one is correct
+
+[11:39:27.0000] <ljharb>
+i suppose it makes sense that it'd be the same as `function bar(a = await / 1) {}` by itself.
+
+[11:39:44.0000] <rkirsling>
+yeah no it's fine that JSC has bugs; I don't understand why the second and third should differe
+
+[11:39:47.0000] <rkirsling>
+*differ
+
+[11:40:00.0000] <Bakkot>
+ah, ok
+
+[11:40:04.0000] <ljharb>
+because the second case doesn't know it's an arrow function yet when it sees the `await`
+
+[11:40:12.0000] <ljharb>
+the third case knows it's in a non-async function already
+
+[11:40:16.0000] <rkirsling>
+(the third can be a function expr, doesn't have to be declaration)
+
+[11:40:16.0000] <Bakkot>
+rkirsling: wait, is your question about "how does the spec do this" or "why does the spec do this"?
+
+[11:40:18.0000] <ljharb>
+(i think?)
+
+[11:40:32.0000] <rkirsling>
+why
+
+[11:40:56.0000] <rkirsling>
+or well
+
+[11:41:45.0000] <Bakkot>
+the answer is that it is impossible to even tokenize the second thing correctly without re-scanning
+
+[11:41:50.0000] <rkirsling>
+first of all I wanted to know whether it's a bug in the spec at all or if it could just be something uncovered by tests and thus the engines have it wrong (although it's weird for them to be uniformly so)
+
+[11:42:14.0000] <Bakkot>
+the spec'd behavior is the behavior every engine but JSC follows, and is intentional
+
+[11:43:24.0000] <rkirsling>
+gotcha
+
+[11:44:06.0000] <devsnek>
+we should get an eshost irc bot
+
+[11:44:41.0000] <rkirsling>
+just feels like it would've been more consistent to prohibit await in default expressions across the board, is all
+
+[11:45:10.0000] <rkirsling>
+devsnek: that'd be cool
+
+[11:45:25.0000] <ljharb>
+devsnek: +1
+
+[11:45:43.0000] <ljharb>
+rkirsling: it wouldn't have been back compat tho - arrows are in 2015 and async/await not until 2017
+
+[11:45:50.0000] <ljharb>
+sorry, defaults  are in 2015
+
+[11:46:14.0000] <ljharb>
+rkirsling: so await would have had to be prohibited in there in 2015 - and anyone using `await` as an identifier pre-2015 would have had a refactoring hazard when migrating to defaults
+
+[11:46:38.0000] <rkirsling>
+ah hmm right
+
+[11:46:40.0000] <Bakkot>
+rkirsling: do you mean "prohibit await expressions" or "prohibit await identifiers"?
+
+[11:46:54.0000] <Bakkot>
+because it is being interpreted as an await identifier, in your third example
+
+[11:46:54.0000] <devsnek>
+if you do `(a = await => ...)`
+
+[11:46:59.0000] <devsnek>
+maybe your code deserves to be broken
+
+[11:47:22.0000] <rkirsling>
+Bakkot: yeah my brain is partially mixed up on that point because the test262 test is confusing
+
+[11:47:34.0000] <rkirsling>
+(one sec)
+
+[11:47:56.0000] <rkirsling>
+https://test262.report/browse/language/expressions/async-arrow-function/await-as-param-nested-arrow-body-position.js?date=2019-09-08
+
+[11:48:20.0000] <rkirsling>
+(sorry for unnecessary query param)
+
+[11:49:23.0000] <Bakkot>
+ah, yeah, I would say that's the wrong error
+
+[11:49:50.0000] <Bakkot>
+oh, wait, no
+
+[11:49:56.0000] <Bakkot>
+I guess that is the right error
+
+[11:49:58.0000] <Bakkot>
+er
+
+[11:50:00.0000] <Bakkot>
+err
+
+[11:50:18.0000] <devsnek>
+that's the right error
+
+[11:50:41.0000] <devsnek>
+thinking from a scanning perspective
+
+[11:50:52.0000] <Bakkot>
+devsnek: the error should be for regular arrow expressions
+
+[11:50:55.0000] <Bakkot>
+not for async arrows
+
+[11:52:27.0000] <Bakkot>
+the right error is https://tc39.es/ecma262/#sec-arrow-function-definitions-static-semantics-early-errors "It is a Syntax Error if ArrowParameters Contains AwaitExpression is true."
+
+[11:52:53.0000] <Bakkot>
+that is, I guess the error is right (if out of date), but the esid is wrong
+
+[11:53:08.0000] <devsnek>
+oh i wasn't looking at the esid
+
+[11:54:19.0000] <rkirsling>
+ah sure
+
+[11:54:45.0000] <rkirsling>
+er wait though
+
+[11:55:10.0000] <rkirsling>
+my point was that I thought it was testing for await expr but it's not
+
+[11:55:16.0000] <Bakkot>
+it is
+
+[11:55:31.0000] <rkirsling>
+because all day yesterday I thought that was a regex but it's not
+
+[11:55:37.0000] <Bakkot>
+the way it works is, you parse it as CoverParenthesizedExpressionAndArrowParameterList, then when you encounter `=>` you refine it with `( UniqueFormalParameters_[?Await] )`, which in this context will pass +Await as the flag
+
+[11:55:54.0000] <Bakkot>
+and then the above early error is applied
+
+[11:56:00.0000] <Bakkot>
+the "It is a Syntax Error if ArrowParameters Contains AwaitExpression is true." one
+
+[11:56:02.0000] <rkirsling>
+so I don't know why we've written it to look like one...
+
+[11:56:07.0000] <Bakkot>
+any lunch back in a while
+
+[11:57:54.0000] <devsnek>
+i wish there was a way to highlight emu-alg spec steps
+
+[12:18:44.0000] <mpcsh>
+Just noticed this: https://tc39.es/ecma262/#sec-future-reserved-words
+
+[12:18:44.0000] <mpcsh>
+Are there any plans for `enum`? I'd love to bring a proposal but I have a gut feeling there's context here
+
+[12:21:42.0000] <ljharb>
+mpcsh: there's two competing proposals in progress that haven't been presented yet
+
+[12:22:17.0000] <ljharb>
+mpcsh: https://github.com/rwaldron/proposal-enum-definitions and https://github.com/rbuckton/proposal-enum
+
+[12:23:22.0000] <devsnek>
+ron v rick battle to the death
+
+[12:24:21.0000] <mpcsh>
+ljharb: do we know if either is being actively worked on?
+
+[12:25:39.0000] <ljharb>
+mpcsh: depends on how you define "active"; neither is abandoned.
+
+[12:25:56.0000] <ljharb>
+mpcsh: meaning, probably best not to make a third :-)
+
+[12:27:16.0000] <devsnek>
+i like that they both allow a function to define enum creation
+
+[12:27:41.0000] <devsnek>
+although rbuckton's seems a bit more involved with all those symbols
+
+[12:28:06.0000] <mpcsh>
+ljharb: sure, just looks like neither has had a commit in a while? is it normal for proposals to linger for a while?
+
+[12:28:20.0000] <ljharb>
+mpcsh: yes
+
+[12:28:25.0000] <devsnek>
+its up to the champion to present them
+
+[12:30:10.0000] <mpcsh>
+cool, I'll ping them to ask what their plans are, thanks :)
+
+[12:50:41.0000] <Bakkot>
+rkirsling: it's written like a regex because it parses as a regex
+
+[12:51:15.0000] <Bakkot>
+if you omit the `=> {}` it will actually be one
+
+[12:52:02.0000] <Bakkot>
+it is an AwaitExpression of a regex, and then the early error for ArrowParameters I linked makes that an error
+
+[12:52:28.0000] <Bakkot>
+in a non-async context it would not be a regex
+
+[13:08:36.0000] <rkirsling>
+Bakkot: I think I figured it had to not be a regex because `async function foo() { function bar(a = await 1) {} }` is an error
+
+[13:09:09.0000] <Bakkot>
+yeah, parsing arrows is much much more complicated than parsing function declarations
+
+[13:09:21.0000] <rkirsling>
+but `async function foo() { function bar(a = await /1/g) {} }` is not
+
+[13:09:21.0000] <rkirsling>
+and neither is `async function foo() { function bar(a = await / 1) {} }`
+
+[13:10:10.0000] <Bakkot>
+yeah; in all of those the inner parameters are parsed with the `Async` flag off
+
+[13:10:42.0000] <devsnek>
+parsing arrow functions is dreadful
+
+[13:10:52.0000] <rkirsling>
+😭
+
+[13:11:34.0000] <Bakkot>
+but you can't do that when parsing `async function foo(){ (a = await/r/g)` because the flag needs to be on if you do not then encounter `=>`
+
+[13:11:35.0000] <devsnek>
+someone should make an ai powered parser
+
+[13:11:40.0000] <Bakkot>
+and the flag affects tokenization
+
+[13:12:23.0000] <Bakkot>
+so what happens is that the flag is _on_ when parsing it and when refining the cover grammar, which means it parses as an Await of a regex
+
+[13:13:01.0000] <Bakkot>
+but because it shouldn't actually be an async context if you encouter `=>`, there's an early error forbidding await expressions in non-async arrow parameters
+
+[13:13:21.0000] <rkirsling>
+wowsers
+
+[13:13:33.0000] <Bakkot>
+(you don't need a similar rule for non-async function declaration parameters because you can't end up with one in the first place, because this ambiguity doesn't happen: you can get the flag right when tokenizing it in the first place)
+
+[13:13:48.0000] <bradleymeck>
+weren't people doing catastrophic backtracking with arrows a few months ago for some reason?
+
+[13:13:56.0000] <devsnek>
+that was with regex
+
+[13:14:14.0000] <Bakkot>
+er, by "you can't end up with [one]" I mean "you can't end up with [an await expression in function declaration parameters]"
+
+[13:14:29.0000] <Bakkot>
+bradleymeck: I don't recall hearing about it
+
+[13:15:14.0000] <devsnek>
+a few months ago a v8 dev wrote a blog post about a way of optimizing out backtracking in v8 regular expressions
+
+[13:15:27.0000] <devsnek>
+which brought up a bunch of talk about backtracking in regular expressions
+
+[13:15:58.0000] <Bakkot>
+sidebar: I have some notes on the difficulty of parsing JS I keep meaning to write up more formally and publish at some point
+
+[13:16:10.0000] <bradleymeck>
+devsnek: nah, this was something else
+
+[13:16:20.0000] <devsnek>
+oh
+
+[13:19:44.0000] <bradleymeck>
+it was the same timeframe as https://github.com/microsoft/TypeScript/issues/30833 coming up but i can't find it
+
+[13:20:04.0000] <bradleymeck>
+there was some variation of that which cause catastrophic backtracking
+
+[13:22:02.0000] <devsnek>
+i would assume most things don't actually backtrack for parsing
+
+[13:22:06.0000] <rkirsling>
+Bakkot: sounds like a good read
+
+[13:22:32.0000] <devsnek>
+in slither i have an intermediate form that can be either lowered to parens or parameters
+
+[13:22:41.0000] <devsnek>
+i think v8 has something similar
+
+[13:25:08.0000] <Bakkot>
+huh; our approach (in Shift) is to just do it as one and then convert it to the other at the point at which it becomes clear which it has to be
+
+[13:26:10.0000] <bradleymeck>
+Bakkot: does it suffer like TS does? https://twitter.com/bterlson/status/1115710324957515776
+
+[13:26:22.0000] <Bakkot>
+bradleymeck: we don't backtrack, so no
+
+[13:26:38.0000] <bradleymeck>
+ah
+
+[13:26:39.0000] <Bakkot>
+https://shift-ast.org/parser.html?parse_type=module&script=async(async(async(async(async(async(async(async(async(async(async(async(async(async(async(async(async(async(async(async(async(async(async()))))))))))))))))))))))%0A%0A
+
+[13:26:44.0000] <devsnek>
+like a = b can either be assignmentexpression or formalparameter = lefthandsideexpression
+
+[13:27:03.0000] <devsnek>
+no reason to backtrack, just pick one based on whether there's an arrow
+
+[13:28:11.0000] <devsnek>
+Bakkot: can shift parser be extended?
+
+[13:29:26.0000] <Bakkot>
+devsnek: in a certain sense, yes? it's implemented as a class and you can extend the class and override any methods you care to (including in the tokenizer). but not all syntax extensions map cleanly to overridden methods.
+
+[13:29:54.0000] <devsnek>
+i'm currently writing a new parser for engine262 cuz we've been having layering problems with acorn
+
+[13:31:02.0000] <devsnek>
+would rather not write a whole parser though :P
+
+[13:31:05.0000] <Bakkot>
+would strongly advise trying other parsers before attempting to roll your own, yes
+
+[13:31:19.0000] <devsnek>
+i've looked at so many parsers lol
+
+[13:31:45.0000] <devsnek>
+there's this one fellow who has made three js parsers
+
+[13:31:55.0000] <Bakkot>
+I remember him, yes
+
+[13:32:00.0000] <Bakkot>
+his approach did not inspire confidence
+
+[13:32:09.0000] <devsnek>
+cherow, meriyah, and buntis
+
+[13:32:22.0000] <devsnek>
+apparently they all confirm to es2020
+
+[13:34:08.0000] <devsnek>
+Bakkot: how come shift does a BinaryExpression tree for the comma operator
+
+[13:34:35.0000] <Bakkot>
+... what else would it do?
+
+[13:35:02.0000] <devsnek>
+i think babel does a "Sequence Expression"
+
+[13:35:27.0000] <devsnek>
+yeah https://gc.gy/35852727.png
+
+[13:35:43.0000] <Bakkot>
+oh, with arbitrarily many children, right
+
+[13:36:06.0000] <devsnek>
+it makes sense
+
+[13:36:14.0000] <devsnek>
+i had just never though of comma as a binary tree before lol
+
+[13:37:14.0000] <Bakkot>
+two answers to that: a.) that's weirdly inconsistent with `x + y + z`, and b.) one of the main goals for Shift is to make impossible programs unrepresentable, and this representation only represents valid programs
+
+[13:37:34.0000] <Bakkot>
+whereas esprima's allows sequence-expression-of-zero-items (or one item), which is not a possible program
+
+[13:38:08.0000] <devsnek>
+oh interesting
+
+[13:38:10.0000] <devsnek>
+i like that
+
+[13:40:12.0000] <bradleymeck>
+babel's has all sorts of gross stuff too
+
+[13:40:17.0000] <bradleymeck>
+like nested comma sequences
+
+[13:40:36.0000] <devsnek>
+estree is rather odd in a lot of ways
+
+[13:55:25.0000] <ljharb>
+so given an arbitrary source text that may contain any arbitrary parameter defaults, is there any performant way, short of building a full parser, to reliably determine something is an arrow function?
+
+[14:02:05.0000] <Bakkot>
+what does 'something' mean?
+
+[14:04:43.0000] <Bakkot>
+it is not generally possible to answer the question "does this string match this grammar" without building a parser; that's what parsers _are_ (though you can make it somewhat more performant by not constructing an AST)
+
+[14:05:04.0000] <Bakkot>
+I guess depending on your definitions you might not consider "a parser, but it doesn't make an AST" to be a parser
+
+[14:05:13.0000] <Bakkot>
+but it's going to end up looking a lot like one
+
+[14:06:24.0000] <devsnek>
+i did something really similar for json
+
+[14:06:36.0000] <devsnek>
+https://github.com/engine262/engine262/blob/master/src/intrinsics/JSON.mjs#L39
+
+[14:06:39.0000] <ljharb>
+yeah fair
+
+[14:06:51.0000] <devsnek>
+the only thing that makes this a "validator" is that it doesn't also build up a json structure
+
+
+2019-09-11
+[19:24:20.0000] <jmdyck>
+devsnek: 2 commits pending at https://github.com/jmdyck/ecma262/tree/1597_ed
+
+[19:27:53.0000] <devsnek>
+jmdyck: nice
+
+[19:28:11.0000] <jmdyck>
+glad you like it.
+
+[21:37:22.0000] <jmdyck>
+ok, done.
+
+[16:07:34.0000] <rkirsling>
+oh also fun fact I forgot to mention yesterday
+
+[16:07:54.0000] <rkirsling>
+there is no test262 test requiring `await => 3` to be valid at top level, heh
+
+
+2019-09-12
+[00:17:05.0000] <littledan>
+rkirsling: Ah, I never thought of that!
+
+[00:17:12.0000] <littledan>
+rkirsling: Are you implementing top-level await?
+
+[00:30:08.0000] <rkirsling>
+littledan: nah, I was fixing some places JSC was off on whether await is permitted
+
+[00:32:21.0000] <littledan>
+ah, I see
+
+[11:30:50.0000] <esprehn>
+In what situations would you want to write `await => thing` ? (=> 3) isn't an expression I'm familiar with
+
+[11:41:49.0000] <rkirsling>
+esprehn: absolutely none, but there are many contexts in which `await` is a valid identifier
+
+[11:42:32.0000] <rkirsling>
+I temporarily broke that one while fixing another and was sad that no tests failed
+
+[11:44:23.0000] <devsnek>
+`const add1 = await => await + 1`
+
+[11:44:40.0000] <devsnek>
+very important use case :P
+
+[11:45:05.0000] <rkirsling>
+lol yep
+
+
+2019-09-13
+[09:00:52.0000] <jgi>
+What is the level of confidentiality of what's shared in https://github.com/tc39/Reflector/, if not explicitly mentioned? E.g. if a topic is discussed in that private repo but hasn't been discussed in a public venue or recorded (transcribed in meeting notes, etc.) and made available to the public, is it OK to share the gist of those discussions with others, or is it encouraged to refrain from that?
+
+[09:03:56.0000] <bterlson>
+Reflector is internal only
+
+[09:04:30.0000] <bterlson>
+The author should likely be willing to post in more places tho
+
+[09:06:04.0000] <jgi>
+bterlson: "internal only": is it implied then that anything discussed only in that repo shouldn't be shared by delegates to members of their organizations?
+
+[09:07:18.0000] <jgi>
+For instance, would sharing https://github.com/tc39/Reflector/issues/246 with Netflix devs be not recommended, until this is discussed in a public forum?
+
+[09:08:12.0000] <bterlson>
+Reflector content is fine to share with any employee of a member company
+
+[09:20:59.0000] <jgi>
+bterlson: sounds good, thank you
+
+[09:30:05.0000] <devsnek>
+is mark miller ever on irc
+
+[09:32:50.0000] <bradleymeck>
+devsnek: nope
+
+[12:01:25.0000] <jorendorff>
+ljharb: Thanks for the link. This is so great. What a different world
+
+[12:04:29.0000] <Bakkot>
+ljharb: prettier has a neat thing where there's a page which redirects you to the appropriate PR preview based on a referrer header, so you can use the same link in every PR: https://prettier.io/playground-redirect
+
+[12:05:10.0000] <Bakkot>
+and they just have a link to that URL in the PR template, so authors can just leave it in
+
+[12:05:56.0000] <Bakkot>
+this avoids having a bot edit posts or leave a comment on every PR while still surfacing the link in a more obvious way
+
+[12:06:01.0000] <Bakkot>
+could we get something like that?
+
+[13:16:10.0000] <ljharb>
+jgi: but also please don't discuss it in this channel, which is public.
+
+[13:16:19.0000] <ljharb>
+Bakkot: hm, let me take a look
+
+[13:16:49.0000] <jgi>
+ljharb: got it!
+
+[13:18:27.0000] <ljharb>
+Bakkot: that's a clever technique that imo is pretty hacky; i'd think we'd want something a bit more robust
+
+[13:18:57.0000] <Bakkot>
+/shrug
+
+[13:19:01.0000] <Bakkot>
+not sure how much more robust you can get given the tools available
+
+[13:19:14.0000] <ljharb>
+you may be right
+
+[13:20:49.0000] <devsnek>
+ljharb: i think we can deploy a netlify function for `ecma262-snapshots.netlify.com/pr` or something
+
+[13:21:37.0000] <ljharb>
+devsnek: seems like the best way to use that technique, sure (altho i'd think the default page would list all open PRs with previews, ideally)
+
+[13:21:49.0000] <devsnek>
+🤷🏻
+
+[14:22:39.0000] <ljharb>
+other than Unicode changes, and template object caching changes, can anyone think of any post-ES2015 spec changes that aren't backwards compatible?
+
+[14:28:36.0000] <gibson042>
+in the sense of not introducing exceptions to previously non-exceptional scripts?
+
+[14:48:18.0000] <ljharb>
+gibson042: basically any observable change that’s likely to break someone, aside from “making an exception no longer be one”
+
+[16:16:25.0000] <devsnek>
+does anyone know how to parse TLA with babel
+
+[16:16:36.0000] <devsnek>
+i was hoping there would be a `allowAwaitOutsideFunction` option or something
+
+
+2019-09-14
+[17:49:08.0000] <bradleymeck>
+@devsnek there is for the parser
+
+[17:51:34.0000] <devsnek>
+oh yeah I had to pass it in `parserOpts`
+
+[10:07:42.0000] <devsnek>
+there was an interesting point on esdiscuss about getting a parser/ast api if binast gives js an official public ast
+
+[10:12:11.0000] <ljharb>
+that's the main reason i'm stoked for binast - it might result in the js ecosystem settling on the same ast, which would be awesome
+
+
+2019-09-15
+[19:37:00.0000] <devsnek>
+does anyone know more about the binast proposal in terms of what structure they're using and such?
+
+[19:37:20.0000] <devsnek>
+all i can find is "our next prototype will be based on the Babylon AST." in the README
+
+[19:42:16.0000] <jmdyck>
+so you're wondering how it differs from the Babylon AST?
+
+[19:43:39.0000] <devsnek>
+i'm just curious what it looks like
+
+[19:43:59.0000] <devsnek>
+it sounds like people are working on it offline
+
+[19:53:28.0000] <Domenic>
+I don't think people are working on it offline
+
+[19:54:09.0000] <jmdyck>
+not working on it at all?
+
+[19:54:43.0000] <Domenic>
+Indeed
+
+[19:54:50.0000] <devsnek>
+hard to tell one way or the other
+
+[20:47:35.0000] <shu>
+devsnek: working on the proposal or working on an experimental implementation?
+
+[20:48:08.0000] <shu>
+devsnek: i haven’t kept up with the implementation tbh, don’t think anyone is working on the spec after my initial spec
+
+[20:48:18.0000] <devsnek>
+shu: i interpreted the readme as firefox+facebook+etc are working on this
+
+[20:48:32.0000] <shu>
+they are afaik, yes, devoting some engineering to it
+
+[20:48:39.0000] <devsnek>
+i was just curious what kinda stuff is going on
+
+[20:48:45.0000] <devsnek>
+was hoping to see more publicly
+
+[20:49:02.0000] <shu>
+well, i’ll leave that up to the fb/mozilla folks for when they want to publicize more
+
+[20:49:28.0000] <devsnek>
+yea
+
+[20:49:43.0000] <shu>
+on the spec side, however, i’m not aware of plans to stop being based on top of the Shape AST
+
+[20:50:31.0000] <shu>
+though i’d like to give some caution for pinning hopes for a unified AST on top of binary ast
+
+[20:51:13.0000] <shu>
+there is very little to no thought given to its AST being good for AST manipulation, only for transport and efficiency of encoding and compression
+
+[20:51:58.0000] <shu>
+last time i talked to the henry zhu of babel, the sense was even a not-great-for-human-consumption AST is fine so long as it is standard
+
+[20:52:15.0000] <ljharb>
+shu: tbh even a standard for node names would be helpful
+
+[20:52:24.0000] <shu>
+but i just wanna warn that this is not meant to be tailored for tooling or human use
+
+[20:52:35.0000] <shu>
+ljharb: right, i agree. just trying to cover the bases
+
+[20:52:55.0000] <ljharb>
+i expect anything standard can be adapted
+
+[07:49:13.0000] <devsnek>
+apparently all the work is happening here https://github.com/binast/binjs-ref
+
+
+2019-09-16
+[21:26:30.0000] <ljharb>
+rofl why is the `lang` of the HTML spec "en-US-x-hixie"
+
+[21:27:03.0000] <TimothyGu>
+ljharb: cuz Hixie wrote the spec
+
+[21:27:07.0000] <devsnek>
+damn it tim
+
+[21:27:11.0000] <devsnek>
+i was about to answer this
+
+[21:27:29.0000] <ljharb>
+TimothyGu: lol yeah, but, seems an odd choice to put an easter egg in an accessibility attribute
+
+[21:27:44.0000] <TimothyGu>
+I guess it's also to test language tag parsers
+
+[21:28:21.0000] <TimothyGu>
+per BCP 47 the "x" is private use or whatever
+
+[21:28:37.0000] <ljharb>
+¯\_(ツ)_/¯
+
+[21:28:44.0000] <devsnek>
+it's a valid en-US
+
+[21:28:52.0000] <devsnek>
+just has extra data
+
+[21:29:16.0000] <ljharb>
+true
+
+[21:42:52.0000] <TabAtkins>
+ljharb: It's... technically correct, yes. Indicating a sub-ideolect, specific to Hixie.
+
+[21:53:12.0000] <Domenic>
+It is derived from en-GB-Hixie: https://ian.hixie.ch/bible/english
+
+[21:55:29.0000] <devsnek>
+Domenic: is that where chrome's practice of using || for code comes from?
+
+[21:55:43.0000] <Domenic>
+devsnek: no I think that's from a long time ago
+
+[21:55:48.0000] <Domenic>
+Like old computers
+
+[21:55:55.0000] <devsnek>
+ic
+
+[21:56:12.0000] <devsnek>
+i've never seen it outside of chromium commits, until today
+
+[21:56:20.0000] <Domenic>
+I first saw it in Mozilla
+
+[21:56:47.0000] <TimothyGu>
+huh? what's ||
+
+[21:57:09.0000] <devsnek>
+like backticks
+
+[21:57:16.0000] <devsnek>
+some code is |1 + 1|
+
+[21:57:45.0000] <TimothyGu>
+ah
+
+[21:58:27.0000] <TabAtkins>
+...wtf is up with Hixie's "-us pluralizes to -ii" rule, that doesn't match anyone ever
+
+[21:58:44.0000] <devsnek>
+lol i was just talking about that with someone
+
+[21:58:46.0000] <devsnek>
+i like it
+
+[21:58:47.0000] <TabAtkins>
+-ii literally only occurs in words like radius
+
+[21:59:48.0000] <devsnek>
+motion to adopt en-US-x-Hixie on all tc39 documents
+
+[22:05:18.0000] <Domenic>
+Singular: bus. Plural: bii. Alternative plural: buses.
+
+[22:05:40.0000] <TimothyGu>
+oh why
+
+[22:33:05.0000] <Domenic>
+us -> ii, it's the rule
+
+[22:38:12.0000] <TabAtkins>
+clearly, 1 radius = 2 radiii
+
+[22:39:05.0000] <TabAtkins>
+but for real i am 100% certain Hixie does *not* pronounce the plural of cactus as "kack-tee-eye"
+
+[23:27:04.0000] <FireFly>
+I think some of it is in jest :p
+
+[05:04:10.0000] <littledan>
+/me thinks we should start using diaeresis over subsequent i's, as in Iberian languages and en-GB-x-Economist, to indicate that they're a separate syllable
+
+[06:37:12.0000] <gibson042>
+ljharb: getting back to your request for "post-ES2015 spec changes that aren't backwards compatible", I remember one around use of built-in vs. custom `then` with Promises, I believe related to the timing of `await`
+
+[06:41:27.0000] <gibson042>
+https://github.com/tc39/ecma262/commit/e985e41c2ac1906ea69226f24966ba1a1f82340b
+
+[06:42:10.0000] <gibson042>
+err, that link is wrong
+
+[06:42:13.0000] <gibson042>
+it was https://github.com/tc39/ecma262/commit/a2647114b7f2d42b02e7c04c8c3a05787846f6e5
+
+[06:48:32.0000] <gibson042>
+and https://github.com/tc39/ecma262/issues/1577 is related
+
+[09:02:47.0000] <devsnek>
+what if we had a Map#take https://gc.gy/36354699.png
+
+[09:44:00.0000] <devsnek>
+is it possible to link modules from different realms
+
+[09:44:14.0000] <devsnek>
+i can't tell if this is a limitation of v8 or a limitation of the spec
+
+[10:02:10.0000] <Bakkot>
+devsnek: what do you mean by "link"?
+
+[10:02:29.0000] <devsnek>
+Bakkot: make them part of the same graph
+
+[10:02:35.0000] <Bakkot>
+which graph?
+
+[10:02:39.0000] <devsnek>
+a module graph
+
+[10:02:53.0000] <devsnek>
+like respond to HostResolveImportedModule with a module from a different realm
+
+[10:02:55.0000] <Bakkot>
+ah, then I'm not sure
+
+[10:03:11.0000] <Bakkot>
+I am pretty sure HTML doesn't allow this, but don't know about the ES spec
+
+[10:03:27.0000] <Bakkot>
+(it doesn't explicitly disallow it, just doesn't provide a mechanism for it)
+
+[10:05:19.0000] <jorendorff>
+My reading of 12.1.1 is that `yiel\u{64}` is a valid Identifier, except in strict mode code
+
+[10:05:44.0000] <jorendorff>
+So that `var yield = 0;` is illegal in a non-strict generator, but `var yiel\u{64} = 0;` is OK
+
+[10:06:58.0000] <jorendorff>
+wait, no, there's a rule covering that case
+
+[10:07:16.0000] <jorendorff>
+it's a valid Identifier but not a valid BindingIdentifier or IdentifierReference
+
+[10:07:30.0000] <Bakkot>
+jorendorff: "It is a Syntax Error if this production has a [Yield] parameter and StringValue of Identifier is "yield"."
+
+[10:07:37.0000] <jorendorff>
+ayup
+
+[11:26:29.0000] <shu>
+littledan: the New Yorker still does that too
+
+[11:27:16.0000] <rkirsling>
+yeah I think certain cases like naïve are quite common
+
+[11:27:38.0000] <rkirsling>
+coöperation looks table-flipping ridiculous though lol
+
+[11:28:18.0000] <shu>
+not sure if any other american publications do, but New Yorker loves itself some diareses
+
+[11:35:32.0000] <shu>
+rkirsling: perhaps we should start pronouncing cooperation like coop-er-ation a la chicken coop out of spite
+
+[11:36:19.0000] <devsnek>
+👎🏻
+
+[11:36:30.0000] <rkirsling>
+shu: I bet you could make it like a personal speaking gimmick
+
+[11:37:10.0000] <rkirsling>
+you'd just have to always keep a straight face / not slow down but just act like it's completely natural
+
+[11:37:22.0000] <rkirsling>
+I for one would just start giggling, I think
+
+[11:37:22.0000] <shu>
+naturally, yes
+
+[11:38:22.0000] <devsnek>
+that's point of order territory
+
+[11:42:36.0000] <rkirsling>
+POO: did you really
+
+[11:47:16.0000] <jmdyck>
+devsnek: It seems to me that Script Record's [[Environment]] field is never consulted (or set to anything interesting). What does engine262 say?
+
+[11:47:39.0000] <devsnek>
+script record?
+
+[11:48:00.0000] <jmdyck>
+https://tc39.es/ecma262/#sec-script-records
+
+[11:48:32.0000] <shu>
+rkirsling: perhaps you mean POÖ
+
+[11:48:50.0000] <devsnek>
+yeah i can't think of any reason for it to have that field
+
+[11:50:18.0000] <rkirsling>
+shu: 😂 you win
+
+[11:50:45.0000] <devsnek>
+jmdyck: you could try modifying Environment to be a getter/setter that throw, and then running test262
+
+[11:57:32.0000] <jmdyck>
+It looks like it's never been used.
+
+[11:58:43.0000] <devsnek>
+nice
+
+[11:58:52.0000] <jmdyck>
+I think it's just there by analogy with Module Record's [[Environment]] field.
+
+[12:49:26.0000] <ljharb>
+gibson042: thanks, the await microtask change in https://github.com/tc39/ecma262/pull/1250 ?
+
+[12:53:06.0000] <jorendorff>
+yeah, defining "keyword" is beyond me
+
+[13:00:43.0000] <jmdyck>
+it'd be something like: a terminal symbol of the syntactic grammar that is presented in monospace font, and is composed only of letters
+
+[13:02:15.0000] <jmdyck>
+Involving a font choice seems flakey, but the spec doesn't really give us a different way to identify such things.
+
+[13:03:17.0000] <rkirsling>
+"something that looks like an identifier but has special meaning to the language" would almost cover it
+
+[13:04:05.0000] <rkirsling>
+(maybe "can have in at least one context". but then "enum" is screwy any way you cut it here)
+
+[13:04:34.0000] <jmdyck>
+it depends on exactly where you want the definition's boundary to be, which depends on how you're using the term
+
+[13:05:30.0000] <jmdyck>
+You're probably better off not trying to define it, if that works.
+
+[13:06:04.0000] <rkirsling>
+true...
+
+[13:43:08.0000] <ljharb>
+jmdyck: i rebased your big editorial PR; i added a commit which is just this line: https://github.com/tc39/ecma262/pull/1636/files#diff-3540caefa502006d8a33cb1385720803R37200 can you take a look and confirm it's fine, before i merge?
+
+[13:47:18.0000] <jmdyck>
+looking...
+
+[14:00:08.0000] <jmdyck>
+It seems like the kebab id was only in master for 3 days (2018-07-09 to 2018-07-12). Is that long enough to warrant an oldid?
+
+[14:00:44.0000] <ljharb>
+hm
+
+[14:01:17.0000] <devsnek>
+peak v8 is switching to a new faster code running api but it also means some of the code just doesn't happen at all
+
+[14:01:55.0000] <ljharb>
+jmdyck: yeah, that's a fair point
+
+[14:02:13.0000] <jmdyck>
+(but i might be misreading the logs: git seems to prefer telling me when something was originally committed rather than when it was merged)
+
+[14:02:41.0000] <ljharb>
+git does prefer author dates over commit dates; github, unfortunately, differs and prefers commit dates
+
+[14:02:55.0000] <ljharb>
+i'll just remove my new commit and look into it later
+
+[14:09:18.0000] <jmdyck>
+Ahh... so much nicer when master has no parsing errors.
+
+[14:27:40.0000] <devsnek>
+jmdyck: is your code for that public
+
+[14:28:19.0000] <jmdyck>
+https://github.com/jmdyck/ecmaspeak-py
+
+[14:28:36.0000] <devsnek>
+nice
+
+[14:28:49.0000] <devsnek>
+is this actually executing the spec yet, or just checking it
+
+[14:30:11.0000] <jmdyck>
+no execution yet.
+
+[14:30:50.0000] <jmdyck>
+(Though I did do some execution in an older version.)
+
+[14:31:19.0000] <devsnek>
+that's pretty cool
+
+[14:32:54.0000] <jmdyck>
+To do execution, I need a functioning ES parser -- derived from the ES grammar and producing syntax trees that respect that grammar.
+
+[14:33:22.0000] <devsnek>
+a small detail :P
+
+[14:33:46.0000] <jmdyck>
+Which I *sort of* have, but it punts on a lot of tricky points.
+
+[14:35:10.0000] <jmdyck>
+I recently had an insight on how to handle things like [lookahead blah] and "X but not Y", but it's going to take a while to get it working.
+
+[14:37:15.0000] <jmdyck>
+In the meantime, the static analysis is moderately useful.
+
+[14:39:02.0000] <jmdyck>
+(Mind you, the static *type* analysis is super kludgey.)
+
+[14:41:47.0000] <jmdyck>
+There are so few "type declarations" in the spec that it basically has to do "whole program" type inference on the whole spec.
+
+[14:42:31.0000] <jmdyck>
+(As opposed to, say, just checking that operation-invocations respect their declarations.)
+
+[14:49:05.0000] <Bakkot>
+btw, I am seeking another stage 3 reviewer for my for-in order proposal: https://github.com/tc39/proposal-for-in-order
+
+[14:49:32.0000] <Bakkot>
+and also just more eyes on the spec text, even if they aren't formal reviews
+
+
+2019-09-17
+[08:04:29.0000] <devsnek>
+is the relationship between js and annex b significantly different from the relationship between js and the webassembly js api
+
+[08:05:29.0000] <devsnek>
+from my perspective they both seem like things big reasonable js engines typically have, but not every js engine will have
+
+[08:16:31.0000] <Domenic>
+No reasonable JS engine will omit Annex B
+
+[08:17:03.0000] <Domenic>
+Smaller JS engines seem likely to omit the wasm JS API
+
+[08:17:28.0000] <Domenic>
+i.e. engines which don't want to implement a separate VM for a different language (albeit on top of shared primitives)
+
+[08:19:05.0000] <bradleymeck>
+most don't have an option to turn off Annex B
+
+[10:34:21.0000] <devsnek>
+Domenic: engine262 omits annex b :P
+
+[10:34:39.0000] <devsnek>
+although I guess engine262 probably doesn't count as "reasonable"
+
+[10:38:28.0000] <rkirsling>
+you and XS, who are clearly not browsers, yeah. that's the motivation for moving things up though; that there wouldn't be two dialects depending on what type of host you are
+
+[10:51:15.0000] <littledan>
+I think it's really important that we define a single language, to enable portability of code among environments
+
+[10:52:00.0000] <devsnek>
+I was more trying to say that I don't expect everything to have String.prototype.bold the same way I don't expect everything to have WebAssembly
+
+[10:52:30.0000] <devsnek>
+(the syntax is obviously a bit tougher)
+
+[10:54:31.0000] <rkirsling>
+er well yeah, B.1 is very different from B.3
+
+[10:55:08.0000] <devsnek>
+like what sort of bad things would happen if the extra methods were given to the dom spec
+
+[10:55:14.0000] <rkirsling>
+er
+
+[10:55:27.0000] <rkirsling>
+B.2 different from B.1 or B.3, is what I meant to be saying
+
+[10:55:32.0000] <devsnek>
+js engines already have things that aren't just the js spec
+
+[11:01:08.0000] <jmdyck>
+ljharb: How do I get an 'official' (netlify) render of https://github.com/tc39/ecma262/pull/1651? E.g. would it suffice to push something to the branch, or do I need to make it no longer a WiP, or both?
+
+[11:02:35.0000] <devsnek>
+dunno what changing the wip status will do, but any sort of push will trigger a build
+
+[11:22:34.0000] <jmdyck>
+force-pushed a rebase, seems to be rendering.
+
+[12:51:16.0000] <jmdyck>
+ljharb?
+
+[14:33:59.0000] <jgi>
+Where should I file PRs to fix meeting notes, https://github.com/rwaldron/tc39-notes or https://github.com/tc39/tc39-notes?
+
+[14:35:53.0000] <devsnek>
+jgi: for the moment the former
+
+[14:36:07.0000] <jgi>
+devsnek: thanks!
+
+[14:36:46.0000] <devsnek>
+rwaldron: what if the repo was just moved to the org instead of being a fork
+
+[16:03:09.0000] <ljharb>
+jmdyck: rebasing and force pushing was the right thing :-)
+
+
+2019-09-18
+[02:18:49.0000] <howdoi>
+how about extending nullish coalescing operator for destructuring objects?
+
+[02:29:52.0000] <howdoi>
+const { thing=true } = { thing: null }; thing; // thing would be null
+
+[02:29:52.0000] <howdoi>
+const { thing??true } = { thing: null }; thing; // thing would be true
+
+[02:46:05.0000] <littledan>
+howdoi: In my opinion, this would be rather confusing. I'd prefer to keep things simpler.
+
+[02:46:32.0000] <littledan>
+howdoi: We should have some strong evidence that this is needed to add more complexity to destructuring
+
+[03:09:29.0000] <howdoi>
+littledan: let me try to find such cases, thanks.
+
+[06:56:01.0000] <bradleymeck>
+howdoi: pretty much all of web specs use null in a way that might be a good place to start, e.g. `let {...} = webAPIResultOrElement`
+
+[10:53:09.0000] <rkirsling>
+hmm, `Array.prototype.push.call('abc', 1);` is prohibited by V8/SM and allowed by JSC/XS, but I don't think we have a relevant Test262 case, and I'm a bit confused in analyzing  https://tc39.es/ecma262/#sec-array.prototype.push
+
+[10:53:39.0000] <rkirsling>
+in that the error V8/SM gives is in assigning to String#length, but nobody complains about `let x = 'abc'; x.length++;`
+
+[10:54:18.0000] <rkirsling>
+oh never mind
+
+[10:54:28.0000] <rkirsling>
+> If success is false and Throw is true, throw a TypeError exception.
+
+[10:54:55.0000] <devsnek>
+jsc and xs should def be throwing
+
+[10:55:27.0000] <devsnek>
+also somehow engine262 has the most descriptive error here https://gc.gy/36534310.png
+
+[11:19:49.0000] <ljharb>
+rkirsling: is that different in sloppy vs strict?
+
+[11:20:24.0000] <rkirsling>
+d'oh, yup
+
+[11:21:04.0000] <rkirsling>
+not the case I was concerned with but the `x.length++` is prohibited in strict, yeah
+
+[11:21:56.0000] <rkirsling>
+XS actually permits it in both
+
+[11:25:12.0000] <rkirsling>
+https://test262.report/browse/built-ins/String/S15.5.5.1_A4_T1.js verifies that it works in sloppy but there's doesn't seem to be a test for strict
+
+[15:54:06.0000] <rkirsling>
+huh, didn't realize you could `super` from one static field to another
+
+
+2019-09-19
+[08:47:01.0000] <jgi>
+What needs to happen to merge https://github.com/rwaldron/tc39-notes/pull/123 that fixes a missing slides link in the previous meeting's notes?
+
+[10:01:50.0000] <bradleymeck>
+littledan: i forgot to ask since you were gone when it came up, wasn't there a decorators README for something that had decorators over **MANY** syntactic constructs?
+
+[10:01:58.0000] <bradleymeck>
+i don't think it was in the main proposal
+
+[10:35:42.0000] <littledan>
+bradleymeck: https://github.com/tc39/proposal-decorators/blob/master/NEXTBUILTINS.md#applying-built-in-decorators-to-other-syntactic-forms
+
+[10:35:56.0000] <bradleymeck>
+tyty
+
+[10:56:21.0000] <devsnek>
+but why do they have to be a new dsl :(
+
+[10:56:27.0000] <devsnek>
+we have this whole expressive language
+
+[11:25:28.0000] <devsnek>
+is there anything in js that can't be a reified value besides lexical scopes
+
+[11:26:49.0000] <bradleymeck>
+i mean... lexical scopes could be reimplemented using values
+
+[11:27:07.0000] <devsnek>
+sure, but i mean in live js code
+
+[11:27:10.0000] <bradleymeck>
+turing completeness kind of makes the question of if something can/cannot be done lean towards it can
+
+[11:27:17.0000] <devsnek>
+like you can capture a variable scope with with(new Proxy())
+
+[11:28:26.0000] <devsnek>
+maybe private fields depending on what you think `#x` is
+
+[11:29:27.0000] <bradleymeck>
+/me takes a long drag off his bubble pipe pondering `#x`
+
+[11:30:32.0000] <devsnek>
+if you view #x as a fancy identifier that jumps the usual MOP stuff, then it doesn't have to be a value in its own right
+
+[11:30:48.0000] <devsnek>
+but its still not reflectable because you can't proxy it so 🤷🏻
+
+[11:30:57.0000] <devsnek>
+i think it goes with lexical scopes
+
+[11:31:27.0000] <bradleymeck>
+I dislike viewing `#x` as its own identifier personally `x` under `#` makes my brain less angry
+
+[11:32:03.0000] <devsnek>
+its cool how much of js is values you can play with
+
+[11:36:15.0000] <bradleymeck>
+`#x` can still be a value just not in the same space as other ones
+
+[11:36:26.0000] <devsnek>
+well if you consider it a value
+
+[11:36:30.0000] <bradleymeck>
+in particular it having a value is useful for sharing (which isn't a thing right now)
+
+[11:36:31.0000] <devsnek>
+some sort of fancy symbol or something
+
+[11:36:47.0000] <devsnek>
+its still not reflectable
+
+[11:37:03.0000] <bradleymeck>
+doesn't matter what it is, just not in the same value space so it cannot interact with things like strings
+
+[12:05:01.0000] <devsnek>
+littledan: aren't almost all of these builtins possible to define in terms of @wrap?
+
+[12:05:16.0000] <littledan>
+devsnek: ...no?
+
+[12:05:40.0000] <littledan>
+devsnek: I mean, tell me how and I'll be interested in simplifying the proposal
+
+[12:05:55.0000] <devsnek>
+how is @register different from @wrap except for timing
+
+[12:08:24.0000] <devsnek>
+@expose and @initialize could be @wrap too if there were better reflective properties for class fields
+
+[12:13:12.0000] <devsnek>
+as a super contrived example, something like could exist and be modified by an @wrap `someClass[Symbol.fields]`
+
+[12:13:40.0000] <devsnek>
+(that codeblock was supposed to be after "something like")
+
+[12:14:05.0000] <devsnek>
+(not that i'm advocating for Symbol.fields, just pointing out that there are other ways to approach this)
+
+[14:00:15.0000] <littledan>
+devsnek: tbh the main thing to resolve at this point is whether we do static decorators at all, see #277
+
+[14:00:30.0000] <littledan>
+devsnek: I encourage you to file an issue about these ideas for adjusting the details
+
+[14:00:48.0000] <littledan>
+We can probably get more engagement that way than we can in this channel
+
+[14:01:45.0000] <devsnek>
+nice to hear alternatives to static are being discussed
+
+[14:03:15.0000] <devsnek>
+rbuckton seems to have captured pretty well what i was saying above
+
+[14:09:11.0000] <shu>
+devsnek: i wonder if you might feel differently if static decorators were named "limited macros"?
+
+[14:09:52.0000] <devsnek>
+shu: perhaps
+
+[14:10:11.0000] <shu>
+when i think about these as fixed-form macros it is not an odd thing that they aren't arbitrary JS functions
+
+[14:10:17.0000] <devsnek>
+indeed
+
+[14:10:22.0000] <devsnek>
+but then i have a bunch of other questions
+
+[14:10:34.0000] <devsnek>
+like why they have an understanding of runtime semantics
+
+[14:10:44.0000] <devsnek>
+they're sort of in limbo at the moment
+
+[14:10:46.0000] <shu>
+what is their understanding of runtime semantics?
+
+[14:11:03.0000] <devsnek>
+hooking structures at certain times, etc
+
+[14:11:51.0000] <devsnek>
+i guess you could say `@initialize` is a macro that explicitly looks for the syntax `a = b`
+
+[14:12:01.0000] <shu>
+like @initialize doing something per instance?
+
+[14:12:05.0000] <devsnek>
+but then what code does it return
+
+[14:12:21.0000] <devsnek>
+generally "macros" operate on code, not runtime structures
+
+[14:13:57.0000] <shu>
+well, for @initialize, there is a code transform that accomplishes the same task
+
+[14:14:02.0000] <devsnek>
+yeah
+
+[14:14:09.0000] <shu>
+are you saying that that transform is non-local, so it's kinda weird?
+
+[14:14:18.0000] <shu>
+like it somehow reaches into the constructor and insert some code
+
+[14:14:23.0000] <devsnek>
+yeah
+
+[14:14:24.0000] <shu>
+instead of doing it at the site where the "macro" is applied
+
+[14:14:32.0000] <shu>
+i see, that's fair
+
+[14:14:44.0000] <devsnek>
+i mean i guess you could turn `a = b` into `a = (() => { return modified_b })()`
+
+[14:14:59.0000] <devsnek>
+entirely at the syntax level
+
+[14:16:27.0000] <devsnek>
+but then i'd ask where the ability to arbitrarily map other types of syntax is
+
+[14:16:39.0000] <devsnek>
+not just `a = b` or `class X {}`
+
+[14:16:42.0000] <shu>
+perhaps the non-locality is a real impediment to the macro mental model but i need to think on it some more
+
+[14:17:03.0000] <shu>
+right, that's why it's limited
+
+[14:17:20.0000] <devsnek>
+i've never expected decorators to be completely no-overhead
+
+[14:17:30.0000] <shu>
+with the foundations in place more expressive macros could be built on top
+
+[14:17:37.0000] <devsnek>
+i always expected them to be some form of running code, and running code always has overhead
+
+[14:18:12.0000] <devsnek>
+shu: well i'd disagree that its foundations, the syntax would be all wrong
+
+[14:18:35.0000] <devsnek>
+macros need to define their bounds, like how c uses line endings or rust uses () and {}
+
+[14:18:39.0000] <shu>
+it's beyond running vs not running code
+
+[14:19:15.0000] <shu>
+the feedback has been it disables optimizations, not just that it might run some code
+
+[14:19:26.0000] <devsnek>
+indeed
+
+[14:24:32.0000] <devsnek>
+on a very different note: https://tc39.es/ecma262/#sec-arraysetlength
+
+[14:24:58.0000] <devsnek>
+this iterates from current length to new length and deletes everything
+
+[14:25:31.0000] <devsnek>
+would it be an observable change to iterate over the actual keys of the object instead?
+
+[14:25:55.0000] <devsnek>
+i thought it was doing it the current way because [[Delete]] would bubble up to the prototype or something
+
+[14:25:57.0000] <devsnek>
+but it isn't
+
+[14:27:19.0000] <shu>
+iterate over the actual keys?
+
+[14:27:59.0000] <devsnek>
+most likely EnumerateObjectProperties
+
+[14:29:22.0000] <devsnek>
+the reason i bring this up is that something like `new Array(2 ** 32).length = 0` can be debilitating to engines without a lot of fancy optimizations
+
+[14:30:36.0000] <shu>
+i'm confused
+
+[14:30:49.0000] <shu>
+ArraySetLength is only on array exotic objects right
+
+[14:30:52.0000] <devsnek>
+right
+
+[14:30:57.0000] <shu>
+so if it's not observable what is the debilitating thing to engines
+
+[14:31:07.0000] <devsnek>
+it has to iterate over 2 ** 32 elements
+
+[14:31:22.0000] <shu>
+but it can simply not do that because the delete isn't observable?
+
+[14:31:53.0000] <devsnek>
+in fact if i plug that code into eshost it just freezes
+
+[14:31:58.0000] <devsnek>
+i think because of xs and engine262
+
+[14:32:34.0000] <devsnek>
+shu: i'm not entirely sure what's observable at the moment
+
+[14:32:57.0000] <devsnek>
+at first i thought it was for something like `Array.prototype[0] = 5; new Array(1).length = 0; Array.prototype[0] === undefined`
+
+[14:33:01.0000] <devsnek>
+but it doesn't do that
+
+[14:54:09.0000] <devsnek>
+wow changing ArraySetLength to only delete defined properties doesn't cause any test262 failures
+
+[15:00:56.0000] <devsnek>
+wow this isn't even observable if you use a proxy around an array
+
+[16:08:56.0000] <ljharb>
+devsnek: does that mean steps can be removed from it?
+
+[16:09:18.0000] <TimothyGu>
+ljharb: https://github.com/tc39/ecma262/pull/1702
+
+[16:09:39.0000] <ljharb>
+well alrighty
+
+[16:15:34.0000] <shu>
+if it's not observable i don't understand the impetus
+
+[16:16:21.0000] <shu>
+deleting all properties between newLen and oldLen is pretty clear, why spec an optimization into it?
+
+[16:19:03.0000] <devsnek>
+shu: i think its clearer, and it stops implementers from doing a silly algorithm by accident
+
+[16:24:51.0000] <shu>
+devsnek: the former is opinion i'll defer to the editor group, but the latter isn't a thing that ecma262 does
+
+[16:25:56.0000] <devsnek>
+the algorithms in the spec generally adhere to the spec's guarantees for their time complexities
+
+[16:26:02.0000] <shu>
+e.g. all objects are eternal in the spec, but it'd be very silly to implement this
+
+[16:26:05.0000] <devsnek>
+at the very least, it doesn't match reality
+
+[16:27:04.0000] <devsnek>
+if you don't think it makes it clearer, that would be a valid reason not to merge it
+
+[16:27:15.0000] <devsnek>
+i agree that the spec shouldn't be hyper optimized
+
+[16:52:17.0000] <Bakkot>
+devsnek: "algorithms in the spec generally adhere to the spec's guarantees for their time complexities" is not the case; e.g. Maps are spec'd to iterate over lists
+
+[16:52:40.0000] <Bakkot>
+also those the algorithm in the spec has the same time complexity as the algorithm in your PR
+
+[16:52:50.0000] <devsnek>
+Bakkot: that matches the spec's guarantee, but not implementations
+
+[16:53:59.0000] <devsnek>
+fair enough for my pr, although i'm thinking mostly about arrays with holes
+
+[16:54:17.0000] <devsnek>
+its very difficult to verify the spec when one of the tests tries to iterate over four million elements
+
+[16:54:56.0000] <devsnek>
+billion*
+
+
+2019-09-20
+[13:00:16.0000] <akirose>
+https://www.prnewswire.com/news-releases/npm-inc-announces-leadership-change-300922517.html?tc=eml_cleartime
+
+[13:00:39.0000] <akirose>
+perhaps of interest to some of you
+
+
+2019-09-21
+[17:17:56.0000] <devsnek>
+so hosts will be able to opt out of TLA?
+
+[17:24:42.0000] <devsnek>
+littledan: reading the W3C issue, is my understanding that this a result of performance concerns correct?
+
+[18:37:07.0000] <ljharb>
+akirose: also relevant https://twitter.com/horse_js/status/1175112238874681345
+
+[23:36:22.0000] <littledan>
+devsnek: Yes, this is what they decided should happen for ServiceWorker
+
+[23:48:16.0000] <littledan>
+I don't think we should read too much into this layering change. This is really for particular restricted hosts like ServiceWorker, which faces other compatibility issues by design (e.g., omitting localStorage)
+
+[06:15:21.0000] <devsnek>
+it reminds me of chrome limiting the size of sync wasm
+
+[06:15:55.0000] <devsnek>
+I've always found it a bit condescending
+
+
+2019-09-24
+[15:47:53.0000] <devsnek>
+oh no joeyhub is spreading
+
+[15:50:28.0000] <TimothyGu>
+oh no indeed
+
+[16:02:00.0000] <rkirsling>
+hmm, seems like `Object.keys({ ...{ a: 1, b: 100, c: 3 }, ...{ b: 2 } })` is another thing we lack a test for
+
+[16:37:12.0000] <Bakkot>
+rkirsling: as in testing the order, or just that `a, b, c` are all in the output?
+
+[16:37:23.0000] <Bakkot>
+the order is explicitly not defined, though I'm working on it
+
+[16:37:31.0000] <rkirsling>
+oh
+
+[16:37:50.0000] <rkirsling>
+I honestly was having trouble verifying whether the order was specified or not
+
+[16:37:52.0000] <Bakkot>
+(this is true of Object.keys in general, not just with spreads)
+
+[16:37:54.0000] <Bakkot>
+btw I am seeking reviewers for https://github.com/tc39/proposal-for-in-order/ :D
+
+[16:38:55.0000] <Bakkot>
+yeah Object.keys just says it needs to be in the order given by EnumerateObjectProperties, which says "The mechanics and order of enumerating the properties is not specified"
+
+[16:39:44.0000] <rkirsling>
+ahh. I think I investigated from the wrong angle
+
+[16:40:23.0000] <Bakkot>
+Reflect.ownKeys is defined, incidentally
+
+[16:40:41.0000] <rkirsling>
+!
+
+[16:40:42.0000] <Bakkot>
+so there could reasonably be tests for `Reflect.ownKeys({ ...{ a: 1, b: 100, c: 3 }, ...{ b: 2 } })`
+
+[16:41:14.0000] <rkirsling>
+I guess I have more cases to check then
+
+[16:41:35.0000] <rkirsling>
+basically somebody reported a bug on WK BZ
+
+[16:41:55.0000] <Bakkot>
+yeah, JSC has a bug
+
+[16:42:23.0000] <Bakkot>
+but it is in Reflect.ownKeys, not Object.keys, at least from the perspective of the specification
+
+[16:43:03.0000] <rkirsling>
+gotcha
+
+[16:43:36.0000] <Bakkot>
+(fixing it in `ownKeys` will probably make `keys` work like whoever filed the bug report was expecting)
+
+[16:43:45.0000] <rkirsling>
+indeed
+
+[16:43:50.0000] <rkirsling>
+thanks for that clarification
+
+[16:44:42.0000] <rkirsling>
+re your seeking reviewers: for-in scares me but I'll consider it heh
+
+[16:45:11.0000] <Bakkot>
+(at least, I certainly hope it does, because I intend to ask for stage 3 for my proposal at the meeting next week - which would make this particular case for Object.keys fully specified - and a crucial part of that ask is that it requires no changes in any engine except for Safari fixing https://bugs.webkit.org/show_bug.cgi?id=38970 )
+
+[16:47:36.0000] <rkirsling>
+ahh
+
+
+2019-09-25
+[18:43:09.0000] <rkirsling>
+Bakkot: think I got this right: https://bugs.webkit.org/show_bug.cgi?id=202139#c1
+
+[20:46:49.0000] <Bakkot>
+rkirsling: lgtm
+
+[21:39:40.0000] <rkirsling>
+Bakkot: I see you got nerd sniped
+
+[21:39:42.0000] <rkirsling>
+:D
+
+[21:39:46.0000] <Bakkot>
+little bit
+
+[21:43:17.0000] <Bakkot>
+rkirsling: I was hoping the fix would be easy because I don't think I have any code in JSC yet and kinda want to
+
+[21:43:32.0000] <rkirsling>
+:D
+
+[21:43:58.0000] <Bakkot>
+but I strongly suspect removing that stray `delete` is going to break parts of the system I do not understand and am not going to have the time to track down, so I will leave it to someone else
+
+[21:44:57.0000] <rkirsling>
+you might want to try it just in case your wrong (depending on how long env setup would take you)
+
+[21:45:04.0000] <rkirsling>
+*you're even
+
+[21:45:50.0000] <Bakkot>
+are there instructions for building just JSC somewhere? because I don't really want to build all of webkit
+
+[21:46:22.0000] <rkirsling>
+yeah, it's actually just `build-jsc` instead of `build-webkit`
+
+[21:49:37.0000] <Bakkot>
+hm, will give it a shot maybe
+
+[21:49:41.0000] <Bakkot>
+do you also happen to know how to run tests?
+
+[21:53:05.0000] <rkirsling>
+yup!
+
+[21:54:14.0000] <rkirsling>
+also under Tools/Scripts there's `run-javascriptcore-tests` which needs `--no-build --jsc-stress`, optionally `--debug` or `--filter=...`
+
+[21:55:19.0000] <rkirsling>
+and also `test262-runner` which defaults to debug but you can use `--release`, `--test-only=...`
+
+[21:55:25.0000] <Bakkot>
+ok it built (surprisingly quickly!) but I can't find the binary
+
+[21:55:38.0000] <Bakkot>
+(thank you for assistance, sorry to people for whom this is off topic)
+
+[21:55:51.0000] <rkirsling>
+you can actually call the `run-jsc` script
+
+[21:56:04.0000] <rkirsling>
+(we can move to #webkit if anybody's annoyed by it)
+
+[21:59:03.0000] <rkirsling>
+(the binary is WebKitBuild/Release/jsc on Mac but it's not meant to be called directly due to needing an env var
+
+[22:06:54.0000] <Bakkot>
+ugh, `build-jsc --cli` gives "error: unable to find sdk 'macosx.internal'" despite xcode being installed. guess I will try to update xcode.
+
+[22:07:48.0000] <Bakkot>
+chasing dependencies is the second-worst part of programming, immediately following "figuring out what absolute nonsense ie9 is doing with my code"
+
+[22:14:00.0000] <rkirsling>
+oh hmm I've never seen a `--cli` option there
+
+[22:14:36.0000] <rkirsling>
+I agree about that but WK on Mac is meant to be "just works" territory 😅
+
+[22:15:13.0000] <rkirsling>
+`build-jsc` doesn't typically need options (just `--debug` if you want)
+
+[22:32:10.0000] <Bakkot>
+alas, just deleting that line does break things
+
+[22:38:17.0000] <rkirsling>
+fair enough :(
+
+[22:50:09.0000] <Bakkot>
+from the JSC source: `globalObject->isHavingABadTime()`
+
+[22:50:17.0000] <Bakkot>
+what a fantastic method name
+
+[23:12:53.0000] <rkirsling>
+lol indeed
+
+[23:15:34.0000] <rkirsling>
+I actually still have no idea what that one means, but it clearly has a very specific meaning
+
+[23:32:21.0000] <rkirsling>
+I guess it's just legitimately not a simple thing -- the definition is in this commit message: https://github.com/WebKit/webkit/commit/1c4a32c94c1f6c6aa35cf04a2b40c8fe29754b8e
+
+
+2019-09-26
+[11:48:01.0000] <Bakkot>
+Does anyone have context for why the secure random strawman didn't make it in to ES6? was it just that everyone was happy with the web API?
+
+[11:48:43.0000] <Bakkot>
+I would kind of like to introduce a `Math.getRandomValues` which is basically an alias for `crypto.getRandomValues`, but lives in ECMAScript and hence can be relied on in node, etc
+
+[11:49:13.0000] <Bakkot>
+especially so that other features can be written in terms of it without each of them introducing their own nondeterminism
+
+[12:34:24.0000] <devsnek>
+Bakkot: i'm assuming because js isn't supposed to have access to the outside workd
+
+[12:34:49.0000] <devsnek>
+not that i necessarily agree or disagree with that sentiment
+
+[12:53:41.0000] <Bakkot>
+devsnek: not sure what having access to the outside world has to do with generating random values
+
+[12:54:14.0000] <Bakkot>
+there was previously a proposal to add an improved RNG; it just got dropped
+
+[12:58:58.0000] <devsnek>
+Bakkot: idk, entropy comes from the outside world in theory
+
+[12:59:07.0000] <Bakkot>
+oh, sure
+
+[12:59:12.0000] <Bakkot>
+I don't think we really worry about that
+
+[12:59:14.0000] <Bakkot>
+so does time
+
+[12:59:40.0000] <devsnek>
+well some people say that was a mistake too...
+
+[12:59:57.0000] <Bakkot>
+we want to impose minimal constraints on hosts, but this API would throw if there was insufficient entropy available, so I am not all that worried about it
+
+[13:00:31.0000] <devsnek>
+is there a link? all I can find is the seeded random one
+
+[13:00:41.0000] <devsnek>
+or is that the one you're talking about
+
+[13:00:46.0000] <Bakkot>
+anyway I don't think this was the reason the 2011-era proposal was dropped
+
+[13:00:48.0000] <Bakkot>
+https://esdiscuss.org/topic/whatwg-cryptographically-strong-random-numbers
+
+[13:01:09.0000] <Bakkot>
+and https://web.archive.org/web/20160603160004/http://wiki.ecmascript.org/doku.php?id=strawman:random-er
+
+[13:01:28.0000] <Bakkot>
+the proposal discussed there pretty much turned into crypto.getRandomValues, as I understand it
+
+[13:02:03.0000] <devsnek>
+I see
+
+[14:19:43.0000] <TabAtkins>
+Can Node just implement web specs?
+
+[14:26:02.0000] <devsnek>
+TabAtkins: in what context
+
+[14:26:12.0000] <devsnek>
+randomness?
+
+[14:26:28.0000] <devsnek>
+https://github.com/nodejs/webcrypto
+
+[14:26:41.0000] <Bakkot>
+TabAtkins: it does for some things! but unfortunately it has its own, different global `crypto`
+
+[14:26:58.0000] <devsnek>
+crypto team is preparing a webcrypto module
+
+[14:27:03.0000] <devsnek>
+which might end up in core eventually
+
+[14:30:27.0000] <TabAtkins>
+Sorry, yeah, in context of the preceding discussion ^_^
+
+[14:31:50.0000] <devsnek>
+a few very vocal people feel that node shouldn't have anything that happens to exist in the web
+
+[14:31:55.0000] <devsnek>
+regardless of the design of the api
+
+[14:32:13.0000] <devsnek>
+which is why there's a separate repo
+
+[14:34:56.0000] <TabAtkins>
+cool cool coool, functional organization
+
+
+2019-09-27
+[21:20:49.0000] <MylesBorins>
+TabAtkins I for one want node to participate in WebSpecs and work towards better support. One of the biggest challenges comes down to small platform differences that we can't adopt and remain spec compliant (e.g. whatwg streams, event pointer, assuming a single client utilizing the runtime (instead of multi tenant)
+
+[21:21:22.0000] <MylesBorins>
+Only so many hours in the day but I would be particularly interested in trying to see what types of changes we could get upstreamed so we could have a spec compliant fetch (for example)
+
+[21:23:17.0000] <MylesBorins>
+part of the separate repo is to work out major implementation details without making lots of noise on core. We did this for the new ESM implementation and for http2. Currently being done right now for wasi and QUIC
+
+[21:25:03.0000] <devsnek>
+yeah I didn't mean to imply that's the only reason there would be a separate repo
+
+[21:25:23.0000] <devsnek>
+I'm loving the freedom of nodejs/repl
+
+[21:26:27.0000] <TimothyGu>
+What seems a bit concerning is that it doesn't look like many of these repos are in the process of preparing to get merged
+
+[21:26:43.0000] <TimothyGu>
+or is that not a fair outlook?
+
+[21:30:50.0000] <devsnek>
+depends on the time available to the people running them
+
+[21:30:57.0000] <devsnek>
+and not all of them intend to be merged
+
+[23:38:20.0000] <MylesBorins>
+TimothyGu I mentioned the ones that are more recent work. AFAIK both QUIC and wasi intead to land, those technologies are still fairly new. I have high confidence with the folks working on webcrypto as well
+
+[07:53:00.0000] <pathiery>
+hello everybody ! I'm looking in to the process of creating a proposal for tc39. I've read that I need a champion before I can start anything, so here I am, searching for a kind soul to champion my proposal !
+
+[08:01:08.0000] <bradleymeck>
+pathiery: it might help to explain the proposal
+
+[08:03:43.0000] <pathiery>
+bradleymeck: sure ! i haven't come across any proposal around the idea of catching by error type (seen for instance in bluebird promises). I think such a feature would be both extremely powerful for developers and simpler than other proposals currently in the works
+
+[08:06:54.0000] <bradleymeck>
+pathiery: a few attempts at that have been brought up in the past. es-discuss has some stuff if you search for it. I believe in general the question that always seems to come up is why to not use if statements instead, a variety of topics come up such as the "default" catch vs conditional ones (see the confusion of "switch" default case)
+
+[08:09:25.0000] <devsnek>
+there are a lot of different ways that the ecosystem brands things
+
+[08:09:37.0000] <devsnek>
+so it would be difficult to choose one for the syntax
+
+[08:14:42.0000] <pathiery>
+bradleymeck: it is true that that feature could be seen as just a different way of using ifs. But with the way the language is evolving with optional catch binding and finally, i fell like a structure handling multiple catches based on type would be a natural evolution, for both try..catch and promises
+
+[08:15:22.0000] <bradleymeck>
+pathiery: like devsnek said, it is very hard to make a generic mechanism that doesn't just devolve into an if/switch
+
+[08:15:43.0000] <bradleymeck>
+since things like `instanceof` are not reliable cross realm / may throw if they get the wrong operand
+
+[08:17:06.0000] <bradleymeck>
+the question then becomes, what unique value do we get by adding something that isn't doable with if/switch
+
+[08:18:47.0000] <pathiery>
+bradleymeck: wouldn't such a feature be useful even if it devolves into an if/switch ? i feel (but that's just an opinion) that the language is evolving to make room for this, and would create better code structure and clarity
+
+[08:19:22.0000] <bradleymeck>
+pathiery: what does it give developers over the if/switch?
+
+[08:19:41.0000] <pathiery>
+i have to say i did not know about the issues of `instanceof`, could you maybe clarify what they are ?
+
+[08:20:08.0000] <bradleymeck>
+`try {} catch (e) {} catch (e is ...) {}` would be confusing in general IMO
+
+[08:20:35.0000] <bradleymeck>
+pathiery: `[] instanceof Array_from_other_frame` is false
+
+[08:21:44.0000] <pathiery>
+i thought of something closer to `try {} catch (ErrorType1, e) {} catch (ErrorType2, e) {} catch (e) {}`
+
+[08:23:10.0000] <bradleymeck>
+pathiery: and how would those types be checked
+
+[08:23:35.0000] <pathiery>
+i believe, i would make code structure and readability better, a little like optional chaining mainly simplifies developer work by removing the need to nest ternaries/ifs
+
+[08:23:37.0000] <bradleymeck>
+it is just a lot of complexity to learn vs just having ifs
+
+[08:23:56.0000] <bradleymeck>
+it might increase readability a little but it adds a lot of complexity for learning
+
+[08:24:20.0000] <bradleymeck>
+it doesn't significantly reduce code size like optional stuff did
+
+[08:25:42.0000] <pathiery>
+that is absolutely true
+
+[08:26:03.0000] <pathiery>
+i honestly did not know about the limitations of `instanceof`
+
+[08:27:45.0000] <pathiery>
+but concerning complexity, i think having an optional parameter in the `catch` would just build on top of the current features of the language, and resemble current librairies implementing such a feature
+
+[08:28:13.0000] <pathiery>
+which should in turn not affect learning too much
+
+[08:49:25.0000] <pathiery>
+bradleymeck: i am a noob here, but wouldn't checking the constructor instead of `instanceof` make this work across realms ?
+
+[08:50:29.0000] <pathiery>
+i guess i should work on fleshing out the proposal fully and adress it's issues, then look for a champion, seeing that it is not a straightforward proposal
+
+[08:51:52.0000] <ljharb>
+pathiery: i would suggest writing it as a followup to the pattern matching proposal.
+
+[08:53:03.0000] <pathiery>
+ljharb: that does sound like the correct way to go about this
+
+[08:54:57.0000] <devsnek>
+did you know in java you can just leave the catch block off entirely
+
+[08:55:09.0000] <pathiery>
+i will return with a drafted proposal based on the current version of the pattern matching one then
+
+[08:55:11.0000] <devsnek>
+and then it just functions as a scope or whatever
+
+[08:55:27.0000] <pathiery>
+devsnek: does the error throw then ?
+
+[08:55:31.0000] <devsnek>
+idk
+
+[08:55:39.0000] <pathiery>
+haha ok
+
+[08:55:42.0000] <devsnek>
+but the interesting part was `try (X = y) {}`
+
+[08:57:05.0000] <pathiery>
+thank you all for your help, have a good day :)
+
+[09:28:44.0000] <bradleymeck>
+why did we ban defaulting in catch?
+
+[09:47:43.0000] <devsnek>
+this test is failing when run with test262
+
+[09:47:44.0000] <devsnek>
+https://github.com/tc39/test262/blob/master/test/built-ins/Array/prototype/flatMap/array-like-objects-nested.js
+
+[09:47:48.0000] <devsnek>
+but works fine when run directly
+
+[09:48:37.0000] <devsnek>
+i think its the last assert
+
+[09:48:54.0000] <devsnek>
+leobalter: cc
+
+[09:49:15.0000] <devsnek>
+oh hmm
+
+[09:49:30.0000] <devsnek>
+i forgot the lines are messed up cuz i concat the files lol
+
+[09:57:42.0000] <devsnek>
+but this is odd
+
+[10:05:18.0000] <devsnek>
+i'm not really sure what's causing this
+
+[10:08:47.0000] <ljharb>
+bradleymeck: i would guess because it slipped people’s mind that you can throw undefined. Seems like a reasonable thing to me to add tho!
+
+[10:09:01.0000] <bradleymeck>
+i'll investigate more later
+
+[10:09:30.0000] <bradleymeck>
+i suspect it might have something to do with expanding the grammar of cacth params
+
+[10:10:07.0000] <ljharb>
+there’s also an open issue on the spec about that i think
+
+[10:11:19.0000] <devsnek>
+assert._formatValue is causing the test to fail
+
+[10:11:24.0000] <devsnek>
+mfw
+
+[10:17:46.0000] <bradleymeck>
+https://github.com/tc39/ecma262/pull/1126
+
+[10:17:55.0000] <bradleymeck>
+yea, seems like this was looked at semi-recently
+
+[10:30:13.0000] <ljharb>
+bradleymeck: https://github.com/tc39/test262/pull/2162 are the tests for it
+
+[10:30:24.0000] <ljharb>
+bradleymeck: if those get written in time, i'll put it on the agenda
+
+[10:32:00.0000] <bradleymeck>
+i won't have time
+
+[10:32:25.0000] <ljharb>
+bradleymeck: i mean i'll present it
+
+[10:32:42.0000] <ljharb>
+and chicoxyzzy has already begun the tests, and leobalter is helping them
+
+
+2019-09-29
+[13:32:39.0000] <devsnek>
+does anyone have usage figures on code that uses TCO
+
+
+2019-09-30
+[20:44:39.0000] <ljharb>
+devsnek: it’d have to be safari only, so I’m assuming it’s almost zero
+
+[20:47:04.0000] <devsnek>
+ljharb: that's my guess too
+
+[20:47:32.0000] <devsnek>
+I'm wondering what usage of TLA will look like if hosts start disabling it all willy nilly
+
+[20:49:26.0000] <ljharb>
+I’m sure it’ll be fine; service worker code is a tiny minority
+
+[20:49:33.0000] <ljharb>
+worker code in general
+
+[20:49:59.0000] <ljharb>
+but i do agree it’s forking the language a bit, and I’d rather it not be done - but there’s also nothing tc39 can do to stop it.
+
+[23:54:44.0000] <Jessidhia>
+I thought Chakra was the one that didn't implement TCO
+
+[00:18:38.0000] <rkirsling>
+it's just JSC and XS that have it: https://test262.report/features/tail-call-optimization/language
+
+[14:24:17.0000] <notprometey>
+Hi everyone, what about a few methods to work with sets conveniently.1. s.issubset(t) [s <= t]test whether every element in s is in t. 2. s.issuperset(t) [s >= t]test whether every element in t is in s. 3. s.union(t) [s | t]new set with elements from both s and t. 4. s.intersection(t) [s & t]new set with elements common to s and t. 5.
+
+[14:24:18.0000] <notprometey>
+s.difference(t) [s - t]new set with elements in s but not in t. 6. s.symmetric_difference(t) [s ^ t]new set with elements in either s or t but not both.
+
+[14:26:23.0000] <ljharb>
+notprometey: https://github.com/tc39/set-methods
+
+[14:41:14.0000] <jmdyck>
+devsnek: could you rebase 1670 to master? I'm getting lots of spurious errors.
+
+[14:42:45.0000] <jmdyck>
+Or, how can I rebase my own copy to master?
+
+[14:51:55.0000] <jmdyck>
+nm, i think I got it.
+
+[15:05:18.0000] <littledan>
+devsnek: I don't think the world of hosts is all that disorganized. They could theoretically do a lot of things, in certain readings of the specification.
+
+[15:18:17.0000] <devsnek>
+littledan: there are so many little js engines out there it's kinda crazy
+
+[15:27:13.0000] <devsnek>
+jmdyck: i rebased
+
+[15:31:32.0000] <littledan>
+devsnek: I think the ecosystem of JS engines relies on some obvious, but impossible to write down, invariants about what should be accepted. For example, the maximum JS stack depth shouldn't be ridiculously small, or you won't be able to run anyone else's code (but what does that mean??)
+
+[15:32:05.0000] <devsnek>
+and yet, you can only go about 400 calls down in engine262 :)
+
+[15:32:41.0000] <devsnek>
+although that's a rather contrived example
+
+[15:34:38.0000] <devsnek>
+i'd think using [[async]] was sort of an "unwritten invariant" but perhaps not
+
+[15:35:06.0000] <devsnek>
+a spec is only as strong as its consistent implementations
+

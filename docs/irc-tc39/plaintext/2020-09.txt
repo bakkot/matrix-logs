@@ -1,0 +1,4425 @@
+2020-09-02
+[12:50:44.0000] <rkirsling>
+huh, interesting that neither V8 nor SM currently pass this: https://test262.report/browse/built-ins/ArrayBuffer/prototype/byteLength/detached-buffer.js
+
+[12:51:21.0000] <devsnek>
+rkirsling: do they support $DETACHBUFFER?
+
+[12:54:56.0000] <rkirsling>
+seems like they do
+
+[12:56:31.0000] <rkirsling>
+they pass, e.g., https://test262.report/browse/built-ins/DataView/prototype/getUint8/detached-buffer.js
+
+[12:58:01.0000] <devsnek>
+rkirsling: https://source.chromium.org/chromium/chromium/src/+/master:v8/src/builtins/builtins-arraybuffer.cc;l=114?q=ArrayBufferByteLength
+
+[12:58:07.0000] <devsnek>
+there's a TODO to throw a typeerror :D
+
+[12:58:44.0000] <rkirsling>
+hah
+
+[12:58:50.0000] <devsnek>
+very simple change
+
+[12:59:30.0000] <devsnek>
+tbh those should all be moved to torque
+
+[13:06:26.0000] <shu>
+there are years-old nonconformances in the TA/AB code in V8
+
+[13:06:49.0000] <shu>
+it is unclear what the value is to cover those corners now
+
+[13:06:59.0000] <devsnek>
+i might rewrite a bunch of that in torque
+
+[13:07:06.0000] <devsnek>
+and cover them while i'm at it
+
+[13:08:15.0000] <rkirsling>
+shu: I mean I can't decide priorities for anybody but I thought spec conformance was its own reward
+
+[13:08:18.0000] <shu>
+to be clear, the open question isn't difficulty of changing the code, but determining web compat
+
+[13:08:31.0000] <shu>
+given these are 4-year old bugs that may have been depended upon
+
+[13:08:32.0000] <shu>
+https://bugs.chromium.org/p/v8/issues/detail?id=4895&q=&can=3
+
+[13:08:54.0000] <shu>
+the "unclear what the value is" means unclear what the value is in doing the research on web compat for these corners
+
+[13:09:02.0000] <rkirsling>
+ohh fascinating
+
+[13:09:34.0000] <rkirsling>
+yeah it is a bit interesting if we've been conforming to something other than the spec for so long
+
+[13:09:50.0000] <shu>
+that's been inheritance chain there from littledan to sathya to me :P
+
+[13:10:05.0000] <shu>
+err, there's been an*
+
+[13:10:29.0000] <devsnek>
+what does it return in browsers
+
+[13:10:30.0000] <devsnek>
+0?
+
+[13:10:56.0000] <shu>
+think so, let me check
+
+[13:10:57.0000] <rkirsling>
+like right now I got confused because I noticed that checking buffer.byteLength on the underlying ArrayBuffer of WebAssembly.Memory *doesn't* throw in other browsers after calling memory.grow(1)
+
+[13:12:02.0000] <rkirsling>
+so like, even in wasm space people could well be checking whether byteLength is 0, just like our tests were
+
+[13:12:19.0000] <rkirsling>
+I wonder if I should jettison that part of my patch
+
+[13:12:34.0000] <devsnek>
+sounds like the thing to do here is change the spec
+
+[13:12:38.0000] <rkirsling>
+yeah
+
+[13:12:39.0000] <shu>
+i think it's 0
+
+[13:12:48.0000] <devsnek>
+ah the wonders of js
+
+[13:12:52.0000] <shu>
+devsnek: yeah, that's what i'd lean to, would like to hear moz and apple's opinions
+
+[13:13:07.0000] <devsnek>
+i wonder what led to the error being left out on byteLength getter
+
+[13:13:10.0000] <devsnek>
+across browsers
+
+[13:13:36.0000] <shu>
+i was just pinged today by anne and domenic on https://github.com/tc39/ecma262/issues/678
+
+[13:14:08.0000] <devsnek>
+> Considering that Edge has been shipping throwing on detached typed arrays, I plan on changing Firefox to also throw.
+
+[13:14:16.0000] <devsnek>
+the good 'ol days
+
+[13:14:25.0000] <shu>
+https://esdiscuss.org/topic/arraybuffer-neutering offers some history
+
+[13:14:48.0000] <shu>
+the throwing behavior was made strict when ecma262 took over speccing ABs from khronos, but stuff had shipped
+
+[13:15:14.0000] <shu>
+and as with things go, this probably was pretty low priority during the ES6 days
+
+[13:15:14.0000] <devsnek>
+TIL they were part of khronos
+
+[13:15:21.0000] <shu>
+when there was a general scramble to catch up on feature implementation
+
+[13:15:22.0000] <shu>
+and here we are
+
+[13:15:41.0000] <rkirsling>
+hmmmm
+
+[13:15:56.0000] <devsnek>
+now we know where the "equiv c type" table came from
+
+[13:16:04.0000] <rkirsling>
+I have to run to a doctor's appt but yeah this is sounding like a potential topic for the next meeting
+
+[13:17:40.0000] <shu>
+the lesson for me here is mainly that the ES6 model of throwing a large featureset over the wall to implementers had many bad consequences in long-tail interop
+
+[13:17:49.0000] <ljharb>
++1000
+
+[13:17:51.0000] <shu>
+(though it traded it arguably for more cohesion)
+
+[13:20:24.0000] <shu>
+gonna take some time off, toodles
+
+[13:45:32.0000] <bradleymeck>
+is there really no simple way of doing [[OwnPropertyKeys]] and keep the interleaved Symbol/string ordering??
+
+[13:45:52.0000] <bradleymeck>
+i'm stuck doing a really weird for...in loop
+
+[13:46:48.0000] <devsnek>
+bradleymeck: wdym?
+
+[13:47:11.0000] <bradleymeck>
+devsnek: I'm implementing a userland https://tc39.es/ecma262/#sec-copydataproperties
+
+[13:47:26.0000] <littledan>
+if there is interoperability between engines on this TypedArray behavior, I'd prefer to change the spec than to risk compatibility
+
+[13:47:32.0000] <devsnek>
+i mean what is "interleaved Symbol/string ordering"
+
+[13:49:50.0000] <bradleymeck>
+devsnek: ...{[Symbol.toStringTag]: ()=>'_', inTheMiddle:true, [Symbol.toPrimitive]: () => 0} , needs to define `inTheMiddle` between the symbols
+
+[13:49:59.0000] <rkirsling>
+littledan: yeah the reality seems very predictable even without hard data here
+
+[13:50:22.0000] <rkirsling>
+er *numerical data, I mean
+
+[13:50:25.0000] <devsnek>
+bradleymeck: that's not how ordinary objects work though
+
+[13:50:50.0000] <littledan>
+rkirsling: I feel like the data we'd need to make this decision would just be, checking the behavior in all engines
+
+[13:51:01.0000] <littledan>
+which I guess there are test262 tests for, so maybe we can even just find it on that dashboard...
+
+[13:51:01.0000] <devsnek>
+they always enumerate their own keys with symbols last
+
+[13:51:19.0000] <devsnek>
+littledan: https://test262.report/browse/built-ins/ArrayBuffer/prototype/byteLength/detached-buffer.js
+
+[13:51:33.0000] <bradleymeck>
+ah, well ... now thats confusing
+
+[13:51:59.0000] <littledan>
+devsnek: wow
+
+[13:53:46.0000] <bradleymeck>
+devsnek: thats only going through OrdinaryOwnPropertyKeys it seems
+
+[13:53:52.0000] <bradleymeck>
+which spread... doesn't?
+
+[13:54:27.0000] <bradleymeck>
+/me stares
+
+[13:55:52.0000] <bradleymeck>
+devsnek: yea it looks like object spread doesn't follow that
+
+[13:56:24.0000] <bradleymeck>
+wait no... its just indirect
+
+[13:57:42.0000] <bradleymeck>
+but it isn't true still for non-ordinary objects so... back to for...in
+
+[13:58:32.0000] <devsnek>
+i mean `Reflect.ownKeys` will return whatever the object gives it
+
+[14:01:05.0000] <bradleymeck>
+aha, forgot about that
+
+[14:01:48.0000] <bradleymeck>
+tyty
+
+[14:29:07.0000] <Bakkot>
+for-in doesn't hit symbols anyway
+
+
+2020-09-03
+[14:49:13.0000] <bradleymeck>
+have we ever had a function length change in a new edition?
+
+[14:59:00.0000] <ljharb>
+bradleymeck: definitely
+
+[15:00:01.0000] <bradleymeck>
+ljharb: do we know if it has ever decremented?
+
+[15:00:24.0000] <ljharb>
+bradleymeck: pretty sure definitely it has
+
+[15:00:34.0000] <ljharb>
+let me check
+
+[15:03:02.0000] <ljharb>
+bradleymeck: https://github.com/tc39/ecma262/pull/1131#issuecomment-374591660 had DataView.length as 1 in the spec but 3 in a number of impls, we kept it at 1. that's not exactly what you asked for tho
+
+[15:03:23.0000] <ljharb>
+(meaning, it's definitely decremented in *engines*)
+
+[15:03:36.0000] <ljharb>
+i've filed a few bugs over the years as well with incorrect length values on various methods, some were too high and some too low
+
+[15:05:08.0000] <ljharb>
+bradleymeck: i'm not finding any other examples post-ES6, so maybe it hasn't happened in the spec itself before
+
+[15:05:37.0000] <ljharb>
+bradleymeck: i'd think we should be able to change function lengths as needed tho, in either direction, modulo web compat
+
+[15:09:48.0000] <bradleymeck>
+Yea, I'm asking because map.get changes might want that for split upsert methods
+
+[15:14:20.0000] <devsnek>
+blocks tho https://gc.gy/66876146.png
+
+[15:40:43.0000] <rkirsling>
+shu: do you mean indexed access for typed arrays in particular?
+
+[15:41:02.0000] <rkirsling>
+(ArrayBuffers alone are just ordinary in this regard, right?)
+
+[15:41:48.0000] <rkirsling>
+either way I agree with you wrt the audit
+
+[15:43:09.0000] <rkirsling>
+the DataView spec is evidently fine so it'd just be a matter of typed arrays in particular, which I've yet to examine precisely (but intend to)
+
+[15:48:22.0000] <ljharb>
+bradleymeck: Map get has a length of 1, why do you envision that decrementing?
+
+[15:53:50.0000] <bradleymeck>
+I imagine it becoming 2, decrement was curiousity
+
+[15:54:26.0000] <ljharb>
+ah k
+
+[15:54:43.0000] <ljharb>
+it'd only become two tho if the second arg was required
+
+[16:01:20.0000] <devsnek>
+bradleymeck: i added arbitrary module namespaces to engine262, seems to be all working
+
+[16:37:51.0000] <shu>
+rkirsling: yes i mean for TAs backed by detached ABs in particular, yes
+
+[16:38:17.0000] <shu>
+rkirsling: spec says detachedTypedArray[i] throws, implementations don't
+
+[16:38:37.0000] <ljharb>
+why don't impls throw there?
+
+[16:39:07.0000] <rkirsling>
+shu: yeah I think I've got the situation understood correctly now, just added a reply comment
+
+[16:41:28.0000] <shu>
+ljharb: they never did, spec added it when tc39 took it over from khronos, we never reflected the changes and now it might be too late
+
+[16:41:30.0000] <shu>
+is my understanding
+
+[16:42:03.0000] <shu>
+like, the same reason why there are other places where impls don't throw
+
+[16:42:55.0000] <ljharb>
+ok so there's no good reason not to throw
+
+[16:43:03.0000] <ljharb>
+it's just that it may not be web compat, or worth seeing if it is?
+
+[16:44:34.0000] <rkirsling>
+yeah like I think it's clear enough that throwing in ArrayBuffer#byteLength won't be web compatible, and so hopefully that same understanding extends to has/get/set for typed arrays too
+
+[16:44:55.0000] <rkirsling>
+(because the reasoning is the same)
+
+[16:45:05.0000] <ljharb>
+ah, there's evidence it wouldn't be?
+
+[16:45:47.0000] <devsnek>
+edge had correct throwing
+
+[16:45:55.0000] <devsnek>
+but then edge stopped existing
+
+[16:46:05.0000] <ljharb>
+sure but doesn't that suggest it was web compatible?
+
+[16:46:16.0000] <rkirsling>
+ChakraCore doesn't though?
+
+[16:47:44.0000] <shu>
+ljharb: seems like maybe edge didn't have all the specced behavior, but supposing that were the case, given that edge's adoption of chromium was for in no small part for more compat, i wouldn't infer that it is web compatible from that data point
+
+[16:48:29.0000] <rkirsling>
+I'm a bit confused about what Edge exactly did, because there's an amazing degree of behavioral consistency here
+
+[16:49:25.0000] <ljharb>
+shu: um, citation for "for more compat"?
+
+[16:49:56.0000] <ljharb>
+shu: i mean like, the implication wasn't "edge is bad and chromium is good", it was "it's easier/cheaper to just adopt chromium", which implies it's not a data point here
+
+[16:50:12.0000] <shu>
+https://blogs.windows.com/windowsexperience/2018/12/06/microsoft-edge-making-the-web-better-through-more-open-source-collaboration/#a11y-skip-link-content:~:text=desktop%20to%20create%20better%20web%20compatibility
+
+[16:50:28.0000] <devsnek>
+`a11y-skip-link-content` is a new one
+
+[16:51:42.0000] <ljharb>
+shu: i think it's a stretch to say that "anything edge did differently from chromium was thus web incompatible"
+
+[16:51:53.0000] <shu>
+i didn't say that
+
+[16:52:16.0000] <shu>
+you said "doesn't that suggest it was web compatible", which i took "that" to mean "edge had correct throwing"
+
+[16:52:21.0000] <ljharb>
+ohh
+
+[16:52:35.0000] <ljharb>
+ok yeah, i was saying that *if* edge had correct throwing, that seems to imply it didn't break websites
+
+[16:52:48.0000] <ljharb>
+i don't know that they had correct throwing ofc :-)
+
+[16:52:52.0000] <shu>
+and i'm saying, even if it did, for all i know it still might have
+
+[16:53:05.0000] <shu>
+since as a product, their public messaging called out better compat as a reason to switch engines?
+
+[16:53:56.0000] <rkirsling>
+oh I see, so Ch shipped throwing behavior, SM was going to follow suit but then aborted upon realizing the danger, and then Ch must have stepped back at some point too
+
+[16:55:11.0000] <ljharb>
+shu: again i think it's a stretch to infer anything about this case from that blog post
+
+[16:55:26.0000] <shu>
+you are still misunderstanding what i'm saying
+
+[16:55:35.0000] <ljharb>
+ok
+
+[16:55:42.0000] <shu>
+*you* are saying you infer web compat from edge having correct behavior
+
+[16:55:56.0000] <shu>
+i am saying i wouldn't infer web compat in any direction from edge's behavior
+
+[16:56:06.0000] <ljharb>
+right, unless a bug report about a broken website were to have come in after the chromium decision was made
+
+[16:56:34.0000] <ljharb>
+but i suppose either way, new websites could now be relying on the behavior, post-chromedge
+
+[16:56:46.0000] <shu>
+it sounds like they were relying on it before, given ff's choice
+
+[16:56:55.0000] <shu>
+this is a 4-year old thing
+
+[16:58:08.0000] <ljharb>
+i'm clearly missing context here :-) if FF had a nontheoretical concern then that seems convincing
+
+[16:58:57.0000] <rkirsling>
+Tom didn't state it in this thread but Anne implied it: https://github.com/tc39/ecma262/issues/678#issuecomment-452699242
+
+[16:59:22.0000] <rkirsling>
+I can probably find the Ch commit where they rolled back
+
+
+2020-09-04
+[17:01:28.0000] <rkirsling>
+I mean I guess the last few comments here are concrete: https://bugzilla.mozilla.org/show_bug.cgi?id=1079853#c8
+
+[17:02:55.0000] <shu>
+all signs point to this having been decided 6 years ago and we somehow dropped the ball on the spec side
+
+[17:04:00.0000] <ljharb>
+fair enough
+
+[17:08:18.0000] <rkirsling>
+meh, this isn't the right thing but it's similar enough: https://github.com/microsoft/ChakraCore/commit/c5ce362139f998347ed0f99a3cd6431fdd7c9451
+
+[17:11:56.0000] <shu>
+whoa does chakra have unlimited column length
+
+[17:12:09.0000] <devsnek>
+unlimited column length?
+
+[17:12:26.0000] <devsnek>
+oh you mean that copyright comment? lol
+
+[17:13:09.0000] <shu>
+i was looking at the old L2611
+
+[17:13:15.0000] <shu>
+that is a very long line
+
+[17:13:56.0000] <devsnek>
+hmm true
+
+[12:28:43.0000] <littledan>
+I don't think the non-throwing behavior is something we have decided, but I think we have significant evidence to motivate the change, so I'm glad this is being brought up.
+
+[13:42:50.0000] <rkirsling>
+lol @ d8
+
+[13:42:53.0000] <rkirsling>
+`--always-promote-young-mc (always promote young objects during mark-compact)`
+
+[13:42:59.0000] <rkirsling>
+I see what you did there
+
+[13:44:23.0000] <rkirsling>
+more seriously though, I don't know how to execute these %-functions
+
+[13:46:44.0000] <ljharb>
+like `%Object%()`?
+
+[13:46:57.0000] <ljharb>
+or `%Object` or whatever, i forget what v8 uses
+
+[13:47:07.0000] <Bakkot>
+there's a --native-syntax or something
+
+[13:47:31.0000] <rkirsling>
+--allow-natives-syntax, I see
+
+[13:47:40.0000] <rkirsling>
+I would not have been able to find that myself
+
+[13:47:47.0000] <rkirsling>
+thanks
+
+[13:48:02.0000] <rkirsling>
+(%ArrayBufferDetach is the reason, fwiw)
+
+[13:48:10.0000] <devsnek>
+%CreatePrivateSymbol though
+
+[14:25:44.0000] <rkirsling>
+interestingly JSC passes a few tests that it shouldn't, if it were totally consistent about IntegerIndexedElement{Get,Set}
+
+[14:57:22.0000] <rkirsling>
+ljharb: yeah I wondered about the 0 too
+
+[16:03:32.0000] <devsnek>
+if you do `return Reflect.apply(...)` does that invoke PrepareForTailCall twice and pop too many contexts?
+
+
+2020-09-05
+[08:27:28.0000] <howdoi>
+How do we define `RelationalExpression`?
+
+[08:28:02.0000] <devsnek>
+like in the spec? https://snek.dev/ecma262-multipage/sec-ecmascript-language-expressions.html#prod-RelationalExpression
+
+[08:29:16.0000] <howdoi>
+say: `RelationalExpression:RelationalExpression in ShiftExpression` if you were to explain it, how do we define what a `RelationalExpression` is and what a `ShiftExpression` is?
+
+[08:30:28.0000] <devsnek>
+A relational expression is a relational expression followed by the "in" keyword followed by a shift expression
+
+[08:32:33.0000] <howdoi>
+hah hah, yes, it means all the expressions?
+
+[08:33:21.0000] <howdoi>
+like how do we define what a "relational expression" and a "shift expression" is?
+
+[08:33:28.0000] <devsnek>
+i'm not sure what you're asking
+
+[08:34:11.0000] <howdoi>
+What types of expressions are not RelationalExpression?
+
+[08:35:22.0000] <devsnek>
+an equality expression is not a relational expression
+
+[08:35:25.0000] <devsnek>
+for example
+
+[08:37:49.0000] <howdoi>
+nods, getting some clarity now
+
+[08:40:30.0000] <howdoi>
+And `ShiftExpression[Yield, Await]: AdditiveExpression[?Yield, ?Await]`
+
+[08:43:30.0000] <howdoi>
+`RelationalExpression in ShiftExpression` can be treated like `LHS in RHS`?
+
+[08:44:35.0000] <howdoi>
+`in` is a binary operator, right?
+
+[08:44:56.0000] <howdoi>
+so 1 in [1,2,3]; here is `1` a `RelationalExpression`?
+
+[08:45:19.0000] <howdoi>
+[Sorry, finding it hard to formulate the question]
+
+[08:46:04.0000] <bendtherules>
+>n "a" == "a" in {}
+
+[08:46:20.0000] <bendtherules>
+(ignore)
+
+[08:46:21.0000] <devsnek>
+howdoi: you could say that `1` is a relational expression, yes
+
+[08:48:22.0000] <devsnek>
+howdoi: https://gc.gy/67025900.png
+
+[08:49:56.0000] <howdoi>
+devsnek: nice :)
+
+[09:06:48.0000] <howdoi>
+devsnek: I am not find engine262 in astexplorer!
+
+[09:07:09.0000] <devsnek>
+howdoi: oh that's just a local clone of the repo
+
+[09:07:17.0000] <devsnek>
+i haven't PR'd it yet
+
+[09:07:27.0000] <devsnek>
+there are still some problems with it
+
+[09:07:41.0000] <howdoi>
+guessed, so, nice! because others aren't showing it as a relational expression
+
+[09:08:21.0000] <devsnek>
+yeah most ASTs just call that "left" and "right"
+
+[09:08:38.0000] <devsnek>
+engine262's ast would be hell for general use
+
+[09:11:13.0000] <howdoi>
+hah hah, true
+
+
+2020-09-06
+[00:02:09.0000] <bendtherules>
+Is there any helper in spec get access to current realm? Like it can call GetRealm() or something from anywhere to get access
+
+[00:04:26.0000] <ljharb>
+bendtherules: you say "the current Realm Record", which gets autolinked to https://tc39.es/ecma262/#current-realm
+
+[00:05:29.0000] <bendtherules>
+Interesting, thanks
+
+
+2020-09-07
+[09:33:52.0000] <devsnek>
+littledan: the latest decorator proposal looks pretty good
+
+[09:34:18.0000] <devsnek>
+i guess the reason we didn't go with it in the first place is all the features it doesn't have that static decorators have?
+
+[09:34:21.0000] <littledan>
+oh my g-d, devsnek is saying this about a proposal that I worked on?!?!?!
+
+[09:34:27.0000] <littledan>
+what's going on?
+
+[09:34:30.0000] <devsnek>
+lol
+
+[09:35:07.0000] <littledan>
+well, it took me personally a long time to come to understand that this is what field decorators should do, nothing more, nothing less. that was kinda the hard case tbh
+
+[09:35:41.0000] <devsnek>
+i need to review it more in depth but the whole "they're just functions" thing is very appealing
+
+[09:35:41.0000] <littledan>
+(it's weird that it took me so long since a lot of different people were saying that explicitly for a while)
+
+[09:39:10.0000] <devsnek>
+littledan: is the proposal adding Symbol.metadata
+
+[09:39:33.0000] <littledan>
+devsnek: Yes, but there's no particular behavior attached to Symbol.metadata
+
+[09:39:42.0000] <devsnek>
+yeah no i like it
+
+[09:40:02.0000] <devsnek>
+it would be fun if ts had a mode to emit type info in metadata
+
+[09:42:50.0000] <littledan>
+yeah... it's hard since types don't really have a runtime representation
+
+[09:43:11.0000] <littledan>
+should we have syntax in JS to indicate types that would have runtime reification???
+
+[09:43:19.0000] <littledan>
+indeed, decorators that use type metadata is a big gap in this proposal
+
+[09:43:41.0000] <littledan>
+but I feel like that can only really be filled by type systems. So, those type systems can emit extra data to Symbol.metadata, maybe
+
+[09:43:56.0000] <devsnek>
+i used a python library once
+
+[09:44:15.0000] <devsnek>
+it took advantage of python's type annotations being runtime reflectable
+
+[09:44:29.0000] <devsnek>
+to dynamically generate string parsers
+
+[09:44:31.0000] <devsnek>
+it was very slick
+
+[09:44:45.0000] <littledan>
+yeah, I mean this is commonly used with TS, it has a mode for this
+
+[09:45:25.0000] <devsnek>
+i wish ts would take rtti more seriously :(
+
+[09:45:34.0000] <littledan>
+rbuckton: ^
+
+[09:46:09.0000] <littledan>
+I feel like TC39 would be the right place to do a proposal for runtime type stuff, and it'd look a bit different from TypeScript. Mark and Waldemar did  a "guards" proposal some years ago; maybe that could be a good basis
+
+[09:47:10.0000] <devsnek>
+i feel like any attempt to standardize a type syntax will fail
+
+[09:47:34.0000] <littledan>
+https://web.archive.org/web/20141214075910/http://wiki.ecmascript.org/doku.php?id=strawman:guards
+
+[09:47:50.0000] <littledan>
+this proposal used :: so it's unambiguous/non-overlapping with TypeScript
+
+[09:48:24.0000] <littledan>
+I like how we have the division between TS doing checking statically and TC39 doing runtime semantics. If we can maintain that, I'll be happy
+
+[09:48:54.0000] <littledan>
+the statement "any attempt to standardize ___ will fail" is true most of the time :)
+
+[09:49:41.0000] <devsnek>
+guards look interesting
+
+[09:53:02.0000] <Bakkot>
+> i wish ts would take rtti more seriously
+
+[09:53:06.0000] <Bakkot>
+I wish TS would take compile-time type information more seriously
+
+[09:55:10.0000] <devsnek>
+lmao
+
+[11:42:08.0000] <devsnek>
+littledan: is `@()` allowed in the simplified proposal? one section says it is and one section says it is not
+
+[11:42:18.0000] <littledan>
+err, it is allowed
+
+[11:42:18.0000] <devsnek>
+well `@(expression)`
+
+[11:42:24.0000] <littledan>
+which section says it isn't
+
+[11:42:27.0000] <devsnek>
+> Forms like @foo.bar or @(foo) are no longer permitted, as decorators are not JavaScript expressions.
+
+[11:42:28.0000] <littledan>
+right, @() is an error :)
+
+[11:42:35.0000] <littledan>
+oops!
+
+[11:42:45.0000] <littledan>
+I should've fixed that before distributing broadly...
+
+[11:42:46.0000] <littledan>
+thanks
+
+[11:43:12.0000] <devsnek>
+so `@x` and `@x.y` are allowed but for random exprs you have to do `@x(expr)`
+
+[11:43:51.0000] <devsnek>
+hm i guess i have to add class fields to engine262 if i want to play with this
+
+[12:25:19.0000] <devsnek>
+we really need to deduplicate all the various function and method evaluation stuff
+
+[13:06:35.0000] <devsnek>
+hmmm when `ObjectLiteral` grammar is used in a proposal, it links to the annex b definition instead of the main definition
+
+[13:35:05.0000] <Bakkot>
+hm, yup, later biblio entries take precedence, looks like, and the annex B definition of `ObjectLiteral` is later than the main one
+
+[13:35:19.0000] <Bakkot>
+also the biblio file is super stale because it isn't automatically kept up to date
+
+[13:41:44.0000] <Bakkot>
+devsnek is there an existing proposal with this behavior that I can link in the issue I'm opening?
+
+[14:20:41.0000] <devsnek>
+Bakkot I was just prototyping something locally
+
+[14:20:47.0000] <Bakkot>
+gotcha
+
+
+2020-09-08
+[20:40:31.0000] <jmdyck>
+Bakkot: doesn't there need to be rule for the TRV of HexDigits :: HexDigits NumericLiteralSeparator HexDigit ?
+
+[20:42:03.0000] <Bakkot>
+jmdyck I don't think so? TRV is used for template literal parts, and TRV for HexDigits is used specifically for the CodePoint production, which passes `~Sep` to HexDigits
+
+[20:42:36.0000] <Bakkot>
+and the `HexDigits :: HexDigits NumericLiteralSeparator HexDigit` production is guarded on `+Sep`, so it cannot be used in that context
+
+[20:44:32.0000] <jmdyck>
+sounds plausible.
+
+[20:46:40.0000] <jmdyck>
+tx
+
+[06:11:13.0000] <littledan>
+> 9:25 PM <• devsnek> we really need to deduplicate all the various function and method evaluation stuff
+
+[06:11:13.0000] <littledan>
+I would be so happy if that happens
+
+
+2020-09-09
+[15:21:38.0000] <devsnek>
+anyone know of anything that would immediately shut down a proposal to add hashing apis?
+
+[15:27:39.0000] <ljharb>
+devsnek: https://github.com/sebmarkbage/ecmascript-shallow-equal ?
+
+[15:28:51.0000] <devsnek>
+ljharb: the goal is being able to build efficient collection types
+
+
+2020-09-10
+[13:19:55.0000] <MylesBorins>
+ /msg ChanServ flags #tc39 septs delegate
+
+[13:19:59.0000] <MylesBorins>
+lol
+
+[14:18:28.0000] <leobalter>
+MylesBorins: how much do you like irc now, Myles? :)
+
+[14:19:25.0000] <MylesBorins>
+I have always simply accepted in
+
+[14:19:26.0000] <MylesBorins>
+never was love story
+
+[14:51:23.0000] <howdoi>
+There is no way to get a permalink to a sub-section right? say the last section of `12.10.3`
+
+[14:51:56.0000] <howdoi>
+maybe I can use Scroll To Text Fragment for now
+
+[14:57:26.0000] <leobalter>
+howdoi: easiest would be using the nested summary on the left
+
+[14:57:49.0000] <leobalter>
+like, click on 12.10.3 and it's quick faster to find 12.10 or 12
+
+[14:59:16.0000] <howdoi>
+leobalter: yes, but I want a link to say, the `in` operator mentioned in `12.10.3`
+
+[15:46:39.0000] <jmdyck>
+That will presumably become more important if #1950 goes through.
+
+
+2020-09-11
+[17:47:35.0000] <Bakkot>
+jmdyck: michael ficarra and I just did a bunch of work on 2007
+
+[17:47:54.0000] <Bakkot>
+incorporated the commits from your 2007_ed branch, rebased on master, and then did a few more things
+
+[17:48:15.0000] <Bakkot>
+hopefully all the uses of ToInteger are correct now
+
+[17:48:26.0000] <Bakkot>
+we still need to rectify Date, which we'll do next Thursday
+
+[17:48:45.0000] <jmdyck>
+how close is it to shipping, do you think?
+
+[17:49:40.0000] <Bakkot>
+really hoping we'll have it ready by the meeting on the 20th, so that we can confirm we've identified all the places that plenary's input is required
+
+[17:50:04.0000] <Bakkot>
+so far that list is Date stuff and this one we just discovered: https://github.com/tc39/ecma262/issues/2170
+
+[17:50:26.0000] <Bakkot>
+if we can get it ready by the meeting and get consensus on those issues at the meeting I'm going to push really hard to land it immediately after
+
+[17:50:38.0000] <Bakkot>
+since it is a massive rebase
+
+[17:51:17.0000] <Bakkot>
+oh we also incorporated the math algorithms one (2122), figuring it would land before 2007
+
+[17:51:42.0000] <jmdyck>
+that one
+
+[17:51:50.0000] <jmdyck>
+that one's still changing, though
+
+[17:54:16.0000] <Bakkot>
+a little bit, yes
+
+[17:54:20.0000] <Bakkot>
+but only a little bit
+
+[17:54:27.0000] <Bakkot>
+hoping we can get it in in the next couple of days
+
+[17:56:50.0000] <jmdyck>
+good thing i got my 2122 review in then
+
+[17:58:52.0000] <jmdyck>
+Are there many calls to ToInteger where infinity makes sense?
+
+[17:59:25.0000] <Bakkot>
+almost all of them
+
+[17:59:41.0000] <Bakkot>
+they tend to immediately bound above and below, in some manner
+
+[18:00:35.0000] <jmdyck>
+I had something different in mind for "makes sense"
+
+[18:01:15.0000] <Bakkot>
+can you rephrase, then?
+
+[18:01:19.0000] <jmdyck>
+hm
+
+[18:02:31.0000] <jmdyck>
+maybe: if ToInteger, rather than returning infinity, returned a large integer, would the resulting behavior be visibly different?
+
+[18:04:23.0000] <Bakkot>
+well, it would need to be an integer larger than any other integer, which is kind of what infinity is for
+
+[18:04:36.0000] <Bakkot>
+but mostly no, with a couple of exceptions in typed arrays / atomics
+
+[12:25:25.0000] <rkirsling>
+shu: also note that byteLength/length for %TypedArray% already return 0
+
+[12:25:37.0000] <rkirsling>
+it's just ArrayBuffer#byteLength that's being relaxed
+
+[12:26:08.0000] <shu>
+rkirsling: ah indeed, oops, let me adjust the test
+
+[12:26:35.0000] <rkirsling>
+(now, it's interesting that there's alignment between spec and reality to have DataView throw a lot, but this is exactly the kind of thing that we could choose to deal with at a later time if we wanted)
+
+[12:50:47.0000] <shu>
+rkirsling: oops got distracted, ArrayBuffer#byteLength definitely is web reality for all engines right now as well
+
+[13:04:55.0000] <rkirsling>
+yup!
+
+[13:05:35.0000] <rkirsling>
+that was the bit that started it all, 'cause I realized I shouldn't fix it
+
+[13:06:04.0000] <rkirsling>
+I hadn't looked into typed arrays in particular until after talking with you, hehe
+
+[14:19:27.0000] <rkirsling>
+it's really interesting to me that typed arrays can have arbitrary properties just as long as the key isn't a stringified float
+
+[14:20:35.0000] <rkirsling>
+I wonder if it's meant to be less confusing somehow? but it's really kind of moreso, since x[1.1] is clearly not an ordered index
+
+[14:36:48.0000] <shu>
+can they?
+
+[14:37:37.0000] <shu>
+i don't think they can have "1.1" as an own property
+
+[14:38:40.0000] <rkirsling>
+yeah that's what I mean
+
+[14:39:43.0000] <rkirsling>
+`ta['1-1'] = 3` does something and `ta['1.1'] = 3` does not
+
+[14:44:47.0000] <shu>
+ah, i misread
+
+[14:44:59.0000] <shu>
+i no longer remember the original motivation
+
+[14:45:12.0000] <shu>
+but it is the source of the extra confusion of what happens when TAs are on the prototype that i talked about last year
+
+[14:45:16.0000] <shu>
+the one at salesforce
+
+[14:50:55.0000] <rkirsling>
+oh yeah I had forgotten about that
+
+[14:52:34.0000] <rkirsling>
+shu: did that result in a PR?
+
+[14:53:51.0000] <shu>
+that dropped off my radar and i haven’t gotten back to it yet, alas
+
+[15:07:38.0000] <shu>
+help appreciated ;)
+
+[15:10:47.0000] <rkirsling>
+hehehe one step at a time
+
+[15:11:26.0000] <rkirsling>
+this sure is a bumpy area of the spec 😅
+
+[16:13:56.0000] <shu>
+you, too, can become an arraybuffer abyss gazer!
+
+[16:15:02.0000] <rkirsling>
+heheheh
+
+
+2020-09-12
+[16:26:38.0000] <Bakkot>
+littledan: out of historical interest, the november 2008 ("Kona") draft of ES3.1 had Decimal in it
+
+[16:26:47.0000] <Bakkot>
+link to the PDF: https://web.archive.org/web/20160323172025/wiki.ecmascript.org/lib/exe/fetch.php?id=es3.1%3Aes3.1_proposal_working_draft&cache=cache&media=es3.1:tc39-es31-draft07nov08.pdf
+
+
+2020-09-13
+[17:51:01.0000] <jmdyck>
+Bakkot: were you planning to PR the removal of overloads? If not, i would.
+
+[17:52:21.0000] <jmdyck>
+(though really i should probably be looking at 2007 again)
+
+[18:00:24.0000] <Bakkot>
+jmdyck I wasn't planning on prioritizing it, no
+
+[18:00:31.0000] <Bakkot>
+if you make a PR I'll review it
+
+[18:00:46.0000] <jmdyck>
+k
+
+[08:17:30.0000] <jmdyck>
+ljharb: Math.max is conflicted about # of args: first para says zero or more, second para says at least two.
+
+[08:18:30.0000] <ljharb>
+then the first para is wrong, it’s length is 2 and signature agrees
+
+[08:20:26.0000] <jmdyck>
+hm, but the former text says "If no arguments are given, the result is *-&infin;*."
+
+[08:21:55.0000] <jmdyck>
+goes back to when Math.max was introduced in ES6.
+
+[08:22:45.0000] <jmdyck>
+test262/test/built-ins/Math/max/S15.8.2.11_A1.js tests for it
+
+[08:24:51.0000] <jmdyck>
+also a couple tests for Math.max with a single arg.
+
+[08:26:38.0000] <jmdyck>
+Ditto Math.min, of course.
+
+[08:30:20.0000] <jmdyck>
+Sorry, not ES6.
+
+[08:31:45.0000] <jmdyck>
+Math.max/min go back to ES1, but they took exactly 2 args until ES3
+
+[08:32:24.0000] <jmdyck>
+since ES3, there's been an "if no arguments" bullet.
+
+[08:32:58.0000] <devsnek>
+i think in cases like this we should do
+
+[08:33:07.0000] <jmdyck>
+In ES3, the heading for max was "15.8.2.11  max([value1[,value2[,...]]])", similarly for min.
+
+[08:33:11.0000] <devsnek>
+`Math.max ( ... args )` and "The length of Math.max is 2"
+
+[08:34:37.0000] <jmdyck>
+ES5 had all the [], but they're not in ES6 headings: "20.2.2.24             Math.max ( value1, value2  , …values  )"
+
+[08:39:12.0000] <jmdyck>
+ljharb: would you like me to make a PR?
+
+[08:41:43.0000] <jmdyck>
+the full-bracketing disappeared between draft 22 and 23 of ES6.
+
+[08:51:54.0000] <jmdyck>
+Do we still not have an archive for wiki.ecmascript.org?
+
+[09:04:51.0000] <jmdyck>
+Didn
+
+[09:06:14.0000] <jmdyck>
+I didn't find anything in the bugzilla archive that would explain the loss of full-bracketing. There aren't any margin notes at that point in the 'notes' version of draft 23.
+
+[09:09:59.0000] <ljharb>
+i think it’s better to avoid length overrides
+
+[09:10:35.0000] <devsnek>
+i think it's better to avoid "[value1[,value2[,...]]]"
+
+[09:11:00.0000] <ljharb>
+in that case they’re all optional and I’d agree
+
+[09:11:06.0000] <ljharb>
+i don’t think your signature suggestion is better.
+
+[10:08:39.0000] <jmdyck>
+presumably it's impossible to avoid a "length override", because that would require the heading to have 2 "normal" parameters, which misleads the reader.
+
+[10:09:17.0000] <jmdyck>
+s/impossible/misleading/
+
+[10:12:43.0000] <jmdyck>
+I'm assuming "length override" = "explicitly specifying a length because it's different from what you'd infer from the heading"
+
+[10:16:35.0000] <ljharb>
+jmdyck: yes
+
+[10:16:54.0000] <ljharb>
+there's a number of methods like this, where we really use varargs but the first N args are explicit
+
+[10:18:53.0000] <jmdyck>
+what do you mean by "really use varargs"?
+
+[10:27:57.0000] <ljharb>
+like Math.max - iow, the way they operate is as if the signature is `( ...args )` but they still have a required minimum number of args
+
+[10:30:36.0000] <jmdyck>
+but Math.max *doesn't* have a required minimum number of args
+
+[10:32:39.0000] <Bakkot>
+yeah, it doesn't even assume the first two to `undefined`
+
+[11:31:24.0000] <devsnek>
+I still don't get built in modules
+
+[11:31:35.0000] <devsnek>
+like given existing patterns with globals they just seem strictly worse
+
+[11:31:42.0000] <Bakkot>
+that is my feeling also
+
+[11:31:55.0000] <devsnek>
+if js had started with them, I'd be a fan
+
+[11:32:23.0000] <Bakkot>
+IIRC domenic came to the same conclusion after champion stuff in that space for years
+
+[11:32:51.0000] <Bakkot>
+https://github.com/w3ctag/design-reviews/issues/421#issuecomment-561705979
+
+[11:32:56.0000] <Bakkot>
+*after championing
+
+[11:33:07.0000] <devsnek>
+yeah his post in the reflector was pretty clear about it
+
+[11:33:37.0000] <Bakkot>
+that said, I do understand the motivation
+
+[11:33:55.0000] <devsnek>
+ya they sound very nice
+
+[11:34:00.0000] <devsnek>
+but just given that we have scripts
+
+[11:35:30.0000] <Bakkot>
+hmmmm
+
+[11:35:55.0000] <Bakkot>
+given TLA, I wonder if we might just start having globals for stdlib stuff where you have to await the global to get the actual functionality
+
+[11:36:04.0000] <Bakkot>
+with TLA in modules that's not bad
+
+[11:36:25.0000] <Bakkot>
+and then you can polyfill asynchronously without needing import maps
+
+[11:36:35.0000] <devsnek>
+sounds bad
+
+[11:36:36.0000] <Bakkot>
+sorry, await a property on a global object
+
+[11:36:46.0000] <Bakkot>
+what's bad about it?
+
+[11:36:58.0000] <devsnek>
+having to await a global
+
+[11:37:04.0000] <devsnek>
+wait do you mean like
+
+[11:37:12.0000] <devsnek>
+`await GoodMap`
+
+[11:37:22.0000] <devsnek>
+or `await X.doY()`
+
+[11:37:38.0000] <Bakkot>
+I'd probably phrase it as `await goodMap()` or something
+
+[11:38:23.0000] <Bakkot>
+`await std.GoodMap()`, I dunno
+
+[11:40:04.0000] <devsnek>
+it's weird to me that async is needed
+
+[11:40:19.0000] <Bakkot>
+I agree it's less nice
+
+[11:40:33.0000] <Bakkot>
+but it's necessary to meet other design goals
+
+[11:40:39.0000] <Bakkot>
+so there's a tradeoff
+
+[11:41:04.0000] <Bakkot>
+it is possible the answer is, this is sufficiently unnice that it is not worth achieving those goals
+
+[11:41:14.0000] <Bakkot>
+but I am inclined to the other side of that
+
+[11:41:52.0000] <Bakkot>
+the not-niceness is mostly paid by developers, whereas the other goals (async, as-needed polyfills) are paid by every user
+
+[11:43:03.0000] <devsnek>
+we should come up with feature codes for each thing added
+
+[11:43:08.0000] <devsnek>
+and that can be sent by browsets
+
+[11:43:11.0000] <devsnek>
+browsers, even
+
+[12:30:03.0000] <jmdyck>
+https://github.com/tc39/ecma262/pull/2174
+
+[12:31:11.0000] <jmdyck>
+(since we were talking about it here)
+
+[13:09:54.0000] <ljharb>
+jmdyck: hm, that's true. in that case maybe the length override makes more sense
+
+
+2020-09-14
+[17:34:57.0000] <devsnek>
+what if, instead of builtin modules, we just added a new `ES` global and stuck everything on that
+
+[10:04:16.0000] <jmdyck>
+ljharb: I can squash 2174 if you want it squashed.
+
+[10:06:27.0000] <ljharb>
+jmdyck: thanks, that’d be great
+
+[10:06:51.0000] <jmdyck>
+would you like the "x32 and x64 to n32 and n64" change?
+
+[10:17:27.0000] <jmdyck>
+I'll put it in.
+
+[10:29:40.0000] <jmdyck>
+Done!
+
+[13:56:54.0000] <shu>
+so we recently got a test262 tests that every single engine gets wrong afaict: https://github.com/tc39/test262/commit/0a977a691dc9c9ec4bab049d0c6c1446defaba52
+
+[13:57:44.0000] <shu>
+what do people think about what we should do here?
+
+[13:59:23.0000] <gsathya>
+change spec
+
+[14:01:48.0000] <rkirsling>
+wowwww it's from a 10-year-old Mozilla BZ ticket
+
+[14:01:52.0000] <rkirsling>
+https://bugzilla.mozilla.org/show_bug.cgi?id=605515
+
+[14:04:04.0000] <rkirsling>
+all else equal "change spec" would be my inclination
+
+[14:04:27.0000] <shu>
+yes that's where i'm leaning as well
+
+[14:08:36.0000] <shu>
+actually i guess it's related to https://github.com/tc39/ecma262/pull/2094
+
+[14:10:21.0000] <shu>
+though it doesn't touch the same parts of the spec, it touches on the same parts of implementation
+
+[14:11:27.0000] <rkirsling>
+hmm interesting
+
+[14:17:27.0000] <ljharb>
+shu: is that test run in strict mode?
+
+[14:17:33.0000] <ljharb>
+like there's no `'use strict';`
+
+[14:18:43.0000] <shu>
+ljharb: it is, the test runners add it when they see `flags: [onlyStrict]`
+
+[14:18:51.0000] <ljharb>
+ah ok
+
+[14:19:26.0000] <shu>
+otherwise the test runners run the test under both strict and sloppy modes
+
+[14:20:30.0000] <Bakkot>
+shu see discussion starting at https://freenode.logbot.info/tc39/20200821#c4834344
+
+[14:23:04.0000] <shu>
+thanks, good to know, maybe i'll make a normative pr for next meeting
+
+[14:25:20.0000] <ljharb>
+could still make one for this meeting if you're ambitious :-p
+
+[14:26:13.0000] <shu>
+the ambition i harbor is not for matching Reference to web reality
+
+[14:27:21.0000] <devsnek>
+hard to believe some of us don't wake up every day thinking about spec types
+
+[14:42:32.0000] <ljharb>
+i wake up with ambition, but by the afternoon it's turned into pmbition
+
+[14:42:47.0000] <rkirsling>
+wow.
+
+[14:43:39.0000] <shu>
+i am thankful dolly is a much better poet
+
+[14:45:12.0000] <ljharb>
+rkirsling: lol i boosted that off of https://twitter.com/dorsalstream/status/969305608540315650
+
+[14:45:22.0000] <rkirsling>
+nice
+
+[15:09:34.0000] <rkirsling>
+I guess with ambition you could go a different route too like: "when I started this I was filled with ambi-tion but there's a side of me that's kind of burned out now"
+
+[15:11:24.0000] <shu>
+what country other than the US use am/pm instead of the 24-hour format?
+
+[15:12:20.0000] <rkirsling>
+hmm I think it's not rare to have AM/PM available, is it?
+
+[15:12:24.0000] <rkirsling>
+Japan uses both
+
+[15:12:39.0000] <shu>
+ah, more than i thought: In several countries the 12-hour clock is the dominant written and spoken system of time, predominantly in nations that were part of the former British Empire, for example, the United Kingdom, Republic of Ireland, the United States, Canada (excluding Quebec), Australia, New Zealand, India, Pakistan, Bangladesh, Malaysia, Malta and others follow this convention as well such as Egypt, Mexico and the
+
+[15:12:40.0000] <shu>
+former American colony of the Philippines.
+
+[15:13:03.0000] <shu>
+i like (excluding Quebec)
+
+[15:13:37.0000] <shu>
+wikipedia does end with "Other than English-speaking countries, the terms a.m. and p.m. are seldom used and often unknown."
+
+[15:13:40.0000] <shu>
+though, citation needed i guess
+
+[15:14:51.0000] <shu>
+rkirsling: what do the japanese think "7-11" mean?
+
+[15:15:01.0000] <shu>
+is it clear to them it's for hours?
+
+[15:15:18.0000] <rkirsling>
+tbf I'm not sure that's clear to _anybody_ lol
+
+[15:15:42.0000] <rkirsling>
+if I stop and think about it, it's like, ah yeah that must be the origin but
+
+[15:15:54.0000] <rkirsling>
+yeah
+
+[15:16:59.0000] <shu>
+true, operating hours is a pretty thing to build a brand identity on
+
+[15:17:15.0000] <shu>
+especially now that many 7-11s are open 24 hours...
+
+[15:18:29.0000] <rkirsling>
+(also do we really not have an opposite root for ambi- in English? this is blowing my mind)
+
+[15:20:21.0000] <rkirsling>
+but yeah the terms AM/PM themselves might not be so common as some other way to convey before-noon/afternoon
+
+[15:21:46.0000] <shu>
+rkirsling: yeah that is really weird
+
+[15:22:28.0000] <shu>
+apparently the antonym to ambidextrous is ambisinistrous, which points to how strongly we lack an  antonym to ambit-
+
+[15:22:30.0000] <shu>
+ambi-
+
+[15:36:38.0000] <devsnek>
+we can make one
+
+[15:36:44.0000] <devsnek>
+we have the power
+
+[15:37:09.0000] <shu>
+nimbi-?
+
+[15:39:01.0000] <devsnek>
+nimbient
+
+[15:43:03.0000] <rkirsling>
+just seems like a semantic hole to not have a prefix for "one of a pair"
+
+[15:43:18.0000] <rkirsling>
+like 片 / 隻
+
+[16:50:45.0000] <TabAtkins>
+7-11: 7 hours a day, 11 days a week
+
+[16:50:46.0000] <TabAtkins>
+easy
+
+[16:53:24.0000] <shu>
+oh yeah? then what does the 31 in 31 ice cream mean?
+
+[16:53:54.0000] <TabAtkins>
+31 flavors a day
+
+[16:53:57.0000] <TabAtkins>
+obviously
+
+[16:54:06.0000] <ljharb>
+p sure baskin robbins keeps it to 31 flavors tho
+
+[16:54:10.0000] <TabAtkins>
+being the ice-cream designer at BR is very stressful
+
+[16:54:30.0000] <ljharb>
+your ice cream musth ave 31 sprinkles, no more no less, or else
+
+[16:59:22.0000] <shu>
+i'd subscribe to Tab Explains Numbers, a new math podcast
+
+
+2020-09-15
+[17:00:09.0000] <devsnek>
+it would just be all heximals
+
+[17:13:13.0000] <TabAtkins>
+I was gonna say, yes, it'll be entirely about base-6 and why it's better.
+
+[17:16:24.0000] <rkirsling>
+TabAtkins is all like, "hey I'm running over to the 1-5, you need anything?"
+
+[17:17:03.0000] <rkirsling>
+err
+
+[17:17:42.0000] <rkirsling>
+(s/err//, I dunno what I was second-guessing)
+
+[17:18:50.0000] <rkirsling>
+well or 11-15, whatever
+
+[17:20:57.0000] <TabAtkins>
+Uh, re-interpreting the numbers, it's roughly 10-54
+
+[17:21:40.0000] <TabAtkins>
+using the heximal clock at https://xanthir.com/hex/clock/
+
+[17:21:56.0000] <devsnek>
+10 months a year 54 years a century
+
+[17:22:03.0000] <TabAtkins>
+yup, you got it
+
+[17:33:21.0000] <rkirsling>
+oh I was just doing numbers mod 6 or base-6
+
+[17:33:34.0000] <rkirsling>
+but yeah for times it'd be different
+
+[17:34:12.0000] <rkirsling>
+devsnek: damn that'd be quite a shop
+
+[19:01:20.0000] <jmdyck>
+Say an ES algorithm has "If _x_ is 0, throw a FooError. If _y_ is 0, throw a BarError." So if you invoke with _x_ = 0, _y_ = 0, you expect a FooError.  Does backwards compat prevent you from swapping the two 'If's, so that _x_=0, _y_=0 results in a BarError?
+
+[19:08:05.0000] <ljharb>
+i would assume so
+
+[19:13:28.0000] <Bakkot>
+jmdyck: people from two browser vendors have told me that they almost never see people depending on the types of errors
+
+[19:13:36.0000] <Bakkot>
+so it'd probably be fine
+
+[19:13:47.0000] <Bakkot>
+but they'd be unlikely to want to try it and see without good reason
+
+[19:13:48.0000] <ljharb>
+jmdyck: which method? my shims depend on that.
+
+[19:14:39.0000] <ljharb>
+more specifically, the tests do, and as soon as an implementation has ever deviated from the spec in that regard, the implementation does too. so if the order's been consistent in every implementation, then it wouldn't break any of my extant code to swap it, it'd just break my tests.
+
+[19:27:08.0000] <jmdyck>
+In https://tc39.es/ecma262/#sec-typedarray-buffer-byteoffset-length, i was looking at the "If length us not undefined" in step 8 and "If length is undefined" in step 11 and wondering if they could be brought together, but that would change the specified behavior (i.e., which error is thrown) in the case that both _length_ is bad and IsDetachedBuffer() is true.
+
+[20:18:01.0000] <shu>
+jmdyck: most of the time, i'm willing to take the risk for different error types
+
+[20:18:26.0000] <shu>
+it's pretty low, but still weighed against the rationale for the change
+
+[20:18:32.0000] <shu>
+if it's just editorial clarity or something, then no
+
+[21:35:45.0000] <ljharb>
+jmdyck: at the least, none of my code happens to care about that particular one ¯\_(ツ)_/¯
+
+[06:49:04.0000] <devsnek>
+you may not like it but this is what peak ecmascript performance looks like https://gc.gy/67882719.png
+
+[07:00:03.0000] <devsnek>
+rwaldron: those generated tests you just added are missing feature flags
+
+[07:46:35.0000] <howdoi>
+What is the `spec` term for auto-boxing?
+
+[07:47:04.0000] <devsnek>
+i'm not sure there is
+
+[07:52:09.0000] <howdoi>
+hmm
+
+[10:08:20.0000] <ljharb>
+howdoi: a few places like https://tc39.es/ecma262/#sec-getv say "using a wrapper object appropriate for the type of the value"
+
+[10:10:31.0000] <howdoi>
+ljharb: thanks for confirming, had zeroed down to same!
+
+
+2020-09-16
+[21:44:37.0000] <jmdyck>
+Bakkot:  https://github.com/tc39/ecma262/pull/2176
+
+[21:45:04.0000] <Bakkot>
+jmdyck sweet, will take a look
+
+[21:46:19.0000] <jmdyck>
+The all-in-one diff  may not make a lot of sense.
+
+[21:47:36.0000] <jmdyck>
+The individual commits should be better.
+
+[21:48:09.0000] <ljharb>
+oof, 23 commits
+
+[21:50:00.0000] <Bakkot>
+the all-in-one is pretty straightforward actually
+
+[21:50:11.0000] <Bakkot>
+just need to compare behavior before and after
+
+[10:37:26.0000] <jmdyck>
+Bakkot, ljharb: if the de-overloading PR looks reasonable, I can take it out of draft.
+
+[11:01:31.0000] <jmdyck>
+(out of draft now)
+
+[11:04:35.0000] <Bakkot>
+jmdyck yeah it definitely looks good
+
+[11:05:23.0000] <jmdyck>
+tx
+
+
+2020-09-17
+[14:27:34.0000] <leobalter>
+Next in Test262: https://twitter.com/leobalter/status/1306705490135506945
+
+[14:28:18.0000] <leobalter>
+shortcut: jump to the runtime evaluation of try-catch-finally
+
+[14:28:40.0000] <rkirsling>
+regardless of the answer, I love the hint XD
+
+[14:28:54.0000] <leobalter>
+in fact all engines are failing
+
+[14:29:44.0000] <rkirsling>
+oh god is the `break` actually relevant? 😱
+
+[14:29:51.0000] <leobalter>
+yes :)
+
+[14:29:57.0000] <leobalter>
+that's the tricky part
+
+[14:30:17.0000] <rkirsling>
+er duh, it's a do-while, of course it's relevant
+
+[14:31:18.0000] <leobalter>
+there is also another example here, even more messed up:
+
+[14:32:05.0000] <rkirsling>
+I mean I really hope it's `undefined` but if it were I feel like we wouldn't be talking about it
+
+[14:33:06.0000] <rkirsling>
+er wait no sorry
+
+[14:33:13.0000] <leobalter>
+(function fn() { do { try { return 42; } catch(e) {} finally { break; } } while (false); })()
+
+[14:33:14.0000] <rkirsling>
+I take that back
+
+[14:33:43.0000] <leobalter>
+don't take that back
+
+[14:33:49.0000] <rkirsling>
+lol
+
+[14:33:57.0000] <leobalter>
+it's undefined
+
+[14:34:13.0000] <rkirsling>
+interesting
+
+[14:34:25.0000] <leobalter>
+https://tc39.es/ecma262/#sec-try-statement-runtime-semantics-evaluation, for the try-catch-finally evaluation, step 5
+
+[14:34:51.0000] <leobalter>
+_If F.[[Type]] is normal, set F to C._
+
+[14:35:05.0000] <leobalter>
+F.[[Type]] is break
+
+[14:35:43.0000] <leobalter>
+then: "Return Completion(UpdateEmpty(F, undefined))."
+
+[14:36:09.0000] <leobalter>
+it swallows the previous completions
+
+[14:40:34.0000] <shu>
+`finally` generally wreaks havoc
+
+[14:40:49.0000] <leobalter>
+unless I missed the finally Block + break
+
+[14:42:39.0000] <leobalter>
+I learned a lot of the finally tricks from Dave Herman, I wish I could confirm this sorcery here
+
+[14:42:49.0000] <leobalter>
+I wish he* could confirm this
+
+[14:43:16.0000] <shu>
+your reading seems right to me
+
+[14:43:26.0000] <shu>
+a break completion always has `~empty~` value
+
+[14:44:37.0000] <shu>
+what made you go down this part of the spec, leo?
+
+[14:44:59.0000] <leobalter>
+migrating old tests from V8
+
+[14:45:19.0000] <shu>
+oh man, do we have tests that test for the wrong completion?
+
+[14:45:19.0000] <leobalter>
+so
+
+[14:45:53.0000] <leobalter>
+idk, I file an issue a couple years ago and Rick was writing down tests. Engines are disagreeing
+
+[14:46:10.0000] <leobalter>
+I was checking the details in a full review, reading spec here and there
+
+[14:46:20.0000] <rkirsling>
+wait but like
+
+[14:46:31.0000] <rkirsling>
+is it even correct that `eval('do { -2; break; -3 } while (false)')` returns -2?
+
+[14:46:35.0000] <leobalter>
+so for a block `while (1) { 42; break; }` the completion is 42;
+
+[14:46:50.0000] <leobalter>
+but _finally_ ignores the try block
+
+[14:46:57.0000] <rkirsling>
+https://tc39.es/ecma262/#sec-do-while-statement-runtime-semantics-labelledevaluation
+
+[14:47:16.0000] <rkirsling>
+`return Completion(UpdateEmpty(stmtResult, V))` yet V is still `undefined`
+
+[14:47:18.0000] <leobalter>
+in this case, I was wrong as well, not undefined, but -2 for my original example
+
+[14:48:40.0000] <leobalter>
+in this case, JSC and Moddable are failing, but ok, engine262, SM and V8 are correct
+
+[14:48:55.0000] <rkirsling>
+I see
+
+[14:48:58.0000] <leobalter>
+and that's super tricky
+
+[14:49:44.0000] <leobalter>
+it's hard to collect all the pieces. I'm trying to fetch where the Block evaluates the completion to -2
+
+[14:50:32.0000] <shu>
+it's in StatementList
+
+[14:51:05.0000] <rkirsling>
+it looks like Block in that case should evaluate with [[Type]]: ~break~ but still [[Value]]: <the last value>
+
+[14:52:40.0000] <rkirsling>
+so that's not quite so shocking then but I wonder what JSC is doing wrong
+
+[14:53:13.0000] <shu>
+there're so many examples floating i'm confused
+
+[14:53:19.0000] <shu>
+which one is JSC getting wrong?
+
+[14:53:52.0000] <rkirsling>
+the one in the tweet
+
+[14:54:06.0000] <leobalter>
+shu `do { try { 42 } catch (e) { -1 } finally { -2; break; -3 }; } while (false)`
+
+[14:54:14.0000] <shu>
+ah
+
+[14:54:28.0000] <shu>
+JSC is getting 42? interesting
+
+[14:54:47.0000] <shu>
+depends on how finally blocks are implemented, is it a subroutine?
+
+[14:58:28.0000] <leobalter>
+but still `do { try { 42 } catch (e) { -1 } finally { break; -3 }; } while (false)` should complete to _undefined_
+
+[14:58:50.0000] <leobalter>
+for that one, V8 is returning 42 instead.
+
+[14:58:58.0000] <leobalter>
+let me transform this in tests
+
+[15:05:32.0000] <rkirsling>
+lol we must be doing something wrong in this massive codegen helper
+
+[15:05:33.0000] <rkirsling>
+https://github.com/WebKit/webkit/blob/master/Source/JavaScriptCore/bytecompiler/BytecodeGenerator.cpp#L5019-L5174
+
+[15:06:17.0000] <devsnek>
+delete it and start over
+
+[15:07:34.0000] <rkirsling>
+🙅‍♀️
+
+[15:09:59.0000] <devsnek>
+wow for once chakracore implements something weird correctly
+
+[15:10:24.0000] <devsnek>
+it seems like only jsc, xs, and qjs get this wrong
+
+[15:11:15.0000] <leobalter>
+I'm not done with the test cases
+
+[15:11:23.0000] <devsnek>
+😱
+
+[15:13:23.0000] <rkirsling>
+engine dev: my code is conformant!
+
+[15:13:24.0000] <rkirsling>
+Leo: oh we're only getting started
+
+[15:13:24.0000] <ljharb>
+leobalter: i'd expect your tweet to either be -2 or -3 - what does the spec say and what do engines do?
+
+[15:13:32.0000] <ljharb>
+i read the scrollback but i still don't know the answer
+
+[15:13:53.0000] <leobalter>
+-2
+
+[15:13:53.0000] <rkirsling>
+for the tweet it's "-2 and JSC is wrong" but it's only one of a variety of cases
+
+[15:14:08.0000] <leobalter>
+and `undefined` for `do { try { 42 } catch (e) { -1 } finally { break; -3 }; } while (false)`
+
+[15:14:09.0000] <rkirsling>
+for instance, remove the `-2;` and V8 is wrong
+
+[15:14:13.0000] <ljharb>
+ah ok
+
+[15:14:21.0000] <leobalter>
+rkirsling: yes sir
+
+[15:14:28.0000] <ljharb>
+intuitively i think i'd expect the last expression evaluated in a finally, and before a break, would be the completion value
+
+[15:14:39.0000] <leobalter>
+there are more cases for continue and return completions
+
+[15:14:48.0000] <ljharb>
+(and if "nothing", undefined)
+
+[15:15:18.0000] <devsnek>
+is there an eshost mode to print the result of running a statement
+
+[15:15:27.0000] <leobalter>
+yes
+
+[15:15:29.0000] <leobalter>
+print()
+
+[15:15:34.0000] <devsnek>
+you can't pass a statement to print
+
+[15:15:40.0000] <leobalter>
+eval :P
+
+[15:15:45.0000] <devsnek>
+oh right eval
+
+[15:15:50.0000] <leobalter>
+ `eshost -stx "print(eval('99; do { -99; try { 42 } catch (e) { -1 } finally { break; -3 }; } while (false);'))"`
+
+[15:16:03.0000] <devsnek>
+-tse ftw
+
+[15:16:20.0000] <ljharb>
+clearly eshost needs a `--print` arg, but lol that would probably interact badly with completion semantics tests
+
+[15:16:22.0000] <leobalter>
+we should have do expressions ASAP
+
+[15:16:26.0000] <devsnek>
+wow almost everything gets the last one wrong
+
+[15:16:39.0000] <devsnek>
+engine262 and spidermonkey op
+
+[15:16:57.0000] <rkirsling>
+leobalter: I mean `do` exprs would effectively be the motivation to fix these, right?
+
+[15:17:20.0000] <rkirsling>
+they're kind of cosmetic at present
+
+[15:17:30.0000] <ljharb>
+do expressions would have to specify these things yeah
+
+[15:19:09.0000] <leobalter>
+rkirsling: it would help me using eshost -e
+
+[15:19:28.0000] <leobalter>
+my use case is probably the least relevant but I'd love it
+
+[15:19:56.0000] <leobalter>
+I just want some sort of `do Block`
+
+[15:20:06.0000] <rkirsling>
+lol yeah no there are various motivations for having do expressions, but I mean, I think the strongest reason to fix the bugs you're looking at is "so that we can have do expressions"
+
+[15:20:39.0000] <devsnek>
+and they have to allow control flow :^)
+
+[15:21:27.0000] <rkirsling>
+lol technically it is a point to add to the list
+
+[15:21:36.0000] <leobalter>
+do expressions are kind of too powerful. the `do Block` is simple in theory but then you can simulate throw expressions with it, like in default values of function params
+
+[15:21:58.0000] <leobalter>
+`fn(x = do { throw 'hi' }) {} `
+
+[15:22:16.0000] <devsnek>
+seems fine to me
+
+[15:22:35.0000] <devsnek>
+p sure the throw expression proposal would simplify that to `fn(x = throw 'hi') {}`
+
+[15:22:43.0000] <leobalter>
+FWIW, I'd be fine.
+
+[15:23:18.0000] <leobalter>
+throw expression helps if you only need throw, but I actually want everything inside the do expressions
+
+[15:23:41.0000] <leobalter>
+even a `eshost -e 'do { ... }'`
+
+[15:23:51.0000] <shu>
+leobalter: why?
+
+[15:24:11.0000] <leobalter>
+shu would you mind specifying what part you're referring to?
+
+[15:24:23.0000] <shu>
+re: but I actually want everything inside the do expressions
+
+[15:25:47.0000] <leobalter>
+for testing, I have many cases I could benefit of do expressions instead of a whole immediate fn or even an arrow function. I also can benefit of verifying completion values without eval and all the garbage from eval. Plus one for throw statements
+
+[15:26:10.0000] <leobalter>
+composing default parameters too
+
+[15:26:42.0000] <shu>
+i'd prefer some of those corner cases to be not expressible at all
+
+[15:27:57.0000] <leobalter>
+well, that's one of the reasons I don't try to champion the do expressions proposal. I'd like it to be simple and even thou, I don't find my use cases compelling enough to convince other people
+
+[15:28:50.0000] <devsnek>
+ i just don't want do expressions to change anything except being a block
+
+[15:29:00.0000] <devsnek>
+makes refactoring harder if random stuff doesn't work
+
+[15:29:01.0000] <leobalter>
+simple as `AssignmentExpression: do Block`
+
+[15:30:32.0000] <ljharb>
+oof, break/return/continue in a do expression is something i very much do not want
+
+[15:31:07.0000] <devsnek>
+we could compromise and have `do good {}` and `do bad {}`
+
+[15:31:21.0000] <leobalter>
+`do crimes {}`
+
+[15:57:48.0000] <leobalter>
+shu rkirsling devsnek ljharb  https://github.com/tc39/test262/pull/2792
+
+[15:58:29.0000] <rkirsling>
+intense
+
+
+2020-09-18
+[19:15:25.0000] <Bakkot>
+do expressions would not need to specify this case as currently proposed because I would make it an early error because no human is capable of reasoning about it
+
+[19:16:12.0000] <Bakkot>
+specifically I would make it an early error for the last statement executed in your `do` to be a `break`
+
+[19:17:22.0000] <Bakkot>
+jmdyck: just pushed changes to 2007
+
+[19:17:28.0000] <Bakkot>
+I _think_ it's all coherent now
+
+[19:17:31.0000] <Bakkot>
+including Date
+
+[19:19:19.0000] <Bakkot>
+there might be some stray "integer"/"integral Number" issues in some prose
+
+[19:20:36.0000] <jmdyck>
+okay, I'll try to look at it
+
+[20:14:11.0000] <devsnek>
+Bakkot: what about `do { if (true) { break } }`
+
+[20:15:42.0000] <Bakkot>
+devsnek no changes on that front; I continue to think breaking through a `do` is a bad idea
+
+[20:16:09.0000] <devsnek>
+what does "no changes" mean
+
+[20:16:14.0000] <devsnek>
+it's not the last statement
+
+[20:16:27.0000] <Bakkot>
+no changes since the last several times we discussed it, I mean
+
+[20:16:33.0000] <devsnek>
+ah ok
+
+[20:17:26.0000] <devsnek>
+was slightly hopeful you had warmed up to it in certain positions :(
+
+[21:59:18.0000] <ljharb>
+i am quite bose-einstein condensate on flow control in do expressions
+
+[10:40:19.0000] <leobalter>
+Bakkot ljharb: so would this be sufficient for a possible do expression? a `AssignmentExpression: do Block` with Early errors preventing any directly nested `return`, `break`, or `continue`?
+
+[11:09:24.0000] <ljharb>
+would that interact unfortunately with any annex b sloppy mode things?
+
+[11:12:25.0000] <devsnek>
+don't need early errors
+
+[11:12:37.0000] <devsnek>
+just `Block[~Yield, ~Return, ~Await]`
+
+[11:13:08.0000] <devsnek>
+oh we don't have params for break/continue
+
+[11:15:55.0000] <leobalter>
+I'm not trying to define how we do define this yet, but conceptually, if we can move the proposal ahead this way I'd love to invest more time.
+
+[11:17:25.0000] <leobalter>
+ljharb: I believe devsnek's suggestion is in the direction of what I'd do. TBH, I'd try the minimum limiting rules just to make it go ahead. Ideally, do expression would need to work seamlessly with anywhere you have a block
+
+[11:17:50.0000] <devsnek>
+it should really just be `Block[~Return]`
+
+[11:17:57.0000] <devsnek>
+dunno why i put ~Yield and ~Await
+
+[11:18:11.0000] <devsnek>
+ideally it would be `Block` though :(
+
+[11:20:25.0000] <leobalter>
+devsnek: I agree. The idea on blocking completions not Normal or Abrupt is just a helpless try to make the proposal advance
+
+[11:25:37.0000] <ljharb>
+leobalter: I’m talking about the sloppy mode function declaration in block hoisting stuff
+
+[11:25:49.0000] <ljharb>
+the annex b thing
+
+[11:26:01.0000] <ljharb>
+I’m relatively sure we wouldn’t want to propagate that to do expressions
+
+[11:27:08.0000] <devsnek>
+does it apply in classes
+
+[11:27:34.0000] <leobalter>
+seems like a lint concern. like, anyone writing script today in sloppy mode, using a new feature  (do expr) and declaring functions inside
+
+[11:27:46.0000] <leobalter>
+they can pick their own poison by themselves
+
+[11:28:11.0000] <devsnek>
+honestly like
+
+[11:28:18.0000] <devsnek>
+whatever wrapping a statement in a block does
+
+[11:28:19.0000] <leobalter>
+ideally `do expr` is just a way to capture the completion value of a block
+
+[11:28:39.0000] <devsnek>
+adding a `do` to the front of it should not change that
+
+[11:28:46.0000] <devsnek>
+it should just change where the block can be
+
+[11:29:05.0000] <leobalter>
+devsnek it seems we are pretty much in sync here
+
+[11:30:37.0000] <ljharb>
+leobalter: I’m saying it’s complexity impls probably don’t want in more places
+
+[11:30:51.0000] <devsnek>
+isn't it more complex to add more rules
+
+[11:31:29.0000] <leobalter>
+I read do expr: let's capture the completion of this block.
+
+[11:31:49.0000] <leobalter>
+It sounds fair enough to disallow return because default parameters
+
+[11:32:36.0000] <leobalter>
+but otherwise the extra limits sound like too complex to resolve a problem I believe it's up to the user choice
+
+[11:33:56.0000] <leobalter>
+ljharb: please help me out on this: is there anything else in the Annex B concerns other than the function declaration?
+
+[11:34:07.0000] <devsnek>
+you can disallow return in default params without disallowing it everywhere
+
+[11:34:16.0000] <devsnek>
+but people just really dislike the idea of it for some reason
+
+[11:35:30.0000] <devsnek>
+which is to say, i would expect `FormalParameters` to carry the `~Return`, i wouldn't expect do expressions to know anything about it
+
+[11:35:40.0000] <leobalter>
+let's say do expr ships with `[~Return, ~Break, ~Continue]` + the Annex B for function declarations is not applied here. Is there anything else? I could do that
+
+[11:36:42.0000] <leobalter>
+It's a fair trade in for me. I'd love to discuss this format, possibly championing the proposal this way
+
+[11:37:30.0000] <leobalter>
+those might comprehend the corner cases shu mentioned before, hopefully
+
+[11:40:45.0000] <leobalter>
+Bakkot: any thoughts?
+
+[11:48:31.0000] <Bakkot>
+leobalter I feel pretty strongly that we should forbid other sharp edges, like ending your `do` in a loop
+
+[11:49:26.0000] <devsnek>
+lint rule tho
+
+[11:49:30.0000] <Bakkot>
+it's not just that users will get cut on those edges; it's also that implementations are not currently consistent because these cases are super weird and so we'd be exposing users to a host of compatibility bugs
+
+[11:50:22.0000] <Bakkot>
+devsnek we should default to leaving things out. if we are adding a syntactic form which we think everyone should forbid in their programs, instead of doing that we should leave the thing out.
+
+[11:52:28.0000] <devsnek>
+i don't think people should forbid it
+
+[11:53:26.0000] <Bakkot>
+because you think it has a reasonable semantics which future readers of the code will understand, or because you don't think anyone will ever try to write this?
+
+[11:54:02.0000] <devsnek>
+the former, given what the spec says at least
+
+[11:54:17.0000] <Bakkot>
+on that point I disagree quite strongly
+
+[11:54:23.0000] <devsnek>
+would definitely need to make sure implementations are correct first
+
+[12:04:27.0000] <devsnek>
+Bakkot: because there are different opinions it seems better to enforce it in a way where you don't clobber the others
+
+[12:04:33.0000] <ljharb>
+even if all the impls and spec did the same thing, i agree strongly with Bakkot that users won't have a reasonable intuition about them
+
+[12:10:48.0000] <Bakkot>
+devsnek when the different opinions are "this wouldn't be harmful" and "this would definitely be harmful", the correct path is to not add the thing
+
+[12:10:55.0000] <devsnek>
+ConciseBody is AssignmentExpression
+
+[12:11:03.0000] <devsnek>
+so why is this `async () => ({}) = 1`
+
+[12:11:11.0000] <devsnek>
+equiv to `(async () => ({})) = 1`
+
+[12:11:22.0000] <devsnek>
+and not `async () => (({}) = 1)`
+
+[12:13:07.0000] <devsnek>
+Bakkot: for security i agree
+
+[12:13:23.0000] <Bakkot>
+for everything
+
+[12:13:36.0000] <devsnek>
+loops in do expressions considered harmful
+
+[12:13:40.0000] <Bakkot>
+if I'm wrong, there's just a minor inconsistency where you reach for a thing and it's not there, which we could maybe repair later
+
+[12:14:04.0000] <Bakkot>
+if you're wrong, there's a sharp edge people will need to lint against or cut themselves on for decades
+
+[12:14:49.0000] <devsnek>
+i mean that's true of basically everything that causes any disagreement
+
+[12:19:49.0000] <Bakkot>
+lots of things have disagreement on aesthetic grounds, not "people will expect this to do something very different from what it actually does" grounds
+
+[12:20:01.0000] <Bakkot>
+re the parsing question, I don't think you're correct about how it's interpreted; why do you think that's the interpretation?
+
+[12:20:36.0000] <devsnek>
+cuz engines throw a syntax error?
+
+[12:21:01.0000] <Bakkot>
+the syntax error is because `({})` isn't a valid LHS
+
+[12:21:09.0000] <Bakkot>
+try it with `a = 1` instead of `({}) = 1`
+
+[12:21:16.0000] <devsnek>
+isn't that an assignment pattern?
+
+[12:21:37.0000] <Bakkot>
+there's an early error for parenthesized nontrivial LHSes
+
+[12:23:17.0000] <devsnek>
+hmmmm
+
+[12:23:30.0000] <devsnek>
+is that just ObjectLiteral and ArrayLiteral?
+
+[12:23:37.0000] <Bakkot>
+yeah
+
+[12:23:39.0000] <devsnek>
+weird
+
+[12:23:51.0000] <Bakkot>
+parenthesizing an LHS is weird
+
+[12:24:08.0000] <Bakkot>
+it's allowed for `a` and `a.b` because that was shipped and then people depended on it
+
+[12:24:20.0000] <Bakkot>
+but that wasn't extended to the new forms
+
+[13:48:25.0000] <rkirsling>
+going back to yesterday's "`break` in a `finally` block" discussion, does anybody know the rationale for the "If F.[[Type]] is normal" guard?
+
+[13:49:13.0000] <rkirsling>
+like, this behavior doesn't really affect anybody right now but thinking it though, it seems like it would be terrible to have exposed
+
+[13:50:08.0000] <rkirsling>
+seems like if the `finally` block's completion value *can* be propagated then it should *always* be propagated
+
+[13:50:33.0000] <rkirsling>
+(by that I mean, the question is whether `finally` exists and not whether it completed normally)
+
+[14:07:32.0000] <Bakkot>
+that guard is necessary so that `try { throw 0; } finally { console.log('cleanup') }` throws
+
+[14:08:09.0000] <Bakkot>
+which is what I'd want to happen, and also the precedent from Java and friends
+
+[14:15:30.0000] <rkirsling>
+oh wow I see
+
+[14:34:10.0000] <ljharb>
+rkirsling: there's similar semantics in promise `.finally` as well, for the same reason
+
+[14:34:28.0000] <ljharb>
+ie that `rejected.finally(() => { console.log('cleanup'); })` should still be rejected
+
+[14:34:42.0000] <rkirsling>
+yeah I see that. this was predicated on my thinking that they were different but it seems that they aren't...
+
+[14:37:31.0000] <ljharb>
+there is one difference between syntactic finally and promise finally, tho - namely that `return x` in syntactic finally overrides the return value for the function, but is a noop in a promise finally
+
+[14:41:28.0000] <Bakkot>
+which is kind of necessary since in a promise finally you can't actually tell if a `return` happened
+
+[14:43:49.0000] <leobalter>
+`try { throw 0; } finally { return console.log('cleanup') }` will not throw
+
+[14:44:41.0000] <rkirsling>
+yikes
+
+[14:45:19.0000] <ljharb>
+right, that was the piece of finally syntax that can't be replicated non-syntactically
+
+[14:46:50.0000] <rkirsling>
+I mean Promise#finally is different in general in that abrupt completions other than `throw` can't make sense from within a lambda
+
+[14:47:08.0000] <rkirsling>
+but "we're throwing! no wait sorry we're returning!" is...really something
+
+[14:47:48.0000] <Bakkot>
+works the other way around too, perhaps more naturally
+
+[14:48:04.0000] <Bakkot>
+`try { return 0; } finally { throw 'oops!' }`
+
+[14:48:55.0000] <Bakkot>
+but my favorite is still break: `label: try { throw 0; } finally { console.log('no.'); break label; } console.log('this is reached');`
+
+[14:53:25.0000] <rkirsling>
+lol
+
+[14:53:45.0000] <rkirsling>
+:thanks_i_hate_it:
+
+[14:56:43.0000] <TabAtkins>
+those are... awful
+
+[14:57:23.0000] <ljharb>
+`break me;`
+
+[16:35:11.0000] <Bakkot>
+devsnek what bug does https://github.com/engine262/engine262/blob/2b21fb9d9aa991d66417e714b581e4c14774c8c2/test/test262/skiplist#L9 refer to?
+
+[16:35:36.0000] <devsnek>
+Bakkot: the nan one
+
+[16:35:43.0000] <Bakkot>
+ah, sure
+
+[16:35:45.0000] <devsnek>
+nan is out of range and crashes
+
+[16:35:49.0000] <Bakkot>
+fun fun
+
+[16:35:55.0000] <Bakkot>
+btw I found a bunch of other cases of that
+
+[16:35:58.0000] <Bakkot>
+do you mind if I take over your PR?
+
+[16:36:06.0000] <devsnek>
+oh i had a pr
+
+[16:36:08.0000] <devsnek>
+i completely forgot
+
+[16:36:23.0000] <devsnek>
+yeah feel free
+
+[16:36:39.0000] <devsnek>
+hmm i guess rick just updated those assignment expression tests
+
+[16:36:40.0000] <Bakkot>
+gonna become normative because I found cases where engines diverged, so there's not a single obvious interpretation
+
+[16:36:52.0000] <devsnek>
+was it not just jsc being weird
+
+[16:37:02.0000] <Bakkot>
+also, unrelated: is this an actual skiplist, or is it xfails?
+
+[16:37:24.0000] <devsnek>
+just skips them
+
+[16:37:26.0000] <Bakkot>
+:(
+
+[16:37:28.0000] <devsnek>
+i've been meaning to add xfail but
+
+[16:37:32.0000] <devsnek>
+i keep forgetting
+
+[16:37:36.0000] <Bakkot>
+yeah
+
+[16:37:47.0000] <devsnek>
+everything there is expected to fail
+
+[16:37:51.0000] <Bakkot>
+open a good-first-issue, someone might take care of it
+
+[16:38:37.0000] <devsnek>
+oh i remember the problem
+
+[16:39:03.0000] <devsnek>
+some assertion failures can leave the engine in a bad state
+
+[16:39:17.0000] <devsnek>
+and i don't spin up a new node process for each test
+
+[16:39:49.0000] <devsnek>
+i suppose it could spin up a worker for each xfail test
+
+[16:41:45.0000] <Bakkot>
+well, or just leave those as skipped
+
+
+2020-09-19
+[19:03:22.0000] <jmdyck>
+Bakkot: 2007's defn of WeekDay is missing an ')'
+
+[19:04:04.0000] <jmdyck>
+or maybe it has an extra '('
+
+[19:04:55.0000] <jmdyck>
+yeah, changing '((' to '(' seems likely
+
+[19:05:05.0000] <Bakkot>
+yup, thanks
+
+[19:05:06.0000] <Bakkot>
+pushed
+
+[19:17:17.0000] <jmdyck>
+hm, you've got <dfn id="integral Number">integral Number</dfn>
+
+[19:17:31.0000] <jmdyck>
+ids don't normally contain space
+
+[19:17:43.0000] <Bakkot>
+indeed
+
+[19:18:01.0000] <Bakkot>
+pushed
+
+[19:26:35.0000] <jmdyck>
+Two ids that exist in master but not 2007: 'mathematical integer' (with a space!) and 'ℝ'
+
+[19:37:06.0000] <Bakkot>
+'ℝ' I'd caught earlier but I guess never fixed
+
+[19:38:38.0000] <Bakkot>
+though not sure if I want to define it or just make the ID exist, hmm
+
+[19:44:37.0000] <Bakkot>
+I guess I just never addressed my own comments on the PR, huh
+
+[19:48:39.0000] <jmdyck>
+"Numeric values without a subscript suffix refer to mathematical values." so I wouldn't expect any "<sub>ℝ</sub>" but there are a few
+
+[19:59:07.0000] <Bakkot>
+pushed
+
+[19:59:25.0000] <Bakkot>
+one addressing that, one addressing the comments I'd left on the PR previously
+
+[20:01:45.0000] <jmdyck>
+still no id for ℝ?
+
+[20:02:21.0000] <Bakkot>
+no, I left a comment about it
+
+[20:02:44.0000] <Bakkot>
+https://github.com/tc39/ecma262/pull/2007#issuecomment-695153332
+
+[20:03:18.0000] <jmdyck>
+k
+
+[20:04:59.0000] <jmdyck>
+one occ of "the mathematical value of the number of code points in ...": delete "the mathematical value of" ?
+
+[20:06:04.0000] <Bakkot>
+done
+
+[20:06:16.0000] <jmdyck>
+eek, 160 parsing errors in emu-algs, this could take a while.
+
+[20:06:34.0000] <Bakkot>
+I'd guess (hope) it's just tripping on some new notation
+
+[20:06:57.0000] <jmdyck>
+probably, but it'll still take a while.
+
+[20:16:35.0000] <jmdyck>
+well, some of should will go away if i rebase to ecmaspeak master. we'll see how that works out...
+
+[20:18:41.0000] <jmdyck>
+lots of conflicts.
+
+[20:24:14.0000] <Bakkot>
+not surprised, given how many conflicts 2007 had
+
+[20:25:45.0000] <Bakkot>
+gonna hold off on landing other nontrivial editorial stuff until 2007 lands (except your overloads-removal PR, probably) so as to avoid having to deal with that again
+
+[20:30:28.0000] <jmdyck>
+ok,maybe resolved conflicts, now only 93 parse errors in emu-algs
+
+[21:00:27.0000] <jmdyck>
+80 errors ...
+
+[21:10:40.0000] <jmdyck>
+46...
+
+[21:20:40.0000] <jmdyck>
+Hm. Seems like "If _n_ is A, _n_ is B, _n_ is C, _n_ is D, or _n_ is E, ..." could be reduced to "if _n_ is A, B, C, D, or E, ..."
+
+[21:20:54.0000] <jmdyck>
+or "if _n_ is one of A, ..."
+
+[21:24:03.0000] <jmdyck>
+8 errors...
+
+[21:29:40.0000] <jmdyck>
+Bakkot: In Atomics.wait, step that starts "If _q_"
+
+[21:30:06.0000] <jmdyck>
+one "else" preceded by semicolon, other by comma.
+
+[21:30:31.0000] <Bakkot>
+do you know off the top of your head if we prefer one or the other?
+
+[21:30:37.0000] <jmdyck>
+should probably both be semicolon
+
+[21:30:39.0000] <Bakkot>
+my guess would be we use both
+
+[21:30:40.0000] <Bakkot>
+cool
+
+[21:30:49.0000] <Bakkot>
+oh, grammatically, yes
+
+[21:31:05.0000] <Bakkot>
+since there's commas within those clauses
+
+[21:31:51.0000] <jmdyck>
+We also use periods, followed by "Otherwise"
+
+[21:32:54.0000] <jmdyck>
+though not as often
+
+[21:34:48.0000] <Bakkot>
+pushed
+
+[21:37:02.0000] <jmdyck>
+urgh "an implementation-approximated value representing 𝔽(&pi; / 4)"
+
+[21:38:41.0000] <Bakkot>
+yeah, it was real tempting to just say `𝔽(&pi; / 4)`, but that is technically a normative change
+
+[21:40:10.0000] <jmdyck>
+but isn't it an imp-approximation to the trancendental number, rather than an imp-approximation to the Number value for the trancendental number?
+
+[21:40:50.0000] <jmdyck>
+i suppose it might be both
+
+[21:40:54.0000] <Bakkot>
+hmm
+
+[21:41:08.0000] <Bakkot>
+it does look like we usually specify a real there
+
+[21:42:04.0000] <Bakkot>
+well, when it's not a constant, anyway
+
+[21:42:06.0000] <Bakkot>
+will change
+
+[21:44:13.0000] <Bakkot>
+(I discussed this with Michael Ficarra at the time, so might end up going the other way if he has strong feelings)
+
+[21:46:25.0000] <Bakkot>
+pushed
+
+[21:46:40.0000] <Bakkot>
+also tweaked Math.hypot to do the computation on reals instead of floats
+
+[21:53:43.0000] <jmdyck>
+finally, 0 parse errors.
+
+[21:54:14.0000] <jmdyck>
+That's all from me for tonight.
+
+[21:55:24.0000] <Bakkot>
+thanks as always!
+
+[03:41:50.0000] <bendtherules>
+Can someone explain why named function expressions allow referencing itself by name?
+
+[03:41:51.0000] <bendtherules>
+From what i understand, for func expression - it creates a special scope between function's local scope and outer lexical scope. This special scope has a immutable binding for func name.
+
+[03:41:51.0000] <bendtherules>
+That means, reassigning will break -
+
+[03:41:51.0000] <bendtherules>
+```
+
+[03:41:51.0000] <bendtherules>
+var hello = 123;
+
+[03:41:51.0000] <bendtherules>
+a = function hello() {
+
+[03:41:51.0000] <bendtherules>
+  hello = 456; // ERROR
+
+[03:41:52.0000] <bendtherules>
+  const hello = 456 // works
+
+[03:41:52.0000] <bendtherules>
+}
+
+[03:41:53.0000] <bendtherules>
+```
+
+[03:41:57.0000] <bendtherules>
+But why was this considered necessary? Because it won't have access to itself from lexical scope?
+
+[08:57:15.0000] <Bakkot>
+it's necessary so you can recurse
+
+[08:58:27.0000] <Bakkot>
+`(function fact(n) { if (n <= 1) return n; return n * fact(n-1); })(5)`
+
+[11:07:12.0000] <jmdyck>
+Bakkot: re 2007: looks like there was a mistake in a conflict resolution
+
+[11:07:59.0000] <jmdyck>
+wrt 2151 NumericLiteralSeparator
+
+[11:08:40.0000] <jmdyck>
+Scan for "The MV of <emu-grammar>DecimalIntegerLiteral :: NonZeroDigit DecimalDigits<"
+
+[11:10:11.0000] <jmdyck>
+is missing "NumericLiteralSeparator?"
+
+
+2020-09-20
+[17:10:32.0000] <Bakkot>
+jmdyck thanks, fixed
+
+[18:02:58.0000] <jmdyck>
+Bakkot: In "the smallest (closest to -&infin;) integral Number value ...", shouldn't the -&infin; be marked as a Number value?
+
+[18:03:20.0000] <jmdyck>
+(ditto 'greatest')
+
+[18:35:46.0000] <jmdyck>
+ditto "preferring the Number closer to +&infin;"
+
+[19:05:36.0000] <bendtherules>
+Bakkot: makes sense. And why is it immutable binding for func name? Is it because that extra scope is shared between all function calls? Normally for function declarations, the binding is mutable, so why not same here
+
+[19:14:28.0000] <Bakkot>
+bendtherules that one I'm not sure of; that's how it's been since es3, or maybe before. I would speculate that it's because the only binding which can possibly exist in its scope, so unlike function declarations it doesn't really make sense to modify it because you can always just shadow it instead
+
+[19:18:59.0000] <bendtherules>
+Hmm, but imo - its still a hidden variable introduced by js, and there is not much clue that it is going to be immutable - so a innocent user might write hello=123 within a function body anr actually face an error
+
+[19:23:08.0000] <bendtherules>
+Also, would you say this behavior is documented from reading the mdn pade (https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/function)?
+
+[19:23:08.0000] <bendtherules>
+Seems undocumented to me, it talks a bit about read-only function.name,but not the binding
+
+[19:26:58.0000] <Bakkot>
+not sure what you mean by hidden
+
+[19:27:44.0000] <Bakkot>
+re: MDN: it's a wiki; if you think something is missing you can submit a fix
+
+[19:46:15.0000] <bendtherules>
+By hidden, i mean created implicitly / it's not super obvious
+
+[19:48:22.0000] <bendtherules>
+Mdn - yes, i understand. just wanted to get more eyeballs on it and see if i am missing where this is documented. Anyway, no worries
+
+[19:48:48.0000] <jmdyck>
+Bakkot: the definitions in "Hours, Minutes, Second, and Milliseconds" look a bit odd to me. Do you have time to talk about them?
+
+[19:49:19.0000] <Bakkot>
+bendtherules I think your reading of MDN is right; you fix it!
+
+[19:49:23.0000] <Bakkot>
+jmdyck sure
+
+[19:49:39.0000] <Bakkot>
+all of the Date stuff is kind of a mess
+
+[19:49:52.0000] <jmdyck>
+e.g. HourFromTime
+
+[19:50:09.0000] <Bakkot>
+bendtherules er, sorry, that should be "you could fix it!"; did not mean that to be an imperative
+
+[19:50:15.0000] <bendtherules>
+Bakkot: 👍
+
+[19:50:25.0000] <jmdyck>
+I think we can assume that _t_ is a Number
+
+[19:51:22.0000] <Bakkot>
+yup, those should all take and return Numbers
+
+[19:52:11.0000] <Bakkot>
+(which was intentional; the idea is to make it clear to implementors that they are expected to be doing floating-point arithmetic here)
+
+[19:52:38.0000] <Bakkot>
+ah, but II guess HoursPerDay is used as a real, hmm
+
+[19:52:48.0000] <jmdyck>
+so the `/` is Number::divide?
+
+[19:52:56.0000] <Bakkot>
+yup
+
+[19:53:24.0000] <Bakkot>
+as per 5.2.5: "Numeric operators such as +, ×, =, and ≥ refer to those operations as determined by the type of the operands. [...] When applied to Numbers, the operators refer to the relevant operations within IEEE 754-2019."
+
+[19:54:24.0000] <jmdyck>
+so then the other thing was MathReal modulo Number
+
+[19:54:46.0000] <Bakkot>
+yeah, looks like HoursPerDay, MinutesPerHour, and SecondsPerMinute have the wrong types
+
+[19:54:50.0000] <Bakkot>
+will change those to reals
+
+[19:56:54.0000] <Bakkot>
+not thrilled about this section, in honesty
+
+[19:56:58.0000] <Bakkot>
+wasn't happy with any approach we considered
+
+[19:57:21.0000] <Bakkot>
+this seemed the least bad, in that is at least (hopefully) extremely clear for implementations
+
+[19:57:25.0000] <Bakkot>
+unlike the current spec
+
+[19:57:26.0000] <Bakkot>
+pushed
+
+[19:57:41.0000] <Bakkot>
+wait, not pushed, one sec
+
+[19:57:55.0000] <Bakkot>
+ok pushed
+
+[19:58:04.0000] <jmdyck>
+is the requirement for FP arithmetic a backwards compat thing
+
+[19:58:12.0000] <Bakkot>
+yup
+
+[19:58:21.0000] <Bakkot>
+I have a topic on the agenda for next week's meeting about this
+
+[19:58:38.0000] <Bakkot>
+https://docs.google.com/presentation/d/1gePsNmlP2u0pYXm0LWO3d7eM4Q_y5Ozx0qXN1zWOv58/edit#slide=id.g8f7c6b6dbb_0_0
+
+[19:59:06.0000] <Bakkot>
+well, backwards compat + engines are unlikely to want to do high-precision arithmetic here
+
+[19:59:31.0000] <jmdyck>
+web reality then?
+
+[19:59:44.0000] <Bakkot>
+web reality is a good way to put it, yes
+
+[19:59:57.0000] <Bakkot>
+web reality is that these are all FP arithmetic
+
+[20:00:33.0000] <jmdyck>
+but it needs to interconvert because floor and modulo are only defined on mathreal
+
+[20:00:38.0000] <Bakkot>
+indeed
+
+[20:02:24.0000] <Bakkot>
+those operations make sense for the restricted subset of numbers in use here, but we figured it wasn't worth introducing them on Numbers given that a complete definition would need to say what to do about edge cases which don't come up in these uses
+
+[20:02:50.0000] <jmdyck>
+yup
+
+[20:29:23.0000] <jmdyck>
+Bakkot: TimeZoneString applies 'abs' to Number (twice)
+
+[20:30:20.0000] <Bakkot>
+fun, one sec
+
+[20:33:10.0000] <Bakkot>
+pushed
+
+[20:36:41.0000] <jmdyck>
+ToIntegerOrInfinity's preamble says it returns a Number, but looks like it returns extendedmath
+
+[20:37:49.0000] <Bakkot>
+nice catch, fixed
+
+[20:41:28.0000] <jmdyck>
+also, "let _integer_ be -_integer_": "let" should be "set"
+
+[20:42:08.0000] <jmdyck>
+also "_number_ &lt; 0" is mixed-type
+
+[20:42:57.0000] <Bakkot>
+pushed
+
+[20:43:32.0000] <Bakkot>
+really want to get ecmarkup to the point where it can warn for the `let` vs `set` error; that shouldn't be that hard
+
+[07:07:01.0000] <devsnek>
+`[Number 10]` vs `Number { 10 }`
+
+[07:39:29.0000] <howdoi>
+6.2.5.3 IsGenericDescriptor returns true in step-2, what does that mean or when does that happen?
+
+[09:21:02.0000] <devsnek>
+howdoi: if the descriptor describes enumerability/configurablity but not data or accessors
+
+[09:23:51.0000] <howdoi>
+devsnek: without data or accessors what's the point?
+
+[09:24:28.0000] <devsnek>
+check where it is called from i guess?
+
+[10:05:09.0000] <howdoi>
+Hmm, thinking of use-cases
+
+[10:23:34.0000] <Bakkot>
+it's so you can e.g. change an existing property's enumerability without changing its value
+
+[13:40:13.0000] <ljharb>
+devsnek: are you asking about the output display? object-inspect uses `Object(10)`, as another alternative
+
+[13:51:17.0000] <devsnek>
+interesting
+
+[14:41:16.0000] <jmdyck>
+Bakkot: msPerDay is Number, so 𝔽(msPerDay) in MakeDate is redundant.
+
+[15:01:33.0000] <jmdyck>
+Bakkot: in MakeDay, _m_ / 12 is mixed-type. ℝ(_m_ / 12) should be ℝ(_m_) / 12?
+
+[15:13:14.0000] <jmdyck>
+In Math.clz32, should "the unsigned 32-bit binary representation of _n_" have "R(_n_)"?
+
+[15:16:18.0000] <jmdyck>
+Number.prototype.toExponential: "_f_ is *+0*<sub>𝔽</sub>" should be just "_f_ is 0"
+
+[15:18:20.0000] <jmdyck>
+also: "Set _x_ to ℝ(_x_)." is unfortunate
+
+[15:18:25.0000] <Bakkot>
+fixed the first 1, 2, and 4 in that list. for the 3, I don't feel strongly either way; left it alone for now
+
+[15:19:00.0000] <Bakkot>
+yeah, that unfortunateness is what prompted https://github.com/tc39/ecma262/issues/2178 I think
+
+[15:19:25.0000] <Bakkot>
+I can clean some of those up now if it's tripping your analysis up
+
+[15:19:36.0000] <jmdyck>
+but anyhow,  ℝ(_x_) is redundant thereafter
+
+[15:20:27.0000] <jmdyck>
+my analysis just raises a warning, so not really tripping it up.
+
+[15:20:27.0000] <Bakkot>
+so it is. just the one occurrence in toExponential, or are there others?
+
+[15:20:47.0000] <jmdyck>
+i only see one.
+
+[15:21:01.0000] <Bakkot>
+I guess two because there's the NOTE after
+
+[15:21:11.0000] <Bakkot>
+*three
+
+[15:21:14.0000] <jmdyck>
+right
+
+[15:22:25.0000] <Bakkot>
+pushed
+
+[16:01:53.0000] <jmdyck>
+Bakkot: Date.prototype.setUTCHours has unset alias _newDate_
+
+[16:03:00.0000] <jmdyck>
+should be _date_, looks like. Or vice versa.
+
+[16:03:35.0000] <Bakkot>
+pushed
+
+[16:03:49.0000] <Bakkot>
+copy-paste error for setHours, looks like
+
+[16:04:04.0000] <Bakkot>
+those algorithms are almost identical but have different aliases, for some reason
+
+[16:04:34.0000] <jmdyck>
+and are "is present" steps and "is not present" steps supposed to be separate?
+
+[16:04:59.0000] <Bakkot>
+yup
+
+[16:05:47.0000] <Bakkot>
+the `If _t_ is *NaN*, return *NaN*.` has to happen after the initial coercions (for side-effect order reasons) but before the fallback computations (so that the computations are guarded against _t_ being NaN)
+
+[16:07:21.0000] <jmdyck>
+so in status quo, t = NaN leads to NaN-arithmetic.
+
+[16:07:47.0000] <Bakkot>
+yup
+
+[16:08:21.0000] <jmdyck>
+and this agrees with web reality?
+
+[16:08:25.0000] <Bakkot>
+there's an earlier PR fixing just this (which I just updated with the semantics from 2007) at https://github.com/tc39/ecma262/pull/2136
+
+[16:08:32.0000] <Bakkot>
+interesting question!
+
+[16:08:36.0000] <jmdyck>
+s/this/what 2007 does/
+
+[16:08:37.0000] <Bakkot>
+no, there is not engine agreement
+
+[16:08:46.0000] <Bakkot>
+it matches Spidermonkey
+
+[16:08:57.0000] <Bakkot>
+JSC and V8 both do other, distinct things
+
+[16:09:01.0000] <Bakkot>
+see https://github.com/tc39/ecma262/pull/2136#issuecomment-695825659
+
+[16:10:40.0000] <jmdyck>
+so that'll be considered at the meeting?
+
+[16:10:44.0000] <Bakkot>
+yup
+
+[16:10:55.0000] <jmdyck>
+k
+
+[16:11:00.0000] <Bakkot>
+can't guarantee there be consensus since it's a late addition
+
+[16:11:34.0000] <Bakkot>
+but spidermonkey is the party which cares most about that, and I happen to be asking to make the spec match their implementation, so I'm hopeful
+
+[16:24:28.0000] <jmdyck>
+afk a while
+
+
+2020-09-21
+[18:10:15.0000] <ljharb>
+Bakkot: the deadline's only for proposal advancement, not needs consensus PRs, but indeed someone might need more time to review it
+
+[19:25:07.0000] <jmdyck>
+Bakkot: `A conversion from a mathematical value or extended mathematical value _x_ to a Number is denoted as "the Number value for _x_" or 𝔽(_x_)`, but "the Number value for _x_" is only defined where _x_ is "an exact real mathematical quantity", and it's a bit dubious that that includes infinities.
+
+[19:25:54.0000] <Bakkot>
+jmdyck I tried to ensure that "the Number value for" was never used for an infinity
+
+[19:54:04.0000] <jackworks>
+that seems obvious
+
+[19:54:17.0000] <jackworks>
+Object.setPrototypeOf is an intentional method call
+
+[19:54:29.0000] <jackworks>
+but obj[key] when key is proto might be unintentional
+
+[20:23:46.0000] <jmdyck>
+Bakkot: does that go for 𝔽() too?
+
+[20:26:28.0000] <jmdyck>
+ToIndex has "the Number value for ? ToIntegerOrInfinity(_value_)", which might apply "the Number value for" to an infinity.
+
+[20:26:49.0000] <Bakkot>
+jmdyck hmmm
+
+[20:26:57.0000] <Bakkot>
+let me look
+
+[20:28:05.0000] <Bakkot>
+yeah, you're right
+
+[20:28:16.0000] <Bakkot>
+I will just generalize "the Number value for" to extend to infinities, I think
+
+[20:28:32.0000] <Bakkot>
+(and `𝔽()`)
+
+[20:28:43.0000] <devsnek>
+F = double and R = real?
+
+[20:28:52.0000] <devsnek>
+oh F for float
+
+[20:28:57.0000] <devsnek>
+i'm caught up
+
+[20:31:02.0000] <Bakkot>
+I believe blackboard-bold F ("𝔽") is the traditional name for collection of floats, for those CS papers which talk about it
+
+[20:31:06.0000] <Bakkot>
+I might have made that up though
+
+[20:31:09.0000] <Bakkot>
+anyway yeah
+
+[20:32:25.0000] <rkirsling>
+at least for the ones that aren't worried about referring to bits as a finite field
+
+[20:33:06.0000] <devsnek>
+big F for big floats
+
+[20:34:02.0000] <jmdyck>
+oh, i guess the meeting is in progress now
+
+[20:34:13.0000] <devsnek>
+japan time :D
+
+[20:34:56.0000] <Bakkot>
+ndeed
+
+[20:35:06.0000] <Bakkot>
+we're on lunch break at the moment
+
+[20:35:43.0000] <Bakkot>
+jmdyck the Notational Conventions section says "A conversion from a mathematical value or extended mathematical value x to a Number is denoted as "the Number value for x" or 𝔽(x)", so it's technically already legal
+
+[20:36:04.0000] <Bakkot>
+but it says the definition is in defined in 6.1.6.1, which doesn't cover infinities, so I'll fix that part
+
+[20:36:25.0000] <jmdyck>
+right, that's what i said.
+
+[20:38:34.0000] <Bakkot>
+yup, sorry, I misread you
+
+[20:38:51.0000] <Bakkot>
+pushed
+
+[20:43:42.0000] <jmdyck>
+mathematical infinities would also fit into the general definition, as long as you allowed them at the top. Maybe the separate para is better though.
+
+[20:43:47.0000] <jmdyck>
+dunno
+
+[20:45:14.0000] <Bakkot>
+I'm happier keeping them explicitly split out, so you don't have to think about the interaction with the infinities in the given algorithm
+
+[20:45:31.0000] <jmdyck>
+yup
+
+[20:50:40.0000] <jmdyck>
+hm, Math.round(NaN) ?
+
+[20:51:53.0000] <Bakkot>
+looks like a bug introduced in 2122, I'll file a separate PR
+
+[20:52:07.0000] <Bakkot>
+I tried to check for all of those carefully as part of 2122; guess I missed one
+
+[20:52:08.0000] <jmdyck>
+test/built-ins/Math/round/S15.8.2.15_A1.js says it's NaN
+
+[20:53:35.0000] <Bakkot>
+yeah, also the previous spec text
+
+[20:54:19.0000] <jmdyck>
+(my analysis is complaining at `_n_ &lt; *0.5*<sub>𝔽</sub>` because it sees that `_n_` might be NaN, which shouldn't be involved in a comparison)
+
+[20:56:11.0000] <Bakkot>
+yup
+
+[20:57:18.0000] <Bakkot>
+hm, it should also be explicit about infinities
+
+[20:59:52.0000] <jmdyck>
+yup
+
+[21:28:07.0000] <jmdyck>
+(Not 2007's problem, but:) https://tc39.es/ecma262/#sec-overview-of-date-objects-and-definitions-of-abstract-operations says "Note that, in every case, if any argument to one of these functions is NaN, the result will be NaN." Except the algorithms don't actually accomplish that.
+
+[21:30:19.0000] <Bakkot>
+I think 2007 should just ensure that none of them are ever passed NaN, though I don't know if it accomplishes that
+
+[21:30:37.0000] <jmdyck>
+so rather than "Note that", the intention seems more like "Imagine that".
+
+[21:31:32.0000] <Bakkot>
+"It would be nice if"
+
+[21:31:38.0000] <jmdyck>
+heh
+
+[21:31:41.0000] <Bakkot>
+I'll reword it, though not tonight
+
+[21:33:11.0000] <jmdyck>
+for 2007, might be nice to have an assertion or a parameter-description that says _t_ isn't NaN. E.g. "takes argument _t_ (a finite time value)"
+
+[21:34:13.0000] <jmdyck>
+well, maybe that isn't 2007's problem either.
+
+[21:34:17.0000] <jmdyck>
+but it would be nice.
+
+[21:39:37.0000] <Bakkot>
+ljharb suggested that as well
+
+[21:39:39.0000] <Bakkot>
+I will address
+
+[21:42:13.0000] <jmdyck>
+actually, LocalTime and UTC are the only AOs here that don't have parameter types. But for the others, presumably "(a Number)" is not as precise as it could be.
+
+[21:42:57.0000] <jmdyck>
+Then there are the <emu-eqn>s, which don't have a place for parameter types or assertions.
+
+[21:44:02.0000] <Bakkot>
+I _think_ all the Date AOs (including the shorthand ones) take and return finite time values
+
+[21:44:15.0000] <Bakkot>
+wait, no
+
+[21:44:17.0000] <Bakkot>
+hm
+
+[21:44:24.0000] <Bakkot>
+nonnegative integral numbers
+
+[21:44:37.0000] <Bakkot>
+but they can exceed the time value bound, in at least some cases
+
+[21:44:48.0000] <jmdyck>
+non-neg?
+
+[21:44:57.0000] <Bakkot>
+oh, no, not that either
+
+[21:45:02.0000] <Bakkot>
+integral numbers, not -0
+
+[21:54:30.0000] <jmdyck>
+I'm done for the day.
+
+[23:02:06.0000] <howdoi>
+outreach++
+
+[07:32:56.0000] <haxjs>
+devsnek: what's the main difference between esvu and jsvu? which one should i use?
+
+[07:33:47.0000] <devsnek>
+haxjs: jsvu has stricter requirements about which engines they distribute
+
+[07:33:54.0000] <devsnek>
+for example they won't include engine262
+
+[07:34:41.0000] <haxjs>
+oh! is there a technical limit in jsvu? or just some strange policy?
+
+[07:34:51.0000] <devsnek>
+the latter
+
+[07:35:10.0000] <haxjs>
+oh! so i should use esvu :) thank u
+
+
+2020-09-22
+[17:59:06.0000] <jmdyck>
+Bakkot: In Abstract Equality Comparison, near the bottom: "If _x_ or _y_ are any of *NaN*, +&infin;, or -&infin;"
+
+[17:59:28.0000] <jmdyck>
+The infinities should be Float-ified.
+
+[18:10:47.0000] <devsnek>
+is there a way
+
+[18:10:49.0000] <devsnek>
+given some character
+
+[18:11:01.0000] <devsnek>
+to get something representing the category, maybe language of origin
+
+[18:11:23.0000] <devsnek>
+like `a` is latin, `м` is cyrillic, `η` is greek, etc
+
+[18:12:21.0000] <rkirsling>
+not sure; that would be useful
+
+[18:12:28.0000] <devsnek>
+it doesn't need to be that exactly
+
+[18:12:41.0000] <devsnek>
+trying to build something that can detect things like "мıηαтσ"
+
+[18:12:49.0000] <rkirsling>
+lol wow
+
+[18:12:51.0000] <devsnek>
+(someone edgy spelling the name Minato)
+
+[18:12:53.0000] <rkirsling>
+yeah
+
+[18:13:08.0000] <devsnek>
+there is cyrillic and greek
+
+[18:13:22.0000] <rkirsling>
+right
+
+[18:16:05.0000] <Bakkot>
+jmdyck fixed, thanks
+
+[18:24:04.0000] <howdoi>
+Where can I know more about Observable Arrays?
+
+[18:24:57.0000] <Bakkot>
+howdoi looks like https://github.com/heycam/webidl/pull/840
+
+[18:33:34.0000] <howdoi>
+Bakkot: thanks. `building.employees.length = 0;` and ` building.employees.push` will throw, hmm.
+
+[18:43:56.0000] <keith_miller>
+Bakkot: Since we think that code unit is a sufficiently big problem, do you think it's worth a `String("content", { format: "utf-32" })` proposal?
+
+[18:44:06.0000] <keith_miller>
+Copied from the delegates channel for posterity
+
+[18:44:11.0000] <Bakkot>
+keith_miller what would that do?
+
+[18:44:25.0000] <keith_miller>
+would mean that [] and others access by code point
+
+[18:44:35.0000] <keith_miller>
+since the string is assumed to be backed by UTF-32
+
+[18:44:51.0000] <devsnek>
+i think grapheme indexed would be more useful
+
+[18:44:51.0000] <keith_miller>
+presumably we'd also have a utf-8 and friends
+
+[18:44:57.0000] <Bakkot>
+ehhhhhh probably not? but I'd have to think more about it; it might be
+
+[18:45:11.0000] <keith_miller>
+devsnek: Sorry not quite sure what grapheme indexed is?
+
+[18:45:26.0000] <devsnek>
+it is slow
+
+[18:45:31.0000] <devsnek>
+but also what people expect :P
+
+[18:45:48.0000] <ljharb>
+keith_miller: 🏳️‍🌈 is 4 code points
+
+[18:45:49.0000] <keith_miller>
+When would it differ from UTF-32 code point?
+
+[18:45:53.0000] <keith_miller>
+AH, ok
+
+[18:46:11.0000] <devsnek>
+oh sorry i thought you were making a jab about grapheme indexing having to be iterative
+
+[18:46:45.0000] <keith_miller>
+Yeah, sounds like there's problems with my idea then
+
+[18:46:56.0000] <devsnek>
+unicode is a bucket of fun
+
+[18:47:22.0000] <keith_miller>
+devsnek: Out of curiosity, can you iterate grapheme clusters backwards?
+
+[18:47:33.0000] <gibson042>
+yes
+
+[18:47:46.0000] <keith_miller>
+ah, ok. Good to know
+
+[18:47:50.0000] <jridgewell>
+reverse_peek?
+
+[18:47:56.0000] <devsnek>
+idk exactly how they work
+
+[18:48:04.0000] <ljharb>
+keith_miller: `[...'🏳️‍🌈'].reverse().join()` gives you two clusters :-p
+
+[18:48:04.0000] <gibson042>
+but it's not optimized
+
+[18:48:17.0000] <devsnek>
+but i would guess you have to walk backward until you hit something that could be followed
+
+[18:48:19.0000] <gibson042>
+https://www.unicode.org/reports/tr29/
+
+[18:48:20.0000] <devsnek>
+and then walk foward
+
+[18:48:21.0000] <gibson042>
+yep
+
+[18:48:33.0000] <keith_miller>
+yeah, that's fine
+
+[18:48:36.0000] <jridgewell>
+ljharb: That's because String iterators are code unit, not grapheme
+
+[18:48:52.0000] <devsnek>
+i wonder if that backtracking can be catastrophic
+
+[18:48:53.0000] <keith_miller>
+Does that work if the string is not well formed?
+
+[18:48:54.0000] <ljharb>
+jridgewell: oh right the q was, iterate backwards, respecting grapheme clusters
+
+[18:48:58.0000] <ljharb>
+jridgewell: got it
+
+[18:49:37.0000] <jridgewell>
+You'd need a multiple reverse peek, till you see the start of a cluster, or no start so take the unit.
+
+[18:49:49.0000] <gibson042>
+https://tc39.es/proposal-intl-segmenter/#sec-findboundary: "Search _string_ for the last segmentation boundary that is preceded by at most _startIndex_ code units from the beginning, using locale _locale_ and text element granularity _granularity_."
+
+[18:49:51.0000] <keith_miller>
+I guess you'd know if you tried to read past the longest grapheme cluster
+
+[18:50:16.0000] <gibson042>
+https://www.unicode.org/reports/tr29/#Random_Access
+
+[18:50:46.0000] <keith_miller>
+Oh interesting
+
+[18:50:54.0000] <keith_miller>
+That's an interesting idea
+
+[18:51:36.0000] <keith_miller>
+But how do you know if you're actually at the Nth cluster? Seems like you'd need to something effectively O(n)
+
+[18:51:49.0000] <devsnek>
+yep
+
+[18:52:08.0000] <devsnek>
+you could also precompute the graphemes :P
+
+[18:52:21.0000] <gibson042>
+correct, indexing by cluster requires O(n)
+
+[18:52:24.0000] <jmdyck>
+Bakkot: StringGetOwnProperty: _len_ is mathy, so  ℝ(_len_) is redundant
+
+[18:52:30.0000] <keith_miller>
+devsnek: https://en.wikipedia.org/wiki/Skip_list
+
+[18:53:23.0000] <devsnek>
+assuming i understand the limitations of skip lists
+
+[18:53:24.0000] <Bakkot>
+jmdyck thanks, pushed
+
+[18:53:31.0000] <devsnek>
+the problem there is that graphemes don't have a specific length
+
+[18:53:41.0000] <Bakkot>
+chasing pointers is slow even if it has better big-o performance
+
+[18:54:21.0000] <keith_miller>
+Bakkot: True but there are numbers where it's better e.g. if you have a 200MB string
+
+[18:54:27.0000] <Bakkot>
+for sure
+
+[18:54:40.0000] <devsnek>
+200mb string :notlikethis:
+
+[18:55:03.0000] <keith_miller>
+*every top 200 webpage*
+
+[18:55:12.0000] <devsnek>
+lol
+
+[18:55:24.0000] <Bakkot>
+I wonder how many of those are me personally
+
+[18:55:34.0000] <Bakkot>
+I guess my strings tend to be on the order of 100k, not quite that big
+
+[21:08:32.0000] <jmdyck>
+Bakkot: in #sec-pattern, "the index into _Input_ of the character that was obtained from element _index_ of _str_": _index_ is a Number, so should be wrapped in ℝ()?
+
+[21:53:20.0000] <Bakkot>
+jmdyck yup
+
+[04:39:39.0000] <aolko>
+hi there
+
+[04:41:33.0000] <aolko>
+can you suggest a channel for "deprecated" standard support such as ECMA-262 5 and ECMA-262 3?
+
+[07:27:12.0000] <devsnek>
+aolko: you can just talk about those here
+
+[08:28:27.0000] <aolko>
+right, any ui libraries for es5? Component ones
+
+[08:28:36.0000] <aolko>
+similar to riot
+
+[08:44:51.0000] <devsnek>
+aolko: better question for #javascript
+
+[08:45:02.0000] <devsnek>
+er ##javascript
+
+[08:45:23.0000] <aolko>
+nah, they are all about those es6+ and whatnot
+
+[08:48:32.0000] <devsnek>
+if someone said that there they are wrong
+
+[08:49:21.0000] <aolko>
+well, they are actively pedalling es6+ only features and apis for starters
+
+[08:49:46.0000] <aolko>
+even tho that was uncalled for
+
+[08:50:37.0000] <devsnek>
+anything js is on topic there
+
+[08:51:02.0000] <devsnek>
+including good js libraries for a website targeting netscape
+
+[08:52:01.0000] <aolko>
+nope, they listed libraries __only__ for es6+, not even a single one from es5, some even rely on custom elements standards with is also uncalled for
+
+[08:52:08.0000] <aolko>
+chich*
+
+[08:52:16.0000] <aolko>
+which** (typo galore)
+
+[08:52:26.0000] <devsnek>
+complain about it to them then
+
+[08:52:31.0000] <devsnek>
+this is offtopic for this channel
+
+[08:53:06.0000] <aolko>
+well, i'm not the one who ruined a glue language by slowly turning it into java and forming a terrible ecosystem we have today
+
+[08:53:27.0000] <devsnek>
+yes that was me, apologies
+
+[08:53:51.0000] <aolko>
+sarcasm not appreciated
+
+[11:50:24.0000] <jmdyck>
+Bakkot: FlattenIntoArray: _depth_ is mathy, so `_depth_ is *1*<sub>𝔽</sub>` is mixed-type.
+
+[11:54:31.0000] <Bakkot>
+jmdyck pushed
+
+[12:17:32.0000] <jmdyck>
+Bakkot: get %TypedArray%.prototype.byteLength: returns a Number, so "return 0" must be float-ified
+
+[12:17:52.0000] <jmdyck>
+ditto get %TypedArray%.prototype.byteOffset
+
+[12:18:07.0000] <jmdyck>
+get %TypedArray%.prototype.length
+
+[12:19:33.0000] <jmdyck>
+similarly Atomics.notify re "return _n_"
+
+[12:21:10.0000] <devsnek>
+does this change require explicit conversions everywhere
+
+[12:21:14.0000] <Bakkot>
+yes
+
+[12:21:22.0000] <Bakkot>
+as it should
+
+[12:21:22.0000] <devsnek>
+i can actually validate that with engine262 :D
+
+[12:21:24.0000] <Bakkot>
+jmdyck pushed
+
+[12:23:33.0000] <jmdyck>
+In unescape, "the code unit whose value is _n_" but _n_ is a Number.
+
+[12:24:58.0000] <rkirsling>
+hmm I was told for my normative PR that it'd end up as `return *+0*`; did that change?
+
+[12:26:47.0000] <Bakkot>
+jmdyck: pushed, also those couple of lines are awful
+
+[12:27:03.0000] <Bakkot>
+rkirsling it will probably be `*+0*<sub>𝔽</sub>`
+
+[12:27:42.0000] <Bakkot>
+but don't worry about it; I'll take care of the making sure things match going forward (and also the linter will catch simple cases like that)
+
+[12:28:25.0000] <rkirsling>
+aye-aye
+
+[12:30:01.0000] <jmdyck>
+Bakkot: is there a rule for when you use "the Number value for" vs "𝔽" ?
+
+[12:30:08.0000] <Bakkot>
+nope
+
+[12:30:11.0000] <jmdyck>
+heh
+
+[12:30:18.0000] <devsnek>
+change 'em all to F
+
+[12:30:23.0000] <Bakkot>
+we will probably go through and try to make them consistent just before landing
+
+[12:30:36.0000] <jmdyck>
+ok, just curious.
+
+[12:32:24.0000] <rkirsling>
+press F to pay your respects to IEEE-754
+
+[12:54:19.0000] <jmdyck>
+Bakkot: I'm assuming that CharacterValue returns a math-integer. If so, then in sec-patterns-static-semantics-character-value, the 3 occurrences of "the Number value for" should be deleted
+
+[12:56:27.0000] <Bakkot>
+yeah, looks like. pushed.
+
+[12:56:43.0000] <Bakkot>
+looking forward to the SDO reorganization so that we can start writing down types for SDOs in a more coherent place
+
+[12:56:53.0000] <jmdyck>
+Also in that clause, under "RegExpUnicodeEscapeSequence :: `u` HexLeadSurrogate `\u` HexTrailSurrogate", 2007 changed `1. Let _cp_ be UTF16SurrogatePairToCodePoint(_lead_, _trail_).\n1. Return the code point value of _cp_.`
+
+[12:57:01.0000] <jmdyck>
+to `Return UTF16SurrogatePairToCodePoint(_lead_, _trail_).`
+
+[12:57:22.0000] <jmdyck>
+but I think that's not quite the same
+
+[12:57:58.0000] <jmdyck>
+`the code point value of _cp_` is the phrase that 'converts' a code point into a math-integer.
+
+[12:59:16.0000] <jmdyck>
+(which is unintuitive, because "an X value" usually means "a value of type X")
+
+[13:00:02.0000] <jmdyck>
+At least, that's the most consistent meaning that I've been able to attach to it.
+
+[13:00:50.0000] <Bakkot>
+I think that particular change is the thing which prompted https://github.com/tc39/ecma262/issues/2181
+
+[13:01:06.0000] <Bakkot>
+I guess I'll revert it for now and we can address as part of that issue, one way or the other
+
+[13:01:21.0000] <jmdyck>
+tx
+
+[13:02:26.0000] <jmdyck>
+(a better phrase might be "the numeric value of code point _cp_")
+
+[13:04:21.0000] <jmdyck>
+fixups: "Return  the MV of |Hex4Digits|." has 2 spaces, and "Return the the MV of |CodePoint|." has 2 "the"
+
+[13:05:51.0000] <jmdyck>
+also, you missed "the Number value" under HexLeadSurrogate etc
+
+[13:22:27.0000] <jmdyck>
+Bakkot: in BackreferenceMatcher, 2007 changed "The value of _A_'s *"length"* property" to "The mathematical value of _A_'s *"length"* property", which makes sense. In sec-array-items, there's a similar case "The value of _array_'s *"length"* property" which should be changed likewise.
+
+[13:30:00.0000] <Bakkot>
+jmdyck pushed
+
+[14:09:11.0000] <jmdyck>
+Bakkot: ToLength could use clamping: Return the Number value for the result of clamping _len_ between 0 and 2^53 - 1.
+
+
+2020-09-23
+[17:17:10.0000] <jmdyck>
+Bakkot: RegExp.prototype [ @@split ]: Alg assumes that _q_ is mathy, but AdvanceStringIndex returns Number
+
+[17:25:13.0000] <jmdyck>
+In Function.prototype.bind, _targetLen_ starts as a Number, but then is overwritten by a math-integer. It's not wrong, but a new alias would probably be better.
+
+[17:26:32.0000] <jmdyck>
+Array.prototype.shift: _len_ is mathy, _k_ is Number, so `_k_ &lt; _len_` is mixed-type.
+
+[17:28:55.0000] <jmdyck>
+Some places where a mathy value needs to floatified:
+
+[17:29:46.0000] <jmdyck>
+StringCreate: _length_, in PropertyDescriptor record
+
+[17:30:59.0000] <jmdyck>
+RegExpInitialize: 0, in Set() call
+
+[17:31:35.0000] <jmdyck>
+RegExp.prototype [ @@match ]: 0, in Set() call
+
+[17:32:38.0000] <jmdyck>
+RegExp.prototype [ @@match ]: _n_, in ToString() call
+
+[17:32:49.0000] <jmdyck>
+RegExp.prototype [ @@search ]: 0, in SameValue() call
+
+[17:32:59.0000] <jmdyck>
+RegExp.prototype [ @@search ]: 0, in Set() call
+
+[17:33:39.0000] <jmdyck>
+RegExp.prototype [ @@split ]: _q_, in Set() call
+
+[17:34:45.0000] <jmdyck>
+RegExp.prototype [ @@split ]: _lengthA_, in ToString() call
+
+[17:35:21.0000] <jmdyck>
+Array.prototype.concat: _n_, in ToString() call
+
+[17:35:33.0000] <jmdyck>
+(twice)
+
+[17:35:45.0000] <jmdyck>
+Array.prototype.concat: _n_, in Set() call
+
+[17:36:14.0000] <jmdyck>
+Array.prototype.filter: _to_, in ToString() call
+
+[17:36:46.0000] <jmdyck>
+Array.prototype.join: _k_, in ToString() call
+
+[17:37:13.0000] <jmdyck>
+Array.prototype.pop: 0, in Set() call
+
+[17:37:39.0000] <jmdyck>
+Array.prototype.reduce: _k_, in ToString() call
+
+[17:37:57.0000] <jmdyck>
+Array.prototype.shift: 0, in Set() call
+
+[17:38:16.0000] <jmdyck>
+(done)
+
+[17:43:52.0000] <Bakkot>
+jmdyck: pushed
+
+[18:05:36.0000] <jmdyck>
+AdvanceStringIndex: "Let _length_ be the Number value for ..." but then the only use of it is `ℝ(_length_)`
+
+[18:06:11.0000] <devsnek>
+something something git blame history :P
+
+[18:06:36.0000] <Bakkot>
+yeah, I'm planning to fix up AdvanceStringIndex to operate on reals more generally at some point soon
+
+[18:07:12.0000] <jmdyck>
+I looked at that and wasn't sure it was a win.
+
+[18:07:58.0000] <Bakkot>
+It gets to be more of a win if the Matcher objects also operate on reals
+
+[18:08:11.0000] <Bakkot>
+which they ought to, conceptually
+
+[18:08:18.0000] <Bakkot>
+so I'd be doing both at the same time
+
+[18:10:15.0000] <jmdyck>
+Also in AdvanceStringIndex: "Let _indexMV_ be the mathematical value of _index_" but then only used once. easier to just have `ℝ(_index_)` inline.
+
+[18:20:30.0000] <jmdyck>
+Bakkot: that might be the end of my analysis of 2007
+
+[18:21:22.0000] <Bakkot>
+jmdyck sweet
+
+[18:21:26.0000] <jmdyck>
+Though I can redo (much faster now) if/when you make significant changes.
+
+[18:21:29.0000] <Bakkot>
+thank you for the many fixes
+
+[18:21:38.0000] <jmdyck>
+yw
+
+[18:21:54.0000] <Bakkot>
+I'll try the change to AdvanceStringIndex and might ping you once that's up
+
+[18:22:15.0000] <jmdyck>
+I'm guessing I got all the blatant ones, but there might be subtler stuff I'm missing.
+
+[18:23:16.0000] <Bakkot>
+seems decently likely that there's some lurking in prose or something, but I'm not too worried; it's much better than it was
+
+[18:23:49.0000] <jmdyck>
+oh, yeah, I'm not checking prose at all (other than param descriptions in preambles)
+
+[18:26:55.0000] <jmdyck>
+also, my analysis was mainly looking for inconsistencies. It's possible there are case where the typing is consistent, but sub-optimal (too much inter-conversion)
+
+[18:29:01.0000] <Bakkot>
+yup
+
+[19:03:09.0000] <Bakkot>
+jmdyck I pushed the change to AdvanceStringIndex
+
+[19:03:25.0000] <jmdyck>
+k
+
+[19:03:27.0000] <Bakkot>
+callsites were evenly split between wanting a Number and wanting a real, but the implementation itself is much nicer with reals
+
+[19:28:22.0000] <jmdyck>
+Bakkot: no new warnings
+
+[19:28:31.0000] <Bakkot>
+great, thanks
+
+[07:47:54.0000] <jorendorff>
+Decorators on private fields are a little mindbending
+
+[15:00:53.0000] <littledan>
+Jorendorff, what about them?
+
+[15:44:35.0000] <jorendorff>
+um, ...nothing, they seem to be pretty normal after all?
+
+
+2020-09-24
+[21:59:24.0000] <Bakkot>
+jmdyck: had to back out the fixes to the `set*` methods on Date because I didn't get consensus for the behavior at the meeting (just because I added it too late, no actual objections)
+
+[22:00:00.0000] <Bakkot>
+so its back to its incoherent state in 2007, and I'll pursue landing those fixes in https://github.com/tc39/ecma262/pull/2136, hopefully in November
+
+[12:41:59.0000] <devsnek>
+without annex b, is `/.{}/` a valid regex
+
+[12:42:23.0000] <devsnek>
+i'm thinking no?
+
+[12:45:51.0000] <Bakkot>
+devsnek I believe you are correct
+
+[12:46:54.0000] <Bakkot>
+the `{` isn't matched by PatternCharacter because it is a SyntaxCharacter and it doesn't match QuantifierPrefix because it would need a DecimalDigits before the `}`
+
+[12:47:08.0000] <devsnek>
+indeed
+
+
+2020-09-25
+[17:07:53.0000] <devsnek>
+i really didn't like ron's meta property idea but now its growing on me
+
+[17:08:00.0000] <devsnek>
+could have `debugger.log` and `debugger.break`
+
+[17:08:31.0000] <devsnek>
+also helps shu's separation case
+
+[17:23:44.0000] <Bakkot>
+phew
+
+[17:23:49.0000] <Bakkot>
+I think https://github.com/tc39/ecma262/pull/2007 is ready
+
+[17:24:26.0000] <Bakkot>
+I need to actually look at all the changes, but I did all the changes I was planning to do
+
+[17:29:15.0000] <devsnek>
+that's very exciting
+
+[17:33:18.0000] <shu>
+is it really
+
+[17:33:32.0000] <shu>
+gonna be a doozy to review
+
+[17:33:46.0000] <shu>
+right after i catch up on all the paperwork i've not done because of tc39
+
+[17:53:33.0000] <Bakkot>
+shu: jmdyck ran his type checker, which is almost certainly more thorough at that particular task than a human can be (it certainly found a lot of issues michael and I had overlooked, now fixed), so you can focus the review on style and correctness and so on without worrying to much about ensuring the types line up
+
+[17:56:23.0000] <shu>
+excellent
+
+[19:04:25.0000] <jmdyck>
+Bakkot: String.prototype.indexOf: last step: extra right paren
+
+[19:05:34.0000] <Bakkot>
+thanks, pushed
+
+[19:27:48.0000] <jmdyck>
+Bakkot: my static analysis gives no new complaints
+
+[20:34:59.0000] <devsnek>
+I will also be moving these changes into engine262
+
+[20:35:06.0000] <devsnek>
+extra layer of verification
+
+[20:35:29.0000] <devsnek>
+I won't do that until after its merged though
+
+[20:54:17.0000] <bendtherules>
+haxjs: saw you post on the delegates channel. From what i am reading, v8 behavior is wrong according to the spec.
+
+[20:54:17.0000] <bendtherules>
+It clearly has those if [[done]] is false checks
+
+[20:55:53.0000] <haxjs>
+yes V8 is definitely wrong because it even inconsistent on `[a, b, c, ...d] = values` and  `[a, b, c, d, e] = values`. Chakra and XS at least consistent.
+
+[20:57:21.0000] <haxjs>
+my only question is whether there is any issue in spec, because three engines behave wrong (as i understand)
+
+[21:01:50.0000] <bendtherules>
+From my understanding, destructuring for both assignment and binding looks correct. It should be empty array, because it always checks cached done value.
+
+[21:01:50.0000] <bendtherules>
+(not sure if i am reading something wrong here)
+
+[21:04:25.0000] <haxjs>
+I agree.
+
+[21:27:38.0000] <devsnek>
+if you do `done: i === 3` then v8 just goes on forever
+
+[21:33:44.0000] <devsnek>
+yeah looking at the code in v8, it just doesn't take into account done returning false and then returning true again
+
+[21:34:49.0000] <bendtherules>
+So, it doesn't store the equivalent of [[done]] ? Or simply doesn't use it?
+
+[21:35:11.0000] <devsnek>
+https://gc.gy/68713509.png
+
+[21:35:14.0000] <devsnek>
+my reading is
+
+[21:35:32.0000] <devsnek>
+it jumps to the done point before it can save the result
+
+[21:36:21.0000] <devsnek>
+might be a one line fix
+
+[21:39:47.0000] <devsnek>
+if the one line fix doesn't work i might just rewrite this from scratch
+
+[21:44:20.0000] <devsnek>
+how can so many engines mess this up
+
+[21:44:34.0000] <devsnek>
+https://gc.gy/68714071.png
+
+[21:49:47.0000] <Bakkot>
+needs a test262 test, clearly
+
+[21:51:42.0000] <devsnek>
+oh the bug is not what i thought
+
+[21:51:52.0000] <devsnek>
+the bug is that the done register isn't checked in the spread case
+
+[21:51:54.0000] <devsnek>
+sigh
+
+[21:54:20.0000] <devsnek>
+woo https://gc.gy/68714661.png
+
+[21:57:54.0000] <bendtherules>
+So, it works in some version of v8?
+
+[21:58:14.0000] <devsnek>
+it works in my local checkout of v8
+
+[21:58:40.0000] <devsnek>
+i think
+
+[21:58:43.0000] <devsnek>
+need to run the test suite
+
+[22:01:32.0000] <devsnek>
+yeah seems fixed
+
+[22:04:15.0000] <bendtherules>
+related question - if iterator is finished, should destructuring assign undefined to rest of the lhs elements?
+
+[22:04:16.0000] <bendtherules>
+Ex - `[a, b] = [] `
+
+[22:04:43.0000] <devsnek>
+yes
+
+[22:04:45.0000] <bendtherules>
+Any difference between assignment and binding for this?
+
+[22:05:21.0000] <devsnek>
+i don't believe so
+
+[22:05:43.0000] <devsnek>
+i wish `git-cl upload` would stop overwriting the author field of the commit
+
+[22:09:44.0000] <devsnek>
+https://chromium-review.googlesource.com/c/v8/v8/+/2430488
+
+[02:00:59.0000] <haxjs>
+devsnek: u mean this bug is already fixed in v8 master ?
+
+[08:07:15.0000] <devsnek>
+haxjs: no
+
+[08:07:43.0000] <devsnek>
+buy it will be soon
+
+[08:08:02.0000] <devsnek>
+but*
+
+[09:09:46.0000] <shu>
+devsnek: oh nice catch, we weren't checking for `.done` correctly in rest?
+
+[09:10:02.0000] <devsnek>
+it wasn't being checked at all
+
+[09:10:06.0000] <devsnek>
+much less correctly :P
+
+[09:10:17.0000] <shu>
+wa
+
+[09:10:18.0000] <shu>
+wha*
+
+[09:10:21.0000] <shu>
+it was ilooping?
+
+[09:10:52.0000] <devsnek>
+https://gc.gy/68755250.png
+
+[09:11:27.0000] <devsnek>
+once an iterator returns `done: true`, the implementation has to remember that forever
+
+[09:11:35.0000] <devsnek>
+it can't call next again
+
+[09:11:53.0000] <shu>
+ah, it wasn't caching it per the [[Done]] slot in the spec
+
+[09:12:02.0000] <devsnek>
+yeah
+
+[09:12:02.0000] <jackworks>
+👀
+
+[09:12:14.0000] <shu>
+cool beans, thanks for the fix
+
+[09:13:24.0000] <devsnek>
+mfw graph verifier is angry
+
+[09:13:30.0000] <devsnek>
+time to go back to JumpIfToBooleanTrue
+
+[10:19:15.0000] <devsnek>
+if i have AssignmentExpression `,`?
+
+[10:19:21.0000] <devsnek>
+and i want to make that whole thing optional
+
+[10:19:28.0000] <devsnek>
+i have to make it its own named production right?
+
+[10:20:15.0000] <Bakkot>
+not sure I understand the question, but probably yes
+
+[10:20:35.0000] <Bakkot>
+`?` can make exactly one nonterminal on the RHS optional
+
+[10:20:40.0000] <jmdyck>
+(unless a solitary comma is also valid)
+
+[10:20:52.0000] <devsnek>
+yeah definitely don't want a solitary comma
+
+[10:20:55.0000] <Bakkot>
+if you have a sequence which you want all or none, you need a new production for that sequence
+
+[10:21:06.0000] <devsnek>
+sigh
+
+[10:21:54.0000] <devsnek>
+alternatively i could just get rid of the optional comma
+
+[10:21:56.0000] <devsnek>
+import calls don't have that
+
+[11:08:35.0000] <ljharb>
+they should, and i think/hope import assertions adds it
+
+[11:09:35.0000] <ljharb>
+i think object rest destructuring doesn't have an optional trailing comma either, but it also should
+
+[13:13:41.0000] <devsnek>
+haxjs: it's fixed in v8 now
+
+
+2020-09-26
+[19:34:15.0000] <haxjs>
+devsnek: Thank u!
+
+[19:37:06.0000] <devsnek>
+👍
+
+[19:37:28.0000] <haxjs>
+ljharb: yeah, i also think rest destructuring should have optional trailing comma, and proposal deiter actually need it for consistency if `[a, ...rest, b]` is added.
+
+[20:38:28.0000] <jackworks>
+I never know deconstructing on an iterator will close the iterator instantly until I read the spec yesterday
+
+[20:39:24.0000] <jackworks>
+I think it is a footgun if we want to use bare iterator without iterable.
+
+[20:40:40.0000] <jackworks>
+Even worse, people won't found this on StringIterator ArrayIterator etc. This only happens on an iterator implements return method. Only generators will be affected
+
+[20:41:49.0000] <bendtherules>
+Imo, the Array iterator having return would be a good thing. It could cleanup reference to the array.
+
+[21:31:31.0000] <devsnek>
+jackworks: iterators are iterable
+
+[21:31:43.0000] <devsnek>
+I think you have the wrong mental model of it
+
+[21:32:11.0000] <devsnek>
+iterable means any object with Symbol.iterator
+
+[21:32:20.0000] <devsnek>
+it doesn't imply anything else
+
+[21:50:14.0000] <jackworks>
+So what should I call a thing that return a new iterator every time when I call symbol.iterator?
+
+[22:05:35.0000] <ljharb>
+haxjs: i agree that even if not before, deiter would need it
+
+[22:06:06.0000] <ljharb>
+jackworks: that's what an iterable is
+
+[22:06:22.0000] <ljharb>
+jackworks: but it's not a single thing. it's a "trait", an interface. everything might be iterable, there's no noun called "iterable" yet
+
+[23:38:40.0000] <jackworks>
+No I'm asking for another concept, what should I call an object that implements symbol.iterator and return a new unconsumed iterator every time it's being called
+
+[23:39:07.0000] <ljharb>
+that's "iterable"
+
+[23:39:10.0000] <ljharb>
+every iterable does that
+
+[23:39:15.0000] <ljharb>
+oh hm
+
+[23:39:20.0000] <ljharb>
+i guess iterators themselves don't
+
+[23:39:27.0000] <ljharb>
+"iterables that aren't iterators" always do tho
+
+[23:39:34.0000] <ljharb>
+(by convention, ofc)
+
+[23:39:58.0000] <ljharb>
+iow, an iterable that *doesn't* always provide a fresh one, that isn't itself an iterator, is the rarity
+
+[00:32:04.0000] <devsnek>
+the spec doesn't have a term for that
+
+[00:51:33.0000] <jackworks>
+But we need to talk about it out of the spec that cuz all of our reusability problems are related to it
+
+[00:52:31.0000] <devsnek>
+jackworks: reusability happens via functions
+
+[00:57:07.0000] <ljharb>
+jackworks: the fact that "iterable" just isn't a noun doesn't actually create any problems. Reusability in JS for `f()` is `() => f()`. 4 characters, 6 if you want the pretty spacing.
+
+[00:57:21.0000] <ljharb>
+iow, *everything* is reusable, you just wrap it in a function
+
+[01:15:00.0000] <jackworks>
+consider this code
+
+[01:17:14.0000] <jackworks>
+const r = range(0, 100) // where range is a userland generator
+
+[01:17:30.0000] <jackworks>
+const [a, b] = r
+
+[01:17:42.0000] <jackworks>
+I expect it to be 0 and 1,it's ok
+
+[01:17:52.0000] <jackworks>
+const [c, d] = r
+
+[01:18:10.0000] <jackworks>
+Ought to be 2 and 3 but now I get undefined undefined
+
+[01:18:20.0000] <ljharb>
+ok so then your expectation is wrong
+
+[01:18:41.0000] <ljharb>
+if you wanted it to be reusable, you'd do `() => range(0, 100)` and do `const [a, b] = r(); const [c, d] = r()`
+
+[01:18:48.0000] <ljharb>
+because almost every iterator in JS is one-use
+
+[01:19:03.0000] <jackworks>
+Then your code will get 0 1 0 1
+
+[01:19:07.0000] <jackworks>
+Not 0 1 2 3
+
+[01:19:11.0000] <ljharb>
+oh
+
+[01:19:16.0000] <jackworks>
+This is another problem
+
+[01:19:26.0000] <ljharb>
+wait
+
+[01:20:09.0000] <ljharb>
+ok so i just tried it and indeed i got 0, 1, 2, 3
+
+[01:20:24.0000] <jackworks>
+What did you try on?
+
+[01:20:25.0000] <ljharb>
+`const arr = [0, 1, 2, 3]; const r = arr.values(); const [a, b] = r; const [c, d] = r;`
+
+[01:20:27.0000] <ljharb>
+node's repl
+
+[01:20:31.0000] <jackworks>
+No
+
+[01:20:41.0000] <ljharb>
+how would "range" be implemented so that doesn't work?
+
+[01:20:45.0000] <jackworks>
+ArrayIterator is not a user land generator
+
+[01:21:33.0000] <jackworks>
+This is a problem with userland generator(or any iterator with return method) to be used to with deconstructing
+
+[01:21:39.0000] <ljharb>
+ok, fair, `const g = function*() { yield 0; yield 1; yield 2; yield 3; }; const r = g(); const [a, b] = r; const [c, d] = r; [a, b, c, d]` does what you say
+
+[01:21:54.0000] <ljharb>
+and yeah that seems super weird to me
+
+[01:21:55.0000] <jackworks>
+I think this is super surprised to me
+
+[01:21:58.0000] <ljharb>
+but that's a problem with generators
+
+[01:22:31.0000] <ljharb>
+i'd certainly be interested to learn why it works that way
+
+[01:23:16.0000] <jackworks>
+Cause any deconstruction will close the iterator instantly
+
+[01:23:24.0000] <jackworks>
+I guess it's memory leaking concern
+
+[01:23:35.0000] <ljharb>
+it's weird that it'd do that for generator iterators but not for an ArrayIterator
+
+[01:23:56.0000] <jackworks>
+Cause ArrayIterator don't have a return method on it
+
+[01:26:32.0000] <ljharb>
+ah. Then it’s a shame generators do :-/
+
+[01:31:43.0000] <jackworks>
+It's the problem of deconstructing semantics and we're too late to change anything 😥
+
+[01:32:14.0000] <devsnek>
+it's more of an ownership problem
+
+[01:32:47.0000] <devsnek>
+everything in the spec that takes an iterable assumes it has full ownership
+
+[01:32:55.0000] <jackworks>
+[haxjs](https://matrix.to/#/@freenode_haxjs:matrix.org) suggested add a new syntax [a, ...] to tell the language it shouldn't close the iterator, but that syntax seems like "hey please call next until done" to me .
+
+[01:34:21.0000] <devsnek>
+you could add an iterator helper method which returns a wrapper that doesn't forward closing
+
+[01:37:33.0000] <jackworks>
+That's too implicit
+
+[01:38:07.0000] <jackworks>
+I'll never imagine this behavior until I step into a bug cause by it
+
+[08:03:50.0000] <haxjs>
+jackworks: I suggested to add new syntax `[a, ...]` for either always close or always not close because current behavior is sometime close (generator), sometime not (ArrayIterator) which is very weird and error-prone :)
+
+[08:05:59.0000] <haxjs>
+Personally I think ArrayIterator should also close. We should add `return` to all builtin Iterators to "fix" it. But maybe it's too late.
+
+[08:08:31.0000] <haxjs>
+If we had unused param, we could use `[a, ...?]` for always close and use `[a, ...]` for always not close. Unfortunately we do not have unused param now.
+
+[09:09:45.0000] <ljharb>
+jackworks: i mean, the range Iterator doesn’t have to have return on it, right?
+
+[09:11:15.0000] <jackworks>
+Yeah
+
+[09:11:52.0000] <jackworks>
+We can do whatever we want to do on the intrinsics
+
+[09:12:28.0000] <jackworks>
+So it's the problem of userland generator DX
+
+
+2020-09-27
+[16:02:48.0000] <howdoi>
+[Array#item(undefine), Array#item(null), Array#item(Nan)] should result in?
+
+[16:10:31.0000] <ljharb>
+howdoi: since they're all ToInteger'd, they'll all be 0
+
+[16:10:38.0000] <ljharb>
+ie, the same as `item(0)`
+
+[16:13:00.0000] <howdoi>
+ljharb: will that not result in confusing behavior? if indx is a result of an expression? would it be better if it returned `undefined` like as it does for a non-existing indx?
+
+[16:15:06.0000] <howdoi>
+Similar to If k < 0 or k ≥ len, then return undefined
+
+[16:15:50.0000] <howdoi>
+I noticed in the spec, as you said there is a TOInteger: which would return +0 for NaN, +0, or -0
+
+[16:19:41.0000] <howdoi>
+-Infinity or Infinity would return an undefined, right?
+
+[16:20:32.0000] <Bakkot>
+howdoi right
+
+[16:21:14.0000] <Bakkot>
+.item using ToInteger matches other existing methods like charAt, etc, so I am not worried abuot it benig confusing
+
+[16:21:38.0000] <Bakkot>
+I don't think it'll come up much and it's better to be consistent with precedent in edge cases if they're rare, so there's fewer things to learn
+
+[16:21:42.0000] <rkirsling>
+also see `document.querySelectorAll('p').item`'s existing behavior
+
+[16:21:51.0000] <Bakkot>
+yeah
+
+[16:22:50.0000] <rkirsling>
+interestingly that throws with zero args though
+
+[16:22:56.0000] <howdoi>
+[][undefined|null|-indx|Infinity] would all result in `undefined` would it not make sense for `item` to do the same?
+
+[16:23:46.0000] <Bakkot>
+howdoi those do not necessarily result in `undefined`
+
+[16:24:02.0000] <howdoi>
+rkirsling: but, if `item` makes it to stage-4, `document.querySelectorAll('p').item` needs to updated?
+
+[16:24:19.0000] <Bakkot>
+also the behavior for `-indx` is very much intentional
+
+[16:24:20.0000] <howdoi>
+or you mean to say, the current behavior is as of the `item` proposal?
+
+[16:24:34.0000] <rkirsling>
+howdoi: no I'm saying that's the reason for this proposal existing
+
+[16:24:47.0000] <rkirsling>
+negative indexation is simply the benefit that users will see
+
+[16:24:59.0000] <rkirsling>
+https://github.com/tc39/proposal-item-method#dom-justifications
+
+[16:25:52.0000] <rkirsling>
+the proposal would have been withdrawn if they couldn't use the name `item` because the layering change is the real goal
+
+[16:27:18.0000] <howdoi>
+interesting, I haven't seen many using `item` on QSA yet.
+
+[16:29:26.0000] <howdoi>
+Bakkot: agree, x = []; x.undefined=1; x['undefined']; //1
+
+[16:30:43.0000] <Bakkot>
+x[undefined] is the more relevant one, but yes
+
+[16:30:58.0000] <howdoi>
+so, `item(+/-Infinity)` would be `undefined`
+
+[16:56:17.0000] <rkirsling>
+I take it we're okay with `[].item()` having an implicit `undefined` though?
+
+[16:56:35.0000] <rkirsling>
+(I mean I sure am, it's just a change from, e.g., NodeList.p.item)
+
+
+2020-09-28
+[17:00:40.0000] <Bakkot>
+yes, that's the normal thing for ES methods
+
+[17:01:00.0000] <Bakkot>
+and not likely to be a web compat issue
+
+[17:01:44.0000] <rkirsling>
+agreed
+
+[17:06:52.0000] <devsnek>
+[].item() should obviously return std::unit
+
+[17:12:40.0000] <rkirsling>
+I got momentarily confused because std:: looks like C++
+
+[17:13:49.0000] <devsnek>
+was in reference to https://doc.rust-lang.org/std/primitive.unit.html
+
+[17:14:23.0000] <rkirsling>
+mhm
+
+[17:14:49.0000] <devsnek>
+i finally managed to get unicode property escapes into engine262
+
+[17:15:07.0000] <devsnek>
+by compressing the properties into ranges
+
+[17:15:13.0000] <devsnek>
+only 300kb of json now
+
+[17:39:32.0000] <jackworks>
+I think the problem here is we cannot really change the semantics here because we have to match the DOM version of item
+
+[17:42:34.0000] <Bakkot>
+we can probably make minor tweaks, like not throwing when given zero arguments
+
+[17:42:46.0000] <Bakkot>
+or returning undefined instead of null
+
+[17:43:11.0000] <Bakkot>
+I don't think there was other stuff we would want to change
+
+[17:43:50.0000] <devsnek>
+it only wraps around once right?
+
+[17:44:05.0000] <Bakkot>
+right
+
+[17:44:35.0000] <devsnek>
+excellent
+
+[09:59:25.0000] <obensource>
+quit
+
+
+2020-09-29
+[07:21:00.0000] <devsnek>
+has anyone else noticed that test262.report sometimes says things are failing that definitely don't fail in your tests
+
+[08:42:03.0000] <bradleymeck>
+do suugestions on ECMA262 PRs not work for anyone else?
+
+[08:48:20.0000] <ljharb>
+bradleymeck: accepting them doesn’t work when the suggester has write access, iirc. github bug.
+
+[13:42:41.0000] <rwaldron->
+devsnek this isn't the place to report issues with test262.report. You can tell me directly, or file an issue here: https://github.com/bocoup/test262-report-issue-tracker/issues
+
+[13:51:16.0000] <rkirsling>
+shu_ (or maybe Bakkot if you're around) -- is it our intention that attempted deletion of an integer-indexed element will still throw in strict mode? I hadn't adequately considered this case myself
+
+[13:52:21.0000] <rkirsling>
+the note here (https://tc39.es/ecma262/#sec-delete-operator-runtime-semantics-evaluation) mentions that it'll throw for `[[Configurable]]: false` in strict mode but the actual behavior is checking what `[[Delete]]` returned
+
+[13:53:05.0000] <rkirsling>
+and the `[[Delete]]` override that anba suggested returns `false` just when we refused to delete an integer-indexed element
+
+[14:01:46.0000] <Bakkot>
+hm
+
+[14:02:53.0000] <rkirsling>
+this is normatively okay but it may make the non-normative description of "what `delete` does in strict mode" feel weird
+
+[14:03:05.0000] <Bakkot>
+the note is talking about regular properties
+
+[14:03:36.0000] <Bakkot>
+wait hang on I thought the plan was to make these _configurable_
+
+[14:03:57.0000] <Bakkot>
+the note doesn't say anything about `configurable: true` properties
+
+[14:05:46.0000] <bradleymeck>
+does Chakra have some weird allowance for strings as import/export names already... ? https://app.circleci.com/pipelines/github/tc39/test262/2113/workflows/f8b33c25-a1f4-4356-98a0-ebd53010cad1/jobs/18454
+
+[14:06:55.0000] <Bakkot>
+rkirsling e.g. `'use strict'; delete (new Proxy({ a: 0 }, { deleteProperty: () => false })).a` throws, despite not falling into either case described in the note
+
+[14:07:23.0000] <rkirsling>
+Bakkot: ah right yeah
+
+[14:07:35.0000] <rkirsling>
+yeah the note is not incorrect if read strictly
+
+[14:07:55.0000] <rkirsling>
+it's just easy to misread it as exhaustive when it isn't
+
+[14:09:26.0000] <Bakkot>
+I would accept an editorial PR adding ", or otherwise cannot be deleted" after the "has the attribute { [[Configurable]]: false }" bit
+
+[14:12:16.0000] <rkirsling>
+cool
+
+[14:18:40.0000] <bradleymeck>
+or chakra just... passes randomly if it tries to do anything with modules?
+
+[14:33:53.0000] <devsnek>
+rwaldron-: i filed an issue in april https://github.com/bocoup/test262-report-issue-tracker/issues/19
+
+[14:34:30.0000] <rwaldron->
+Oh right, I saw that but you didn't actually describe what issues you were encountering.
+
+[14:35:31.0000] <devsnek>
+rwaldron-: for example https://test262.report/browse/built-ins/RegExp/lookBehind/alternations.js
+
+[14:35:41.0000] <devsnek>
+engine262 passes this test
+
+[14:36:07.0000] <rwaldron->
+I have to go for the day, can I move this to the issue?
+
+[14:44:29.0000] <rkirsling>
+Bakkot: https://github.com/tc39/ecma262/pull/2195
+
+
+2020-09-30
+[14:20:48.0000] <devsnek>
+bradleymeck: i'm seeing this failure... not entirely sure if its the test or i have a bug https://gc.gy/69205831.png
+
+[14:21:41.0000] <devsnek>
+i think the problem is the fixture doesn't `export function Mercury() {}` but i'm not sure
+
+[14:22:33.0000] <bradleymeck>
+test is problem
+
+[14:22:54.0000] <bradleymeck>
+it should export Mercury or some kind of binding
+
+[14:24:14.0000] <bradleymeck>
+https://github.com/tc39/test262/blob/ad8a5e9940ee60d1ecb6e150b7aecf09b17545dd/test/language/module-code/export-expname-binding-string.js would also need a tweak to not complain
+
+[14:33:43.0000] <bradleymeck>
+good to know that Reflect.apply doesn't use array@@iterator *wipes sweat from brow*
+

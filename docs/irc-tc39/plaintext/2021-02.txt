@@ -1,0 +1,1883 @@
+2021-02-01
+[10:45:29.0000] <rkirsling>
+oh wow this still isn't merged
+
+[10:45:30.0000] <rkirsling>
+https://github.com/tc39/ecma262/pull/2221
+
+[10:45:46.0000] <rkirsling>
+wonder what happened
+
+[11:08:35.0000] <Bakkot>
+rkirsling it's just waiting on michael to have to time to review it, basically
+
+[11:08:45.0000] <rkirsling>
+ah okay
+
+[11:08:47.0000] <Bakkot>
+it's on his stack but he's been getting slammed at work lately
+
+[11:09:02.0000] <rkirsling>
+no worries, thanks for the update
+
+
+2021-02-02
+[21:10:43.0000] <shu>
+i could use a second opinion on https://bugs.chromium.org/p/v8/issues/detail?id=11376&q=&can=1
+
+[21:11:12.0000] <shu>
+(it's a spec question, not a V8 one)
+
+[11:19:39.0000] <leobalter_ic>
+shu I'm taking a look, regardless the outcome, this should become a test262 test.
+
+[11:28:51.0000] <shu>
+leobalter_ic: might be in the works already. guy confirmed my reading and took the discussion back to GH since it's a spec bug, see the link in the bug
+
+[11:32:59.0000] <leobalter_ic>
+I've seen people are taking care of it already in the proposal's repo.
+
+
+2021-02-04
+[18:15:10.0000] <jackworks>
+ljharb: oh I forgot to check out my email and miss (did I?) the pattern matching call, is there anything important to mention on the call?
+
+[19:06:19.0000] <ljharb>
+jackworks: you did, but there’s another one in ~43 hours, so hopefully you can attend that one and catch up on what you missed :-)
+
+[20:16:33.0000] <jackworks>
+Is it on 10pm Feb 5 UTC+0?
+
+[20:37:18.0000] <ljharb>
+jackworks: it's 2PM PT, which i believe is 10PM UTC yes
+
+[20:37:29.0000] <ljharb>
+you should have a calendar invite in your email for it
+
+[20:38:20.0000] <jackworks>
+Thanks
+
+
+2021-02-06
+[06:06:32.0000] <devsnek>
+another reason why class fields are icky https://github.com/nodejs/node/issues/37247
+
+[06:26:23.0000] <ljharb>
+that looks like a normal outcome from attempting to communicate with a subclass from a superclass
+
+[06:26:42.0000] <ljharb>
+B's constructor calling a method it doesn't define itself is just weird
+
+[08:09:20.0000] <Bakkot>
+yeah that's the same outcome you'd get if you defined the property within A's constructor, using the pre-class-field pattern
+
+[08:09:27.0000] <Bakkot>
+seems like the only possible behavior to me
+
+[08:49:40.0000] <devsnek>
+ljharb: Bakkot: yeah i posted that in the issue, the icky part is that it makes it less obvious
+
+[08:50:24.0000] <aclaymore>
+only reasonable solution is to not use inheritance </bad-joke>
+
+[08:50:34.0000] <ljharb>
+the part that’s broken is the constructor calling this.test() in class A - there’s no fields in that class, so i don’t see how it’s related.
+
+[08:51:30.0000] <ljharb>
+(sorry, swap A and B in my comment, i assumed B would be extending A)
+
+[08:51:55.0000] <devsnek>
+ljharb: it is not immediately obvious that the private field hasn't been initialized yet
+
+[08:52:11.0000] <devsnek>
+with normal properties you have to call `super()` first which makes it more apparent
+
+[08:52:14.0000] <ljharb>
+right but it’s immediately obvious that the superclass is calling a method that doesn’t exist in it
+
+[08:52:24.0000] <devsnek>
+🤷🏻
+
+[08:57:21.0000] <aclaymore>
+not a big surprise but this is also something that TS doesn't warn about either. playground: https://cutt.ly/YkvdpWn
+
+[09:04:12.0000] <Bakkot>
+it's not something TS can warn about really
+
+[09:07:51.0000] <aclaymore>
+yep - it would have to effectively error or calling any method in a constructor to catch all the ways this could happen
+
+[09:10:34.0000] <aclaymore>
+I think the rule of 'subclass properties are not setup until after the parents constructor returns' ends up being a rule that is unavoidable/necessary to learn when doing any inheritance.
+
+[09:11:56.0000] <aclaymore>
+for me the pros of this rule outweigh the pain when hitting it for the first time. hopefully the same for others.
+
+[13:05:44.0000] <ljharb>
+mainly it's just that there's a long list of things with classes that if you do it, it's weird - it can be valid and made to work, but is still weird. calling class methods or doing side effects in the constructor, making a superclass that can't be instantiated by itself, etc
+
+
+2021-02-07
+[14:00:22.0000] <devsnek>
+ljharb: when would a pattern and an expression be ambiguous?
+
+[14:01:57.0000] <ljharb>
+devsnek: is `{ foo }` an object literal with the `foo` property set to the value of the identifier `foo`, or an object pattern where it's checking that "foo" exists?
+
+[14:02:07.0000] <devsnek>
+a pattern
+
+[14:02:17.0000] <devsnek>
+you couldn't ever match the identity of an object literal
+
+[14:02:18.0000] <ljharb>
+that's a choice, but it's going to be confusing for someone
+
+[14:02:21.0000] <ljharb>
+not identity
+
+[14:02:26.0000] <ljharb>
+but there'd be a matching protocol
+
+[14:02:42.0000] <devsnek>
+i think parens would be a more elegant solution
+
+[14:02:47.0000] <devsnek>
+if you really want to put an object/array literal there
+
+[14:02:53.0000] <ljharb>
+so then is `{ __proto__: objWithMatcher }` an object that delegates to the protocol, or an object with that [[Prototype]]
+
+[14:03:00.0000] <ljharb>
+parens are indeed one solution for that
+
+[14:03:11.0000] <devsnek>
+matcher makes sense though
+
+[14:03:12.0000] <ljharb>
+but that'd be super weird and confusing without some kind of word in front of it.
+
+[14:03:13.0000] <devsnek>
+thx for context
+
+[14:03:15.0000] <ljharb>
+np
+
+[14:03:35.0000] <devsnek>
+btw is there any info from the meeting that have been happening
+
+[14:03:37.0000] <ljharb>
+tldr there's not really any point in the folks discussing things on that proposal rn, since it will be largely rewritten soon
+
+[14:03:43.0000] <devsnek>
+just trying to follow passively
+
+[14:03:46.0000] <devsnek>
+yeah
+
+[14:03:56.0000] <ljharb>
+nothing really shareable yet, but happy to hop on a call sometime to catch you up
+
+[14:04:10.0000] <devsnek>
+ah no i don't need to know that badly
+
+[14:04:18.0000] <ljharb>
+lol k, offer will remain open
+
+[14:19:59.0000] <devsnek>
+the spec says only [[Get]] and [[Set]] can be used with TypedArray.prototype.sort
+
+[14:20:11.0000] <devsnek>
+but 1585 seems to force the use of [[HasProperty]]
+
+[14:20:14.0000] <devsnek>
+unless i'm missing something?
+
+[14:25:10.0000] <ljharb>
+also deletepropertyorthrow, if I’m reading it right
+
+[14:25:45.0000] <devsnek>
+yeah
+
+[14:25:52.0000] <devsnek>
+well that path will never be called because there are no holes
+
+[14:25:58.0000] <devsnek>
+but the HasProperty one is forced
+
+[14:31:52.0000] <Bakkot>
+yeah technically
+
+[14:32:08.0000] <Bakkot>
+we should just say it can call [[HasProperty]] too
+
+[14:33:37.0000] <Bakkot>
+or, actually
+
+[14:33:41.0000] <Bakkot>
+we should just remove that part
+
+[14:33:53.0000] <Bakkot>
+because it's no longer nearly as implementation-defined as it was
+
+
+2021-02-08
+[17:32:50.0000] <devsnek>
+Atomics.add and Atomics.sub are missing validation that `typedArray` is a typed array
+
+[17:34:12.0000] <Bakkot>
+looks like
+
+[17:34:20.0000] <Bakkot>
+want to submit the PR or shall I
+
+[17:34:45.0000] <devsnek>
+i'm going through these step by step so i can submit one big thing at the end
+
+
+2021-02-11
+[12:18:18.0000] <jmdyck>
+Are the latest meeting notes published today?
+
+[12:19:35.0000] <ljharb>
+tomorrow iirc
+
+[12:19:37.0000] <ljharb>
+oops, they left
+
+[12:24:17.0000] <jmdyck>
+(I come and go, but I usually check the logs.)
+
+[12:30:56.0000] <ljharb>
+ha, k
+
+
+2021-02-12
+[19:12:15.0000] <ljharb>
+found a fun bug in some version of v8 - check out node v10.0, and sometimes if you make a `new Error()` instance, and then stick properties on it, and `Object.entries()` it, you'll mistakenly get an empty array
+
+[19:12:27.0000] <ljharb>
+it's not deterministic tho so i can't even figure out how to test for it
+
+[20:03:23.0000] <ljharb>
+gsathya mathiasbynens shu: any chance there's a v8 bug that can link me to a regression test for that? (i'm having trouble locating one)
+
+[20:13:41.0000] <devsnek>
+ljharb: do you have an example bit of code?
+
+[20:16:10.0000] <ljharb>
+devsnek: in the 10.0 repl, `asdf = Object.assign(new Error('foo'), { path: '/some/path', pkgid: 'some@package', file: '/some/file', stack: 'hello' })` and then `Object.entries(asdf)` - verbatim
+
+[20:16:28.0000] <ljharb>
+if you stick a `var` in front, you get the proper entries, which is even weirder
+
+[20:16:34.0000] <devsnek>
+fun
+
+[20:16:53.0000] <ljharb>
+but if you do the same in "not the repl" it's not as reproducible
+
+[20:17:07.0000] <ljharb>
+but like, npm's own tests fail in node 10.0 because tap is using Object.entries
+
+[20:17:56.0000] <devsnek>
+its a bug in the Object.entries builtin probably
+
+[20:18:01.0000] <devsnek>
+no jit happening at this point
+
+[20:18:24.0000] <ljharb>
+yes, that's what i'm trying to reliably detect at runtime, so i can patch it
+
+[20:23:07.0000] <ljharb>
+all i can find is maybe https://chromium-review.googlesource.com/c/v8/v8/+/859937 but i don't know how to navigate v8 stuff well enough to find a regression test
+
+[20:23:28.0000] <devsnek>
+v8 tests are not well organized
+
+[20:23:41.0000] <devsnek>
+best luck is checking for `test/mjsunit/regress-bugid.js`
+
+[20:29:13.0000] <ljharb>
+hm, all i can find is https://chromium.googlesource.com/v8/v8/+/4455377fca84bd78274a87b6dce898000f7d5784/test/mjsunit/es8/object-entries.js so i guess i'll have to try all those one at a time to see if it can repro it without the %HeapVerify stuff
+
+[20:35:49.0000] <devsnek>
+i can't repro it in d8 using the same version that node 10.0 is using
+
+[20:35:55.0000] <devsnek>
+but i can repro it in node 10.0
+
+[20:38:58.0000] <ljharb>
+hm, how would node differ from d8?
+
+[20:40:36.0000] <devsnek>
+all the repl stuff
+
+[20:40:55.0000] <ljharb>
+this definitely doesn't just happen in the repl; i just can't repro it reliably outside the repl, or outside npm's tap tests
+
+[20:41:11.0000] <shu>
+ljharb: i’m off now and also on pto tomorrow, please email me at my work email
+
+[20:41:46.0000] <ljharb>
+shu: oh sure, thanks!
+
+[20:41:48.0000] <ljharb>
+devsnek: https://github.com/npm/cli/runs/1875790649?check_suite_focus=true
+
+[20:46:53.0000] <ljharb>
+devsnek: lol the repro code, in a `test.js` file, and in the repl doing `.load test.js` doesn't repro it either
+
+[01:28:45.0000] <mathiasbynens>
+ljharb: i don't have more context re: whether this is a regression or not, but for these things it's totally fine to file a crbug and take it from there
+
+[07:29:09.0000] <ljharb>
+mathiasbynens: oh it’s totally fixed - I’m trying to figure out how to patch that old v8 version by locating the old regression test
+
+[08:25:42.0000] <mathiasbynens>
+ljharb: ooh! if i wanted to find out i'd probably just bisect, either with https://source.chromium.org/chromium/chromium/src/+/master:tools/bisect-builds.py;drc=b590808db8d9a05e4dab667239348088cc049c87
+
+[08:26:21.0000] <ljharb>
+i don't have v8 cloned, so if it comes to that i will :-)
+
+[08:26:34.0000] <mathiasbynens>
+or by manually doing `for v in 8.{0,9}; do jsvu "v8@${v}"; done` and testing in the different v8-* binaries quickly
+
+[08:27:06.0000] <mathiasbynens>
+once you find the version with the fix, git log just that range
+
+[08:27:13.0000] <ljharb>
+interesting, thanks - i'll try that
+
+[08:29:57.0000] <jmdyck>
+ljharb: ?
+
+[08:37:30.0000] <jmdyck>
+ljharb: There's an unclosed <p> tag in the spec. Do you want to slip in a fix, or do you want me to submit a PR?
+
+[08:39:07.0000] <ljharb>
+jmdyck: line?
+
+[08:39:51.0000] <jmdyck>
+<p>Every built-in function object, including constructors, has a *"name"* property ...
+
+[08:41:58.0000] <ljharb>
+thanks, it's still valid html (it auto-closes) but i'll just add a commit to fix it
+
+[08:42:34.0000] <Bakkot>
+will make a note to lint that
+
+[08:54:02.0000] <jmdyck>
+tx
+
+
+2021-02-16
+[07:21:05.0000] <jackworks>
+https://es.discourse.group/t/new-forbidden-rule-no-leaking-proxy/646/
+
+[07:21:16.0000] <jackworks>
+proxy should be non-detectable right?
+
+[09:14:32.0000] <gsathya>
+the spec doesn't forbid this
+
+[09:17:59.0000] <ljharb>
+jackworks: no, it shouldn't be non-detectable in the absence of membranes.
+
+[09:19:55.0000] <ljharb>
+and more to the point, the spec effectively requires that it be detectable for a proxy to a builtin that has internal slots
+
+[09:54:00.0000] <ljharb>
+sooooo i made a terrible thing: https://www.npmjs.com/package/private-fields
+
+[10:00:36.0000] <Bakkot>
+but
+
+[10:00:36.0000] <Bakkot>
+why
+
+[10:02:46.0000] <ljharb>
+because node makes it possible ¯\_(ツ)_/¯
+
+[10:02:57.0000] <Bakkot>
+lots of things are possible and also harmful
+
+[10:03:22.0000] <Bakkot>
+("harmful" is perhaps too strong a term)
+
+[10:03:33.0000] <Bakkot>
+("inadvisable", perhaps)
+
+[10:04:41.0000] <ljharb>
+yeah it's super harmul
+
+[10:04:48.0000] <ljharb>
+i'm hoping i can convince node to remove the capability
+
+[10:06:01.0000] <Bakkot>
+seems unlikely; if nothing else you could always rewrite it as a C module and just rip them out of memory directly, so it's always going to be possible
+
+[10:06:07.0000] <Bakkot>
+question is how easy it is
+
+[10:06:13.0000] <ljharb>
+true
+
+[10:07:55.0000] <Bakkot>
+maybe you could add an `install` script which requires someone to confirm they know what they're doing at a prompt, just so that there's added friction to prevent using it as a dependency
+
+[10:08:03.0000] <Bakkot>
+also I am amused by the idea of node packages with EULAs
+
+[10:11:21.0000] <ljharb>
+lol sure, i could do tht
+
+[10:11:31.0000] <ljharb>
+or just add console warnings every time the function is called
+
+[10:11:52.0000] <Bakkot>
+or `if (Math.random() < .1) process.exit(1)`
+
+[10:12:54.0000] <ljharb>
+lol
+
+
+2021-02-19
+[11:08:09.0000] <devsnek>
+what is 2125 waiting on at this point?
+
+[11:08:37.0000] <ljharb>
+devsnek: me to write some prose and styling for "legacy"
+
+[11:08:50.0000] <devsnek>
+👍🏻
+
+[11:12:14.0000] <TabAtkins>
+Is it possible to meaningfully distinguish between an ordinary function and a class's constructor function?
+
+[11:13:12.0000] <TabAtkins>
+Assume I'm fine with specifically caring about `class { constructor()...}`, not just arbitrary functions that can be used to construct an object.
+
+[11:13:29.0000] <devsnek>
+you can check if something implements [[Construct]]
+
+[11:13:35.0000] <devsnek>
+but idk about [[IsClassConstructor]]
+
+[11:14:03.0000] <TabAtkins>
+Ah, `function foo(){...}` doesn't have [[Construct]]?
+
+[11:14:36.0000] <devsnek>
+it does
+
+[11:15:45.0000] <devsnek>
+ljharb: how about 2216
+
+[11:19:19.0000] <ljharb>
+TabAtkins: only with function toString, and not in every browser version. so, robustly? no
+
+[11:19:36.0000] <ljharb>
+TabAtkins: otherwise i'd have an npm package for that predicate :-p
+
+[11:20:16.0000] <devsnek>
+TabAtkins: what are you trying to do with that info 👀
+
+[11:20:26.0000] <ljharb>
+devsnek: 2116 landed, so i'm not sure if https://github.com/tc39/ecma262/pull/2216#discussion_r553050958 is updated yet? otherwise i think it just needs reviews
+
+[11:27:59.0000] <TabAtkins>
+I'm wondering if this proposal can have special behavior for functions in a particular spot (intended to be predicates), but not trigger that behavior for class constructors (because it would be worthless) (but class objects are still useful for a different purpose if they opt into the protocol)
+
+[11:30:41.0000] <TabAtkins>
+Rephrased a bit: I have a custom protocol that objects can opt into, via a Symbol property holding a function. But it would be somewhat reasonable to let you just pass the function directly, too, rather than requiring it to be wrapped in a single-purpose wrapper object.
+
+[11:30:42.0000] <TabAtkins>
+Wondering if I can meaningfully allow both these cases, without accidentally triggering the "function" case when someone passes a class that doesn't use the protocol key.
+
+[11:39:42.0000] <Bakkot>
+TabAtkins presumably you'd also want to exclude methods, as in `{ o(){} }`, since those are constructible but not callable?
+
+[11:40:16.0000] <TabAtkins>
+I don't care about those, if you pass those and it's wrong it's your own fault.
+
+[11:40:32.0000] <TabAtkins>
+If they get banned, fine, if they don't, fine.
+
+[11:40:37.0000] <Bakkot>
+but that is not true of class objects, you feel?
+
+[11:40:47.0000] <Bakkot>
+I guess I'm having a hard time visualizing this API
+
+[11:42:49.0000] <TabAtkins>
+Less abstractly, I'm thinking about the custom matcher protocol for the match statement - an object can have `[Symbol.matcher]` or whatever and it gets called with the match object and can accept/reject it. I think it'll be common to just put `[Symbol.matcher]` on your class to get an isinstance match, and I would like it to properly complain at you when you drop a class in there and it *doesn't* have the key.
+
+[11:43:24.0000] <Bakkot>
+ahh, got it
+
+[11:43:29.0000] <TabAtkins>
+But it also seems reasonable to me to let you just write a function that does custom matching and use that, rather than having to wrap it in an object just so you can assign it.
+
+[11:44:01.0000] <TabAtkins>
+So if I can distinguish between the return value of `class` vs `function`/arrow-func, that would be nice.
+
+[11:45:07.0000] <Bakkot>
+I am not convinced it's worth trying to spec this
+
+[11:45:22.0000] <Bakkot>
+you'll get an error either way, right?
+
+[11:45:31.0000] <Bakkot>
+like, it looks like a function, so it gets called, and then it's a type error
+
+[11:45:39.0000] <Bakkot>
+and engines could choose to give a useful error message there
+
+[11:46:01.0000] <Bakkot>
+I don't think it's all that helpful to specify that the error happens prior to calling
+
+[11:46:45.0000] <Bakkot>
+unless I'm misunderstanding, and the observable behavior would be different somehow
+
+[11:46:46.0000] <devsnek>
+do you mean like
+
+[11:47:08.0000] <devsnek>
+`case ((value) => { /* determine if value matches */ })`?
+
+[11:47:24.0000] <devsnek>
+as opposed to `case T` where `T[Symbol.matcher]`
+
+[11:48:17.0000] <devsnek>
+TabAtkins: ^
+
+[11:48:20.0000] <TabAtkins>
+If you pass a class and it doesn't have the key, it's a constructor function so you'll just call it at that point, right?
+
+[11:48:40.0000] <TabAtkins>
+So it'll silently construct an object and do something wrong, rather than erroring.
+
+[11:48:40.0000] <Bakkot>
+right, and then immediately get a type error
+
+[11:48:47.0000] <Bakkot>
+no, you can't just `()` a class
+
+[11:48:49.0000] <ljharb>
+TabAtkins: you can make an IsConstructor check with Proxy
+
+[11:48:50.0000] <Bakkot>
+have to `new` it
+
+[11:48:55.0000] <TabAtkins>
+OH RIGHT
+
+[11:48:59.0000] <ljharb>
+TabAtkins: but it won't just be `class`
+
+[11:49:03.0000] <TabAtkins>
+I forgot that class constructors aren't callable normally!
+
+[11:49:10.0000] <TabAtkins>
+okay never mind that's all fine then
+
+[11:49:39.0000] <devsnek>
+🎉
+
+[11:49:40.0000] <TabAtkins>
+devsnek: Yes, I meant that.
+
+[11:50:16.0000] <TabAtkins>
+so lik ein spec terms i'd be checking the value for a [[Call]] slot or something, right?
+
+[11:50:16.0000] <Bakkot>
+TabAtkins good good
+
+[11:50:19.0000] <Bakkot>
+yeah
+
+[11:50:22.0000] <TabAtkins>
+kk
+
+[11:50:23.0000] <Bakkot>
+classes have that slot
+
+[11:50:34.0000] <Bakkot>
+even though the thing it does is throw
+
+[11:50:36.0000] <TabAtkins>
+How does it have the [[Call]] slot if you can't call it
+
+[11:50:37.0000] <Bakkot>
+it's a bit silly
+
+[11:50:37.0000] <TabAtkins>
+what
+
+[11:51:01.0000] <Bakkot>
+the reason, I think, is that the typeof check looks for the slot
+
+[11:51:05.0000] <TabAtkins>
+okay well whatever it still works, I'd just have to make sure the tests are ordered correctly
+
+[11:51:17.0000] <Bakkot>
+and `typeof class {}` should be `"function"`
+
+[11:51:30.0000] <TabAtkins>
+"typeof looks for the slot" if only typeof were a builtin that we had full control of the interior function of, drat
+
+[11:51:36.0000] <Bakkot>
+ha
+
+[11:51:37.0000] <Bakkot>
+yeah
+
+[11:51:44.0000] <Bakkot>
+well, it's all just for our own convenience
+
+[11:51:51.0000] <Bakkot>
+it was most convenient to leave the slot there
+
+[11:51:55.0000] <Bakkot>
+I assume
+
+[11:51:59.0000] <devsnek>
+there is an invariant
+
+[11:52:05.0000] <devsnek>
+that all things with [[Construct]] must also have [[Call]]
+
+[11:52:12.0000] <Bakkot>
+it's a dumb invariant though
+
+[11:52:23.0000] <devsnek>
+well this is js
+
+[11:52:24.0000] <Bakkot>
+or, at least, not a particularly useful one
+
+[11:52:28.0000] <TabAtkins>
+Yeah it's not a meaningful invariant if you just... can't call classes
+
+[11:52:35.0000] <devsnek>
+i totally agree :P
+
+[11:52:39.0000] <Bakkot>
+TabAtkins classes and `{ o(){} }` methods!
+
+[11:52:42.0000] <Bakkot>
+that's why I was asking about those
+
+[11:52:50.0000] <Bakkot>
+or, wait, those are the other way around
+
+[11:52:55.0000] <Bakkot>
+those are callable but not constructible
+
+[11:53:03.0000] <TabAtkins>
+okay phew i was confused
+
+[11:53:06.0000] <Bakkot>
+still have a [[construct]] slot though
+
+[11:53:16.0000] <Bakkot>
+I think
+
+[11:53:24.0000] <shu>
+they should have a [[Cantstruct]] slot
+
+[11:54:35.0000] <devsnek>
+how do you do a variadic construct without spread
+
+[11:55:02.0000] <Bakkot>
+ok I'm wrong they don't have that slot
+
+[11:55:07.0000] <Bakkot>
+apparently I'm just confused today
+
+[11:55:13.0000] <Bakkot>
+devsnek `arguments` and `.apply`, presumably
+
+[11:55:25.0000] <devsnek>
+.apply is [[Call]] though
+
+[11:55:33.0000] <devsnek>
+i guess if you're pre spread it doesn't matter?
+
+[11:55:53.0000] <devsnek>
+want to replace this `Test262Error.thrower = (...args) => { throw new Test262Error(...args); };`
+
+[11:57:09.0000] <Bakkot>
+`Reflect.construct(A, arguments)` also works
+
+[11:57:20.0000] <Bakkot>
+and does apply
+
+[11:57:27.0000] <Bakkot>
+er, does construct
+
+[11:57:37.0000] <devsnek>
+i guess its reasonable to assume they could implement Reflect.construct at least
+
+[11:59:17.0000] <Bakkot>
+`Test262Error` is a thing test262 defines, so you know you can just call it
+
+[12:00:12.0000] <devsnek>
+fair enough
+
+[12:00:23.0000] <devsnek>
+just trying to help someone who is trying to get a js engine up and running
+
+[12:00:32.0000] <devsnek>
+they don't have spread yet 😄
+
+[12:00:48.0000] <Bakkot>
+ahh
+
+[12:01:05.0000] <Bakkot>
+I think I'd just tell them to patch `.thrower` to be `= (a, b, c) => { throw new Test262Error(a, b, c); }`
+
+[12:01:18.0000] <Bakkot>
+it's not actually called with a bunch of arguments, so that's a fine stopgap
+
+[12:01:23.0000] <ljharb>
+it's super absurd to me the way Call and Construct slots are done in the spec tho
+
+[12:01:33.0000] <ljharb>
+classes shouldn't have [[Call]] at all
+
+[12:01:36.0000] <devsnek>
+a lot of things in the spec are pretty absurd
+
+[12:01:51.0000] <ljharb>
+true, but this one has ended up creating user-observable weirdness that can't be undone
+
+[12:01:56.0000] <ljharb>
+primarily around Proxy tho, to be fair.
+
+[12:04:47.0000] <Bakkot>
+ljharb I don't know that one; what's the user-observable bit?
+
+[12:09:50.0000] <ljharb>
+Bakkot: new Proxy will throw if you give it a handler with Apply/Construct, on a value that lacks both slots - but it will not throw on an object that lacks only one of them
+
+[12:10:02.0000] <ljharb>
+or sorry
+
+[12:10:14.0000] <ljharb>
+that's how you can use Proxy to make an `IsConstructor` - it throws if you pass a Construct handler but the target lacks [[Construct]]
+
+[12:10:37.0000] <ljharb>
+so you can observe it *not* throw when you pass an Apply handler for a target that *should* lack [[Call]]
+
+[12:11:30.0000] <ljharb>
+so if we fix up the slots to be conceptually correct, the kludges we'd have to accept is that Proxy would have to not throw in a bunch of weird cases, on top of `typeof` having to return "function" for Call *or* Construct, whereas now it's just Call.
+
+[12:23:09.0000] <Bakkot>
+> it throws if you pass a Construct handler but the target lacks [[Construct]]
+
+[12:23:17.0000] <Bakkot>
+... does it? I thought all the handlers were evaluated lazily
+
+[12:23:33.0000] <Bakkot>
+`new Proxy(() => {}, { construct(){} })` does not seem to throw
+
+[12:24:32.0000] <Bakkot>
+ahh, but you _can_ observe the `get` failing to happen
+
+[12:24:39.0000] <Bakkot>
+that just seems wrong to me tbh
+
+[12:24:48.0000] <Bakkot>
+it should do the lookup on the handler before checking the underlying object
+
+[12:25:31.0000] <Bakkot>
+(that said you can only observe the `get` failing to happen by actually `new`'ing the proxy itself, which is maybe not so useful)
+
+[12:25:58.0000] <Bakkot>
+ljharb or maybe I'm misunderstanding; a running code sample would maybe help
+
+[12:27:16.0000] <Bakkot>
+(you can both observe the `[[get]]` for `"construct"` happening or not happening and the `construct` method on the handler being called or not being called, I guess)
+
+[12:37:35.0000] <ljharb>
+Bakkot: ah right, sorry. you can `new` it and call it. `new (new Proxy(target, { construct(){ return {}; } }))` throws iff target lacks [[Construct]], and `(new Proxy(target, { apply(){} }))()` throws if it lacks [[Call]], and the latter won't throw on `class {}`
+
+[12:38:34.0000] <Bakkot>
+yeah
+
+[12:38:48.0000] <Bakkot>
+tbh I think we should make the first one not throw
+
+[12:39:18.0000] <Bakkot>
+it's probably web-compat to do so
+
+[12:41:36.0000] <ljharb>
+unless people are using it as an IsConstructor, as an esdiscuss post in 2016 advised them to do
+
+[12:41:53.0000] <ljharb>
+the only reason i haven't built a package that does that is because Proxy isn't far enough back to be useful to me
+
+[13:59:30.0000] <jmdyck>
+Hey Bakkot, it's been 4 weeks since you added the "editor call" label to https://github.com/tc39/ecma262/issues/2148 Has it fallen off the agenda, or have the editors discussed it but not reached consensus?
+
+[13:59:44.0000] <jmdyck>
+Just curious.
+
+[14:06:27.0000] <Bakkot>
+jmdyck we discussed it but our conclusion was that we need to think about it more
+
+[14:08:15.0000] <jmdyck>
+tx
+
+
+2021-02-20
+[16:17:00.0000] <devsnek>
+i really wish stage 3 required tests
+
+[16:18:38.0000] <Bakkot>
+you could propose it as a requirement
+
+[16:21:09.0000] <rkirsling>
+if you add the word "initial" then it should be uncontroversial
+
+[16:21:19.0000] <Bakkot>
+open PR to test262 with initial tests
+
+[16:21:24.0000] <rkirsling>
+yeah
+
+[16:21:25.0000] <rkirsling>
+that
+
+[16:21:28.0000] <Bakkot>
+problem is a lot of people don't know how to write tests
+
+[16:21:38.0000] <Bakkot>
+otoh, this would incentize them to learn
+
+[16:21:45.0000] <rkirsling>
+it's easier than writing a polyfill lol
+
+[16:21:47.0000] <Bakkot>
+*incentivize
+
+[16:21:53.0000] <Bakkot>
+debatable
+
+[16:23:47.0000] <devsnek>
+well that depends if your polyfill is ljharb level or not
+
+[16:24:36.0000] <rkirsling>
+if it's not, would would call it a "prollyfill"
+
+[16:24:42.0000] <rkirsling>
+*would you
+
+[16:25:39.0000] <ljharb>
+lol
+
+[16:25:53.0000] <ljharb>
+rkirsling: and it is def not easier than writing a polyfill :-p
+
+[16:26:11.0000] <ljharb>
+altho i suppose test262 tests for polyfillable things aren't so bad
+
+[16:26:22.0000] <ljharb>
+i still haven't taken the time to figure out how to write `#x in obj` test262 tests :-/
+
+[16:26:40.0000] <rkirsling>
+fair, it depends on the proposal
+
+[16:33:57.0000] <ljharb>
+(a prollyfill, ftr, is a polyfill that only does what it can - like es6-shim's Map/Set is a prollyfill in ES3 envs, because it can't fake getters)
+
+[16:42:12.0000] <rkirsling>
+oh no was I not the first to make that pun :P
+
+[16:42:48.0000] <rkirsling>
+wow so many google results
+
+[16:42:57.0000] <rkirsling>
+I feel definitively unspecial now
+
+[16:50:48.0000] <ljharb>
+rkirsling: https://twitter.com/getify/status/563522031954558976 is probably where i got it from, and i used it here https://github.com/es-shims/es-shim-api/commit/8377ed3fb9f030dd7afbbc44b3e0108ad1974eab ; i'm trying to figure out where it was first used
+
+[16:51:03.0000] <rkirsling>
+nice
+
+[16:51:28.0000] <rkirsling>
+I mean it's a very apt name for something subject to change
+
+[16:51:31.0000] <ljharb>
+hm, https://github.com/sindresorhus/object-assign/commit/37cc2c168ee3f0f640f8850f40b483491996d71e#diff-dedb6c21fdaac9cba4da4afde881ffe5c80f80896274dbf7971d312fc6f5207dR21 predates those
+
+[16:51:49.0000] <rkirsling>
+what is the deal with ponyfill
+
+[16:52:23.0000] <ljharb>
+ugh
+
+[16:52:51.0000] <ljharb>
+basically, there's not a universal definition of "polyfill". in my world, a "polyfill" is a non-self-installing spec-compliant implementation, a "shim" is a self-installing polyfill
+
+[16:53:14.0000] <ljharb>
+but one particular package author decided they wanted a term for "non-self-installing spec-compliant implementation" and decided on "ponyfill", which means nothing and is just silly
+
+[16:55:37.0000] <rkirsling>
+heh I see
+
+[16:55:49.0000] <ljharb>
+if i can ever come up with an actual unambiguous word that isn't childish, i'd try to popularize it, but i haven't been able to
+
+[17:03:38.0000] <rkirsling>
+the most mystifying thing is that "polyfill" stuck in the first place, when nobody actually knows the thing it's referencing
+
+[17:04:11.0000] <rkirsling>
+it's a genuinely terrible term lol
+
+[17:30:07.0000] <ljharb>
+polyfilla?
+
+[17:30:27.0000] <ljharb>
+“spackle” would definitely have been a better term tho
+
+[01:36:41.0000] <aclaymore>
+oo some `#x in obj` test262 tests would be lovely. I'm just doing the tsc implementation atm
+
+[15:20:26.0000] <devsnek>
+we should add subscripts to duplicate productions
+
+[15:20:54.0000] <devsnek>
+idk what a good syntax would be though
+
+
+2021-02-21
+[17:14:09.0000] <jmdyck>
+devsnek: re "duplicate productions", do you mean duplicated nonterminals within a production? If so, see https://github.com/tc39/ecma262/issues/1768
+
+[14:58:12.0000] <Bakkot>
+devsnek: you will be happy to know that I am finally working on multipage builds
+
+[15:18:34.0000] <devsnek>
+Bakkot: very exciting
+
+
+2021-02-22
+[17:36:24.0000] <jackworks>
+Multiple page builds will save my computer
+
+[17:54:43.0000] <Bakkot>
+devsnek / jackworks: PTAL: https://bakkot.github.io/ecma262-previews/multipage-builds/multipage/intro.html
+
+[17:55:02.0000] <Bakkot>
+I think everything works
+
+[17:55:05.0000] <Bakkot>
+the reference panel and so on
+
+[17:55:26.0000] <Bakkot>
+only thing I haven't implemented yet is preserving the state of the reference panel when you navigate across pages, which I may not bother with today
+
+[18:16:00.0000] <jackworks>
+Cool!!
+
+[18:58:32.0000] <devsnek>
+Bakkot: looks really good. two things: i would change intro.html to index.html and add in a redirect script
+
+[18:59:55.0000] <Bakkot>
+redirect script is already added, I just didn't bother rebuilding
+
+[18:59:58.0000] <Bakkot>
+but yeah will update
+
+[19:00:20.0000] <Bakkot>
+and good point about intro->index
+
+[19:00:34.0000] <devsnek>
+yeah just nice to have `multipage/#xyz` be stable
+
+[19:01:03.0000] <Bakkot>
+tempted to just have index.html be a blank page which just handles redirects, actually
+
+[19:01:15.0000] <devsnek>
+whatever works
+
+[19:01:31.0000] <Bakkot>
+I already intend to be generating such pages eventually to handle renaming top-level sections
+
+[19:01:45.0000] <devsnek>
+hm another nice thing might be a "multipage" link on the single-page one
+
+[19:01:58.0000] <devsnek>
+if its up high enough it will be rendered even if it freezes on the rest of the page
+
+[19:05:51.0000] <ljharb>
+jackworks: try "not chrome", single page works fine
+
+[19:06:47.0000] <devsnek>
+unless you're on mobile
+
+[19:06:49.0000] <devsnek>
+then nothing works
+
+[19:07:00.0000] <devsnek>
+except https://snek.dev/ecma262-multipage 😎
+
+[19:08:24.0000] <Bakkot>
+which only kinda works :P
+
+[19:08:33.0000] <Bakkot>
+(the reference pane is broken)
+
+[19:08:54.0000] <Bakkot>
+devsnek: updated: https://bakkot.github.io/ecma262-previews/multipage-builds/multipage/
+
+[19:08:57.0000] <ljharb>
+devsnek: mobile safari works just fine with it
+
+[19:09:05.0000] <devsnek>
+i don't use iphone
+
+[19:09:11.0000] <Bakkot>
+hmm, yeah, let me just install that on my android...
+
+[19:09:14.0000] <ljharb>
+lol
+
+[19:09:16.0000] <devsnek>
+reference pane is broken?
+
+[19:09:27.0000] <Bakkot>
+devsnek yeah, references to other sections don't appear
+
+[19:09:38.0000] <devsnek>
+oh you mean the search box?
+
+[19:09:44.0000] <Bakkot>
+no the references pane
+
+[19:09:54.0000] <Bakkot>
+the thing you get when you hover a clause and click "references" in the popup
+
+[19:09:59.0000] <devsnek>
+oh
+
+[19:10:01.0000] <devsnek>
+i've never used that
+
+[19:10:15.0000] <Bakkot>
+it's super handy
+
+[19:10:26.0000] <devsnek>
+i'm not being redirected :(
+
+[19:10:39.0000] <Bakkot>
+oh
+
+[19:10:49.0000] <Bakkot>
+the redirect script needs to be fixed for index.html, lol
+
+[19:10:51.0000] <Bakkot>
+sec
+
+[19:11:19.0000] <devsnek>
+always the edge case
+
+[19:13:50.0000] <Bakkot>
+I swear a majority of my time on this project has been spent waiting for the spec to rebuild
+
+[19:13:54.0000] <Bakkot>
+jsdom is sloooooooow
+
+[19:14:02.0000] <Bakkot>
+handy though
+
+[19:15:01.0000] <Bakkot>
+hokay: https://bakkot.github.io/ecma262-previews/multipage-builds/multipage/#sec-overview
+
+[19:15:45.0000] <devsnek>
+it works
+
+[19:16:15.0000] <devsnek>
+is lack of fragment supposed to redirect to the first section
+
+[19:16:25.0000] <devsnek>
+it would be nice if it did
+
+[19:16:39.0000] <Bakkot>
+don't think lack of a fragment should redirect
+
+[19:17:23.0000] <devsnek>
+just on the index.html at least, it would be nice if it went to intro
+
+[19:17:51.0000] <devsnek>
+i won't die on this hill though
+
+[19:17:53.0000] <Bakkot>
+sure, I can make the index page do that
+
+[19:21:58.0000] <Bakkot>
+ok done: https://bakkot.github.io/ecma262-previews/multipage-builds/multipage/
+
+[19:22:04.0000] <Bakkot>
+(might need to clear your cache, of course)
+
+[19:22:37.0000] <devsnek>
+it works
+
+[21:29:25.0000] <Bakkot>
+kind of tempted to make it so that if you scroll past the end it takes you to the next page
+
+[21:29:36.0000] <Bakkot>
+don't think I'm going to do that though
+
+[08:38:56.0000] <ljharb>
+please don't, infinite scroll is gross
+
+[08:41:10.0000] <Bakkot>
+well I mean it would be finite
+
+[08:42:38.0000] <ljharb>
+i mean like, where "hitting the page end key combo results in loading more content"
+
+[09:06:44.0000] <Sirisian|Work>
+What's the goal here? This seems identical to the single page system which already works on desktop/mobile right?
+
+[09:08:01.0000] <Bakkot>
+the single page version of the spec loads very slowly on Chrome, especially on Android
+
+[09:08:11.0000] <Bakkot>
+it does not like doing all that layout during page load
+
+[09:09:25.0000] <Bakkot>
+it's a pretty frequent request: https://github.com/tc39/ecma262/issues/1270 https://github.com/tc39/ecma262/issues/1434 https://github.com/tc39/ecma262/issues/1700 https://github.com/tc39/ecmarkup/issues/195 https://github.com/tc39/ecmarkup/issues/151
+
+[09:18:35.0000] <Sirisian|Work>
+My devices must be too fast. Seems fine on Firefox, Chrome and my S10 loads it fine. The width seems a bit crushed on mobile.
+
+[09:20:21.0000] <Bakkot>
+having your personal devices be too fast is a common problem in web dev, yeah
+
+[09:20:23.0000] <Sirisian|Work>
+Could probably just clean up the dom a bit. I removed like 4k+ dom nodes ages ago in a pull request, but it was never accepted before the merge broke. I get the impression it could be cleaned up. Either that or optimize the JS itself.
+
+[09:20:48.0000] <Bakkot>
+I've played with cleaning up the dom, but it doesn't make much difference
+
+[09:20:57.0000] <Bakkot>
+and the JS is imperceptible
+
+[09:20:59.0000] <Bakkot>
+it really is the layout which is expensive
+
+
+2021-02-24
+[08:16:43.0000] <croraf>
+Would it be nicer if the optional chaining returns null or undefined, not just undefined if the left side is null or undefined?
+
+[08:16:56.0000] <croraf>
+Can I propose, ask that somewhere on github?
+
+[08:17:21.0000] <croraf>
+(tag me when replying, ty)
+
+[08:34:15.0000] <ljharb>
+croraf: it was considered during the proposal
+
+[08:34:33.0000] <ljharb>
+croraf: if `null?.foo` returned null, that would be telling you something about the left hand side
+
+[08:34:40.0000] <ljharb>
+croraf: but it's supposed to be telling you something about the right hand side
+
+[08:34:53.0000] <ljharb>
+croraf: so `a?.b` should only return null when `a` is non-nullish and `a.b` is literal null
+
+[12:12:57.0000] <croraf>
+ljharb, I dont really see much logic in that
+
+[12:13:11.0000] <croraf>
+comparing to returning null if null?.something
+
+[12:19:09.0000] <croraf>
+a?.undefined also returns undefined, so you dont know if this is from left nullsih or right undefined
+
+[12:22:11.0000] <croraf>
+And also it would be the opposite of ?? kind of. Cause that deals with null and undefined on the left side
+
+[14:03:46.0000] <ljharb>
+croraf: `a.b` tells you about `b`
+
+[14:04:58.0000] <ljharb>
+croraf: `a?.b` should thus also tell you about b. you're right that `a?.foo` returns `undefined` for a nullish `a`, so you don't know if it's undefined because `a` is undefined or because `a.foo` is undefined. but you *still* wouldn't know that if `a?.foo` returned `null` for a null `a`, because what if `a` was `{ foo: null }`
+
+[14:07:30.0000] <ljharb>
+croraf: https://github.com/tc39/proposal-optional-chaining/issues/69 has more background
+
+
+2021-02-25
+[16:51:36.0000] <jackworks>
+🤔
+
+
+2021-02-26
+[17:13:27.0000] <jmdyck>
+ljharb: #2256 has &notin;, but it should be &lt;! per the grammarkdown docs and the other usage in the spec.
+
+[17:55:34.0000] <ljharb>
+bakkot_: ^ something to lint for
+
+[20:36:11.0000] <bakkot_>
+ehhhhh
+
+[20:36:15.0000] <bakkot_>
+I'd prefer to change the docs
+
+[20:36:19.0000] <bakkot_>
+$notin; is much more readable
+
+[20:36:25.0000] <bakkot_>
+*&notin;
+
+[21:50:24.0000] <jmdyck>
+Well, whatever, as long as the spec is consistent.
+
+[15:11:37.0000] <croraf>
+ljharb, ofc, you woulndt be able to make distinction in that case if a is null vs b is null.
+
+[15:12:30.0000] <croraf>
+And now you cannot do that for undefined. I just mentioned this because your comment that a?.b should tell you about b, and that's why it returns undefined for null. Which is a comment I dont see sense in it.
+
+[15:20:22.0000] <croraf>
+"It's quite surprising that null?.a.b evaluates to undefined" Wow. THis is a novelty to me.
+
+
+2021-02-27
+[16:02:30.0000] <ljharb>
+croraf: because if `a` is nullish, `a.b` doesn't exist, so `undefined` can tell you that
+
+[16:02:56.0000] <ljharb>
+croraf: if it told you `null`, that would tell you that `a` is null, but `a?.b` shouldn't tell you anything certain about `a`
+
+[16:05:48.0000] <rkirsling>
+yep. it would be "reverse shadowing" because you would have no way of distinguishing `null?.b` from `({ b: null })?.b`
+
+[16:06:03.0000] <rkirsling>
+it is only in the latter case that `b` exists.
+
+[16:08:24.0000] <ljharb>
+and since `undefined?.b` and `({ b: undefined })?.b` are both `undefined`, you already can't tell if `b` exists on the object, or if the object was nullish, and it's important that null and undefined give you the same lack of information.
+
+[17:23:54.0000] <DerekNonGeneric>
+what is the name for these double-bracket things in the spec (e.g., `[[Class]]`)? https://262.ecma-international.org/5.1/#sec-8.6.2
+
+[17:25:23.0000] <rkirsling>
+https://tc39.es/ecma262/#sec-object-internal-methods-and-internal-slots
+
+[17:25:51.0000] <jmdyck>
+the spec doesn're isn't a name for the
+
+[17:26:25.0000] <jmdyck>
+the spec doesn't give a name to the construct of "a name enclosed in double square brackets"
+
+[17:27:11.0000] <jmdyck>
+They're used for various purposes,
+
+[17:28:21.0000] <jmdyck>
+so depending on the context, it can be an internal slot name, internal method name, record field name, and a couple more obscure ones
+
+[17:29:27.0000] <DerekNonGeneric>
+that's a good answer, thanks!
+
+[17:30:03.0000] <jmdyck>
+yw
+
+[20:06:35.0000] <bakkot>
+ljharb: updated https://bakkot.github.io/ecma262-previews/multipage-builds/multipage/ to preserve the toc state, roughly; lmk if it looks good
+
+[20:08:03.0000] <bakkot>
+("roughly": it will open the things you had manually opened, but if a section was expanded because you'd scrolled into it, it will be closed when you click to a new section - which is what I'd expect, but then the scroll position will be wrong and I'm not going to bother making it right, since that's a little nontrivial.)
+
+[21:14:10.0000] <ljharb>
+bakkot: i just manually opened 4-5 sections, and then clicked annex C, and nothing was restored. safari console shows no errors (except a favicon 404)
+
+[21:14:32.0000] <ljharb>
+bakkot: the scroll position of the sidebar doesn't seem preserved either
+
+[21:16:28.0000] <bakkot>
+hmmm
+
+[21:16:38.0000] <bakkot>
+maybe hard refresh?
+
+[21:17:04.0000] <bakkot>
+or, no, it is maybe broken on safari
+
+[21:17:43.0000] <bakkot>
+does safari just not have sessionStorage?
+
+[21:18:03.0000] <ljharb>
+afaik it does
+
+[21:20:28.0000] <bakkot>
+uuuugh, it works when opening files from disk, even
+
+[21:20:33.0000] <bakkot>
+some weirdness here
+
+[21:27:57.0000] <bakkot>
+ah, turns out it doesn't like the `unload` event and needs it to be `beforeunload`
+
+[21:28:02.0000] <bakkot>
+will push a build in a sec
+
+[21:32:11.0000] <bakkot>
+ljharb try again?
+
+[21:32:22.0000] <bakkot>
+(will need a hard refresh probably)
+
+[21:33:02.0000] <ljharb>
+nice! much better. when i click "back" tho, the things i opened on the page aren't preserved
+
+[21:36:26.0000] <bakkot>
+on the new page?
+
+[21:36:43.0000] <bakkot>
+seems like what I'd expect - back usually puts you at the previous state, not the current one, no?
+
+[21:37:02.0000] <ljharb>
+yeah that's fair
+
+[21:37:16.0000] <ljharb>
+altho on the single page, i use back all the time to go to previous anchors, and the state naturally stays the same
+
+[21:37:26.0000] <ljharb>
+so if the goal is to replicate the single page experience, i'd expect it to be preserved
+
+[21:38:36.0000] <bakkot>
+that's not really the goal, just trying to make it nice to use in general
+
+[21:39:00.0000] <bakkot>
+anyway I think I can make that happen if it seems right to you; I don't have a strong intuition either way
+
+[21:39:19.0000] <ljharb>
+nah i'll just keep it in mind. if it ends up bugging me i'll bring it up again :-)
+
+[21:40:25.0000] <bakkot>
+too late I've already implemented it :P
+
+[21:40:44.0000] <bakkot>
+will push it up once it finishes building and see how it feels
+
+[21:43:52.0000] <ljharb>
+haha k
+
+[21:46:47.0000] <bakkot>
+done
+
+[21:47:06.0000] <bakkot>
+you're right, it does seem pretty natural
+
+[21:47:51.0000] <ljharb>
+sweet
+
+[21:48:03.0000] <ljharb>
+i'll play more with it tomorrow and let you know if i have any more awk reactions
+
+[21:51:17.0000] <bakkot>
+thanks!
+
+[06:12:32.0000] <devsnek>
+bakkot: is your copy thingy live?
+
+[06:13:02.0000] <devsnek>
+if so it still has all those weird bugs with indentation and missing lines and stuff
+
+[07:56:00.0000] <jackworks>
+surma: hi can I share the language you shared on the research call to my friend?
+
+[08:42:04.0000] <jmdyck>
+can someone run an eshost test for me?: Reflect.ownKeys(/(?<z>a)(?<y>b)(?<x>c)/.exec('abc').groups)
+
+[08:46:58.0000] <jmdyck>
+if i'm reading the spec right, the result should have the GroupNames in chronological order of property creation, but the spec don't specify what that order is.
+
+[08:47:59.0000] <jmdyck>
+so I'm wondering if implementations agree that it's left-to-right order
+
+[09:06:18.0000] <jmdyck>
+it looks like test262 has some tests that assume left-to-right order.
+
+[10:04:26.0000] <bakkot>
+devsnek yup and yup
+
+[10:05:14.0000] <bakkot>
+I might try to fix them at some point but I think the main use case is copying individual lines, for which those issues don't really matter
+
+[10:05:59.0000] <devsnek>
+i mean my use case is copying the whole thing
+
+[10:06:04.0000] <devsnek>
+i could already copy an individual line
+
+[10:06:06.0000] <bakkot>
+jmdyck: jsc, sm, v8 say z,y,x, xs... has a bug (z,y,x,4294967295)
+
+[10:07:04.0000] <bakkot>
+devsnek what browser do you usually use? they all have different behavior but I can try to make it work for one of them
+
+[10:07:14.0000] <bakkot>
+devsnek though also this seems like maybe a case for greasemonkey
+
+[10:07:22.0000] <devsnek>
+firefox
+
+[10:08:06.0000] <devsnek>
+the two issues are sometimes the first `1.` is missing, and sometimes there's randomly way too much indentation
+
+[10:08:48.0000] <bakkot>
+jmdyck: I think the spec does specify the order, also:
+
+[10:09:06.0000] <bakkot>
+27. For each integer i such that i ≥ 1 and i ≤ n, do [...] f. If the ith capture of R was defined with a GroupName, then [...] ii. Perform ! CreateDataPropertyOrThrow(groups, s, capturedValue).
+
+[10:09:26.0000] <bakkot>
+(oh hey, that was a case where having the line numbers per line was exactly the thing I wanted!)
+
+[10:09:33.0000] <devsnek>
+the spec specifies it in that its an ordinary object having ordinary properties created in group index order
+
+[10:11:59.0000] <bakkot>
+I can't get the missing 1 thing to happen
+
+[10:12:08.0000] <bakkot>
+but I guess I can try to patch it anyway
+
+[10:12:42.0000] <devsnek>
+i guess its more like
+
+[10:12:42.0000] <bakkot>
+also is "way too much indentation" just "one extra line of indentation"? because that's the thing I see
+
+[10:12:52.0000] <devsnek>
+the number for whatever line i start the selection on
+
+[10:12:53.0000] <devsnek>
+is missing
+
+[10:13:03.0000] <devsnek>
+uhh i've seen two
+
+[10:13:07.0000] <devsnek>
+but mostly 1
+
+[10:13:21.0000] <bakkot>
+are you doing the copy by click-and-drag or by tripleclick-and-drag?
+
+[10:13:52.0000] <devsnek>
+double click to select word and then drag
+
+[10:14:02.0000] <devsnek>
+its the same either way
+
+[10:14:44.0000] <bakkot>
+you should triple click to get the whole line
+
+[10:14:47.0000] <bakkot>
+and then that will not happen
+
+[10:15:15.0000] <devsnek>
+are we sure we can't just have the clipboard button lol
+
+[10:16:20.0000] <bakkot>
+you'd need to convince me it's something many people other than you want
+
+[10:16:29.0000] <bakkot>
+if it's just you, just make a greasemonkey script
+
+[10:16:35.0000] <bakkot>
+that is what greasemonkey is for
+
+[10:16:37.0000] <devsnek>
+idk i'm surprised copying one line is smth people need
+
+[10:16:52.0000] <bakkot>
+it's for adding comments to your implementations and tests, mostly
+
+[10:17:05.0000] <bakkot>
+where the line of code corresponds to a line of the algorithm
+
+[10:17:10.0000] <devsnek>
+yeah that's what i use it for
+
+[10:17:11.0000] <bakkot>
+why do you need the whole algorithm?
+
+[10:17:20.0000] <devsnek>
+why would you want to do that line by line lol
+
+[10:17:41.0000] <bakkot>
+because... you don't want all of the lines?
+
+[10:18:05.0000] <devsnek>
+i mean engine262 is definitely more verbose than the average js engine
+
+[10:18:10.0000] <devsnek>
+but i do the same thing when writing algos in v8
+
+[10:18:53.0000] <bakkot>
+I think people writing algorithms in v8 usually just copy the relevant line for the relevant part
+
+[10:18:58.0000] <bakkot>
+that's what I did, certainly
+
+[10:19:19.0000] <bakkot>
+also: I needed "copying one line" literally two minutes ago, in this channel
+
+[10:19:25.0000] <bakkot>
+(ok, ten minutes)
+
+[10:19:33.0000] <devsnek>
+lol fair enough
+
+[10:19:43.0000] <devsnek>
+curious what you consider a "relevant" line though
+
+[10:19:51.0000] <devsnek>
+s/relevant/not relevant/
+
+[10:20:38.0000] <bakkot>
+I just mean, like, each part of the code corresponds to only part of the 262 algorithm
+
+[10:20:48.0000] <bakkot>
+it's not like there's precise implementations of each AO; things get split up and etc
+
+[10:21:00.0000] <bakkot>
+so only parts correspond precisely to algorithm steps
+
+[10:21:18.0000] <bakkot>
+and even then I want each line as it's own comment, with code below it; I do not want the whole algorithm in one place
+
+[10:21:36.0000] <devsnek>
+well yeah generally i paste in the algo and then fill in each line
+
+[10:21:38.0000] <devsnek>
+oh well
+
+[10:21:38.0000] <bakkot>
+[*its]
+
+[10:22:02.0000] <bakkot>
+I will write you the greasemonkey script if it's too much work for you
+
+[10:22:08.0000] <bakkot>
+it really is a very straightforward process
+
+[10:22:12.0000] <bakkot>
+and then everyone is happy
+
+[10:22:14.0000] <devsnek>
+no i can do that much
+
+[10:22:21.0000] <devsnek>
+i already use greasemonkey for discord mods
+
+[10:22:33.0000] <devsnek>
+although soon i can stop doing that 🙏🏻
+
+[10:33:02.0000] <bakkot>
+oh, I think jmdyck's point is maybe that the for loop I mentioned above doesn't specify "in ascending order"
+
+[10:34:53.0000] <devsnek>
+:(
+
+[10:35:45.0000] <bakkot>
+I guess I will put a quick normative PR on the agenda
+
+[12:18:34.0000] <jmdyck>
+bakkot: thanks
+
+[12:19:33.0000] <jmdyck>
+devsnek: But "For each integer i such that i ≥ 1 and i ≤ n" doesn't specify an order
+
+[12:19:53.0000] <jmdyck>
+no wait that was bakkot too
+
+[12:21:25.0000] <jmdyck>
+there's nothing to say an implementation can't start with i=n and go to i=1 (or do them in a random order)
+
+[12:24:05.0000] <jmdyck>
+bakkot: ah, you figured that out.
+
+[12:25:17.0000] <jmdyck>
+sorry, i started responding when I thought I'd got to the end of the log, but hadn't.
+
+[12:34:34.0000] <ljharb>
+bakkot: ftr i've never used triple click and would never think to do it
+
+[12:35:34.0000] <bakkot>
+fascinating
+
+[12:35:49.0000] <bakkot>
+that's like one of the primitive computer-using operations for me
+
+[12:36:24.0000] <bakkot>
+jmdyck you mentioned there's tests262 tests which assume the order; can you link those?
+
+[12:36:32.0000] <jmdyck>
+yup
+
+[12:36:38.0000] <bakkot>
+I'll add them to the description for https://github.com/tc39/ecma262/pull/2329
+
+[12:36:43.0000] <bakkot>
+(one is fine; I don't need an exhaustive list)
+
+[12:36:56.0000] <jmdyck>
+i think there's only a couple
+
+[12:37:13.0000] <jmdyck>
+built-ins/RegExp/named-groups/groups-properties.js
+
+[12:37:48.0000] <bakkot>
+ah, thanks
+
+[12:38:00.0000] <bakkot>
+I'd looked at that one, but missed that it was testing multiple things
+
+[12:38:04.0000] <jmdyck>
+built-ins/RegExp/named-groups/lookbehind.js
+
+[12:39:16.0000] <jmdyck>
+and then built-ins/RegExp/match-indices/indices-groups-properties.js, but match-indices isn't merged yet, so prob not a good example
+
+[12:43:14.0000] <jmdyck>
+bakkot: I think it's only observable for named group properties.
+
+[12:43:44.0000] <jmdyck>
+for numbered group properties, regardless of creation order, own properties have to come in numeric order, right?
+
+[12:45:13.0000] <jmdyck>
+... have to be *reported* in numeric order
+
+[12:50:48.0000] <bakkot>
+yeah
+
+[12:50:52.0000] <bakkot>
+but it's the same fix either way
+
+[12:52:37.0000] <devsnek>
+60s topic
+
+[12:53:34.0000] <jmdyck>
+bakkot: agree re the fix, I'm just thinking of the PR title/descr
+
+[12:54:29.0000] <bakkot>
+ah, I didn't think it needed to be more explicit
+
+[12:54:36.0000] <jmdyck>
+ok
+
+[12:54:38.0000] <bakkot>
+the title originally was but then it was too long
+
+[12:54:49.0000] <bakkot>
+I'll expand the description a bit I guess
+
+[12:58:25.0000] <jmdyck>
+looks good
+
+[12:58:34.0000] <devsnek>
+i appreciate github's ability to call us out on our lack of mental organization https://gc.gy/82164495.png
+
+[13:15:35.0000] <ljharb>
+it is very important that everyone knows that i missed the test262 comment in the OP for about 4 seconds
+
+[13:16:26.0000] <bakkot>
+reddit has a thing where edits made within a minute or so of posting the comment don't show up as edits
+
+[13:16:32.0000] <bakkot>
+I think it's a nice compromise
+
+
+2021-02-28
+[20:15:36.0000] <bakkot>
+ljharb any further comments on the multipage build? gonna land it and get it upstreamed if not
+
+[21:15:13.0000] <devsnek>
+I wonder if content-visibility: auto would improve the spec rendering
+
+[21:17:18.0000] <ljharb>
+bakkot: i think the main thing is that the multipages should probably have a <link rel="canonical"> that points to the single-page one?
+
+[21:17:35.0000] <bakkot>
+oh yeah I forgot that one
+
+[21:17:58.0000] <bakkot>
+devsnek see https://github.com/tc39/ecmarkup/pull/263
+
+[21:22:22.0000] <bakkot>
+ljharb oh, wait, actually I decided not to do that
+
+[21:22:27.0000] <ljharb>
+why not?
+
+[21:22:39.0000] <ljharb>
+there should only be one canonical URL for any given piece of content
+
+[21:22:53.0000] <bakkot>
+since it seems like the guidance from Google is that it is only for _duplicated_ pages, not _subsets_: https://developers.google.com/search/docs/advanced/crawling/consolidate-duplicate-urls
+
+[21:23:19.0000] <bakkot>
+and since google (and other search engines) are the intended consumer, I figure we ought to follow their guidance
+
+[21:26:42.0000] <ljharb>
+it says similar or duplicated
+
+[21:26:44.0000] <ljharb>
+subsets are similar
+
+[21:26:55.0000] <ljharb>
+is there anything that says that a subset is *not* "similar"?
+
+[21:27:32.0000] <bakkot>
+it says "Note that the pages do not need to be absolutely identical; minor changes in sorting or filtering of list pages do not make the page unique (for example, sorting by price or filtering by item color)."
+
+[21:28:01.0000] <bakkot>
+those seem much less major than "having 50x more content"
+
+[21:28:12.0000] <ljharb>
+that's saying that the non-canonical and canonical don't have to be identical
+
+[21:28:33.0000] <ljharb>
+iow, it's saying google will decide heuristically if two pages are "similar" and will pick one to be canonical, if the page fails to declare one as such
+
+[21:28:50.0000] <bakkot>
+it will pick one even if the page does declare one
+
+[21:28:59.0000] <bakkot>
+it has no obligation to honor it
+
+[21:29:03.0000] <ljharb>
+sure
+
+[21:29:06.0000] <ljharb>
+but it's a hint to it
+
+[21:29:18.0000] <ljharb>
+so i don't see any guidance that says *not* to provide a rel
+
+[21:29:35.0000] <ljharb>
+iow the guidance absolutely does _not_ say it's "only" for duplicated pages not subsets
+
+[21:29:57.0000] <bakkot>
+it implies it is for use with a level of similarity which I do not think we meet
+
+[21:29:58.0000] <ljharb>
+it says that "google will do whatever it wants, and a rel=canonical can be used as a hint, and any similar pages might mean google pickes one"
+
+[21:32:09.0000] <ljharb>
+iow i see zero downsides to including it, and only upside to including it.
+
+[21:32:56.0000] <ljharb>
+we can certainly wait to talk about it again on the editor call this week; but we'd agreed on the last one to include it.
+
+[21:33:24.0000] <bakkot>
+ehhhh
+
+[21:33:30.0000] <bakkot>
+i think it's the wrong call but I would prefer to land it than to wait
+
+[21:33:34.0000] <bakkot>
+will make the change
+
+[21:34:24.0000] <ljharb>
+if there's a downside to including it i'm happy to hear it
+
+[21:35:02.0000] <bakkot>
+the downside is that the multipage builds won't show up in google search results, presumably
+
+[21:35:51.0000] <bakkot>
+and at least when I am on my phone would prefer to at least be offered the multipage one, instead of only ever getting the one which takes thirty seconds to load
+
+[21:38:06.0000] <ljharb>
+if neither is canonical then you’d be arbitrarily pointed to one or the other. Unless we had a server that could sniff the user agent and send you to the multioage version when you’re using the only browser that can’t handle the single page one, i don’t think the ideal ux is really achievable
+
+[21:38:29.0000] <ljharb>
+(meaning, i see the worst outcome is that the search results are a mix of single and multi page)
+
+[21:38:56.0000] <ljharb>
+either way, google docs you linked implies they’ll pick one anyways, so it might be moot
+
+[21:39:34.0000] <bakkot>
+it wouldn't be arbitrary; google picks results based on the device you're on
+
+[21:39:52.0000] <bakkot>
+that is, it ranks faster-loading pages higher when you are on mobile devices
+
+[21:40:14.0000] <ljharb>
+that seems unfortunate; on my iOS devices i prefer the single page build, which loads quite fast.
+
+[21:40:33.0000] <bakkot>
+I disagree with your reading of the document i linked
+
+[21:40:54.0000] <bakkot>
+I really do not think it implies that it will pick a canonical one when the content is a subset
+
+[21:41:13.0000] <bakkot>
+indeed, it does not appear to have done so for the html spec; it will regularly offer both the single-page and multi-page version
+
+[21:41:20.0000] <bakkot>
+which is ideal: then you can pick
+
+[21:45:28.0000] <bakkot>
+like I think it is worth noting that the HTML spec does not use it, in exactly this circumstance
+
+[21:45:30.0000] <ljharb>
+if it can figure out that both links are different formats then yes, that’s ideal
+
+[21:45:40.0000] <ljharb>
+and yeah i did look that up, and was surprised to see they don’t
+
+[21:46:17.0000] <ljharb>
+but there’s no link rel=subset or anything so I’m not sure how a search engine would figure that out
+
+[21:46:37.0000] <ljharb>
+(have you seen html spec search results that present both links?)
+
+[21:47:05.0000] <bakkot>
+sure: I search `whatwg html` and the first two links are the multipage version and the single page version
+
+[21:49:34.0000] <bakkot>
+I asked about this in #whatwg a couple days ago and Domenic said
+
+[21:49:35.0000] <bakkot>
+> I usually apply canonical to mean "the content is exactly the same, just don't search-engine-index this duplicate"
+
+[21:50:03.0000] <ljharb>
+sigh, alright then. Seems like a mistake to me tho.
+
+[21:50:23.0000] <bakkot>
+well, it's easy enough to fix later
+
+[21:50:27.0000] <bakkot>
+it's not like this is set in stone
+
+[21:53:28.0000] <bakkot>
+ok, here: I will land it with the link rel=canonical included and open a PR to remove it, which we can discuss later
+
+[22:02:58.0000] <ljharb>
+either way
+
+[11:26:17.0000] <devsnek>
+https://gc.gy/82245375.png
+
+[11:26:25.0000] <devsnek>
+could this just be `Return ! localEnv.BindThisValue(thisValue)`
+
+[11:58:54.0000] <ljharb>
+yes, but the reasoning would still be a useful note
+

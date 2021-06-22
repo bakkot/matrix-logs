@@ -1,0 +1,2375 @@
+2019-12-01
+[12:01:31.0000] <jgraham>
+PiersW, gsnedders: Yeah, I'm always happy to talk about wpt and to visit Cambridge :)
+
+[12:02:34.0000] <gsnedders>
+we're not the hardest audience, really.
+
+
+2019-12-02
+[23:29:33.0000] <jochen__>
+domfarolino: then I don't get why you're looking at the initiator for same-origin checks?
+
+[23:30:50.0000] <domfarolino>
+jochen__: A request's referrer string and initiator (origin) can be cross-origin. And the definition of same-origin compares a request's URL with the initiator origin
+
+[23:31:19.0000] <domfarolino>
+jochen__: (But chrome's impl compares a request's URL with the referrer string origin)
+
+[23:32:31.0000] <jochen__>
+but why would we care about the initiator?
+
+[23:32:45.0000] <jochen__>
+maybe the same-origin definition is not fitting the intend ?
+
+[23:34:51.0000] <domfarolino>
+jochen__: I was just trying to align chrome's impl with the definition of same-origin (found in referrer-policy spec). It compares a request's origin with the current URL, and in implementation-land, I believe that is the same as comparing initiator (origin) and URL
+
+[23:36:46.0000] <domfarolino>
+I think we can either change chrome's implementation to match the spec, or change the spec's definition of same-origin to compare <url, referrrer string> instead of <url, origin>
+
+[23:38:02.0000] <jochen__>
+we should do the latter
+
+[23:39:39.0000] <domfarolino>
+OK; feel free to mention that on the thread too. Just want to make sure there isn't any harm in doing that (privacy-wise maybe)
+
+[23:39:45.0000] <domfarolino>
+cc yhirano
+
+[23:42:20.0000] <domfarolino>
+does feel a little inconsistent that one spec's definition of a same-origin request is kinda different from others though. Maybe that's ok
+
+[23:47:57.0000] <MikeSmith>
+Domenic: FYI https://github.com/mdn/browser-compat-data/issues/5214 is about updating BCD to distinguish between legacy Edge and Blink-based Edge
+
+[23:49:59.0000] <MikeSmith>
+as I commented there, I think it would make the most sense to just create a new top-level "Edge (Blink-based)" browser in BCD, and add the new data under that (which is relatively simple because it can basically just all be copied from the existing Chrome data)
+
+[23:58:44.0000] <yhirano>
+domfarolino, jochen__: commented at https://github.com/w3c/webappsec-referrer-policy/issues/123
+
+[05:11:17.0000] <PiersW>
+jgraham, gsnedders: you're welcome to come up whenever. We're an easy 15 minute walk from the station. I'd try to avoid a Wednesday as some people tend to work from home that day, but that could change if necessary. Probably best to DM?
+
+[05:17:09.0000] <gsnedders>
+PiersW: what's your email, and I'll drop you a line later?
+
+[05:20:13.0000] <PiersW>
+piers⊙ec
+
+[06:32:28.0000] <botie>
+zcorpan, at 2019-05-31 11:29 UTC, MikeSmith said: when you have some time, I wanted to ask you about <picture> test cases
+
+[06:32:42.0000] <zcorpan>
+MikeSmith: here now
+
+[06:34:00.0000] <zcorpan>
+I noticed another html parser interop difference :-|
+
+[06:34:50.0000] <Ms2ger>
+:/
+
+[06:36:43.0000] <zcorpan>
+"If the parser was created as part of the HTML fragment parsing algorithm, then act as described in the "any other start tag" entry below. (fragment case)"
+
+[08:02:35.0000] <bradleymeck>
+Domenic: any concerns exposing MIMEParams as a ctor in https://bmeck.github.io/node-proposal-mime-api/ , seems like it should accept a round-trip able string is all?
+
+[08:04:26.0000] <bradleymeck>
+also unclear on how to handle URL percent encoding staring at the parser it doesn't have any flags so would decoding prior to piping through it be the right place? that would mean encoded `=` acts a bit odd though
+
+[09:29:45.0000] <Domenic>
+bradleymeck: I'm not sure that it's great to add the concept of "parameter string" separate from "serialized MIME type"
+
+[09:30:32.0000] <Domenic>
+Like right now there is no concept for what `foo=bar;baz=qux` is separate from `x/y;foo=bar;baz=qux`. And introducing a new concept with its own parser, serializer, etc. seems potentially problematic.
+
+[09:30:36.0000] <bradleymeck>
+it makes the API slightly more convenient since non-callable classes are not really a thing in, and URL params also exposes a string ctor
+
+[09:31:03.0000] <bradleymeck>
+part of the reason here is there appears to be a problem with URL percent encoding and MIME param parsing as well
+
+[09:31:22.0000] <Domenic>
+I think a constructor can exist without being overloaded to also take a string
+
+[09:31:24.0000] <bradleymeck>
+you likely want to flag decoding the params as it shouldn't happen before parsing the params due to encoding the =
+
+[09:31:27.0000] <Domenic>
+It should just behave like the Map() constructor.
+
+[09:31:37.0000] <Domenic>
+I don't think URL encoding should be involved here at all
+
+[09:31:45.0000] <Domenic>
+Just prohibit characters not in the list
+
+[09:32:19.0000] <bradleymeck>
+I'm a bit confused as URL encoding is quite intertwined with MIME params when you deal with data:
+
+[09:32:24.0000] <Domenic>
+i.e. parameter names must be HTTP token code points and parameter values must be HTTP quoted-string code points
+
+[09:32:29.0000] <bradleymeck>
+the list of prohibited characters doesn't really work
+
+[09:32:30.0000] <Domenic>
+data: is separate
+
+[09:32:43.0000] <Domenic>
+If you don't agree with the spec's prohibitions then you have more fundamental problems
+
+[09:32:47.0000] <bradleymeck>
+it is not as parsing URL percent encoding is involed in data MIME parsing
+
+[09:33:02.0000] <bradleymeck>
+its part of data, it isn't really about agreement
+
+[09:33:22.0000] <bradleymeck>
+the parser seems fine but gets all wonky and doesn't make sense when put inside a URL
+
+[09:33:23.0000] <Domenic>
+That isn't how the data: URL parser works. First it URL parses. Then it MIME type parses pieces of it. Only the first part involves URL encoding.
+
+[09:34:40.0000] <bradleymeck>
+so you are saying `text/plain;foo${encodeURIComponent('=')}bar${encodeURIComponent(',')}baz,`  should have a body of `baz,` not ``?
+
+[09:35:08.0000] <Domenic>
+Is that a MIME type or a data URL?
+
+[09:35:50.0000] <bradleymeck>
+ah, prepend `data:` to that, so `data:text/plain;foo${encodeURIComponent('=')}bar${encodeURIComponent(',')}baz,`
+
+[09:35:58.0000] <Domenic>
+The answers are different in each case
+
+[09:36:50.0000] <Domenic>
+Well, I guess they are not, in both cases the URLs are not decoded
+
+[09:36:55.0000] <Domenic>
+https://jsdom.github.io/whatwg-url/#url=ZGF0YTp0ZXh0L3BsYWluO2ZvbyUzRGJhciUyQ2Jheiw=&base=YWJvdXQ6Ymxhbms=
+
+[09:37:05.0000] <bradleymeck>
+i'm trying to figure out an API that is usable for both, thats all. i don't really want to propose changes anywhere but the specs seem confusing here
+
+[09:38:28.0000] <Domenic>
+The MIME type string is `text/plain;foo%3Dbar%2Cbaz` which parses as just `text/plain` since the parameter named `foo%3Dbar%2Cbaz` gets thrown out
+
+[09:38:43.0000] <bradleymeck>
+the data: RFC pointed out using percent encoding for values outside of http quoted-string ranges so it just adds to this confusion a bit for me
+
+[09:38:57.0000] <Domenic>
+https://runkit.com/domenicdenicola/5de54c2c2340d00019ec9b51
+
+[09:39:01.0000] <Domenic>
+Ignore the RFCs
+
+[09:40:17.0000] <Domenic>
+Use the reference implementations, at https://jsdom.github.io/whatwg-url/ and https://npm.runkit.com/whatwg-mimetype
+
+[09:40:27.0000] <Domenic>
+So e.g. your example data: URL is at https://jsdom.github.io/whatwg-url/#url=ZGF0YTp0ZXh0L3BsYWluO2ZvbyUzRGJhciUyQ2Jheiw=&base=YWJvdXQ6Ymxhbms=
+
+[09:40:49.0000] <Domenic>
+As you can see it has a path component of `text/plain;foo%3Dbar%2Cbaz,`
+
+[09:40:52.0000] <bradleymeck>
+Domenic: there appears to be issues with that ref impl though
+
+[09:40:53.0000] <bradleymeck>
+https://runkit.com/bmeck/5de54c621ede90001abf065e
+
+[09:41:06.0000] <Domenic>
+What's the issue?
+
+[09:41:08.0000] <bradleymeck>
+i've tried going step by step through the mimesniff spec
+
+[09:41:38.0000] <Domenic>
+That result looks correct to me
+
+[09:41:51.0000] <bradleymeck>
+it doesn't seem to deal with percent encoding anywhere that i can tell
+
+[09:41:57.0000] <Domenic>
+Correct
+
+[09:41:59.0000] <bradleymeck>
+like percent encoding is ignored for that part of the url
+
+[09:42:02.0000] <Domenic>
+Correct
+
+[09:42:06.0000] <Domenic>
+That is the correct behavior
+
+[09:42:13.0000] <Domenic>
+You seem to have been confused by some obsoleted RFCs
+
+[09:42:26.0000] <bradleymeck>
+and the current mimesniff / data url processor
+
+[09:42:30.0000] <bradleymeck>
+not just the RFCs
+
+[09:42:41.0000] <bradleymeck>
+the RFCs got brought up after the issue on fetch opened
+
+[09:42:54.0000] <Domenic>
+OK. Then where are you getting the idea that URL encoding should be involved?
+
+[09:44:29.0000] <bradleymeck>
+https://fetch.spec.whatwg.org/#data-urls , it takes a URL and serializes it , the URL would have already decoded stuff to my understanding, and re-encoding gets funky/wrong with some stuff
+
+[09:45:12.0000] <bradleymeck>
+bbiab
+
+[09:45:33.0000] <Domenic>
+The URL does not "already have decoded stuff"
+
+[09:45:46.0000] <Domenic>
+As seen from https://jsdom.github.io/whatwg-url/#url=ZGF0YTp0ZXh0L3BsYWluO2ZvbyUzRGJhciUyQ2Jheixmb28lM0RiYXIlMkNiYXo=&base=YWJvdXQ6Ymxhbms=
+
+[09:46:08.0000] <Domenic>
+I'll be back later too, getting lunch
+
+[10:02:58.0000] <bradleymeck>
+Domenic: then i'm just more confused as to how a URL is there if it isn't parsed/decoded already
+
+[10:04:59.0000] <annevk>
+The URL parser does very little percent decoding itself (only for hosts and dots in paths really, iirc)
+
+[10:05:41.0000] <annevk>
+A processor for a particular scheme could do more decoding, and the data: one does, but not for the MIME type
+
+[10:09:19.0000] <bradleymeck>
+i'm fine with either direction but feel some uneasiness with the tone of ignoring other places (e.g. the RFCs) that i often see here
+
+[10:11:51.0000] <annevk>
+So the problem with some RFCs is that they aren't maintained and nobody wants to align with them. That's mainly why there's alternatives now, that are maintained (mostly).
+
+[10:12:37.0000] <annevk>
+(Well, "nobody" is something like "nobody big enough that they need to interoperate with web content in the wild".)
+
+[10:14:30.0000] <annevk>
+bradleymeck: as for your API sketch, if a MIME's mime is a MIME type, that'll also hold the parameters
+
+[10:14:42.0000] <annevk>
+bradleymeck: also, I'd call the main class MIMEType
+
+[10:15:29.0000] <annevk>
+bradleymeck: and there should be an essence getter on it
+
+[10:15:37.0000] <bradleymeck>
+annevk: yes, but if you expose an API for the params like URLSearchParams does it causes a separate object API
+
+[10:17:15.0000] <annevk>
+This might lead to all kinds of issues though depending on how folks use these
+
+[10:19:43.0000] <bradleymeck>
+annevk: can you clarify/has this been discussed regarding URLSearchParams somewhere that I can read?
+
+[12:51:31.0000] <MikeSmith>
+annevk: Domenic: https://domspec.herokuapp.com/ has MDN annotations added to the DOM spec
+
+[12:52:24.0000] <MikeSmith>
+I’m still working on the patch for Bikeshed, but as far as the output goes, that’s what the patch will generate
+
+[12:52:48.0000] <MikeSmith>
+e.g., look around https://domspec.herokuapp.com/#dom-event-stoppropagation
+
+[12:52:50.0000] <Domenic>
+That's pretty sweet!!
+
+[12:55:22.0000] <MikeSmith>
+:)
+
+[12:57:24.0000] <MikeSmith>
+I’ll try to get Bikeshed PR raised for it this morning (I’ll otherwise be out all day from 10am to the evening my time)
+
+[13:15:10.0000] <TabAtkins>
+Oh dang, thanks MikeSmith! I wanted to get to it but between vacation and some higher-prio thing I haven't been able to!
+
+[13:15:28.0000] <MikeSmith>
+Hey TabAtkins!
+
+[13:15:45.0000] <MikeSmith>
+no worries — I had meant to get to it long before now
+
+[13:17:21.0000] <MikeSmith>
+TabAtkins: anyway, after I get the PR raised, you can make lots of time to review it :)
+
+[13:17:28.0000] <TabAtkins>
+yeah def
+
+[13:18:43.0000] <MikeSmith>
+if you have a good setup for doing profiling of Bikeshed, among the things I hope you can look at is the performance
+
+[13:19:11.0000] <MikeSmith>
+on my machine it increases the build time for the DOM spec from 15 seconds to 30 seconds..
+
+[13:20:19.0000] <MikeSmith>
+I guess there is probably some costly thing I’m naively doing, or else maybe just general slowness of lxml, I dunno
+
+[13:20:54.0000] <MikeSmith>
+anyway, it will be nice if it’ll be possible to get that time reduced
+
+[13:23:50.0000] <Krinkle>
+I wonder if anyone here happens to know current state of Safari's disagreement about how Page Visibility API works? – https://bugs.webkit.org/show_bug.cgi?id=116769
+
+[13:24:00.0000] <Krinkle>
+( https://bugs.webkit.org/show_bug.cgi?id=151234 )
+
+[13:40:48.0000] <TabAtkins>
+Yeah, I've got some good profiling scripts set up that I can run over the stuff.
+
+[13:41:12.0000] <TabAtkins>
+(The `bikeshed profile` command, tho it depends on some things installed that aren't immediately obvious.)
+
+[13:41:43.0000] <TabAtkins>
+More than likely it's something like you running selectors inside a loop or something.
+
+[13:44:19.0000] <MikeSmith>
+TabAtkins: yeah there are couple places that I suspect but I haven’t had time to look at yet
+
+
+2019-12-03
+[00:30:21.0000] <yoav>
+annevk: Hey! npm@ asked me to ping you regarding https://github.com/whatwg/fetch/pull/955. Could you take another look?
+
+[06:36:32.0000] <annevk>
+yoav: I should yes. I’m wondering if some of the actual timings should move as well as otherwise it remains a weird monkey patch
+
+[06:38:08.0000] <yoav>
+annevk: without digging into specifics, the answer is probably yes, but I'd prefer if we could move things piece by piece
+
+[06:39:26.0000] <yoav>
+I plan to rebase RT on Fetch early next year, but don't want to block npm@'s work on that
+
+[06:43:34.0000] <annevk>
+yoav: yeah fair, I should be able to get to this tomorrow at the latest. Been out for a bit.
+
+[06:43:57.0000] <yoav>
+Thank you! :)
+
+[07:30:35.0000] <domfarolino>
+What is the ordering of authors on W3C specs? I looked a couple in webappsec and figured it was alphabetical by last name, then I looked at https://www.w3.org/TR/mediaqueries-4/ and seems otherwise
+
+[07:32:03.0000] <Domenic>
+I suspect it is at the whim of whoever last touched the file
+
+[07:32:28.0000] <domfarolino>
+👍
+
+[09:06:02.0000] <annevk>
+Former editors there looks to be in order of appearance
+
+[10:48:30.0000] <Domenic>
+annevk: did you want to land the user activation PR, or shall I pull it in? I believe all your comments were addressed.
+
+[11:23:41.0000] <domfarolino>
+PiersW: are there any plans to open-source Flow?
+
+[11:49:20.0000] <PiersW>
+domfarolino: Not really. Need to pay the developers as we don't have a big corporation backing us.
+
+[11:50:03.0000] <domfarolino>
+Gotcha
+
+
+2019-12-04
+[17:31:26.0000] <MikeSmith>
+The "79" version number in Edge means it’s based on Chromium 79, right?
+
+[17:32:02.0000] <MikeSmith>
+So can we assume that Microsoft plans to keep Edge version numbering in sync with Chrome version numbering?
+
+[17:33:00.0000] <MikeSmith>
+Or have Microsoft explicitly said anywhere that’s how they will be doing the version numbering?
+
+[20:52:32.0000] <Domenic>
+https://textslashplain.com/2019/08/08/livin-on-the-edge-dude-wheres-my-fix-redux/ comes close to stating that they intend to keep them in sync, but not quite
+
+[21:01:33.0000] <MikeSmith>
+Domenic: OK, thanks
+
+[21:04:46.0000] <MikeSmith>
+heh, may takeaway from reading that write-up is: To be unambiguous, Chrome and all Blink/Chromium-based browsers should just use the last part of the version number..
+
+[21:04:56.0000] <MikeSmith>
+the part that is now 3983
+
+[21:05:22.0000] <MikeSmith>
+so, Edge 3983
+
+[21:05:28.0000] <MikeSmith>
+that’d be fun
+
+[02:51:02.0000] <MikeSmith>
+is there anything in any devtools that will give me the x and y coordinates of a the current position under the cursor?
+
+[03:10:15.0000] <ondras>
+yes
+
+[03:10:17.0000] <ondras>
+in Firefox
+
+[03:10:24.0000] <MikeSmith>
+ondras: how?
+
+[03:10:29.0000] <ondras>
+devtools
+
+[03:10:31.0000] <ondras>
+settings
+
+[03:10:38.0000] <ondras>
+"toolbox buttons"
+
+[03:10:44.0000] <ondras>
+"measure a portion of the page"
+
+[03:11:19.0000] <MikeSmith>
+/me tries it now
+
+[03:13:09.0000] <MikeSmith>
+ondras: perfect!
+
+[03:13:15.0000] <MikeSmith>
+exactly what I was looking for
+
+[03:13:19.0000] <MikeSmith>
+thanks much!
+
+[03:14:08.0000] <ondras>
+np :)
+
+[07:37:25.0000] <domfarolino>
+Domenic: long-term do you think tightening up the dfn for “intersects the viewport” would entail doing some sort of CSS box computation like Intersection Observer does for other things?
+
+[07:38:10.0000] <Domenic>
+domfarolino: maybe, it kind of depends on what that reviewer is asking for. Even IntersectionObserver just says something like "two boxes intersect" which is not significantly different from the existing definition for video.
+
+[07:41:17.0000] <domfarolino>
+Gotcha
+
+[07:45:56.0000] <domfarolino>
+Domenic: Also you’re right about the implementer interest for imagesrcset/imagesizes (sorry about that). Would filing a standards position issue have been the better approach?
+
+[07:46:33.0000] <Domenic>
+domfarolino: yeah probably; sometimes pinging works but standards-position is more likely to work.
+
+[08:06:56.0000] <domfarolino>
+Oh geez I read your comment in my email, not realizing it was made _on_ the standards-positions issue. I see...
+
+
+2019-12-05
+[20:59:14.0000] <yhirano>
+annevk: Do you have any opinions on the last comment of https://github.com/whatwg/fetch/issues/966?
+
+[00:17:04.0000] <annevk>
+yhirano: it seems fine to me, I wonder if we really need 2, but I guess theoretically it could be an attack vector so maybe that's good; I kinda prefer requiring h2 over that, but can live with provided there's solid test coverage
+
+[00:22:39.0000] <yhirano>
+annevk: Thanks. I'm not fully sure about the need for the new header too, but I think the new header is less confusing than requiring h2.
+
+[00:26:45.0000] <annevk>
+yhirano: who suggested the new header? Security team?
+
+[00:27:33.0000] <annevk>
+yhirano: are we effectively looking at two new headers or do we only want the preflight response to advertize it, similar to Access-Contor-Allow-Credentials?
+
+[00:27:46.0000] <annevk>
+yhirano: Access-Control-Allow-Streams: true?
+
+[00:28:28.0000] <yhirano>
+annevk: none. I thought  some participants wanted to restrict the feature for H2, which seemed unfortunate to me.
+
+[00:29:04.0000] <yhirano>
+annevk: If everyone agrees that the secure context restriction is enough, I'm happy to retract the new header.
+
+[00:31:07.0000] <yhirano>
+annevk: I'm fine with both (having one header on response, or having headers on both req and res). Maybe only on response is enough?
+
+[00:35:03.0000] <annevk>
+yhirano: so the main reason to restrict to h2 is to avoid imposing new impl requirements on browsers with regards to chunked encoding
+
+[00:35:32.0000] <annevk>
+yhirano: might be sunk cost for Chrome, but not sure that's the case for all involved, I thought it wasn't for Firefox
+
+[00:36:48.0000] <annevk>
+yhirano: I hadn't considered that sending chunked encoding itself to a different origin is in effect a new attack vector, but given the required CORS preflight I'm kinda okay with not requiring an additional opt-in for that, especially as it's a normal HTTP request in pretty much all respects, except for not listing Content-Length
+
+[00:39:59.0000] <yhirano>
+annevk: Does @ddragana know Firefox's status for chunked encoding?
+
+[00:44:09.0000] <annevk>
+yhirano: she would know for sure, yes, I can ask again
+
+[01:06:32.0000] <yhirano>
+annevk: Thank you. I'll add a comment on the thread.
+
+[01:06:46.0000] <annevk>
+yhirano: so
+
+[01:07:02.0000] <annevk>
+yhirano: we don't have it, but adding it is doable
+
+[01:07:10.0000] <annevk>
+yhirano: secure contexts is a must though
+
+[01:07:30.0000] <yhirano>
+annevk: My understanding is:
+
+[01:07:41.0000] <yhirano>
+annevk: secure context is a must-have
+
+[01:08:30.0000] <yhirano>
+annevk: requiring h2 may be good for some user agents from implementation cost PoV, but at least one web dev expressed a concern from usability PoV
+
+[01:08:52.0000] <yhirano>
+annevk: adding a new header may be good from security PoV
+
+[01:09:12.0000] <annevk>
+/me nods
+
+[01:09:38.0000] <annevk>
+Though, I'm okay with saying that the existing CORS preflight is sufficient here
+
+[03:55:22.0000] <annevk>
+littledan: heya, who would be best to ask questions about WebAssembly.Module?
+
+[03:55:46.0000] <littledan>
+annevk: I can answer some, also Ms2ger and Luke
+
+[03:56:47.0000] <annevk>
+littledan: I don't really understand how it's similar to SharedArrayBuffer, since it always copies the input bytes
+
+[03:57:06.0000] <annevk>
+littledan: and it doesn't even accept SharedArrayBuffer as an argument currently
+
+[03:57:27.0000] <littledan>
+yeah... I wasn't around when they made that decision. I believe it was so that it can be processed asynchronously, but I don't know why they didn't detach it instead
+
+[03:57:59.0000] <littledan>
+I don't see why it couldn't accept a SAB, but I also don't understand the use case. I thought we were adding SAB support on a case-by-case basis when we were confident?
+
+[03:58:20.0000] <littledan>
+the copy is created eagerly and then the compilation may happen in the background
+
+[03:58:35.0000] <littledan>
+annevk: Are there any issues with the wording of the copy?
+
+[03:58:39.0000] <annevk>
+littledan: maybe since they don't actually want to recompile?
+
+[03:58:57.0000] <littledan>
+well, yeah, if it were a live, changing thing and expected to reflect that, that'd be pretty unworkable...
+
+[03:59:09.0000] <annevk>
+littledan: the specification is clear, I'm trying to understand the space in light of the changes we're making around SharedArrayBuffer serialization
+
+[03:59:17.0000] <littledan>
+do you have a reference for that?
+
+[04:00:20.0000] <annevk>
+littledan: no, in a discussion with lth that came up, that maybe folks don't want to compile again and therefore don't want to allow messaging these things out of a process
+
+[04:00:58.0000] <littledan>
+oh, there was a separate thing about serializing modules
+
+[04:01:09.0000] <littledan>
+but some folks were saying they *would* want to recompile
+
+[04:01:17.0000] <annevk>
+okay
+
+[04:01:47.0000] <annevk>
+(Your understanding about allowing SharedArrayBuffer is correct btw, we'll gradually sprinkle [AllowShared] all over the place.)
+
+[04:02:08.0000] <littledan>
+serializing modules is supported, see https://webassembly.github.io/spec/web-api/index.html#serialization
+
+[04:02:20.0000] <littledan>
+not to storage, though (although that was originally planned)
+
+[04:02:34.0000] <littledan>
+modules are much nicer than SAB here since the code can't mutate. Also, they've already had an async compile step
+
+[04:03:09.0000] <annevk>
+I guess the real question is, should serializing these modules only work when serializing SAB works?
+
+[04:03:11.0000] <littledan>
+I'm not sure what implementations do, whether they actually recompile or not. My memory was that, in the beginning, more folks than I expected were actually just serializing the Wasm bytecode
+
+[04:04:09.0000] <annevk>
+I'll email you and Luke as a start if that's okay.
+
+[04:04:18.0000] <littledan>
+hmm, I can imagine the reason for this restriction, yes
+
+[04:04:39.0000] <littledan>
+if one origin's process is totally hosed, then you might not trust it to compile things
+
+[04:04:59.0000] <littledan>
+OTOH, the browser could just decide to fall back to sharing the bytecode when going across sites
+
+[04:05:22.0000] <littledan>
+this would make it more of a performance cliff than a security hole
+
+[04:05:50.0000] <littledan>
+(Ms2ger would be a good person to cc in any email)
+
+[04:05:57.0000] <annevk>
+Going across processes will always be a cliff of sorts I suspect (unless we make everything slower)
+
+[04:05:59.0000] <annevk>
+Okay
+
+[04:06:13.0000] <annevk>
+I'll copy Ms2ger on all my emails from now
+
+[04:06:15.0000] <annevk>
+on
+
+[04:06:16.0000] <littledan>
+yeah, this makes sense. I suspect there's no restriction needed here
+
+[04:06:19.0000] <Ms2ger>
+\o/
+
+[04:11:57.0000] <annevk>
+littledan: Ms2ger: ah, I think a thing I was missing is https://github.com/WebAssembly/threads/blob/master/proposals/threads/Overview.md#javascript-api-changes
+
+[04:12:27.0000] <annevk>
+littledan: Ms2ger: that would certainly be a type of WebAssembly.Module type that needs similar restrictions
+
+[04:13:05.0000] <littledan>
+isn't this implicit in WebIDL?
+
+[04:13:29.0000] <littledan>
+err sorry I misread
+
+[04:14:09.0000] <littledan>
+I don't see why we need this sort of option for WebAssembly.Module
+
+[04:14:33.0000] <littledan>
+it's a bit backwards: Memory actually *creates* a SAB. Whereas Module's constructor consumes one
+
+[04:15:00.0000] <annevk>
+Oh wait, that's WebAssembly.Memory
+
+[04:15:01.0000] <littledan>
+I think we can just rely on WebIDL to check that no SAB is passed in, and then the result is always copied and sharable
+
+[04:15:15.0000] <annevk>
+Can WebAssembly.Memory be serialized?
+
+[04:15:15.0000] <littledan>
+(and this is the current specified semantics IIRC)
+
+[04:15:38.0000] <annevk>
+Well currently it's restricted to be shared within an agent cluster
+
+[04:15:53.0000] <annevk>
+And cannot be serialized to disk despite mostly being bytes
+
+[04:17:00.0000] <littledan>
+right, we had a whole debate about serializing WebAssembly.Module to storage. IMO it only makes sense if people will actually store the compilation output, but this has all sorts of cases where it gets invalidated. Better to just store the bytecode and have good caching
+
+[04:17:23.0000] <littledan>
+(it's a high-level, unreliable API, but IndexedDB support would've been as well, given all the cases where it would disappear)
+
+[04:17:52.0000] <littledan>
+also it seemed like some engines were just going to store the bytecode anyway, when you serialize WebAssembly.Module, which defeats the whole purpose
+
+[04:19:39.0000] <littledan>
+Here's the spec for serializing WebAssembly.Memory. It does what you'd probably expect https://github.com/WebAssembly/threads/blob/master/document/web-api/index.bs#L146
+
+[04:20:18.0000] <littledan>
+(looks like I wrote that)
+
+[04:22:38.0000] <annevk>
+littledan: I see, so, you can create Memory from any kind of BufferSource, but you can only serialize if that BufferSource was SAB
+
+[04:22:54.0000] <annevk>
+littledan: and then when you serialize, all SAB serialization restrictions automatically apply
+
+[04:23:57.0000] <littledan>
+you can create a Module from any BufferSource, but the Memory constructor allocates the underlying ArrayBuffer
+
+[04:25:05.0000] <littledan>
+when you use the "shared" option for Memory, it creates an SAB internally (which you can easily access), and that is subject to those serialization restrictions
+
+[04:25:18.0000] <littledan>
+thanks for this review, btw
+
+[04:25:52.0000] <annevk>
+littledan: okay, so you create Memory and based on options it either creates AB or SAB (I might not call the internal slot BufferSource in that case)
+
+[04:26:29.0000] <annevk>
+I guess what WebAssembly.Module does doesn't matter so much then, indeed
+
+[04:27:10.0000] <annevk>
+As by itself it's not an attack vector and the process isolation seems to be driven by non-security reasons
+
+[05:18:06.0000] <littledan>
+annevk: Yeah, that's how I see it
+
+[05:20:06.0000] <annevk>
+Cool, I'm glad this is layered even better than I expected and I think I mostly misunderstood WebAssembly.Module since I didn't know about the plans around WebAssembly.Memory
+
+[07:59:05.0000] <annevk>
+nox: I'm looking at what's remaining of your script insertion work
+
+[07:59:43.0000] <nox>
+annevk: Remaining?
+
+[07:59:49.0000] <nox>
+Parts landed? :O
+
+[08:00:05.0000] <annevk>
+nox: I think I have a slightly better handle on what I want out of it so maybe I can try to drive it to a conclusion
+
+[08:00:15.0000] <annevk>
+nox: and also get Apple to weigh in
+
+[08:00:20.0000] <nox>
+annevk: Nice. Sorry for dropping the ball.
+
+[08:00:52.0000] <annevk>
+nox: I really appreciate all the work you put into it thus far, looking over it again it seems we were extremely close
+
+[08:01:00.0000] <annevk>
+or are, really
+
+[08:01:11.0000] <nox>
+Thanks!
+
+[08:44:45.0000] <annevk>
+nox: so yeah, now I'm at what kind of mutation records should normalize() generate
+
+[08:44:49.0000] <annevk>
+nox: meh
+
+[08:45:04.0000] <annevk>
+but, progress
+
+[08:49:52.0000] <annevk>
+Maybe it's not quite that bad
+
+[08:54:39.0000] <nox>
+annevk: Famous last words. :P
+
+[08:58:42.0000] <nox>
+annevk: Took a day off to go protest against pension system reform today, so I'll look at your PR tomorrow. :)
+
+[08:59:01.0000] <annevk>
+nox: 👍🏻
+
+[09:30:36.0000] <jugglinmike>
+annevk / Domenic: by my reading, the `crossorigin` attribute for `<script>` only affects classic scripts, not modules. Does that sound right to you?
+
+[09:31:10.0000] <annevk>
+jugglinmike: hmm, doesn't crossorigin=use-credentials have an effect?
+
+[09:32:11.0000] <Domenic>
+^ that
+
+[09:33:30.0000] <jugglinmike>
+oh, let's see
+
+[09:33:32.0000] <jugglinmike>
+I
+
+[09:35:12.0000] <annevk>
+also, not sure empty string counts as a state
+
+[09:35:44.0000] <jugglinmike>
+ah, I see it now: https://html.spec.whatwg.org/#set-up-the-module-script-request
+
+[09:36:37.0000] <jugglinmike>
+sorry, I was thrown off by 'mode is "cors"' in https://html.spec.whatwg.org/#fetch-a-single-module-script
+
+[09:38:47.0000] <jugglinmike>
+oh, no. "credentials mode" is not "mode"
+
+[09:40:52.0000] <annevk>
+Correct, they're distinct
+
+[09:43:02.0000] <jugglinmike>
+Okay, so `crossorigin` affects the "mode" of the request for a classic script and the "credentials mode" of the request for module scripts
+
+[09:43:58.0000] <annevk>
+It affects both for classic scripts
+
+[09:44:21.0000] <annevk>
+It doesn't affect mode for module scripts
+
+[09:45:20.0000] <jugglinmike>
+via https://html.spec.whatwg.org/#set-up-the-classic-script-request
+
+[09:45:31.0000] <jugglinmike>
+I think I get it, now. Thanks for the help :)
+
+[09:45:58.0000] <annevk>
+👍🏻
+
+
+2019-12-06
+[19:17:53.0000] <MikeSmith>
+looking at https://fetch.spec.whatwg.org/#ref-for-concept-response-status%E2%91%A0%E2%91%A8 I’m wondering why annevk chose the wording “are to be ignored” rather than “must be ignored”
+
+[19:18:15.0000] <MikeSmith>
+is “are to be ignored” normative language?
+
+[19:18:57.0000] <MikeSmith>
+it seems like rather than “Any responses whose status is in the range 100 to 199, inclusive, and is not 101, are to be ignored.
+
+[19:19:09.0000] <MikeSmith>
+... it would just be more clear to say:
+
+[19:19:15.0000] <MikeSmith>
+Any responses whose status is in the range 100 to 199, inclusive, and is not 101, are to be ignored.
+
+[19:19:18.0000] <MikeSmith>
+oofs
+
+[19:19:50.0000] <MikeSmith>
+“Ignore any responses whose status is in the range 100 to 199, inclusive, and is not 101.”
+
+[19:19:58.0000] <MikeSmith>
+imperative
+
+[23:10:01.0000] <annevk>
+MikeSmith: Fetch takes PRs 😊
+
+[23:10:22.0000] <MikeSmith>
+hey annevk
+
+[23:10:46.0000] <annevk>
+MikeSmith: I try to avoid saying must again if an algorithm is already required, but no hard fast rule for that yet
+
+[23:10:46.0000] <MikeSmith>
+I was just curious if there was a specific reason you worded it that way
+
+[23:10:51.0000] <MikeSmith>
+ok
+
+[23:11:25.0000] <MikeSmith>
+I’ll make a PR
+
+[23:11:28.0000] <annevk>
+MikeSmith: I like your imperative version
+
+[23:11:32.0000] <MikeSmith>
+OK
+
+[23:11:54.0000] <MikeSmith>
+well once I make my PR, then we’ll have two problems :p
+
+[23:12:13.0000] <annevk>
+Oooh that hasn’t been resolved?
+
+[23:12:20.0000] <MikeSmith>
+nope :(
+
+[23:12:23.0000] <annevk>
+Ouch best not to then
+
+[23:12:27.0000] <MikeSmith>
+I have been working on it
+
+[23:12:32.0000] <MikeSmith>
+at Keio
+
+[23:12:48.0000] <MikeSmith>
+just had a another discussion about it today
+
+[23:12:56.0000] <MikeSmith>
+but no resolution
+
+[23:13:42.0000] <MikeSmith>
+anybody who thinks it’s not a huge amount of work and time to get an employer to sign off on that, they are fooling themselves
+
+[23:14:06.0000] <MikeSmith>
+pretty disheartened about this situation
+
+[02:47:47.0000] <nox>
+annevk: So my DOM PR will just land as is?
+
+[02:53:15.0000] <annevk>
+nox: well, not literally, but I'm still convinced by that basic setup, yes
+
+[02:53:23.0000] <nox>
+Cool!
+
+[02:54:51.0000] <annevk>
+nox: I think we might need similar hooks for removal, and all the places that used to invoke "child text content change steps" will now invoke "children changed steps" and those might all need to have deferred steps of sorts
+
+[05:31:19.0000] <ondras>
+zcorpan: may I ask why is document.domain bad? and somewhat related, why does the metric name include "CrossOriginAccess"?
+
+[05:33:43.0000] <zcorpan>
+ondras: i think it's bad for several reasons. first, it complicates the origin model in browsers; more complexity leads to more interop problems and more security bugs
+
+[05:34:43.0000] <ondras>
+I might be not familiar enough with its functionality. It does more than reporting location.hostname ?
+
+[05:35:17.0000] <zcorpan>
+ondras: using it for one use case opens up access for all subdomains, which might not be intentional or desirable
+
+[05:35:38.0000] <zcorpan>
+ondras: oh. yes. you can set it to change the origin
+
+[05:35:44.0000] <ondras>
+oops
+
+[05:35:46.0000] <ondras>
+wow.
+
+[05:36:02.0000] <zcorpan>
+ondras: not to anything, but to a parent domain
+
+[05:36:23.0000] <ondras>
+aha, from a.b.com to b.com?
+
+[05:36:24.0000] <zcorpan>
+ondras: so foo.example.com and bar.example.com can access each others DOMs
+
+[05:36:28.0000] <zcorpan>
+right
+
+[05:36:59.0000] <ondras>
+ah. is there any other use case for this, except for cross-document access?
+
+[05:37:42.0000] <zcorpan>
+I don't think so
+
+[05:37:49.0000] <ondras>
+okay, thanks for explanation then!
+
+[05:38:39.0000] <zcorpan>
+np! I think there needs to be a doc that explains this stuff and why it's bad :)
+
+[05:39:29.0000] <annevk>
+mutable global policies/state is/are bad, thank you for coming to my ted talk
+
+[05:40:20.0000] <ondras>
+succintly said.
+
+[05:40:59.0000] <zcorpan>
+that too. and that it enables access between http://foo.test and https://foo.test
+
+[05:42:56.0000] <annevk>
+zcorpan: is that true?
+
+[05:43:34.0000] <annevk>
+zcorpan: I've been meaning to test that, but I was really hoping document.domain would still have scheme protection
+
+[05:46:43.0000] <zcorpan>
+annevk: looks like i misremembered the spec for that case
+
+[05:49:21.0000] <annevk>
+ah, same origin-domain checks the schemes
+
+[05:52:50.0000] <zcorpan>
+yes. though the spec ignores the port
+
+[06:02:41.0000] <annevk>
+yeah, jochen__ looked into that at some point, but it wasn't worth the trouble
+
+[06:41:44.0000] <ondras>
+zcorpan: nicely tweeted
+
+[06:41:58.0000] <zcorpan>
+ondras: ty
+
+[15:37:09.0000] <Domenic>
+Origin policy starting to get together... https://github.com/WICG/origin-policy/pull/60
+
+
+2019-12-09
+[09:15:36.0000] <domfarolino>
+annevk: Do you think you’ll have time this week for another pass on the lazyload PR?
+
+[09:15:58.0000] <annevk>
+domfarolino: for sure, didn't realize it was blocking on me
+
+[09:16:03.0000] <annevk>
+domfarolino: do we have tests?
+
+[09:16:38.0000] <annevk>
+domfarolino: I put a reminder in for tomorrow
+
+[09:16:46.0000] <domfarolino>
+annevk: np. Some, not all. Rob is writing some, I may be able to write others soonish
+
+[09:17:04.0000] <domfarolino>
+Cool thank you
+
+[09:17:55.0000] <annevk>
+domfarolino: I guess part of the question is if we now have unambiguous wording for the various tests we imagined
+
+[09:18:17.0000] <annevk>
+domfarolino: including constructing the image outside the tree and such
+
+[09:21:16.0000] <domfarolino>
+annevk: Yeah, I believe we do but I also want to take another look. RE outside-the-tree, I believe said image is not considered intersecting the viewport, but I also don’t know much about “CSS boxes”
+
+[09:22:27.0000] <annevk>
+domfarolino: ah yeah, that algorithm (if generalized from video) would return false so lazyload would kick in I guess, which is nice
+
+[09:22:53.0000] <annevk>
+anyway, tomorrow 🙂
+
+[09:23:15.0000] <domfarolino>
+(for explicitly loading=lazy adorned images, that is)
+
+[09:23:20.0000] <domfarolino>
+Sg!
+
+[10:45:35.0000] <annevk>
+Heh, MDN didn't care to document ProcessingInstruction
+
+[10:45:53.0000] <annevk>
+Or at least not in a way that MikeSmith's annotator picked up
+
+[13:35:30.0000] <domfarolino>
+annevk: Could a visibility:hidden image "intersect" with the viewport? from reading around, I believe the answer is yes.
+
+[13:42:23.0000] <astearns>
+domfarolino: I expect it should - it's still taking up a defined space
+
+[13:43:36.0000] <domfarolino>
+astearns: That is what I think too, thanks. I think display:none would never "intersect" the viewport however
+
+[13:45:10.0000] <astearns>
+that's my expectation, too
+
+[13:45:37.0000] <astearns>
+(standard caveat about applying logic)
+
+[13:54:46.0000] <MikeSmith>
+annevk: if the annotator didn't pick it up, that's either because there's no MDN article for it, or else because there is an MDN article, but it has no link to the DOM spec
+
+
+2019-12-10
+[17:27:05.0000] <MikeSmith>
+annevk: I edited https://wiki.developer.mozilla.org/en-US/docs/Web/API/ProcessingInstruction to add a link to the DOM spec
+
+[17:27:33.0000] <MikeSmith>
+...and to re-work the content to have it actually make sense
+
+[17:27:40.0000] <MikeSmith>
+https://wiki.developer.mozilla.org/en-US/docs/Web/API/ProcessingInstruction$compare?to=1594758&from=1522738
+
+[17:28:53.0000] <MikeSmith>
+the anno for it will be added/picked-up the next time I run the scripts that (re)generate the https://raw.githubusercontent.com/w3c/mdn-spec-links/master/dom.json file
+
+[20:57:54.0000] <Domenic>
+MikeSmith: I really like the <hr>s in the generated annotations
+
+[21:05:33.0000] <MikeSmith>
+Domenic: yeah I think there have always been too many browsers in those annotations (the Can I Use and MDN ones in the HTML spec, the Bikeshed-generated ones) to not have them logically separated somehow
+
+[22:31:37.0000] <MikeSmith>
+why/how would an element in the DOM end up with no parentNode?
+
+[22:32:50.0000] <MikeSmith>
+rather, I mean an event target
+
+[22:33:17.0000] <MikeSmith>
+how would event target end up with no parentNode?
+
+[22:34:01.0000] <MikeSmith>
+if you look at https://serviceworkerspec.herokuapp.com/docs/ and inspect the "Collapse Sidebar" arrow/button
+
+[22:34:48.0000] <MikeSmith>
+... and if you set a click event listener, and check the event target for when that "Collapse Sidebar" arrow/button is clicked
+
+[22:38:28.0000] <MikeSmith>
+... you will find that it’s either the span whose text content is "Collapse Sidebar" or else the span[aria-hidden] element with the arrow
+
+[22:38:53.0000] <MikeSmith>
+... and if you inspect those, you find they have no parentNode
+
+[22:39:22.0000] <MikeSmith>
+... despite them being children of the a[#toc-toggle] element
+
+[22:46:51.0000] <MikeSmith>
+ah, I think I see now: those nodes are getting removed from the DOM by another listener
+
+[22:47:04.0000] <annevk>
+MikeSmith: that sounds very strange. Is there a library involved? Ah
+
+[22:47:39.0000] <MikeSmith>
+annevk: https://www.w3.org/scripts/TR/2016/fixup.js is what does that ToC collapsing
+
+[22:48:10.0000] <MikeSmith>
+I guess I have to look at .composedPath() in this case
+
+[22:48:30.0000] <MikeSmith>
+... because I don’t see where it would otherwise be exposed at that point
+
+[23:47:45.0000] <hsivonen>
+jgraham: is there a way to tell WPT testharness.js that the test will renavigate before onload fires and, therefore, unload is not an error?
+
+[23:48:12.0000] <hsivonen>
+jgraham: use case: encoding tests where the encoding is discovered after 1024 bytes
+
+[00:30:56.0000] <annevk>
+hsivonen: can you run it in a popup?
+
+[00:34:24.0000] <hsivonen>
+annevk: Maybe. I'll fix other things first. (Obviously, non-UTF-8 tests are hard to edit, so I'll need to figure out a way to edit them without corrupting the tests.)
+
+[00:37:46.0000] <annevk>
+hsivonen: I quite like Hex Fiend, though it's mainly useful if you have the bulk of the test already written
+
+[00:38:46.0000] <hsivonen>
+these are already written
+
+[00:46:42.0000] <JakeA>
+I'm getting spammed with "Run failed for master (ccf3169)" on my fork of web-platform-tests. How do I make it stop?
+
+[00:47:44.0000] <hsivonen>
+in other news, various test cases that have undeclared UTF-8 seem to want windows-1252 specifically, so one needs to detect the UTF-8 and then respond windows-1252 instead of just allowing whatever the outcome would be from excluding UTF-8 from detection
+
+[00:48:57.0000] <hsivonen>
+(both intentional and addidental tests)
+
+[00:49:06.0000] <hsivonen>
+argh. accidental
+
+[00:49:40.0000] <hsivonen>
+accidental tests include things like not declaring the encoding but copying and pasting smart quotes from the spec into a comment in the test
+
+[00:49:48.0000] <hsivonen>
+in a UTF-8 editor
+
+[00:53:28.0000] <annevk>
+JakeA: W3C IRC, #testing might be a better place
+
+[00:53:37.0000] <annevk>
+JakeA: if you haven't rebased in a while, that's usually a good bet btw
+
+[00:53:56.0000] <JakeA>
+ta. Nah, it started when I rebased :D
+
+[00:54:09.0000] <annevk>
+good times
+
+[00:54:46.0000] <annevk>
+hsivonen: that doesn't sound like fun to have to debug at all
+
+[01:04:27.0000] <annevk>
+mkwst: why did https://bugs.chromium.org/p/chromium/issues/detail?id=691930 stall?
+
+[01:04:33.0000] <annevk>
+mkwst: the localhost thing
+
+[01:05:00.0000] <mkwst>
+Hrm. It's implemented. Let me find the patch and close that bug.
+
+[01:05:12.0000] <annevk>
+mkwst: even if "Let 'localhost' be localhost." is not standardized, applications are still permitted to always use the loopback address, right?
+
+[01:05:37.0000] <annevk>
+mkwst: ah okay, for all .localhost. addresses? I guess that means Firefox could follow
+
+[01:06:20.0000] <mkwst>
+annevk: I don't recall that detail. Let me find the patches so I don't lie to you. :)
+
+[01:06:50.0000] <annevk>
+ta!
+
+[01:08:20.0000] <mkwst>
+annevk: https://chromium-review.googlesource.com/c/chromium/src/+/598068/
+
+[01:08:42.0000] <mkwst>
+Tests say that we do indeed resolve `*.localhost` to loopback (both ipv4 and ipv6).
+
+[01:09:25.0000] <annevk>
+mkwst: great, thanks!
+
+[01:11:35.0000] <mkwst>
+annevk: I gave up on getting it through DNSOP. :(
+
+[01:12:41.0000] <annevk>
+mkwst: we could put it in Fetch still, adding a comment to standards-positions atm
+
+[01:13:27.0000] <mkwst>
+In "obtain a connection"? That's pretty hand-wavey as-is, and I don't think anyone has the energy to make it less so.
+
+[01:14:17.0000] <annevk>
+Fair
+
+[01:14:45.0000] <mkwst>
+Could add a note, I guess? I'm not sure how we'd add a normative requirement there, given that DNS isn't really described at all.
+
+[01:16:13.0000] <annevk>
+We could add more hand-wavy things about what obtaining a connection involves and make that part normative
+
+[01:16:25.0000] <annevk>
+But doesn't seem super important
+
+[01:16:42.0000] <mkwst>
+Yup. And yup.
+
+[01:16:52.0000] <annevk>
+I'm not sure if we still support that eager DNS lookup feature, defining that would also want some kind of hook
+
+[01:17:14.0000] <mkwst>
+Happily(?), there is always more work to do.
+
+[01:23:31.0000] <hsivonen>
+annevk: fortunately, it didn't require debugging
+
+[01:46:40.0000] <jgraham>
+hsivonen: No for tests that do weird navigation things you need to use a popup
+
+[01:46:52.0000] <jgraham>
+Unfortunately
+
+[01:49:00.0000] <hsivonen>
+jgraham: can you suggest an example that I should look at?
+
+[01:57:47.0000] <jgraham>
+hsivonen: Not off the top of my head, will look in a bit when I'm not on a rather crowded train
+
+[01:58:12.0000] <hsivonen>
+jgraham: ok. thanks.
+
+[01:58:39.0000] <hsivonen>
+jgraham: is adding a setup() argument allow_unload out of the question?
+
+[01:59:15.0000] <jgraham>
+hsivonen: I suspect it interferes too much with the way that the testdriver bits work
+
+[01:59:25.0000] <hsivonen>
+jgraham: ok. :-(
+
+[01:59:43.0000] <jgraham>
+So we'd need some way to communicate that a specific test wasn't using testdriver and then more codepaths and complexity
+
+[02:34:10.0000] <annevk>
+hsivonen: I’d make the popup message the results to the opener once done, that’s easiest
+
+[02:35:18.0000] <annevk>
+hsivonen: if you grep for window.open you’ll find some examples; if that doesn’t help let me know and I’ll create an example
+
+[02:35:54.0000] <jgraham>
+hsivonen: Right so https://searchfox.org/mozilla-central/source/testing/web-platform/tests/html/browsers/browsing-the-web/unloading-documents/001.html is a somewhat old example that uses the properties of the opener directly
+
+[02:36:15.0000] <jgraham>
+But as annevk says, using postMessage to return the results is probably better
+
+[02:38:06.0000] <jgraham>
+https://searchfox.org/mozilla-central/source/testing/web-platform/tests/content-security-policy/unsafe-hashes/javascript_src_denied_missing_unsafe_hashes-window_location.html is a pretty simple example of that
+
+[02:38:40.0000] <jgraham>
+(I guess there are bonus points if you do things like forward onerror to the parent)
+
+[03:09:32.0000] <MikeSmith>
+PSA: If you ever run any scripts that make requests to https://tools.ietf.org/, make sure the requests are sent with a User-Agent header; otherwise your IP address will get blocked for 7 days.
+
+[03:10:23.0000] <MikeSmith>
+... and apparently, urllib3 doesn’t send a User-Agent header in requests https://github.com/urllib3/urllib3/issues/1296
+
+[03:18:25.0000] <hsivonen>
+jgraham, annevk: thanks
+
+[09:08:55.0000] <annevk>
+Domenic: so afaict there's multiple numbers in use for the same email on lists.whatwg.org
+
+[09:09:19.0000] <annevk>
+Domenic: e.g., http://lists.whatwg.org/htdig.cgi/whatwg-whatwg.org/2009-May/019595.html and http://lists.whatwg.org/htdig.cgi/whatwg-whatwg.org/2009-May/061868.html are identical, just accessed from a different index
+
+[09:09:38.0000] <Domenic>
+Oh... fun?
+
+[09:09:46.0000] <annevk>
+(it's https://lists.w3.org/Archives/Public/public-whatwg-archive/2009May/0030.html)
+
+[09:10:31.0000] <Domenic>
+I bet if we knew the logic behind it, we could still figure that out, since they still seem date-sequential. But I'm not sure how to.
+
+[09:10:57.0000] <annevk>
+I do continue to get the same email if I increment both numbers
+
+[09:11:21.0000] <annevk>
+So the numbers are not related to the type of index
+
+[11:05:29.0000] <Krinkle>
+Does someone here know of a more public / official-looking signal from Mozilla of their intent to cap cookies to 7 days?
+
+[11:05:47.0000] <Krinkle>
+I found https://groups.google.com/forum/m/#!topic/mozilla.dev.platform/lECBPeiGTy4 and https://bugzilla.mozilla.org/show_bug.cgi?id=1529836 but both seem a bit internal / non-representative.
+
+[11:55:03.0000] <annevk>
+Krinkle: for document.cookie? If Ehsan is involved that seems official
+
+[11:55:22.0000] <annevk>
+Krinkle: Safari does a similar thing iirc
+
+[11:58:04.0000] <Krinkle>
+yeah, apple talked about it very clearly on their blog
+
+[11:58:59.0000] <Krinkle>
+I'm looking for something less obscure than an engineering ticket or obscure mailing list :)
+
+[12:17:55.0000] <annevk>
+Krinkle: you prolly know how to get hold of Ehsan
+
+[12:18:27.0000] <Krinkle>
+Ha, hadn't thought of that. Thanks :)
+
+[12:18:27.0000] <annevk>
+Krinkle: he might be able to make things look more official if there’s a need
+
+[12:18:33.0000] <Krinkle>
+yeah
+
+
+2019-12-11
+[01:17:15.0000] <nicolas____>
+hi all,
+
+[01:17:15.0000] <nicolas____>
+already answered question I guess but:
+
+[01:17:15.0000] <nicolas____>
+how mature are the web components ?
+
+[01:17:15.0000] <nicolas____>
+custom elements and template are in v1 and in "living standard" but what does that imply and how likely are they to change ?
+
+[01:17:15.0000] <nicolas____>
+i don't know the w3c process but what does the version 1 imply ? does it ensure that every new versions will ensure backward compatibily ?
+
+[01:17:15.0000] <nicolas____>
+shadow dom seems to still changing, where can I find information about how mature to use it is ?
+
+[01:17:16.0000] <nicolas____>
+thanks in advance,
+
+[01:17:17.0000] <nicolas____>
+If anyone has a website explaining how mature are webcomponents, I'll be very grateful
+
+[01:19:05.0000] <annevk>
+nicolas____: "v1" is a Google designation as they implemented an earlier proposal (they call "v0") that ended up being revised
+
+[01:19:21.0000] <annevk>
+nicolas____: everything that's implemented by Chrome/Firefox/Safari is stable
+
+[01:24:31.0000] <nicolas____>
+thanks for the quick answer,
+
+[01:24:31.0000] <nicolas____>
+when you say what is implemented is stable, does that mean that w3c specifications on webcomponents won't move or that will move but with no breaking changes ?
+
+[02:40:03.0000] <annevk>
+nicolas____: it's mostly in WHATWG specifications
+
+[02:40:39.0000] <annevk>
+nicolas____: and things will evolve, but backwards compatibility is extremely important for things deployed across multiple user agents
+
+[03:34:53.0000] <nicolas____>
+annevk ok so to sum up,
+
+[03:34:53.0000] <nicolas____>
+custom element and template are part of of the living standard so they won't change a lot,
+
+[03:34:53.0000] <nicolas____>
+shadow dom is still in working draft , so it might change a lot but since it was widely deployed among the user agents,
+
+[03:34:53.0000] <nicolas____>
+user agents will ensure backwards compatibilty
+
+[03:55:31.0000] <annevk>
+nicolas____: shadow trees are part of the DOM standard, they are here to stay
+
+[05:49:49.0000] <annevk>
+domfarolino: I pushed another loading=lazy review just now
+
+[05:50:04.0000] <annevk>
+domfarolino: we had a power outage here yesterday and I ended up forgetting it
+
+[06:26:54.0000] <Domenic>
+We need to delete the W3C shadow DOM and custom elements documents
+
+[06:27:01.0000] <Domenic>
+I think they are causing the confusion above
+
+[06:33:53.0000] <domfarolino>
+annevk: np thanks. Regarding in-parallel observation, a while ago I was wondering if we should use an intersection observer from the spec since it has good infra to get notified when an intersection happens. Doing something as part of update the rendering sounds good too, but as you mentioned doing that in a follow-up seems fine
+
+[06:59:54.0000] <annevk>
+domfarolino: assuming some commitment to get to the follow-up, yeah
+
+[07:24:36.0000] <domfarolino>
+annevk: we’d also have to make sure attribute mutation is updated (that is, loading=lazy +> loading=eager also resumes updating-the-image-data
+
+[07:48:46.0000] <domfarolino>
+...algorithm)
+
+[07:58:19.0000] <annevk>
+domfarolino: I'm not sure I understand
+
+[08:12:06.0000] <domfarolino>
+annevk: You suggested possibly adding something to "update the rendering", that would determine if an image intersects the viewport, and if so, resume #updating-the-image-data? Is this right?
+
+[08:14:28.0000] <annevk>
+domfarolino: I guess I see what you mean now
+
+[08:14:34.0000] <annevk>
+makes sense
+
+[10:19:13.0000] <Domenic>
+I don't understand why request upload streaming is so scary. It seems extremely hypothetical that there will be some exploitable issue in a behind-a-firewall server that can be triggered just by using Transfer-Encoding: chunked.
+
+
+2019-12-12
+[01:51:58.0000] <zcorpan>
+yoav: re https://groups.google.com/a/chromium.org/d/msg/blink-dev/zlLSxQ9BA8Y/0L7gimc3DwAJ - maybe the situation for tests would be clearer if the intent to ship template asked for a testing plan?
+
+[01:59:14.0000] <annevk>
+Domenic: changes to the same-origin policy are always scary
+
+[02:00:31.0000] <annevk>
+And I strongly suspect that downplaying the significance of such changes has led to quite a number of exploits in the past we're still coping with today
+
+[02:02:13.0000] <yoav>
+zcorpan: it currently asks if the feature is fully tested, which should cover it, but maybe we can do better
+
+[02:15:39.0000] <zcorpan>
+yoav: right. i think often people claim "Yes" when tests exist, but it's not actually fully tested. Reviewing a testing plan is easier than reviewing tests, so makes it easier for others to poke holes in the testing plan or note that the plan says to test something but no test exist for it
+
+[02:18:45.0000] <zcorpan>
+yoav: where is the right place to send feedback about the intent to X process?
+
+[02:33:06.0000] <yoav>
+The blink-api-owners mailing list would be the best venue
+
+[02:34:07.0000] <yoav>
+https://groups.google.com/a/chromium.org/forum/m/#!forum/blink-api-owners-discuss
+
+[03:10:14.0000] <zcorpan>
+https://groups.google.com/a/chromium.org/forum/m/#!topic/blink-api-owners-discuss/S2cZGThNPlY
+
+[06:38:47.0000] <dtapuska>
+annevk: How is it pure fiction? This check is the first quick check V8 makes.
+
+[06:44:48.0000] <annevk>
+dtapuska: at a conceptual level
+
+[06:46:14.0000] <dtapuska>
+annevk: Two agents that are cross domain should just fail on the check right away. So it is an early out. Yes it is true that it could be an assert after the same-domain check today.
+
+[06:46:55.0000] <annevk>
+dtapuska: the thing is that per JavaScript two objects that are in different agents shouldn't be able to reach each other
+
+[06:47:27.0000] <annevk>
+dtapuska: an agent is kinda like a process boundary (although implementation-wise the process boundary is more at the agent cluster level)
+
+[06:48:07.0000] <annevk>
+dtapuska: so if you're talking to an object from another agent, you're really talking to some kind of "remote object" in your agent that messages things across the boundary
+
+[06:48:12.0000] <dtapuska>
+WindowProxy is a PaltformObject
+
+[06:48:34.0000] <dtapuska>
+https://html.spec.whatwg.org/multipage/window-object.html#windowproxy-getprototypeof
+
+[06:48:47.0000] <annevk>
+(again, this is how it's supposed to be, the spec quite freely lets objects cross this boundary, but that's not necessarily great)
+
+[06:49:27.0000] <annevk>
+(as in, HTML steps a bit all over ECMAScript and ECMAScript doesn't really give great tools for working with agents)
+
+[06:50:11.0000] <dtapuska>
+In V8 I'd consider an Agent mapping to an Isolate.
+
+[06:50:36.0000] <dtapuska>
+And an Isolate can't access memory that it doesn't have mapped into it.
+
+[06:51:20.0000] <annevk>
+I'm not really familiar with V8 internals
+
+[06:52:26.0000] <dtapuska>
+Ya.. I understand that. I just want to be sure that you are aware there can be multiple Agents in a given standard operating system process.
+
+[06:55:05.0000] <annevk>
+Sure, that's clear to me, that's why I said conceptual
+
+[06:55:39.0000] <Domenic>
+(agent ~ thread, agent cluster ~ process)
+
+[06:55:46.0000] <annevk>
+In Firefox agents are also a number
+
+[06:56:01.0000] <annevk>
+Domenic: in impl yes, conceptually agents are closer to processes imo
+
+[06:56:16.0000] <Domenic>
+No, conceptually they are threads, since they can share memory amongst each other
+
+[06:56:28.0000] <annevk>
+But they cannot share anything else, which threads typically can
+
+[06:56:48.0000] <Domenic>
+Only in languages which choose to make that possible
+
+[06:56:50.0000] <annevk>
+And there's cross-process shared memory as well on some architectures
+
+[06:56:54.0000] <annevk>
+So meh
+
+[06:57:07.0000] <Domenic>
+Well, actually, memory is the only thing that is shareable in other languages too, they just hide it behind different language constructs
+
+[07:02:02.0000] <dtapuska>
+So you are saying that we probably really need to define Location and WindowProxy having the Agent check then?
+
+[07:03:37.0000] <dtapuska>
+https://www.irccloud.com/pastebin/zcSyTABj/
+
+[07:04:10.0000] <dtapuska>
+err sorry... ie; cause on a Remote WindowProxy..
+
+[07:04:10.0000] <dtapuska>
+1. Let W be the value of the [[Window]] internal slot of this.  <--- This doesn't really exist if they are different Agents...
+
+[07:04:10.0000] <dtapuska>
+2. If ! IsPlatformObjectSameOrigin(W) is true, then return ! OrdinaryGetPrototypeOf(W).
+
+[07:04:10.0000] <dtapuska>
+3. Return null.
+
+[07:40:11.0000] <annevk>
+dtapuska: ideally we'd have "remote WindowProxy" and "remote Location" objects for WindowProxy and Location others in other agents and those would message to their local counterparts in those agents
+
+[07:45:31.0000] <annevk>
+Domenic: what's the current state of 5107 and 5109 according to you? I believe I replied to all feedback in the PRs and tests
+
+[07:47:26.0000] <annevk>
+dtapuska: anyway, I was wrong about saying we can use asserts, as clearly we don't have remote/local objects and happily compare objects across agents. But I think continuing to build on the current setup with ECMAScript clearly having a different idea about this isn't great
+
+[07:49:23.0000] <Domenic>
+annevk: in both cases I don't believe the current tests are sufficient. In 5107 you've stated they are, and vaguely gestured toward why, so when I have several hours I can try to sit down and figure out what you mean. In 5109 you stated that only one of the two scenarios I outlined was tested so there the ball is in your court I believe?
+
+[07:54:29.0000] <annevk>
+Domenic: I suspect the second test would require browsers to expose document.domain in SVG documents, I'm not sure all of them do
+
+[07:55:06.0000] <Domenic>
+Hmm that would be an interesting divergence from the spec
+
+[07:55:07.0000] <annevk>
+Though I guess it should work, so why not
+
+[07:57:25.0000] <annevk>
+I'm not sure I was that vague btw
+
+[07:57:49.0000] <annevk>
+If you navigate from A1 to A2 and that's same origin and same origin-domain
+
+[07:57:58.0000] <Domenic>
+I feel that in 5107 you've been repeatedly brief and unclear, which is not helpful when trying to evaluate this very complex space.
+
+[07:58:02.0000] <annevk>
+If you do the same but A1 has set document.domain, it's still same origin, but not same origin-domain
+
+[07:58:09.0000] <annevk>
+A2 can never set document.domain
+
+[07:58:21.0000] <annevk>
+So same origin-domain is a stricter check and more secure
+
+[07:58:33.0000] <Domenic>
+I've tried to express in great detail scenarios that I think are being changed by the PR and that would be important to test, and you have given short not-very-clear answers as to why they're not important to test.
+
+[07:58:37.0000] <Domenic>
+GTG to a meeting for a bit
+
+[07:59:22.0000] <annevk>
+Well, I've said why they would be redundant with existing tests or cannot be tested and you have not provided an example why that's untrue...
+
+[08:32:15.0000] <Domenic>
+I haven't understood your "why's because they are very short and cryptic
+
+[08:32:41.0000] <Domenic>
+Fundamentally I find it impossible to understand how a spec change that preserves Window object identity doesn't end up testing Window object identity by checking if globals stay the same
+
+[08:33:10.0000] <Domenic>
+I understand that the ball is in my court to respond but it would take me a lot less time to respond if you were more clear
+
+[08:33:12.0000] <annevk>
+Again, as I wrote above it doesn't, it preserves it in fewer cases
+
+[08:33:26.0000] <Domenic>
+OK, then checks that the global variables disappear, either way
+
+[08:33:33.0000] <annevk>
+The whole bug is that it was preserved
+
+[08:33:51.0000] <annevk>
+Those would security error as is already checked?
+
+[08:34:16.0000] <Domenic>
+That isn't clear to me, so I'll spend some time when I can trying to make it clearer
+
+[08:34:47.0000] <annevk>
+Sure
+
+
+2019-12-13
+[23:53:49.0000] <MikeSmith>
+annevk: when you have time, can you please test some WIP changes to the deploy.sh script to support W3C publication of the DOM spec?
+
+[23:54:09.0000] <MikeSmith>
+git checkout review-drafts-w3c-additions
+
+[23:54:13.0000] <MikeSmith>
+make review
+
+[23:54:20.0000] <MikeSmith>
+make deploy
+
+[23:54:22.0000] <MikeSmith>
+...
+
+[23:54:57.0000] <MikeSmith>
+and you should end up with a dom.spec.whatwg.org/review-drafts/2019-12/index.html that includes MDN annotations
+
+[00:06:35.0000] <annevk>
+MikeSmith: I can but I also plan to publish today without such changes
+
+[00:06:43.0000] <MikeSmith>
+OK
+
+[02:12:09.0000] <annevk>
+MikeSmith: "DEPRECATION: Python 2.7 will reach the end of its life on January 1st, 2020. Please upgrade your Python as Python 2.7 won't be maintained after that date." oh joy
+
+[02:12:32.0000] <MikeSmith>
+yeah
+
+[02:12:56.0000] <MikeSmith>
+bikeshed is all python2 still
+
+[02:14:12.0000] <ato>
+RedHat has committed maintain Python 2.7 until June 2024.
+
+[02:14:49.0000] <annevk>
+MikeSmith: where would I give feedback?
+
+[02:15:01.0000] <annevk>
+MikeSmith: I see one of my early comments about no inline style blocks still stands
+
+[02:16:16.0000] <annevk>
+MikeSmith: are these only the MDN changes? Searching for W3C doesn't give much apart from cross-references
+
+[02:17:22.0000] <annevk>
+ato: that's nice, though I guess that also means we better start?
+
+[02:18:28.0000] <MikeSmith>
+annevk: so far the only thing the patch on that branch adds is the MDN annos
+
+[02:18:36.0000] <MikeSmith>
+I am working on the other bits now
+
+[02:18:51.0000] <MikeSmith>
+... which is, adding the logo and adding the status at the end
+
+[02:19:08.0000] <annevk>
+MikeSmith: I see
+
+[02:19:34.0000] <annevk>
+MikeSmith: I had missed there is a w3c-status.htm section
+
+[02:19:47.0000] <ato>
+Bikeshed may not have the same complication as WPT where we are forced to support both Python 2 and 3, because of the Apple test infrastructure ban on installing third-party dependencies.
+
+[02:20:17.0000] <ato>
+That should make things a bit easier.
+
+[02:20:30.0000] <annevk>
+MikeSmith: is the idea whatwg/dom would maintain that file? Or is that just for ease of development atm?
+
+[02:21:03.0000] <annevk>
+MikeSmith: I was wondering a bit about how we'd organize that and how comfortable we should be pulling in some HTML from elsewhere and such
+
+[02:21:44.0000] <annevk>
+ato: well, macOS will soon stop shipping Python, right?
+
+[02:22:06.0000] <annevk>
+ato: at that point it shouldn't matter
+
+[02:22:23.0000] <MikeSmith>
+annevk: I was thinking whatwg/dom would maintain the result, yeah
+
+[02:22:48.0000] <ato>
+Indeed, but the Bikeshed installation instructions recommends installing a custom Python on macOS due to security vulnerabilities in the Python bundled with macOS.
+
+[02:23:20.0000] <MikeSmith>
+annevk: is the deal that we will publish a separate Review Draft for W3C purposes?
+
+[02:23:24.0000] <ato>
+So as long as MacPorts and Homebrew keep shipping Python 2, Bikeshed will continue working on macOS even if Apple removes python2.7.
+
+[02:23:44.0000] <MikeSmith>
+yeah
+
+[02:24:03.0000] <MikeSmith>
+otherwise we’d be up a creek
+
+[02:24:26.0000] <annevk>
+ato: search for Python in https://developer.apple.com/documentation/macos_release_notes/macos_catalina_10_15_release_notes
+
+[02:24:38.0000] <annevk>
+ato: oh sure, I'm not worried about that
+
+[02:24:50.0000] <annevk>
+ato: I was mentioning that as an argument for WPT being able to move on
+
+[02:25:13.0000] <annevk>
+MikeSmith: I don't know
+
+[02:25:42.0000] <annevk>
+MikeSmith: I'm actually confused how it will all work
+
+[02:25:55.0000] <ato>
+annevk: Ah yes! There’s already progress on porting wptrunner, but there are some non-trivial tasks left as I understand it.
+
+[02:26:28.0000] <annevk>
+MikeSmith: I thought the idea was that W3C would prepare notes in advance of a RD publication and those would be inlined somehow upon publication
+
+[02:26:52.0000] <MikeSmith>
+that is what the status section is
+
+[02:26:55.0000] <annevk>
+MikeSmith: however, it appears review is happening on older drafts and some people expect us to mutate these older RDs with notes
+
+[02:27:14.0000] <annevk>
+MikeSmith: that seems quite silly to me as these are supposed to be immutable
+
+[02:27:16.0000] <ato>
+(gsnedders has the nitty-gritty details, but essentially the manifest parser produces widely different results on Python 2 and 3, despite the program being entirely Python 3 compatible. It has to do with a change in string/binary comparison/coercion.)
+
+[02:27:27.0000] <annevk>
+MikeSmith: so sorry, I'm not actually sure
+
+[02:27:48.0000] <MikeSmith>
+https://www.w3.org/2019/01/whatwg-w3c-sample.html is what I am working from
+
+[02:28:06.0000] <MikeSmith>
+as far as "some people expect us to mutate these older RDs with notes" I think the answer to that just needs to be No
+
+[02:28:49.0000] <MikeSmith>
+I don’t know who is expecting that but that is not what I understand from talking with plh at least
+
+[02:28:58.0000] <annevk>
+MikeSmith: a reasonable question is though how you can have reviewed it as recommendation if it was changing up until the day before
+
+[02:29:19.0000] <MikeSmith>
+yeah
+
+[02:29:20.0000] <annevk>
+MikeSmith: but I thought that's what the status section things were for plus mdn annotations
+
+[02:29:28.0000] <MikeSmith>
+right
+
+[02:29:30.0000] <MikeSmith>
+me too
+
+[02:29:41.0000] <annevk>
+Okay, so maybe we're on the same page, but Domenic isn't
+
+[02:30:19.0000] <MikeSmith>
+ah OK, let’s chat with Domenic about it when he’s here
+
+[02:30:54.0000] <MikeSmith>
+in the mean time I’ll finish up on the code parts of automating the insertion of the W3C stuff
+
+[02:32:48.0000] <annevk>
+Thanks, overall it looks good to me (including that sample we previously reviewed). There's some cleanup to do with inline styles (and maybe scripts), but not much
+
+[02:33:00.0000] <annevk>
+And MDN annotations are great to have in general of course
+
+[02:33:13.0000] <annevk>
+Especially in this automatic fashion
+
+[02:34:11.0000] <annevk>
+ato: making a backwards incompatible release was dumb and string changes might have been the dumbest
+
+[02:35:32.0000] <annevk>
+And of course, benefit of hindsight, but I think by the time it happened there was already massive evidence that platforms that evolve mostly compatibly do better
+
+[02:36:19.0000] <ato>
+annevk: The whole debacle makes me very sad.
+
+[04:15:06.0000] <MikeSmith>
+annevk: thanks for looking it over
+
+[04:15:17.0000] <MikeSmith>
+I pushed the rest of the changes to the branch just now
+
+[04:16:08.0000] <MikeSmith>
+so if you do "make deploy" again, you should now get a review draft that includes the W3C logo and the Status section at the end
+
+[04:17:26.0000] <MikeSmith>
+... and with that, I am done as far as the code part of automating production of W3C-ready Review Drafts for the DOM spec
+
+[04:18:43.0000] <annevk>
+MikeSmith: it'd be interesting to see the changes to deploy and review too
+
+[04:18:52.0000] <annevk>
+MikeSmith: the shell scripts that is
+
+[04:19:16.0000] <annevk>
+MikeSmith: in the at-risk section there's some missing closing parenthesis
+
+[04:19:46.0000] <MikeSmith>
+ok, I’ll fix the closing-parenthesis thing
+
+[04:20:22.0000] <MikeSmith>
+as far as the changes to the deploy and review scripts, the intent is that those won’t need to change
+
+[04:20:25.0000] <MikeSmith>
+I think
+
+[04:20:59.0000] <annevk>
+MikeSmith: there needs to be some change to get that w3c-status.html inlined, no?
+
+[04:21:02.0000] <MikeSmith>
+the changes I made to them for now were just to make it use bikeshed locally, rather than remotely — and to use bikeshed from the mdn-annotations branch
+
+[04:21:21.0000] <MikeSmith>
+annevk: that part I put into the python script
+
+[04:22:02.0000] <annevk>
+MikeSmith: interesting
+
+[04:22:18.0000] <MikeSmith>
+yeah that python script just gets called by setting POST_BUILD_STEP
+
+[04:22:34.0000] <MikeSmith>
+the deploy script already has that the POST_BUILD_STEP hook
+
+[04:23:11.0000] <annevk>
+MikeSmith: does that work if review-drafts/ already contains older published copies?
+
+[04:23:20.0000] <annevk>
+MikeSmith: I guess maybe those won't be there
+
+[04:24:01.0000] <MikeSmith>
+right those are not under version control there
+
+[04:24:06.0000] <MikeSmith>
+not in the dom repo
+
+[04:24:40.0000] <annevk>
+MikeSmith: if we can use Bikeshed's insertion feature that might be more future proof, but that's a minor detail too
+
+[04:24:41.0000] <MikeSmith>
+but I guess what we would do is to check in the w3c-logo-status-insert-into-review-drafts.py w3c-logo.html and w3c-status.html files to the dom repo
+
+[04:24:46.0000] <MikeSmith>
+yeah
+
+[04:25:27.0000] <MikeSmith>
+annevk: for now, I wanted to make it work without changing the dom.bs source at all
+
+[04:25:42.0000] <annevk>
+MikeSmith: okay
+
+[04:26:30.0000] <annevk>
+MikeSmith: so yeah, I think the main thing to sort out here is how this joint publication is to work in more detail
+
+[04:26:42.0000] <MikeSmith>
+right
+
+[04:26:45.0000] <annevk>
+MikeSmith: perhaps some coordination between plh/you/HTML WG chairs/SG is warranted
+
+[04:26:51.0000] <MikeSmith>
+yup
+
+[04:26:55.0000] <annevk>
+And I guess Domenic and I since we gotta review
+
+[04:27:13.0000] <MikeSmith>
+OK
+
+[04:28:24.0000] <annevk>
+MikeSmith: anyway, plenty of time for that as I'm taking a break for a couple of weeks (happy holidays!) and it won't block the current DOM RD (per SG decision)
+
+[04:28:37.0000] <MikeSmith>
+super
+
+[04:29:03.0000] <annevk>
+(well, not an official SG decision I guess, but that's what it came down to)
+
+[04:29:12.0000] <MikeSmith>
+OK good enough
+
+[04:29:23.0000] <MikeSmith>
+from W3C side, we have not yet gotten approval for the transition to CR anyway
+
+[04:29:51.0000] <MikeSmith>
+plh has been waiting on me to get the work done on producing a W3C-ready version
+
+[04:32:18.0000] <MikeSmith>
+anyway for now I guess I will push a W3C-ready version to a domspec-w3c-ready.herokuapp.com URL so others can review
+
+[04:32:50.0000] <MikeSmith>
+and I can push subsequent fixes/updates to that as needed
+
+[04:33:13.0000] <MikeSmith>
+for now I will fix the parenthesis typo
+
+[04:36:09.0000] <annevk>
+MikeSmith: if you want you can also open a (perhaps a WIP one) PR against DOM so other can take a look if they want
+
+[04:38:23.0000] <MikeSmith>
+annevk: OK, will do that too
+
+[04:43:35.0000] <annevk>
+👍🏻🎉
+
+[06:28:53.0000] <Domenic>
+annevk: MikeSmith: the agreement seems very clear. We mutate review drafts in place.
+
+[06:29:18.0000] <Domenic>
+annevk has expressed confusion on this point a few times but both myself and the SG have stepped in to clear up that no, that's what we do.
+
+[06:29:24.0000] <Domenic>
+I'm a bit surprised we're revisiting this.
+
+[06:42:19.0000] <annevk>
+Domenic: yeah, the MoU indeed spells it out, my understand is probably from a prior discussion; I don't really like where this ended up as it's a lot more management, but I guess since there is this MoU the W3C can do that and we'd have to trust the security of that setup (or figure out sandboxing)
+
+[06:42:29.0000] <annevk>
+understanding* sigh
+
+[06:43:03.0000] <Domenic>
+I don't quite get the security concerns; we don't need to have them make edits directly. Any edits can go through PRs.
+
+[06:44:22.0000] <Domenic>
+E.g. one technical route is to pull down the current compiled RD text into the repo and then do PRs against that. (But, that might work poorly with the work MikeSmith is doing, since we probably want to re-compile with Bikeshed.)
+
+[06:45:19.0000] <MikeSmith>
+in the end I can do it however we need
+
+[06:47:03.0000] <Domenic>
+In my mind the ideal flow would be that we update the `Status: RD` to `Status: RD-CR` then `Status: RD-REC` and each time the CI process deploys the new document like normal for RD publication (just at the same URL) and everything works great. But I think the danger there is if things change in Bikeshed in the intervening 6 months or whatever horizontal review takes, such that things no longer compile, then we could be
+
+[06:47:04.0000] <Domenic>
+in for some pain.
+
+[06:47:29.0000] <annevk>
+If they go through PRs we'd have to handle them
+
+[06:47:53.0000] <annevk>
+One of my goals was no additional work for editors long term
+
+[06:48:00.0000] <Domenic>
+Hmm, OK, that was not my goal.
+
+[06:48:28.0000] <Domenic>
+Adding additional work on the same order of magnitude as the current RD process (which is pretty small I think?) was what I was envisioning.
+
+[06:50:29.0000] <Domenic>
+I also want to make sure we have a process that is relatively easy for MikeSmith :)
+
+[06:50:56.0000] <Domenic>
+So please don't implement my "ideal flow" if there's something easier you had in mind
+
+[06:55:03.0000] <MikeSmith>
+writing and maintaining the automation for it is relatively easy regardless of how/when we choose to deploy the W3C-ready RDs, I guess
+
+[06:55:44.0000] <MikeSmith>
+the harder part right now is getting the code for the MDN-annotations feature landed
+
+[06:56:07.0000] <MikeSmith>
+that is gonna need review from TabAtkins still
+
+[06:56:41.0000] <Domenic>
+But that part gives giant ecosystem-wide benefits <3
+
+[06:57:05.0000] <MikeSmith>
+yeah :)
+
+[07:04:09.0000] <TabAtkins>
+Is your patch ready for review MikeSmith ?
+
+[07:05:55.0000] <MikeSmith>
+TabAtkins: yes
+
+[07:07:05.0000] <TabAtkins>
+Ah kk. Whatever tooling you use for pushing commits just says "Fixup!" for every commit message, so I couldn't tell what was happening in your commits
+
+[07:08:17.0000] <MikeSmith>
+ah OK
+
+[07:08:50.0000] <MikeSmith>
+yeah I made some tweaks to it and probably there are some things I have overlooked but at this point is stable for review purposes
+
+[07:10:39.0000] <MikeSmith>
+I can just squash all those subsequent commits
+
+[07:11:01.0000] <MikeSmith>
+if you prefer
+
+[07:12:29.0000] <TabAtkins>
+I'll take care of that; they're not an ongoing problem, it just means I have no clue what each commit is actually doing unless I load up the gh page and carefully look.
+
+[07:14:08.0000] <TabAtkins>
+annevk: Bikeshed will be upgraded to Python 3 early next year btw
+
+[07:20:08.0000] <MikeSmith>
+(TabAtkins: I just made the subsequent commits (rather then amend-ing and force pushing) because I wasn’t sure if you had started to review the code yet and so I didn’t want to clobber what you were looking over)
+
+[07:52:00.0000] <annevk>
+I think patching the generated file is the way to go without reproducible builds, also to make it clear to lawyers what the delta actually is (I presume they're not interested in source delta). I guess this could be either editor-mediated on our side or with some kind of hook that can be called remotely (though ideally that goes through some kind of git repo for analysis).
+
+[09:19:27.0000] <annevk>
+I’m out until around the end of the year btw. Might check things sometimes.
+
+[09:24:00.0000] <annevk>
+Happy holidays! 🎄
+
+[09:26:12.0000] <Domenic>
+\o/
+
+[10:01:37.0000] <TabAtkins>
+MikeSmith: Ah, I wasn't sure if I should *start* reviewing, since you were apparently pushing fixups the whole time. ^_^ (What are you using to push those commits, btw? I've seen someone else pushing those plain "Fixup" commit messages.)
+
+[10:02:31.0000] <TabAtkins>
+Domenic, annevk: If reproducible builds are wanted, it shouldn't be difficult to do now that bikeshed-data is versioned as well.
+
+[10:06:52.0000] <annevk>
+TabAtkins: interesting, though we'll have to see about all the surrounding infrastructure as well I suppose and for HTML it's going to be vastly different :-(
+
+[10:06:57.0000] <annevk>
+MikeSmith: ^^
+
+[14:01:15.0000] <domfarolino>
+annevk: I know you're out until EOY, buuutttt if you get around to it, I've addressed the lazyload nits :) (enjoy break)
+
+
+2019-12-14
+[07:05:34.0000] <benjamingr__>
+Hey, this room is probably filled with more senior people than most other rooms around - if anyone feels like filling my (Quick, 2m, I promise) survey I would love some help https://forms.gle/t7Kp2T9KQVmdZZey8
+
+
+2019-12-15
+[14:07:45.0000] <domfarolino>
+Anyone know why the `mozilla:gecko-blocked` label might be auto-added to a WPT PR?
+
+[14:08:02.0000] <domfarolino>
+ I can't tell what exactly it means (..maybe that gecko won't be able to cleanly pull the changes, if the PR is merged?)
+
+[14:43:16.0000] <gsnedders>
+domfarolino: (yes)
+
+[14:43:39.0000] <gsnedders>
+domfarolino: you can ignore it, fwiw
+
+[14:43:55.0000] <domfarolino>
+gsnedders: Thanks! Do you happen to know if the label gets auto-removed once any conflicts are resolved in the PR?
+
+[14:43:57.0000] <domfarolino>
+gsnedders: Ah, OK
+
+[15:51:01.0000] <domfarolino>
+(FWIW it appears the answer is yes)
+
+
+2019-12-16
+[17:27:47.0000] <gsnedders>
+domfarolino: (I mean it depends really on conflicts with what's been so far imported, so it's not quite that simple)
+
+[20:21:36.0000] <domfarolino>
+Right, makes sense. My observation was just from my PR lol
+
+[10:36:40.0000] <jgraham>
+PiersW: I made a PR to fixup the problems with the selenium executor, so hopefully it should work again soon https://github.com/web-platform-tests/wpt/pull/20791
+
+[12:04:45.0000] <PiersW>
+jgraham: that's great, thanks. Hope the trip wasn't too painful.
+
+
+2019-12-17
+[03:06:36.0000] <gitesh>
+what whatwg in relation to HTML5?
+
+[03:06:45.0000] <gitesh>
+s/what/what's
+
+[03:58:40.0000] <hsivonen>
+gitesh: WHATWG is a group working on specs. HTML5 is a spec based on the WHATWG's work. the presently-active WHATWG spec on the topic is called the HTML Standard (without the "5")
+
+[05:25:37.0000] <gitesh>
+ok, hsivonen.
+
+[06:52:20.0000] <zcorpan>
+annevk: is postMessage allowed between documents in different agent clusters?
+
+[06:54:57.0000] <annevk>
+zcorpan: yup
+
+[06:56:27.0000] <zcorpan>
+annevk: ok, thanks
+
+[09:36:08.0000] <jugglinmike>
+annevk: this GitHub Gist references "changes to navigation." https://gist.github.com/annevk/6f2dd8c79c77123f39797f6bdac43f3e
+
+[09:36:34.0000] <jugglinmike>
+Is that HTML's "process a navigate response"?
+
+[09:49:59.0000] <annevk>
+jugglinmike: yeah, I should make that more specific, but that sounds about right
+
+[09:55:59.0000] <jugglinmike>
+annevk: Thanks. This influences how we can test this, possibly down to the algorithm step where it's inserted
+
+
+2019-12-19
+[16:59:40.0000] <MikeSmith>
+Domenic: (or any other node gurus) For async JSON parsing in node, do you have any recommendations? (and for stringifying too)
+
+[17:03:32.0000] <MikeSmith>
+jsonparse? https://www.npmjs.com/package/jsonparse
+
+[17:04:24.0000] <Domenic>
+Haven't used any myself, sorry
+
+[17:10:55.0000] <MikeSmith>
+k
+
+[12:16:34.0000] <zcorpan>
+annevk: Domenic: do we have a way to give folks ability to set labels in whatwg/* ?
+
+[13:53:43.0000] <jenny-m>
+zcorpan: we could create a team that has Triage privileges, I believe
+
+[13:54:52.0000] <zcorpan>
+jenny-m: I had a vague recollection that something like it already existed, but maybe not
+
+[13:55:25.0000] <zcorpan>
+in any case, I'd like jugglinmike to be able to set their labels :-)
+
+
+2019-12-20
+[05:35:04.0000] <zcorpan>
+annevk: https://help.github.com/en/github/setting-up-and-managing-organizations-and-teams/repository-permission-levels-for-an-organization - there's a Triage permission level
+
+[05:41:51.0000] <annevk>
+zcorpan: it seems they added new options there indeed
+
+[05:41:59.0000] <annevk>
+zcorpan: might also allow us to have less admins
+
+[05:42:51.0000] <annevk>
+zcorpan: file an issue I guess?
+
+[05:43:06.0000] <zcorpan>
+annevk: for meta/ ?
+
+[05:47:43.0000] <zcorpan>
+https://github.com/whatwg/meta/issues/154
+
+[06:03:39.0000] <annevk>
+zcorpan: I guess we want everyone that is a member of WHATWG to get triage, but need to look into details a bit more
+
+[06:04:07.0000] <annevk>
+Certainly nice they expanded beyond read/write/admin
+
+[06:04:51.0000] <annevk>
+Another minor problem we have is that WHATWG is not a 2FA org
+
+[07:40:25.0000] <slikts>
+what's with Firefox not implementing WritableStream?
+
+[07:40:46.0000] <slikts>
+and TransformStream
+
+[11:39:04.0000] <annevk>
+domfarolino: https://twitter.com/rich_harris/status/1208040145385086982
+
+[11:40:15.0000] <annevk>
+domfarolino: it’s worth reconsidering what we want beyond not immediately fetching and not blocking the main load event
+
+[11:40:31.0000] <Domenic>
+I'm not a big fan of optimizing for NYC subways over the rest of the world, especially places starting to come online where bandwidth is more constrained. It feels very first-world-exclusive.
+
+[11:40:33.0000] <domfarolino>
+Hmmm
+
+[11:40:45.0000] <Domenic>
+(Not to mention that in the rest of the first world internet works fine in subways.)
+
+[11:52:33.0000] <domfarolino>
+Reading some of the replies..interesting, but I'll have to take a closer look l8r
+
+[11:56:04.0000] <annevk>
+Domenic: yeah, fair, but there might well be need for both
+
+[11:56:38.0000] <annevk>
+Domenic: akin script async/defer or some such
+
+
+2019-12-23
+[02:11:48.0000] <DarwinElf>
+i've always liked to download the HTML specification for offline usage (since the 1990s) and after W3C replied on Github and finally made an html52.tar.gz file, they said they'd do one for future versions... but I don't see an html53.tar.gz anywhere, or is that not the latest normally-numbered version?
+
+[02:26:42.0000] <DarwinElf>
+hmm... it's a living document now?  Anytime I edit HTML and might have to learn/review something, is it best to just read/download the latest version?  It used to sometimes be years until I was aware of a new version from W3C but it seems you're working on it much more than they were in the past...
+
+[02:28:26.0000] <DarwinElf>
+though it'd be nice to read from a tarball as well as single-page or PDF... is it acceptable/doable to copy the developer version with wget or something?
+
+[03:32:23.0000] <annevk>
+DarwinElf: that should be fine, there’s also a PDF
+
+[03:34:04.0000] <annevk>
+DarwinElf: there’s a half-yearly snapshot for lawyers, but for most people the latest version is the one to read, which is updated somewhat frequently indeed
+
+[07:10:12.0000] <domfarolino>
+annevk: What would an async/defer equivalent for images buy us? They are already not render-blocking. It could unblock the load event but is that a big win?
+
+[07:38:16.0000] <annevk>
+domfarolino: it might be as lots of execution blocks on that; pages coded that way might not adopt this though
+
+[08:47:07.0000] <annevk>
+domfarolino: I think it also frees up some space for browsers to innovate versus only fetching when it is about to intersect the viewport
+
+[08:52:41.0000] <Ms2ger>
+/me waves
+
+[08:52:47.0000] <Ms2ger>
+See y'all in '20
+
+[09:00:36.0000] <domfarolino>
+annevk: Sounds like that would result in a looser spec than we have now right? We'd specify the image can be deferred from parse-time until basically any time the browser wants to fetch...that seems vague
+
+[09:08:41.0000] <annevk>
+domfarolino: yeah
+
+[09:12:23.0000] <domfarolino>
+annevk: seems a little tricky to test, but haven’t thought about it much
+
+[12:49:29.0000] <bathos>
+Got a question re: https://gist.github.com/alice/174ae481dacdae9c934e3ecb2f752ccb
+
+[12:49:45.0000] <bathos>
+I was under the (maybe mistaken) impression that one of the motivations for the AOM reflection API was that it could solve currently intractable accessibility issues when using shadow DOM. One of the options listed in this gist says that it ‘does not allow authors to refer to elements across any shadow boundaries.’ Am I understanding correctly that this means this API might not end up addressing those issues?
+
+[13:01:19.0000] <Domenic>
+bathos: yes, my understanding is that due to Apple and Mozilla preferences it is no longer clear whether we will be able to have accessible shadow DOM structures in this way.
+
+[13:03:02.0000] <bathos>
+ouch ... well, crossing my fingers that they’ll reconsider its importance. thanks for confirming
+
+
+2019-12-24
+[17:56:26.0000] <DarwinElf>
+thanks.  If development has sped up then (I can just save it with note of the date maybe rather than commit hash) I'll just view or maybe copy the site if I'm going to be reading it a lot.  The half-yearly archive for lawyers doesn't sound as useful as the development version...
+
+[23:43:44.0000] <annevk>
+bathos: https://annevankesteren.nl/2019/10/encapsulation-theory
+
+[23:45:12.0000] <annevk>
+bathos: that shouldn’t really prevent anything per se btw, but would require a different approach to the design
+
+[23:45:17.0000] <bathos>
+thanks, annevk. I’m very interested in the subject of hard privacy in custom elements, but I think I’ve misunderstood something because I don’t see how the refs would break it.
+
+[23:46:58.0000] <annevk>
+bathos: if the refs are on a light tree node you have a public API pointing into the shadow tree
+
+[23:49:12.0000] <bathos>
+I was like ??? at first because the refs would seem to need to have been explicitly exposed to that end, which is always possible, but I think I understand what you’re saying now — are you talking about cases where the relationship desired is one where the a shadow-enclosed element is the referencee rather than the referencer?
+
+[23:49:55.0000] <bathos>
+I’ve never run into the need for that so I hadn’t considered it, but it makes sense that it would happen sometimes. (I hit the opposite issue pretty much daily.)
+
+[23:50:30.0000] <bathos>
+in any case though I have no investment in a particular solution and I’m glad it sounds like it’s a design question rather than just dropping the issue
+
+[00:43:13.0000] <annevk>
+bathos: shadow referencing light tree is fine btw and doesn’t break encapsulation
+
+[00:43:53.0000] <bathos>
+yep, that’s what I was missing — I was only considering that scenario
+
+
+2019-12-27
+[16:05:54.0000] <devsnek>
+how come WindowProxy doesn't override [[HasProperty]]
+
+[18:42:03.0000] <Domenic>
+Why would it?
+
+[21:10:24.0000] <devsnek>
+Domenic: i dunno, isn't the point to protect the origin window
+
+[21:11:12.0000] <devsnek>
+i don't know much about why windowproxy exists tbh, i was just looking at the history of why v8 doesn't properly support [[HasProperty]] operations on the global proxy
+
+[21:56:13.0000] <annevk>
+devsnek: iirc that delegates to something that is protected
+
+[21:56:55.0000] <devsnek>
+yeah i wasn't able to get a full picture from the spec
+
+[21:57:16.0000] <devsnek>
+interesting to know why v8 doesn't intercept [[HasProperty]] correctly though
+
+[21:57:58.0000] <annevk>
+devsnek: does the default Has not call GetOwn?
+
+[21:58:17.0000] <devsnek>
+it does
+
+[21:58:36.0000] <annevk>
+So no need to override it then
+
+[21:58:38.0000] <devsnek>
+but if you use an exotic object, v8 doesn't call [[HasProperty]]
+
+[21:58:50.0000] <devsnek>
+it goes straight to GetOwnProperty
+
+[21:59:04.0000] <devsnek>
+i assume as an optimization
+
+[21:59:22.0000] <annevk>
+Okay, that might be a bug if observable
+
+[21:59:37.0000] <devsnek>
+well its only observable if you put like a proxy or something as the global object
+
+[21:59:45.0000] <devsnek>
+not possible in browsers
+
+[13:41:44.0000] <white_soldier>
+Hi can I ask question about Stream API JS
+
+
+2019-12-31
+[06:28:58.0000] <gsnedders>
+Are there any tests for encoding that aren't reliant on HTML + JS etc.?
+
+[13:19:53.0000] <annevk>
+gsnedders: there’s a lot of JSON
+
+[13:20:38.0000] <annevk>
+While I’m here, 👋🏻🎉
+

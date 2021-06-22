@@ -1,0 +1,4395 @@
+2021-03-01
+[22:22:21.0000] <annevk>
+There was another weird deploy failure, rsync exiting with 255, which is apparently some kind of SSH error, retry worked
+
+[02:20:58.0000] <annevk>
+Okay, so progress events are as dumb as I expected, which is nice, if the service worker lies about Content-Length we'll just use the lie and call it a day
+
+[04:05:13.0000] <annevk>
+wanderview: so I noticed something odd
+
+[04:05:18.0000] <annevk>
+wanderview: event.respondWith(new Response("meeeeh", { headers: [["Content-Length", "10000"], ["Content-Length", "10000"]] }));
+
+[04:05:34.0000] <annevk>
+wanderview: what does xhr.getResponseHeader() return?
+
+[04:05:43.0000] <annevk>
+(when you pass Content-Length)
+
+[04:32:39.0000] <noamr>
+hi annevk! I'm starting to work on resource-timing/fetch integration with yoav. One choice I need to make is for all the 12 different timestamps - between having a struct that predefines them, or a string-to-Timestamp map where we set different entries. The second one might make it easier to add new ones and reduce some duplication. WDYT? Is there a general guideline for this?
+
+[04:56:13.0000] <croraf>
+Hi. Literally any Javascript on the loaded website can read the localStorage and cookies?
+
+[04:58:46.0000] <croraf>
+(localStorage and cookies stored for that website)
+
+[05:09:32.0000] <annevk>
+noamr: I prefer a struct so the times have names
+
+[05:09:39.0000] <annevk>
+noamr: and dfns
+
+[05:10:14.0000] <noamr>
+cool, thanks annevk.
+
+[05:10:40.0000] <annevk>
+noamr: whenever you add you’ll have to touch Fetch anyway
+
+[05:10:51.0000] <noamr>
+yes of course
+
+[05:11:09.0000] <annevk>
+croraf: yes
+
+[05:11:47.0000] <annevk>
+croraf: don’t execute scripts you don’t trust
+
+[05:22:02.0000] <ondras>
+also, only those cookies that do not have the HttpOnly flag
+
+[09:37:45.0000] <annevk>
+If https://github.com/whatwg/fetch/pull/1183 is actually correct than parsing Content-Length is not too silly, one might even say elegant
+
+[09:39:05.0000] <annevk>
+Still a lot more than what you'd want to do for obtaining an integer of course
+
+[15:42:10.0000] <croraf>
+annevk, ondras I cannot really execute only scripts I trust. I use 3rd party libraries, etc.. I need to make sure to hide sensitive data behind the HttpOnly I guess
+
+[15:43:00.0000] <croraf>
+And also regarding localstorage, all the scripts on the site, no matter where their origin is can access localStorage also. So both localStorage and cookies (non-http-only) are the same with that regards?
+
+[15:44:09.0000] <croraf>
+Like some script from 3rd party can read the localStorage (cookie) data (for example authentication token) send it to the internet and use this token in malicious requests.
+
+[15:44:33.0000] <croraf>
+use it from anywhere.
+
+[15:46:02.0000] <Domenic>
+You should not use 3rd party libraries that you don't trust. That is how the web's security model works.
+
+[15:46:48.0000] <Domenic>
+A third party library could do much worse than read storage. It could redirect the page (e.g. location.href = "https://scam-site.com"), it could listen for all keystrokes and send them to a remote server, it could extract any sensitive information you write to the DOM (e.g. account balance, private messages, etc.)
+
+
+2021-03-02
+[19:07:58.0000] <croraf>
+Domenic, I mean you cannot have complete control over the 3rd party libraries. This is a major vector of attack.
+
+[19:08:26.0000] <croraf>
+This is the reason why HTTP only cookie exists, to prevent access to it from 3rd party library code.
+
+[19:15:17.0000] <Domenic>
+That's not true; it's to prevent access from JS at all (including first party)
+
+[19:15:34.0000] <Domenic>
+If you do not trust the third party libraries, and do not have the resources to audit them, then you shouldn't use them.
+
+[21:21:11.0000] <annevk>
+HttpOnly cookies are defense-in-depth, so that in the case of XSS you still have a chance
+
+[01:02:10.0000] <zcorpan>
+https://twitter.com/csswizardry/status/1366431849925476356 - can we make the html standard faster to paint? what's causing it to take 6.8 seconds?
+
+[01:03:30.0000] <Rik`>
+zcorpan: you should ask him a link to the webpagetest used. my bet is that this is capped to 3G
+
+[01:04:16.0000] <annevk>
+zcorpan: JakeA looked into this with that new CSS property
+
+[01:05:08.0000] <zcorpan>
+Rik`: good point. but testing locally with 500/500 connection it takes about the same amount of time to first paint
+
+[01:08:30.0000] <zcorpan>
+annevk: oh right, content-visibility: auto
+
+[01:17:15.0000] <Rik`>
+zcorpan: https://www.webpagetest.org/video/compare.php?tests=210302_AiZT_414af020384b0e09012567cad3a12c67-r:1-c:0
+
+[01:17:42.0000] <Rik`>
+first-step : use the same domain for HTML and CSS
+
+[01:19:15.0000] <zcorpan>
+Rik`: are you telling us the subdomain scheme for each spec was a mistake? :P
+
+[01:21:52.0000] <JakeA>
+zcorpan: https://html-spec-with-c-v.glitch.me/
+
+[01:22:03.0000] <JakeA>
+(using `content-visibility`)
+
+[01:22:30.0000] <zcorpan>
+JakeA: nice! fast-fast
+
+[01:25:08.0000] <zcorpan>
+I guess we're waiting for a second implementation
+
+[01:25:57.0000] <annevk>
+If it's an accepted standard I think it's okay to add the property, but is that really all there is to it?
+
+[01:26:54.0000] <zcorpan>
+need to add a bunch of <section>s (or <div>s would work too)
+
+[01:27:07.0000] <JakeA>
+Some folks don't like the scrollbar behaviour, although I think we tried to improve that though
+
+[01:27:21.0000] <JakeA>
+I know Domenic wasn't happy with it
+
+[01:29:02.0000] <JakeA>
+Also https://github.com/tc39/ecmarkup/pull/263
+
+[01:29:16.0000] <zcorpan>
+JakeA: do you know if webkit is interested in implementing? I don't see a bug for it
+
+[01:32:13.0000] <Rik`>
+zcorpan: https://www.webpagetest.org/video/compare.php?tests=210302_Ai2F_d0f8e800e633104520f0dda99a7142bf-r%3A2-c%3A0&thumbSize=200&ival=100&end=visual seems like there are some inefficiencies in the TCP/TLS handshakes as well
+
+[01:32:57.0000] <Rik`>
+this test is with a non-capped connection and TCP/TLS takes way more time than DNS
+
+[01:33:12.0000] <JakeA>
+zcorpan: I'm not sure what webkit's position is
+
+[01:33:52.0000] <Rik`>
+it does not look like the spec servers are behind any kind of CDN so maybe that's why?
+
+[01:36:07.0000] <annevk>
+Ooh right, I forgot about the scrollbar issue, that does seem bad
+
+[01:37:17.0000] <annevk>
+Rik`: they are not, we use DigitalOcean atm and that's it
+
+[01:37:58.0000] <Rik`>
+in which region? US probably?
+
+[01:38:59.0000] <annevk>
+Rik`: dunno
+
+[01:39:46.0000] <annevk>
+MikeSmith might know and foolip would know, but he's off this week
+
+[01:54:56.0000] <noamr>
+technical bikeshed question... trying to link from fetch to "time origin" which is exported from HR-TIME and it wouldn't catch... Tried all the different voodoo <a for="time origin">time origin</a> [[!HR-TIME-2]] etc, what should I be looking for?
+
+[01:58:22.0000] <annevk>
+noamr: is HR-TIME indexed?
+
+[01:59:11.0000] <annevk>
+noamr: it seems that <a for=/>time origin</a> should work
+
+[02:00:32.0000] <noamr>
+annevk: I am not sure I know what that means (still new-ish to spec-land). It does catch HR-TIME, but it doesn't  catch "time origin". "No 'dfn' refs found for 'time origin' that are marked for export"
+
+[02:01:18.0000] <annevk>
+noamr: oh, weird, it's included in `bikeshed refs --spec=hr-time` and it even says it's exported there
+
+[02:02:09.0000] <annevk>
+noamr: are you doing this locally? Is your bikeshed up-to-date?
+
+[02:02:25.0000] <noamr>
+yes locally. maybe an old bikeshed thing. Let me check
+
+[02:02:53.0000] <annevk>
+(it works here)
+
+[02:05:28.0000] <noamr>
+yea that was it. thanks annevk
+
+[03:01:34.0000] <noamr>
+annevk: another thought I want to run by you :) Currently HR-TIME defines timeOrigin, which may be different between different clients of fetch. I'm trying to decide between bookkeeping the time as relative to the client's timeOrigin, or as global monotonic time and diff`ing it with timeOrigin when it's reported. not sure which is cleaner. any preference?
+
+[03:06:47.0000] <noamr>
+Seems like the implementations do the latter
+
+[03:08:40.0000] <annevk>
+noamr: when in doubt follow implementations; at least that's what I usually do
+
+[03:08:58.0000] <noamr>
+yea learning that. thanks
+
+[03:09:02.0000] <annevk>
+noamr: maybe the fact that a request can come from a document and end up in a service worker also plays a role here
+
+[03:10:03.0000] <noamr>
+annevk: exactly, the service worker has a different timeOrigin from the document, which means that I can't use something like "current high resolution time" and need either a given timeOrigin or to use the global monotonic time
+
+[03:11:09.0000] <MikeSmith>
+Rik`: our DigitalOcean servers are in New York
+
+[03:12:25.0000] <MikeSmith>
+I can investigate any details of the setup for them, as long as the DigitalOcean admin UI exposes the info
+
+[03:13:09.0000] <MikeSmith>
+as far as web servers and TLS, we’re just running nginx and using Let’s Encrypyt certs
+
+[03:16:27.0000] <MikeSmith>
+we’re not using any other CDN on top of that, as far as I can recall
+
+[06:48:04.0000] <annevk>
+hsivonen: each browser gives a different code point for https://hsivonen.com/test/moz/xml-decl/space-around-label.htm good times
+
+[06:55:01.0000] <croraf>
+Why dont svg elements accept a title attribute?
+
+[06:55:33.0000] <croraf>
+(I mean handle and show the info)
+
+[06:59:41.0000] <ondras>
+probably because there is no such feature in the svg specification
+
+[06:59:51.0000] <ondras>
+svg uses the <title> element instead
+
+[08:13:40.0000] <MikeSmith>
+annevk: https://github.com/w3c/csswg-drafts/pull/5838 has been merged but if you can still review it that would be great. I’m not confident I got it right, and can create a follow-up PR for any further fixes needed
+
+[08:15:07.0000] <annevk>
+MikeSmith: you should use <a for=request>URL</a> and such
+
+[08:15:16.0000] <annevk>
+MikeSmith: I think you also want to set <a for=request>mode</a> to "cors"
+
+[08:16:01.0000] <annevk>
+MikeSmith: it also doesn't seem to do anything with the request? Like it needs to be passed to fetch and then you need to handle the response
+
+[08:16:24.0000] <annevk>
+MikeSmith: the prior text was also inadequate though :-)
+
+[08:17:35.0000] <MikeSmith>
+yeah it was not really rigorously specified before
+
+[08:17:48.0000] <annevk>
+MikeSmith: I'm not sure how much work you want to be doing, but there's a *lot* missing when it comes to fetching and CSS
+
+[08:18:28.0000] <annevk>
+MikeSmith: also "spec:fetch; type:dfn; for:/; text:request" should not be needed ideally
+
+[08:18:42.0000] <MikeSmith>
+ok
+
+[08:19:01.0000] <annevk>
+MikeSmith: I guess they are needed unless you use <a for=/>request</a>
+
+[08:19:11.0000] <MikeSmith>
+right
+
+[08:19:24.0000] <MikeSmith>
+so, will fix that
+
+[08:19:49.0000] <MikeSmith>
+about the other CSS fetch stuff, I think I don’t want to do any more of it than this
+
+[08:20:03.0000] <MikeSmith>
+because it’s just pulling at a thread
+
+[08:20:41.0000] <MikeSmith>
+the thing is, I can’t even remember now why I raised the original PR about this
+
+[08:21:04.0000] <MikeSmith>
+the original PR I raised for HTML to expose a particular dfn
+
+[08:21:49.0000] <MikeSmith>
+but it turned out we didn’t want to expose that, because that CSS spec was calling into the wrong thing anyway
+
+[08:21:52.0000] <MikeSmith>
+etc
+
+[08:22:17.0000] <MikeSmith>
+I wish I could just remember what the original problem was that I had meant to solvelllllll
+
+[08:22:24.0000] <MikeSmith>
+oofs
+
+[08:22:42.0000] <MikeSmith>
+dunno where those extra lllls came from
+
+[08:23:22.0000] <MikeSmith>
+anyway, I will make a follow-up for that PR
+
+[11:14:11.0000] <croraf>
+ondras, OK, but svg root element is an HTML element, why is it unfeasible to handle "title"?
+
+[11:20:43.0000] <ondras>
+probably because its properties (attributes, IDL, ...) are defined within the SVG spec and not the HTML spec
+
+[12:42:49.0000] <zcorpan_>
+ok folks. updating html parser tests is way too painful
+
+[12:47:11.0000] <zcorpan_>
+gsnedders: jgraham: does html5lib have a convenient way to rebaseline .pytest.expect?
+
+[12:53:01.0000] <gsnedders>
+zcorpan_: honest answer: in WPT,  it should probably checkout a given revision of both html5lib-python and html5lib-tests, not necessarily the html5lib-tests that html5lib-python has
+
+[12:53:48.0000] <zcorpan_>
+gsnedders: yeah, I was thinking about that too. does wpt need html5lib-python at all?
+
+[12:54:31.0000] <gsnedders>
+zcorpan_: it uses the parser for the test data format from html5lib-python
+
+[12:55:46.0000] <zcorpan_>
+gsnedders: ah ok. but yeah, it could hardcode a specific revision of html5lib-tests
+
+[12:57:38.0000] <gsnedders>
+honestly I wish https://github.com/html5lib/html5lib-tests/pull/83 had landed five(!) years ago with some sort of linter and parser for the test format upstream, though I'd like to move more of html5lib-tests to wpt and preferably just use JS to parse the files in the brower, which does admittedly mean faffing aroudn with sha1 if we want to keep the test names the same (which I don't think we need to?)
+
+[12:57:55.0000] <gsnedders>
+(like changing the test names to something meaningful would be a one-time pain)
+
+[12:58:27.0000] <gsnedders>
+but like none of this has been a priority for my time in a very long timer
+
+[12:58:29.0000] <gsnedders>
+*time
+
+[13:10:13.0000] <zcorpan_>
+Test name changes are fine for chromium I think, less sure about gecko and webkit
+
+[13:11:44.0000] <zcorpan_>
+and yeah, moving the test data into wpt and getting rid of html5lib dependency sounds good
+
+[13:13:00.0000] <zcorpan_>
+Sounds like a possible project for a contractor if we knew any
+
+[13:28:24.0000] <zcorpan_>
+gsnedders: r? https://github.com/html5lib/html5lib-python/pull/531
+
+[14:25:46.0000] <MikeSmith>
+annevk: FWIW about the CSS font-loading PR, I see now that https://stackoverflow.com/questions/65588439/unexpected-http-request-mode-while-fetching-font-file-from-same-origin#comment115965754_65588439 is what led me to it to begin with
+
+
+2021-03-03
+[01:42:36.0000] <jgraham>
+One-off test name changes are usually OK for gecko
+
+[02:12:15.0000] <noamr>
+hi annevk.  started integration of fetch/resource-timing as we discussed, please take a look at https://github.com/whatwg/fetch/pull/1185 when you get a chance.
+
+[02:13:08.0000] <annevk>
+noamr: it still had a bunch of TODOs in it?
+
+[02:14:55.0000] <annevk>
+noamr: one thing I'm not sure about is that it patches the body read operations, wouldn't it make more sense to set the timing as stuff is being put into the stream by the network? Like how would this work when you want to read a request body?
+
+[02:15:44.0000] <noamr>
+annevk: regarding TODOs - yes it does. but I wanted to see that the main direction of how to do this is aligned. I want to work on this incrementally rather than a big patch with everything
+
+[02:16:37.0000] <noamr>
+annevk: regarding the body - it shouldn't work for request bodies. Would it make more sense to integrate it into 'streams' instead?
+
+[02:17:27.0000] <annevk>
+noamr: I think it would make more sense to integrate it where we create the response body stream and enqueue bytes into it
+
+[02:17:46.0000] <annevk>
+noamr: and don't couple it with the body or streams at all
+
+[02:18:03.0000] <noamr>
+ok makes sense, let me see what that means in practice
+
+[02:18:08.0000] <annevk>
+noamr: but that's at a high level as I still need to actually read resource timing in detail
+
+[02:20:09.0000] <noamr>
+annevk: sure... I'm wondering what to do with the timing that requires intimate knowledge of HTTP/TLS/DNS. Fetch doesn't go that deep... I can either put a general note about it in "obtain a connection" but trying to make it accurate would mean going pretty deep into them
+
+[02:21:23.0000] <annevk>
+noamr: I guess you would describe it in prose somehow when the timing are to be obtained
+
+[02:21:37.0000] <noamr>
+annevk: will do
+
+[02:21:40.0000] <annevk>
+noamr: note that obtain a connection will soon have callers outside of Fetch as well
+
+[02:22:19.0000] <noamr>
+annevk: I think that's fine, timingInfo will be null and obtain a connection will noop it.
+
+[02:22:49.0000] <annevk>
+noamr: it might be nicer to store the timing information directly on the connection so they can use it if needed
+
+[02:23:43.0000] <noamr>
+annevk: interesting, I have to check if that's what resource-timing would expect
+
+[02:24:05.0000] <annevk>
+noamr: well, in case of fetch it could take it from the connection and forward it
+
+[02:24:27.0000] <annevk>
+noamr: I guess there are some interesting cases with H/2 and H/3 where connections are reused and this would make that very observable
+
+[02:25:38.0000] <noamr>
+annevk: yes, it's unclear in resource-timing how connection pools are handled. yoav WDYT?
+
+[02:26:00.0000] <noamr>
+(that's what I mean by "what resource timing would expect"
+
+[02:26:16.0000] <annevk>
+/me goes to look at resource timing
+
+[02:26:53.0000] <annevk>
+ah, "Implementers SHOULD be aware that this document is not stable. Implementers who are not taking part in the discussions are likely to find the specification changing out from under them in incompatible ways." looks like we can do whatever we want :p
+
+[02:29:30.0000] <annevk>
+"Resources for which the fetch was initiated, but was later aborted (e.g. due to a network error) MAY be included as PerformanceResourceTiming objects in the Performance Timeline" might be tough
+
+[02:30:02.0000] <annevk>
+there are a lot of places where we simply return a (new) network error
+
+[02:30:14.0000] <annevk>
+and determining when it's safe to expose information on them is just...
+
+[02:44:29.0000] <yoav>
+regarding the "MAY be included", we should get rid of the MAY parts and enforce exposing that info
+
+[02:45:00.0000] <yoav>
+assuming we consider it safe
+
+[02:45:24.0000] <yoav>
+Also need to clarify that error status code responses don't fall into that bucket
+
+[02:46:26.0000] <yoav>
+"there are a lot of places where we simply return a (new) network error" - hmm, might be worthwhile to test what implementations are currently doing on that front
+
+[02:47:31.0000] <yoav>
+Regarding connection pools, RT currently exposes connection reuse
+
+[02:49:25.0000] <yoav>
+https://www.w3.org/TR/resource-timing-2/#dom-performanceresourcetiming-connectstart
+
+[02:52:22.0000] <noamr>
+this is what the current work is about... defining the points in time where metrics are marked as precisely as possible, like we did before with paint timing.
+
+[02:54:47.0000] <annevk>
+I understand and I think it's great that we're doing this 🙂
+
+[02:56:27.0000] <annevk>
+yoav: aah I see, so I guess we'd return fetchStart if connectStart < fetchStart
+
+[02:56:46.0000] <annevk>
+yoav: that way we don't have to tell resource timing what kind of connection it is
+
+[02:57:23.0000] <yoav>
+yeah, SG
+
+[02:58:05.0000] <annevk>
+I guess ideally we also put the security checks directly into Fetch so ResourceTiming can just return the integers Fetch hands out
+
+[02:58:30.0000] <yoav>
+👍
+
+[02:58:42.0000] <annevk>
+I guess modulo adjusting to the global and jitter stuff
+
+[02:59:09.0000] <yoav>
+(was just about to comment the same)
+
+[02:59:13.0000] <annevk>
+heh
+
+[02:59:57.0000] <noamr>
+for connection pools though - do we want to obfuscate it or should resource-timing know about it? it's exposed only for same-origin or for origins with TAO
+
+[03:00:31.0000] <annevk>
+encodedBodySize is just Content-Length, right? https://github.com/whatwg/fetch/pull/1183 should help with that
+
+[03:01:48.0000] <annevk>
+noamr: my thinking is that we store the timings on the connection and then fetch takes the timings from the connection and puts them on the struct, adjusting them based on fetchStart as needed
+
+[03:02:26.0000] <zcorpan>
+I wonder if we should make <noscript> always parse as if scripting flag is enabled
+
+[03:02:36.0000] <noamr>
+annevk: yes, got it.
+
+[03:02:48.0000] <annevk>
+noamr: and once TAO happens we might have to set a bunch of things to 0
+
+[03:03:04.0000] <noamr>
+yup
+
+[03:03:36.0000] <noamr>
+Fetch gets all the timings, and in the shim between fetch and TAO there will be an algorithm that cleans them up
+
+[03:04:05.0000] <annevk>
+zcorpan: you want to test XHR and sandboxed iframes at least
+
+[03:04:17.0000] <annevk>
+(XHR may already ask for that?)
+
+[03:04:17.0000] <MikeSmith>
+Is there existing spec text in any CSS specs that defines what to do with the response from a fetch request for a font?
+
+[03:04:37.0000] <annevk>
+it's been such a long time that I forgot
+
+[03:05:19.0000] <annevk>
+noamr: yeah, though to be clear I think fetch should be setting things to 0 based on TAO
+
+[03:05:59.0000] <annevk>
+(wasn't entirely sure if by cleaning up you meant the jittering/global stuff or also that)
+
+[03:06:39.0000] <annevk>
+MikeSmith: there's a font spec but as I understand it it's light on details and true type / open type are a mess?
+
+[03:07:57.0000] <zcorpan>
+annevk: my point is it's repeatedly used as HTML sanitization bypasses because different places set the scripting enabled flag differently. if we kill the <noscript> functionality and it always parses as text, we kill those attacks (and hopefully don't introduce new ones)
+
+[03:08:44.0000] <zcorpan>
+annevk: also browsers aren't interoperable with when the flag is set (e.g. template.innerHTML)
+
+[03:09:08.0000] <annevk>
+zcorpan: yeah I'm not opposed, but XHR / <iframe sandbox> might be places where content relies on this
+
+[03:09:50.0000] <zcorpan>
+annevk: yes, good point
+
+[03:10:08.0000] <annevk>
+zcorpan: I think I'm even in favor as you're right that these mode switches are a pain (it's also a worry I have with decl shadow trees)
+
+[03:13:47.0000] <annevk>
+RT decodedBodySize is interesting, we have just enough enough infrastructure to define it I think, but it's also horribly broken
+
+[03:15:41.0000] <MikeSmith>
+annevk: OK. I’m just looking back at that section of the Fonts spec I patched, and trying to figure out what precisely it should say to do with the <var>response</var> it gets back from the fetch
+
+[03:16:20.0000] <annevk>
+yoav: how is secureConnectionStart different? is it just connectStart but 0 for insecure connections?
+
+[03:19:03.0000] <MikeSmith>
+I find https://drafts.csswg.org/css-font-loading/#font-face-css-connection so I guess I need to hook into that ... somehow
+
+[03:19:14.0000] <MikeSmith>
+> A CSS @font-face rule automatically defines a corresponding FontFace object, which is automatically placed in the document’s font source when the rule is parsed. This FontFace object is CSS-connected.
+
+[03:19:41.0000] <MikeSmith>
+> The internal [[Urls]] slot of the FontFace object is set to the value of the @font-face rule’s src descriptor, and reflects any changes made to the src descriptor.
+
+[03:24:45.0000] <MikeSmith>
+in a spec that’s supposed to be normatively defining UA requirements, the multiple “automatically” words are a bit surprising
+
+[03:25:11.0000] <MikeSmith>
+very much wishing I had not pulled at this thread
+
+[03:28:41.0000] <MikeSmith>
+anyway I guess I’ll make an attempt at re-updating the @font-face loading requirements in the Fonts spec
+
+[03:40:08.0000] <yoav>
+annevk: the prose suggests it's not, but the diagram says your interpretation is correct
+
+[03:40:33.0000] <yoav>
+and I'm failing to find a local case where they don't all equal fetchStart
+
+[03:40:54.0000] <yoav>
+so here as well, would be good to add tests to see what implementations are actually doing
+
+[03:41:43.0000] <yoav>
+I suspect that predictive preconnection mean that these values are typically just fetchStart
+
+[03:55:45.0000] <zcorpan>
+annevk: hmmm, I think the "scripting flag" and innerHTML logic in the spec is currently broken. The fragment parsing algo always creates a new Document for parsing the fragment, and that Document has no browsing context, so its "scripting flag" is always disabled for innerHTML
+
+[03:57:26.0000] <zcorpan>
+whereas I think the intent was for innerHTML to always parse with "scripting flag" enabled*
+
+[03:57:59.0000] <zcorpan>
+(* was a typo)
+
+[04:05:19.0000] <annevk>
+yoav: aaah makes sense
+
+[04:06:18.0000] <annevk>
+zcorpan: could be I filed an issue against DOM parsing for this
+
+[04:07:02.0000] <annevk>
+yoav: yeah tests would be really good
+
+[04:07:51.0000] <annevk>
+MikeSmith: you could also file some follow-up issues
+
+[04:08:16.0000] <annevk>
+MikeSmith: prolly easier to address by someone tackling this for CSS in general
+
+[05:05:36.0000] <gsnedders>
+zcorpan: not read all the way up, but fragment parsing should work with scripting disabled, e.g. for cases where content expects to be parsed as a fragment regardless of whether scripting is enabled (e.g., if you're an Atom/RSS feed reader, you might want to render each item's content as a div fragment)
+
+[05:24:10.0000] <zcorpan>
+gsnedders: sure, but that could still parse <noscript> as text instead of as elements
+
+[05:26:57.0000] <noamr>
+annevk: how would you suggest associating the connection timing info with a connection? fetch doesn't specify what a 'connection' is. I can either say that a connection info is "associated" with a connection, or create a new struct that has the timing-info,  ALPN protocol and actual connection and have 'obtain a connection' return that struct
+
+[05:31:28.0000] <annevk>
+noamr: yeah, turning https://fetch.spec.whatwg.org/#concept-connection into a struct seems good
+
+[05:32:42.0000] <annevk>
+noamr: or maybe a thing with associated things, hmm
+
+[05:32:44.0000] <noamr>
+annevk: but a lot of the usage of `connection` is vague: e.g. "the <a>connection</a> uses HTTP/2"
+
+[05:33:08.0000] <annevk>
+noamr: let's just say that connection has associated fields then, similar to request/response
+
+[05:33:52.0000] <noamr>
+annevk: alrighty. and if I want to send the same connection, but with something else associated with it, what's the right way do describe that?
+
+[05:34:17.0000] <noamr>
+e.g. if a connection comes from a pool, I want to return the connection but without its associated connection info
+
+[05:35:47.0000] <noamr>
+I thought to have a struct that includes that opaque connection + connection info, and return that struct from 'obtain a connection', later working with the struct's 'actual connection' (or something to that effect)
+
+[05:40:46.0000] <noamr>
+annevk: or return a "return connection with its timing info associated to null"
+
+[05:42:49.0000] <annevk>
+noamr: when would it return null for that?
+
+[05:43:38.0000] <annevk>
+noamr: I would basically expect these fields to be set when a connection is created, if they sometimes have to be null, that could happen there
+
+[05:44:04.0000] <noamr>
+annevk: it's not that. I need to differentiate between connections from pool and newly created connections. Only newly created connections should have the connection timing info
+
+[05:44:18.0000] <annevk>
+noamr: you don't have to do that per the above discussion
+
+[05:44:36.0000] <annevk>
+noamr: we can deal with that in the fetch algorithm
+
+[05:44:47.0000] <noamr>
+annevk: ah, maybe I missed part of the discussion. Re-reading
+
+[05:45:20.0000] <annevk>
+noamr: when fetch gets a connection and its connection.start < fetch.start, fetch.connectStart = fetch.start or some such
+
+[05:47:08.0000] <noamr>
+annevk: ok, clamp it by value. easy enough. was thinking that there might be a corner case where this is not enough, but maybe it's not the case or not an interesting use-case
+
+[05:48:49.0000] <annevk>
+noamr: I'm always interested in corner cases, but I think this covers what RT is trying to do
+
+[05:49:07.0000] <noamr>
+annevk: yes I think so too
+
+[10:25:56.0000] <annevk>
+Domenic: never thought I’d see the day where XHR is used as a pattern to follow 😀
+
+[10:26:44.0000] <annevk>
+Domenic: so maybe we should have a TimoutSignal
+
+[10:27:05.0000] <Domenic>
+Maybe... feels a bit heavyweight, but perhaps fine.
+
+[10:27:29.0000] <Domenic>
+We'd want APIs that accept `signal` to accept it too, I think?
+
+[10:28:00.0000] <annevk>
+Domenic: yeah, I think we don’t want separate timout inputs everywhere
+
+[10:28:15.0000] <annevk>
+That’s what I liked about your proposal
+
+[10:29:20.0000] <Domenic>
+Or we could have some mode of AbortSignal that lets you customize the error thrown... although the AbortSignal -> error thrown channel is indirect (until/unless https://github.com/whatwg/dom/issues/927 happens).
+
+[10:29:37.0000] <Domenic>
+annevk: thanks for pushing on this a bit, I probably would have given up without you prodding...
+
+[10:30:22.0000] <annevk>
+👍🏻
+
+[10:35:59.0000] <annevk>
+It was hard to let go as it would resolve some rather long-standing and hugely popular issues in Fetch
+
+[14:29:10.0000] <bkardell>
+I have a probably silly question as I am trying to understand something the html spec says currently... If you call the have an onclick on an input, which in turn calls focus() - when the focusing steps are evaluated, is a focus trigger of click set or no?
+
+[14:31:55.0000] <Domenic>
+bkardell: from what I can see the focus trigger is only "click": "When a user activates a click focusable focusable area"
+
+[14:33:39.0000] <bkardell>
+this is how I read it, that the answer is "no", right?
+
+[14:33:49.0000] <bkardell>
+I just dont want to get it wrong :)
+
+[14:34:03.0000] <Domenic>
+Indeed, if there's no user involved, then the answer is no.
+
+[14:34:14.0000] <bkardell>
+excellent - thank you for clarifying Domenic
+
+
+2021-03-04
+[20:26:38.0000] <bugweiser>
+hi all
+
+[20:27:40.0000] <bugweiser>
+i'm trying to make sense of some older posts, particularly this one: http://cmsmcq.com/2007/C1.xml
+
+[20:28:15.0000] <bugweiser>
+it appears to imply that html (2 - 4.01) was specified using a different flavour of sgml.
+
+[20:28:40.0000] <bugweiser>
+is this true? where can one find the definition for this non-standard sgml?
+
+[20:29:28.0000] <bugweiser>
+in particular, it states:
+
+[20:29:31.0000] <bugweiser>
+The "document character set" as defined by SGML is rather unlike the "document character set" concept of HTML 4, which brilliantly co-opted the SGML term and gave it a new and better meaning. (At least, that's the way I understand the history of events.)
+
+[20:35:47.0000] <bugweiser>
+let me clarify: when I read "document character set" I assume DCS, as specified in SGML.  Hence, when I read the "sgml declaration" for html (2-4.01) I assume the DCS is to be read/interpreted as defined in SGML.
+
+[20:37:41.0000] <bugweiser>
+but this link (which is supposed to clarify things) appears to say that this is not the case.
+
+[21:23:33.0000] <annevk>
+bugweiser: nobody ever had a compliant SGML impl so I’m not sure it matters (and a compliant impl would not work for the HTML documents produced back then (or now))
+
+[21:25:53.0000] <bugweiser>
+annevk, thanks for responding (and another humble thanks for all the good work you've been doing over the years).
+
+[21:27:19.0000] <bugweiser>
+I very much realise the common discrepancy between specs and real world implementations. And obviously I whish to include and abide by that as well in what i'm doing. But at the moment i'm just focussing on the theoretical/spec side of things.
+
+[21:28:12.0000] <bugweiser>
+I don't have access to the genuine sgml spec (for the obvious common reason, it's paywalled) so i'm left with second hand info on blogs etc.
+
+[21:32:41.0000] <bugweiser>
+also, there's no sgml channel on freenode, and I asked on ##programming 2 days ago. I'm stuck, this particular url I referenced is throwing me off my 'game' :)
+
+[22:21:18.0000] <annevk>
+bugweiser: I know from Dan Connolly that HTML was very much meant to be SGML and that's why they did all the DTD stuff
+
+[22:21:42.0000] <annevk>
+bugweiser: they might have made mistakes though
+
+[22:22:25.0000] <annevk>
+bugweiser: and with the benefit of hindsight we know that HTML4 (dunno about earlier) wasn't a great specification
+
+[22:23:12.0000] <bugweiser>
+I know, I've read the history on the w3c archives, from the moment mr Connolly stepped in and basically asked "are you sure you want to make this into an application of sgml" and then went to the store and buy an sgml book. I've had the honer to ask him some years ago if he could remember why &apos was initially left out, but he couldn't remember.
+
+[22:25:40.0000] <bugweiser>
+the reason why I fret about this particular question is becouse the source of the link above and that it has been used/referenced a bunch of times over the years in a number of w3c mailing list archives. Seems to have 'some' authority.
+
+[22:28:45.0000] <bugweiser>
+and this link *appears* to say that "document character set" in the sense of an "sgml declaration" works differently in html.
+
+[22:35:50.0000] <annevk>
+That person does seem like they would know. And HTML did indeed define things in terms of Unicode (thankfully) and it seems likely that SGML did not as it predates Unicode. So yeah, seems likely that was a change of sorts.
+
+[22:38:42.0000] <bugweiser>
+I was under the impression that sgml always wanted to seperate 'encodings' (byte streams) from meaning/'characters'
+
+[22:39:02.0000] <bugweiser>
+I *think* it always used a "character reportoire", defined in the DCS
+
+[22:39:32.0000] <bugweiser>
+I *think* html merely clarified this, in: https://www.w3.org/TR/html401/charset.html#h-5.1
+
+[22:40:03.0000] <bugweiser>
+I *think* that when I read: https://www.w3.org/TR/html401/sgml/sgmldecl.html
+
+[22:40:33.0000] <bugweiser>
+that "ISO 8879:1986 (WWW)" (sgml annex k) is used, and I should interpret it as such.
+
+[22:41:11.0000] <bugweiser>
+but then that link that's messing with my mind is wrong in *seemingly* stating there are 2 different 'mechanics' for "document character set".
+
+[22:41:20.0000] <bugweiser>
+does this clarify my confusion?
+
+[22:42:54.0000] <bugweiser>
+In other words, the link that's messing with my mind seems to imply that the concept of a "character reportoire" in a DCS is new in html, whereas I think it already existed in sgml, and as such it was used in defining HTML (as application of sgml).
+
+[23:32:08.0000] <MikeSmith>
+annevk: not to beat the CSS Fonts thing into the ground, but do you think it would be worthwhile for me to attempt to rewrite that “Font fetching requirements” to reference https://drafts.csswg.org/css-font-loading/#font-face-css-connection instead?
+
+[23:32:40.0000] <MikeSmith>
+because it seems to me the fetching requirements should not be in the Fonts spec to begin with
+
+[23:34:47.0000] <MikeSmith>
+instead it seems like what should be stated in the Fonts spec is language about the @font-face src value creating a FontFace object, with its [[Urls]] slot set to the src value
+
+[23:34:58.0000] <annevk>
+MikeSmith: it seems per step 4 of https://drafts.csswg.org/css-font-loading/#font-face-load that might get circular?
+
+[23:35:09.0000] <MikeSmith>
+/me looks
+
+[23:35:39.0000] <annevk>
+MikeSmith: anyway, I have some high-level ideas of what CSS needs to define fetching properly, and a lot of it starts with defining a proper environment/model to work with
+
+[23:36:00.0000] <MikeSmith>
+OK
+
+[23:36:31.0000] <MikeSmith>
+and yeah, thanks, I now see “Using the value of font face’s [[Urls]] slot, attempt to load a font as defined in [the Fonts spec]”
+
+[23:37:01.0000] <MikeSmith>
+what bothers me is that my patch did not actually fix anything
+
+[23:37:23.0000] <MikeSmith>
+so the spec is broken
+
+[23:37:47.0000] <annevk>
+It does make sense to me that there's only a single point for fetching fonts and everything calls into that, but there are a lot of things broken/missing still
+
+[23:37:58.0000] <MikeSmith>
+though arguably it’s no worse broken than it was before I touched it
+
+[23:38:35.0000] <MikeSmith>
+OK, I guess I’ll just raise an issue
+
+[23:39:06.0000] <MikeSmith>
+to me, issues I raise typically cost me a lot more time than just raising PRs
+
+[23:39:28.0000] <MikeSmith>
+but I guess I’m already way past that, as far as costing time
+
+[23:50:53.0000] <bugweiser>
+annevk: do you think I should disregard that part of the link as being 'wrong' (IE: html and xml did NOT redefine the mechanics of the DCS section in the sgml declaration)?
+
+[23:51:45.0000] <bugweiser>
+and that the meaning if the DCS as used in the sgml declaration for html is identical to the meaning/mechanics as specified in sgml?
+
+[23:52:21.0000] <bugweiser>
+which appears to me is also what is said in: https://www.w3.org/TR/html401/charset.html#h-5.1
+
+[23:55:20.0000] <annevk>
+bugweiser: no, I suspect it's correct, that HTML redefined it a bit to abstract away from bytes
+
+[23:56:58.0000] <annevk>
+bugweiser: but again though, none of it was backed by an implementation so it's hard to consider it a standard
+
+[23:57:50.0000] <bugweiser>
+well.. validaters were based on sgml parsers... so, yeah, it was implemented and used.
+
+[23:58:26.0000] <bugweiser>
+it's basically the ancient (unresolved for older specs) "is form-feed allowed".
+
+[23:58:31.0000] <bugweiser>
+in html
+
+[23:59:02.0000] <bugweiser>
+validator saays no, couse it was unknown in the sgml DCS
+
+[23:59:31.0000] <bugweiser>
+html 3.2 and then 4/4.01 suddenly included formfeed in prose-text as whitespace (with collapsing rules).
+
+[23:59:50.0000] <annevk>
+bugweiser: I'm pretty sure that no validator had a conforming SGML parser
+
+[00:01:43.0000] <bugweiser>
+well, that's been brought up a number of times on several w3c mailing lists (in the archives) and it was always sayd that the validator was correct (from an sgml point of view).
+
+[00:15:59.0000] <bugweiser>
+If html redifined the mechanics of the DCS section in the sgml declaration, then where can I find how to correctly interpret this sgml-declaration (such as: https://www.w3.org/TR/html401/sgml/sgmldecl.html) ?
+
+[00:17:41.0000] <bugweiser>
+also, why wouldn't https://www.w3.org/TR/html401/charset.html#h-5.1 mention that the mechanics for interpreting the DCS section is modified from 'standard' SGML? To me it appears it says the opposite of that: explicitly saying html works this way couse sgml works this way, quoting relevant phrases below:
+
+[00:17:59.0000] <bugweiser>
+To promote interoperability, SGML requires that each application (including HTML) specify its document character set. A document character set consists of:
+
+[00:18:16.0000] <bugweiser>
+* A Repertoire: A set of abstract characters,, such as the Latin letter "A", the Cyrillic letter "I", the Chinese character meaning "water", etc.
+
+[00:18:30.0000] <bugweiser>
+* Code positions: A set of integer references to characters in the repertoire.
+
+[00:18:46.0000] <bugweiser>
+Each SGML document (including each HTML document) is a sequence of characters from the repertoire.
+
+[00:25:56.0000] <bugweiser>
+now the sgml declaration itself has an identifier: "ISO 8879:1986 (WWW)"  and the "(WWW)" means iso 8879:1986 annex K. annex K in turn is usually freely available as update, it doesn't include the base text just the additions/extras/clarifications like an rfc errata.
+
+[00:26:31.0000] <annevk>
+Well, there was no interop with SGML (or HTML) and also, standards have bugs, especially when they were ratified because the committee wanted to go skiing
+
+[00:27:23.0000] <bugweiser>
+annex K states it's backwards compatible and only has clarifications and solutions to problems that arose while applying sgml to web-based markup languages. There is no update/clarification/change whatsoever in this freely available 'errata' regarding the meaning/interpretation of a DCS section
+
+[00:27:45.0000] <bugweiser>
+:) agree
+
+[00:29:17.0000] <bugweiser>
+still, (while not oblivious to real life, as-implemented, and other jazz such as a javascript generated string including 'illegal chars' which is still shipped of to a browser and must do something with it).. i'm just looking at 'what does the spec say/intend'.
+
+[00:32:00.0000] <bugweiser>
+see 'even you' (with your particular background) are tempted to say that this http://cmsmcq.com/2007/C1.xml#idp30280695 could be correct (that html did change the interpretation of the DCS declaration) patially becouse who wrote it.
+
+[00:32:53.0000] <bugweiser>
+but then, where is the documentation to that alternate interpretation of the DCS section. After all, it should be conforming to <!SGML  "ISO 8879:1986 (WWW)"
+
+[00:34:22.0000] <bugweiser>
+but then, other sources, including https://www.w3.org/TR/html401/charset.html#h-5.1 contradict that, and basically say this is how sgml works.
+
+[00:35:09.0000] <bugweiser>
+in fact, if the DCS section in sgml did work on a bytelevel input stream, it would go against the prime design considerations of sgml itself.
+
+[00:37:01.0000] <annevk>
+Right, for intent it's better to talk to the people involved. And yeah, standards have been known to contradict themselves. And also, accepting a standard as golden even when it was clearly broken has led to a lot of complexity (e.g., CSS 2.1 authors trying to adhere to CSS 2 as close as possible instead of devising a better set of rules).
+
+[00:38:31.0000] <bugweiser>
+I guess from the sgml perspective that would be mr Goldfarb.
+
+[00:39:24.0000] <annevk>
+yoav: I don't understand the definition of https://w3c.github.io/hr-time/#dfn-unsafe-shared-current-time
+
+[00:39:35.0000] <annevk>
+yoav: it seems to reference a variable?
+
+[00:39:44.0000] <annevk>
+noamr: ^
+
+[00:40:33.0000] <noamr>
+annevk: it's an algorithm, that returns the current value of the global monotonic clock
+
+[00:40:48.0000] <noamr>
+does it have to be written as steps to make that clearer?
+
+[00:41:34.0000] <bugweiser>
+/me as a reader loves steps!
+
+[00:55:23.0000] <annevk>
+noamr: what's weird is that  shared monotonic clock is formatted as a variable and is clickable but nothing happens
+
+[00:56:46.0000] <annevk>
+noamr: I guess I would either expect it not to be formatted or link to something that explains what it is (I'm not familiar with term, but happy to accept it's a thing)
+
+[01:00:18.0000] <noamr>
+annevk: oops, it's defined there in the document, seems like a technical issue.
+
+[01:01:44.0000] <noamr>
+annevk: I'll take care of it! In the meantime, https://github.com/whatwg/fetch/pull/1185 is ready for another look (it has a lot less TODOs)
+
+[01:04:54.0000] <noamr>
+https://github.com/w3c/hr-time/pull/108
+
+[03:12:55.0000] <annevk>
+noamr: you got it
+
+[03:13:41.0000] <annevk>
+noamr: it's mainly nits and questions, overall this looks like the thing we want
+
+[03:13:59.0000] <noamr>
+annevk: great, thanks! I'll follow up on the nits and qs.
+
+[03:14:37.0000] <annevk>
+lol GitHub hid 21 items from my review by default, so helpful
+
+[03:16:42.0000] <bugweiser>
+annevk: is it correct to conclude (for now) that you consider it possible that the sgml declaration for html4.01 might not be supposed to be interpreted under the rules of ISO 8879:1986 (WWW) (even tough that is what it declares)?
+
+[03:22:37.0000] <annevk>
+bugweiser: it's certainly possible; zcorpan might be able to find out, I think he had a copy of SGML at one point, though he also had more free time than he likely has now 😊
+
+[03:23:36.0000] <annevk>
+I also recall gsnedders knowing a lot of obscure SGML things
+
+[03:27:11.0000] <bugweiser>
+hehe, becouse if yes, then the obvious followup question would be: how do I hunt for something we can't name and 'everyone' thinks I'm bonkus to assume that "iso 8879:1996 (WWW)" is not to be interpreted as such.. and as such say I'd be searching for something that doesn't exist.
+
+[03:27:31.0000] <bugweiser>
+I'd VERY much appriciate other's input! Thanks for pinging them!
+
+[03:32:46.0000] <bugweiser>
+PERSONALLY I kind of expect there had been historically confusion in sgml parsers about what exactly the DCS meant/represented. And as such discarded, either out of not knowing or intentionally to simplify things. In my mind one of the primary sgml goals could not have been met with if SGML didn't at least IMPLY that a 'bytestream' was in some existing 'code page' which FIRST had to be translated to the DCS, where the DCS in turn translates
+
+[03:32:46.0000] <bugweiser>
+these numbers to number-ranges of known other 'code pages' or even actually replace them with literal strings (which I have seen in examples).
+
+[03:33:09.0000] <zcorpan>
+annevk: I haven't had SGML, maybe gsnedders did?
+
+[03:33:52.0000] <bugweiser>
+I know a bunch of people in the old days used the DCS mechanism to just translate codepages. For example from ebcdic to ascii.
+
+[03:37:33.0000] <bugweiser>
+in fact, it's mentioned a bunch of time throughout different html spec versions that it is convenient that the DCS maps to unicode, and thus the translation of encoded charset that enters can now be just tranlated to unicode (which is then equivalent to translating it to the DCS).
+
+[03:38:08.0000] <bugweiser>
+zcorpan: thanks for responding, any other input would be also very much apreciated!
+
+[03:39:00.0000] <zcorpan>
+bugweiser: I skimmed the scrollback now, but not clear to me what the question is :)
+
+[03:41:39.0000] <bugweiser>
+this link: http://cmsmcq.com/2007/C1.xml#idp30280695, specifically the part: "The "document character set" as defined by SGML is rather unlike the "document character set" concept of HTML 4, which brilliantly co-opted the SGML term and gave it a new and better meaning. (At least, that's the way I understand the history of events.)"
+
+[03:42:26.0000] <bugweiser>
+becouse of who wrote this text, I (and it seems anne) don't fully discard that info as wrong, It might be correct.
+
+[03:46:10.0000] <bugweiser>
+so, i'm looking for an answer to EITHER: someone saying this is hogwash and "iso 8879:1996 (WWW)" is to be interpreted as "iso 8879:1996 (WWW)" (aka annex K) or not that is :)
+
+[03:47:04.0000] <zcorpan>
+bugweiser: ok, well, I wasn't participating in the design of HTML4 so can't help unfortunately
+
+[03:48:33.0000] <zcorpan>
+at a high level, my impression is that HTML was first "inspired by" SGML, and later specified to be an application of SGML (but never implemented that way in browsers)
+
+[03:49:43.0000] <bugweiser>
+alternatively, from an sgml perspective, we could ask, Is what html does/says/defines just how sgml works (this is actually stated here:  https://www.w3.org/TR/html401/charset.html#h-5.1 )
+
+[03:51:09.0000] <bugweiser>
+mostly I agree (though it seems to have started as tagsoup and it was surmized that it could be defined using sgml, and mr connolly did just that when tim berners lee gave the green light to attemt to do so).
+
+[03:51:12.0000] <bugweiser>
+but, yeah.
+
+[04:04:17.0000] <MikeSmith>
+annevk: just raised https://github.com/w3c/csswg-drafts/issues/6076
+
+[04:05:59.0000] <annevk>
+MikeSmith: nice
+
+[04:06:47.0000] <MikeSmith>
+my karmic debt feels a tiny bit lighter
+
+[04:11:40.0000] <annevk>
+JakeA: so https://bugzilla.mozilla.org/show_bug.cgi?id=1131187 is still open and https://bugzilla.mozilla.org/show_bug.cgi?id=1655866 was a recent change, so maybe your test is not hitting when we show the dialog?
+
+[04:14:39.0000] <JakeA>
+annevk: In my tests, the frames were same-origin, so same-process. But yeah, I didn't see Firefox show a dialog for frames, so I didn't hit those edge cases
+
+[04:15:33.0000] <annevk>
+JakeA: it might also be with where user activation is, we might require the user to have interacted with the frame
+
+[04:16:04.0000] <JakeA>
+ohhhhhhhh
+
+[04:16:05.0000] <annevk>
+JakeA: and the other thing I thought is that maybe we just don't do prompts when going back, but hmm
+
+[04:17:36.0000] <JakeA>
+annevk: you're right, Firefox behaviour changes if you click in the iframe
+
+[04:17:51.0000] <annevk>
+cool
+
+[04:18:44.0000] <JakeA>
+hm, that makes me think we can't just throw away prompts for iframes
+
+[04:18:49.0000] <JakeA>
+sad
+
+[04:28:59.0000] <bugweiser>
+annevk and zcorpan, thank you so much for your valuable time and thoughts/help!! I'll patiently wait some more hoping for some input from gsnedders (or anyone else :) ).
+
+[04:39:27.0000] <zcorpan>
+bugweiser: np, I kinda like these kinds of questions. in a similar vein, the comments in https://annevankesteren.nl/2005/07/html5-doctype go down the rabbit hole of what a doctype does and doesn't do. The last link doesn't work anymore but is available here https://web.archive.org/web/20061012164723/http://groups-beta.google.com/group/comp.text.sgml/msg/c3e53dee2c152a81
+
+[04:40:13.0000] <bugweiser>
+ohh yeah, I absolutely *LOVED* that doctype work! Really!
+
+[04:46:58.0000] <bugweiser>
+zcorpan, actually, I remember a much longer article with an extensive list of browser (to proverbially the stoneage) being tested, perhaps hixie or kangax, or just another page from anne?
+
+[04:49:21.0000] <bugweiser>
+ https://annevankesteren.nl/2005/07/html5-doctype appears to document why we went from <!DOCTYPE html5> to just <!DOCTYPE html>
+
+[04:53:20.0000] <noamr>
+annevk: I can see your deleted comments. Sorry for the cruft, I forgot to double-check my diff :( will ping you when I have a cleaner revision. thanks
+
+[04:54:11.0000] <annevk>
+noamr: I think there might also be a conflict with the obtain a connection changes that have landed and will land
+
+[04:54:24.0000] <annevk>
+noamr: probably need to be careful around there when rebasing and such
+
+[04:54:28.0000] <gsnedders>
+bugweiser: not totally clear what the outstanding questions are, but: I have no memory about DCS and don't really have the time today to pick up SGML, but it was certainly the intention that HTML 4.01 was SGML (and should therefore be parsed as such), but there was some admission somewhere in the spec that basically said "you probably want this subset because that's actually compatible with browsers"
+
+[04:54:39.0000] <noamr>
+annevk: I will rebase and take into account. no worries
+
+[05:06:23.0000] <bugweiser>
+gsnedders, thank you so much for responding and time! Might I please ask of the top of your memory reagrding SGML: was the DCS in SGML always intended/specced as 'character repertoire', meaning that technically a 'byte-stream' encoded as *for example* ebcdic was always supposed to be first translated into the DCS? If you don't recall, I understand!
+
+[05:13:59.0000] <bugweiser>
+(I know you said you have no memory about DCS, but I tried anyway becouse the phrasing of the question might have ringed a bell)
+
+[07:44:18.0000] <annevk>
+noamr: fyi, I’ll be back Tuesday
+
+[08:41:29.0000] <noamr>
+annevk: enjoy the time off ☺️ I am in Israel so my weekend starts tomorrow... will post something by Tuesday
+
+[08:44:50.0000] <annevk>
+noamr: sounds good; if you're still around, I guess we/I might have to look a bit more into navigation as navigation calls into Fetch
+
+[10:04:15.0000] <smaug____>
+Is there some kind of webidl validator somewhere?
+
+[10:04:23.0000] <smaug____>
+for spec authors
+
+[10:28:16.0000] <annevk>
+smaug____: if you use Bikeshed it should validate IDL
+
+[10:28:34.0000] <annevk>
+smaug____: prolly ReSpec as well
+
+[10:29:18.0000] <smaug____>
+https://github.com/gpuweb/gpuweb/issues/1484#issuecomment-790689574
+
+[10:30:16.0000] <smaug____>
+perhaps webgpu folks could use some hints how to validate their webidl
+
+[10:31:10.0000] <TabAtkins>
+Ah, Bikeshed's IDL parser just gives basic syntax checking, not more advanced validation like in the issue.
+
+[10:32:05.0000] <annevk>
+I see, so I guess that would apply to all specs then
+
+[10:32:21.0000] <annevk>
+TabAtkins: does plinns's thing not offer more?
+
+[10:32:39.0000] <TabAtkins>
+Nah
+
+[10:34:29.0000] <annevk>
+I filed https://github.com/plinss/widlparser/issues/63 as a start, but there's several old issues there
+
+[10:36:36.0000] <annevk>
+smaug____: if we made Gecko's IDL parser reusable somehow maybe Bikeshed could use that instead, although writing that down I guess that wouldn't actually work as it seems widlparser does a bunch of special things for markup
+
+[11:19:28.0000] <Domenic>
+webidl2.js (not to be confused with webidl2js) does some more advanced validation
+
+[11:24:32.0000] <andreubotella>
+Yesterday I realized I hadn't tested what browsers do when you try to upload files with filenames that don't match the OS's expected encoding. Fun times
+
+[11:24:34.0000] <andreubotella>
+https://github.com/w3c/FileAPI/issues/161
+
+[11:25:00.0000] <andreubotella>
+Can anyone test that on macOS? I'm fairly sure it should behave like Linux, but I'd like to make sure
+
+[12:45:17.0000] <Domenic>
+andreubotella: I don't have a MacOS device, although I could borrow my partner's. However I suggest you set up a simple test page that instructs people on what to name their files and echos back the .name property for them, to make this kind of recruitment easier :)
+
+[12:47:56.0000] <zcorpan>
+I can test on macOS if there's a demo with instructions :)
+
+[12:54:07.0000] <andreubotella>
+Domenic, zcorpan: we're talking non-UTF-8 filenames, so it's probably not something you can create from the OS's UI
+
+[12:54:12.0000] <andreubotella>
+but let me get a python script ready
+
+[12:56:10.0000] <zcorpan>
+I have a pretty old macOS though. Need to update some day :/
+
+
+2021-03-05
+[16:37:15.0000] <howdoi>
+Is there any signal on Portals?
+
+[16:45:03.0000] <Domenic>
+howdoi: they are being rebased on https://github.com/jeremyroman/alternate-loading-modes, both in spec and implementation. The implementation work is taking a long time so we are moving relatively slowly on the spec.
+
+[16:48:11.0000] <howdoi>
+Domenic: thanks! It was/is a very interesting proposal, chrome has it under flags for few year already no, hoping for the best.
+
+[16:49:54.0000] <Domenic>
+Yeah, definitely still actively working on it!!
+
+[16:59:16.0000] <howdoi>
+🙏
+
+[04:01:46.0000] <nox>
+Hello there, been a while since I last came around that part of the relay chats,
+
+[04:02:16.0000] <nox>
+I just stumbled on https://github.com/hyperium/http/blob/638928f561cef4c4ff8060152912382bdf9a2afd/src/uri/authority.rs#L124-L133 and from a cursory reading of the whatwg spec I can't find the bit that rejects percent-encoding in the authority part of an URL,
+
+[04:02:30.0000] <nox>
+could someone link me to it, or maybe infirm that this is even rejected?
+
+[04:25:26.0000] <andreubotella>
+nox: I'm not the most familiar with the URL spec, but it doesn't seem to be rejected
+
+[04:26:05.0000] <andreubotella>
+the host state doesn't deal with percents, and the host parser will accept them on opaque hosts and domains
+
+[04:29:01.0000] <annevk>
+Something like http://x%x/ will fail due to forbidden host code point including %
+
+[04:29:08.0000] <annevk>
+iirc
+
+[04:30:32.0000] <nox>
+annevk: Step 3 of https://url.spec.whatwg.org/#concept-opaque-host-parser seems to contradict that
+
+[04:33:23.0000] <andreubotella>
+Step 7 in the host parser applies only for domains, and since it comes after step 4, only to percent characters that aren't part of an escape
+
+[04:34:20.0000] <andreubotella>
+Or that come from decoding the "%25" escape
+
+[04:42:28.0000] <nox>
+andreubotella: And step 2 shortcircuits anyway
+
+[04:42:59.0000] <nox>
+Never mind I always forget that all the schemes we care about are actually special lol.
+
+[04:43:55.0000] <nox>
+So just rejecting all percents in a hostname seems wrong to you, andreubotella?
+
+[04:45:38.0000] <andreubotella>
+nox: I don't really understand the interplay between URL parsing and IDNA, so I don't know
+
+[04:48:00.0000] <nox>
+new URL("http://g%6fogle.com/") works in Firefox
+
+[04:55:37.0000] <annevk>
+Right, the restriction comes after percent-decoding
+
+[04:55:50.0000] <annevk>
+And after IDNA
+
+[05:00:23.0000] <nox>
+I asked on Hyper's discord what's going with that code, thanks for the help
+
+[08:32:06.0000] <JakeA>
+annevk: I'm trying to remember the conditions for the window being reused when an iframe is navigated from about:blank to something same-origin. Are the in the spec & correct?
+
+[08:32:51.0000] <JakeA>
+ah, found https://github.com/whatwg/html/issues/3267
+
+[09:18:42.0000] <annevk>
+JakeA: it’s in the spec, should be able to observe it by navigating a new iframe I think
+
+[09:23:17.0000] <annevk>
+We got rid of the other way around fortunately (document reused) 😀
+
+[10:43:29.0000] <JakeA>
+annevk: it seems more subtle than that, and not cross browser, but I found a way that does it in all browsers (iframe with src followed by inline script)
+
+[10:58:26.0000] <annevk>
+JakeA: yeah, initial about:blank is a bit of a minefield
+
+[12:23:54.0000] <howdoi>
+TIL: navigator.mediaDevices.getCurrentBrowsingContextMedia() would let us share the current tab, nice feature, but would be useful to have a search bar in the share window when we have too many tabs opened? [Or is it an overkill?]
+
+[12:28:32.0000] <howdoi>
+Domenic: Navigating a portal to cross-origin content is not currently permitted and was blocked, so one must be on origin trial to avoid this?
+
+[12:28:54.0000] <Domenic>
+howdoi: I think there is a separate chrome:flags for cross-origin portals since they are not very well audited for security
+
+[12:29:51.0000] <howdoi>
+/me is trying that flag
+
+[12:31:59.0000] <howdoi>
+Domenic: nice, it works! But fails for those URLs which have CSP: "frame-ancestors 'self' <domain>"; this is expected right?
+
+[12:32:46.0000] <Domenic>
+Yes
+
+[12:32:59.0000] <howdoi>
+Also, navigating back when we have multiple portal elements gets interesting
+
+
+2021-03-07
+[20:59:12.0000] <MikeSmith>
+every https://wicg.github.io/ spec URL seems to now be 404
+
+[21:09:37.0000] <MikeSmith>
+hmm no actually just some of them
+
+[21:24:51.0000] <EveryOS>
+In `Let nodes be node https://usercontent.irccloud-cdn.com/file/zLuNBmdy/image.png
+
+[21:25:00.0000] <EveryOS>
+Oops, pressed enter early
+
+[21:26:37.0000] <EveryOS>
+In the line that says "Let nodes be node's children" is that copy-by-reference or copy-by-value? Because step 4.1 mutates the children, and then `nodes` is used again later on.
+
+[21:38:05.0000] <wroathe>
+Do any of you happen to know where style properties are specified? Specifically Chrome seems to allow me to set style.transform = new DOMMatrix() without first calling .toString() on the matrix object, and I'd like to find where that's documented
+
+[21:38:16.0000] <wroathe>
+As in what standard they're in?
+
+[21:57:32.0000] <andreubotella>
+wroathe: https://drafts.csswg.org/cssom-1/#the-elementcssinlinestyle-mixin
+
+[21:58:32.0000] <andreubotella>
+but you're probably dealing with a WebIDL conversion, which happens automatically when you call a web API with the wrong type
+
+[21:58:57.0000] <andreubotella>
+some will throw, but for objects → strings, that's the same as calling String(obj): https://heycam.github.io/webidl/#es-DOMString
+
+[21:59:07.0000] <andreubotella>
+* String( obj )
+
+[21:59:47.0000] <andreubotella>
+EveryOS: web specs always treat values as by-reference
+
+[22:00:03.0000] <EveryOS>
+Ok, thanks!
+
+[22:07:31.0000] <wroathe>
+andreubotella: Awesome. Thanks!
+
+
+2021-03-08
+[05:15:21.0000] <hsivonen>
+Should @whatwg also post a subtweet of this nature https://twitter.com/w3c/status/1368912373214556161 ?
+
+[06:20:53.0000] <nox>
+hsivonen: No subtweet, only big energy QRT
+
+[06:52:59.0000] <jgraham>
+Subsubtweet the part about how lack of coordination between standards bodies causes fragmentation ;)
+
+[07:46:48.0000] <nox>
+jgraham: Hah.
+
+[07:47:02.0000] <nox>
+I wish there was WHATWG HTTP Living Standard
+
+[07:54:04.0000] <annevk>
+nox: I take it you saw https://twitter.com/annevk/status/1368804319940710404?
+
+[07:54:50.0000] <nox>
+annevk: Oooooh nice
+
+[07:55:03.0000] <nox>
+Just came back from a walk so I didn't look at the Twitters yet, thanks for the link!
+
+[07:57:59.0000] <nox>
+I'm working on a proxy at le Cloudflare so obviously we need to support all of that
+
+[07:59:45.0000] <Domenic>
+nox: you should write a real spec and expand the WPTs :)
+
+[08:00:18.0000] <nox>
+Domenic: Not sure my manager would agree to that :p
+
+[08:01:00.0000] <nox>
+annevk: "http-version is case-sensitive; this should be an error" lol
+
+[08:27:26.0000] <nox>
+annevk: There is no way to inspect the version of an HTTP response from the Fetch spec, right?
+
+[08:31:21.0000] <nox>
+Oh wait, TIL Chrome rejects all of that.
+
+[08:34:30.0000] <nox>
+Domenic: Do you know if Chrome's HTTP parser is stricter through the Fetch spec, or is it strictly the same?
+
+[08:34:51.0000] <Domenic>
+nox: I do not know. Matt Menke (on the thread Anne linked to) would know.
+
+[09:08:15.0000] <annevk>
+nox: I think Matt made some improvements, but haven’t kept track; and yeah, Fetch does not expose version and prolly shouldn’t
+
+
+2021-03-09
+[16:32:11.0000] <br3nt>
+Does anyone know if there is a recommendation for html includes?  Eg to include html custom elements, or vue components, etc?
+
+[01:28:28.0000] <noamr>
+hi annevk! when you're back, https://github.com/whatwg/fetch/pull/1185 is ready for another look. it currently doesn't handle navigation-timing: that would require some adjustments, like integration with the HTML spec and updating the entry on-the-fly, but I wanted to start with RT before getting to that
+
+[01:30:25.0000] <annevk>
+noamr: do we have tests for these fields? E.g., that show implementations don't use Content-Length?
+
+[01:31:47.0000] <noamr>
+annevk: we have tests for the fields, though not to that particular case. Also writing tests for the connection-internal timestamps is a big undertaking (requires writing a custom TCP server in WPT)
+
+[01:35:42.0000] <noamr>
+annevk: I can add a test specifically for encodedSize with no content-length, it shouldn't be too difficult. also I'm OK with not including encodedSize in the first patch and adding it after we have a test. Added https://github.com/web-platform-tests/wpt/issues/27952 to track
+
+[01:40:07.0000] <annevk>
+noamr: yeah, I'm also curious what happens for WPT fetch/content-length/too-long.window.js
+
+[01:41:06.0000] <noamr>
+sure, interesting cases
+
+[01:43:19.0000] <annevk>
+noamr: do we just keep the timing info on fetch params the entire time or do we put it on response? because if the latter it'll also disappear when steps return a network error
+
+[01:43:33.0000] <annevk>
+Anyway, I guess I should do another review, just have a big backlog
+
+[01:44:37.0000] <noamr>
+annevk: currently if there's a network error while the response is processed it's still reported
+
+[01:45:13.0000] <noamr>
+reporting happens after the response is either aborted or the body is fully read
+
+[01:50:13.0000] <annevk>
+noamr: I guess I was also wondering when there was no response (just a network error)
+
+[01:50:46.0000] <noamr>
+I think it would be in the backlog to report it in certain cases. The implementations are quite messy about this.
+
+[03:01:13.0000] <noamr>
+annevk: testing current chromium, when Content-Length header is missing things work OK, otherwise encodedBodySize is equal to min(actualLength, headerLength) (cc yoav)
+
+[03:02:54.0000] <annevk>
+noamr: that means it's never looking at Content-Length, right? as per current steps
+
+[03:02:56.0000] <noamr>
+same in Firefox (Safari does not support encodedBodySize)
+
+[03:03:29.0000] <noamr>
+annevk: if Content-Length header is there, it truncates the actual size
+
+[03:04:19.0000] <annevk>
+noamr: well, but in that case you cannot actually observe more bytes so that's more a function of H/1 parsing
+
+[03:04:20.0000] <yoav>
+RE "encodedBodySize is equal to min(actualLength, headerLength)" - that's a bug, right?
+
+[03:04:34.0000] <noamr>
+right
+
+[03:04:47.0000] <noamr>
+right, annevk. It's not a bug, it's H1
+
+[03:05:21.0000] <annevk>
+Okay, that means we can ignore Content-Length here, thanks
+
+[03:05:36.0000] <noamr>
+cool, I'll PR the test to WPT
+
+[03:06:10.0000] <yoav>
+Thanks! If you could also throw a crbug my way once the WPT is there, that'd be highly appreciated :)
+
+[03:59:59.0000] <andreubotella>
+annevk: I'd completely forgotten that you'd raised an objection on https://github.com/whatwg/html/pull/6287
+
+[04:02:31.0000] <annevk>
+andreubotella: I don't think that's an objection 🙂
+
+[04:02:36.0000] <annevk>
+Unless I'm missing something
+
+[04:02:57.0000] <andreubotella>
+well, a comment that expected an answer
+
+[04:05:30.0000] <andreubotella>
+I'
+
+[04:06:53.0000] <andreubotella>
+I'll be marking Firefox as interested, since at this point I don't think it makes sense to wait for jdai's approval
+
+[04:07:05.0000] <annevk>
+andreubotella: ah okay, I think given your comment I really like removing normalization from form submission though
+
+[04:07:45.0000] <andreubotella>
+annevk: Yeah, I'll be filing a separate issue then
+
+[04:07:54.0000] <annevk>
+andreubotella: I guess one worry I have is that if we don't change that quickly and the tests don't expect that we'll end up with Firefox and Safari engineers just adding it
+
+[04:19:48.0000] <andreubotella>
+annevk: Now I remember that I filed a Webkit bug about it: https://bugs.webkit.org/show_bug.cgi?id=219086
+
+[04:43:45.0000] <annevk>
+andreubotella: I see, I guess add a comment there that it's still under consideration pointing to the new issue?
+
+[07:17:10.0000] <annevk>
+Domenic: I guess the only way to peek at streams is to read from a stream and give the caller another stream upon which you enqueue whatever you read followed by the remainder?
+
+[07:17:51.0000] <annevk>
+Domenic: ORB has to do something similar to SRI, though not always with the full response body
+
+[07:18:22.0000] <Domenic>
+annevk: yes, unless you want to reach into internal slots.
+
+[07:24:12.0000] <annevk>
+Domenic: at some point this warrants an abstraction, but not quite there yet and maybe it can be limited to Fetch, dunno much about other cases
+
+[08:09:26.0000] <noamr>
+annevk, yoav: fixed a lot of the style & nits for fetch/RT... still a few open issues. Not sure how to describe the connection timing info as "requirements", and not sure how to handle response-end in the worker case. Could use some guidance on the first one, and thinking to leave the second one as a TODO
+
+[08:17:00.0000] <annevk>
+noamr: I guess if a section doesn't suit you maybe a <ul> with an item for each time thingy
+
+[08:17:32.0000] <noamr>
+Sure, I can do that annevk.
+
+[08:20:01.0000] <annevk>
+noamr: so the second one (assuming service workers) was kinda handled with the "done flag" architecture you had initially, assuming implementations do create RT entries
+
+[08:20:34.0000] <annevk>
+but "done flag" itself is rather fraud :/
+
+[08:20:42.0000] <noamr>
+annevk: hmm so maybe it should move back there.
+
+[08:21:26.0000] <noamr>
+implementations do create RT entries, but not in fetch, rather in the clients of fetch, where "done" is about the resource and not about the request/response
+
+[08:21:50.0000] <annevk>
+noamr: yeah, I guess so
+
+[08:21:59.0000] <annevk>
+noamr: you mean the callers of fetch?
+
+[08:22:01.0000] <noamr>
+yes
+
+[08:22:19.0000] <noamr>
+annevk: in chromium, img/script/etc create RT entries and not FETCH
+
+[08:22:30.0000] <noamr>
+the problem with fetch is that once it creates a response stream, it's pretty much done
+
+[08:22:46.0000] <noamr>
+and RT is created after responseEnd, which is after that point
+
+[08:22:50.0000] <annevk>
+That's kind of the beauty of it, but yes, agreed
+
+[08:23:31.0000] <noamr>
+The way that makes sense for me to think about it is an event to the response body, something like "entire body retrieved"
+
+[08:23:59.0000] <noamr>
+which would trigger the RT entry
+
+[08:24:16.0000] <annevk>
+It's interesting though timing-wise, is the RT entry added during the load event?
+
+[08:24:31.0000] <noamr>
+sometimes it is, sometimes it isn't
+
+[08:24:33.0000] <annevk>
+That might be hard to specify without actually updating each caller
+
+[08:24:46.0000] <noamr>
+in some cases it's enqueued after some timer
+
+[08:25:13.0000] <noamr>
+there is no definition or standard implementation of "when is RT actually enqueued", only of what the timestamps represent
+
+[08:25:40.0000] <noamr>
+it's clear that it needs to be enqueued after the entire response body is read, which in the case of video for example could be never
+
+[08:25:44.0000] <annevk>
+It only takes one implementation and a couple of high-profile sites to get a de facto definition
+
+[08:26:13.0000] <annevk>
+Oh yeah, video is interesting
+
+[08:26:41.0000] <annevk>
+But yeah, Fetch kinda wants to register a listener on the stream that's invoked at the right time
+
+[08:27:02.0000] <noamr>
+it's no wonder responseEnd is tricky, when we talk about resource as something that is a "stream"
+
+[08:28:12.0000] <noamr>
+Maybe what the implementations do is what should be spec'd - associate the fetch timing info to the response, and have the different clients enqueue it to RT. but that would require diving to HTML and several other specs. /cc yoav
+
+[08:28:33.0000] <annevk>
+Perhaps we should have special read body operations that are tailored for responses, they use the ready body operations underneath, but can also handle RT
+
+[08:29:24.0000] <annevk>
+And yeah, that might still mean that the callers have to do something, but we could try to make it minimal
+
+[08:29:24.0000] <noamr>
+interesting, so the stream passed to body would be sort-of a decorated stream
+
+[08:32:11.0000] <noamr>
+Let me see if I can spec something like that, I think it would make the most sense (and less of a headache than trying to patch every possible client of FETCH)
+
+[08:35:36.0000] <annevk>
+noamr: let's see what yoav says though
+
+[08:36:20.0000] <annevk>
+noamr: I think there's still wrinkles unless we're sure callers always do the thing at EOF (though maybe they do, it'd be somewhat logical)
+
+[08:46:24.0000] <noamr>
+annevk: SGTM, pending yoav
+
+[08:49:52.0000] <yoav>
+/me catching up..
+
+[08:55:48.0000] <yoav>
+I'm in favor of trying to do as much as we can inside of Fetch and limit what callers need to do, as they are spread all over the place
+
+[08:58:08.0000] <annevk>
+yoav: the main tricky aspect is actions of callers vs creation of RT entry objects; if callers always read on the main thread I think we can require that RT objects are created in the EOF task (we'll even have access to a global!), but how realistic this is, is unclear
+
+[08:59:03.0000] <annevk>
+And I guess some callers are special and might need more? E.g., media elements
+
+[08:59:51.0000] <yoav>
+I'm not 100% sure callers always read on the main thread
+
+[09:00:00.0000] <annevk>
+yoav: in principle everything creates an RT object though, right? Aside from reports/navigations? E.g., background-image, CSS, etc.
+
+[09:00:09.0000] <yoav>
+Are we talking about spec or implementation?
+
+[09:00:36.0000] <yoav>
+yeah, every renderer-based request creates an RT entry
+
+[09:00:38.0000] <annevk>
+yoav: this would be for the specs, though implementations might be impacted, depending
+
+[09:01:19.0000] <annevk>
+e.g., if an implementation does a load event and creates the RT later, they might become non-conforming
+
+[09:01:42.0000] <annevk>
+or if they create an RT and then tasks happen and then load, also a problem
+
+[09:02:12.0000] <yoav>
+I *think* all implementations currently create the entry before their load event
+
+[09:02:23.0000] <yoav>
+(but currently they're not required to)
+
+[09:03:35.0000] <annevk>
+yoav: this might also solve part of the problem of the fetch <> RT linking issue I saw
+
+[09:03:47.0000] <annevk>
+yoav: though that would definitely require some caller integration
+
+[09:04:04.0000] <annevk>
+yoav: e.g., the load event could point to the RT object
+
+[09:05:25.0000] <yoav>
+(in a meeting, back in ~30)
+
+[09:10:06.0000] <noamr>
+annevk, yoav: implementations sometimes create the entry after the load event, e.g. after a timeout. And I doubt we can count on main-thread reading, e.g. a media decoder is not guaranteed to live on the main thread.
+
+[09:11:20.0000] <noamr>
+but they can enqueue a main-thread task to add that entry, no? as long as the timestamps are valid, I would expect implementations to do something similar to that.
+
+[09:16:24.0000] <noamr>
+The current responseEnd definition can expose strange timing information, like "the time it took to decode an image", also for cross-origin images. not sure if this is desirable/problematic/neutral.
+
+[09:30:21.0000] <yoav>
+that is definitely on the "problematic" side of that equation
+
+[09:31:21.0000] <yoav>
+noamr: do you have a sense of how many call sites we'd have to deal with if we hang the queueing e.g. as a task before the load event?
+
+[09:35:00.0000] <noamr>
+Yoav: I think most of them are in the HTML spec, and the list is roughly equivalent to the “destination” list in fetch
+
+[09:35:13.0000] <noamr>
+Going offline for a bit
+
+[09:39:20.0000] <annevk>
+HTML + CSS + fetch() + XHR should capture a lot of things
+
+[09:39:38.0000] <annevk>
+Not reports, but they might be skipped anyway?
+
+[09:42:26.0000] <yoav>
+reports are skipped, I believe
+
+[09:42:46.0000] <yoav>
+my fear is that HTML has a *lot* of callers
+
+[09:43:16.0000] <annevk>
+It's not that bad, what's bad is that they are in a bad state
+
+[09:43:16.0000] <yoav>
+e.g. only images has <img>, <video poster> and <input type=image>
+
+[09:43:22.0000] <yoav>
+and I'm probably forgetting some
+
+[09:44:02.0000] <yoav>
+but if that's the way to go, then 🤷
+
+[09:44:04.0000] <annevk>
+<link rel=icon> 🙂 (but we'd handle all <link> in one go)
+
+[09:44:28.0000] <yoav>
+:)
+
+[09:45:34.0000] <annevk>
+yoav: it seems hard to get a consistent task without it, but I need to think about it some more
+
+[09:45:52.0000] <yoav>
+👍
+
+[09:48:43.0000] <annevk>
+yoav: I guess one question I have if you're still here is whether sometimes entires don't get created if you don't hit EOF
+
+[09:49:04.0000] <annevk>
+yoav: or maybe they get created when the document is discarded and fetches are aborted?
+
+[09:49:12.0000] <annevk>
+(e.g., for EventSource)
+
+[09:50:47.0000] <yoav>
+The current spec doesn't require them to be created. I *think* implementations do create them, but not sure as this is not currently tested
+
+[09:51:20.0000] <yoav>
+Naively , it would make sense to fire those entries, with missing attributes for the parts that never happened
+
+[09:51:45.0000] <yoav>
+(unless there are some security issues with that that I'm failing to think of)
+
+[09:54:14.0000] <annevk>
+yoav: yeah, you could expose things the moment Fetch returns a response, but that would definitely be different and if it depends on the caller we'll need some caller integration
+
+[09:55:21.0000] <domfarolino>
+annevk: Can you point me to where Fetch sets request's client to an actual ESO? I can't seem to find it
+
+[09:59:06.0000] <annevk>
+domfarolino: it wants that the caller sets it at the moment
+
+[10:00:46.0000] <annevk>
+domfarolino: note that it doesn't have a default value (and yes, all this needs a guide and a better description, nearly there in terms of addressing that)
+
+[10:01:17.0000] <annevk>
+(I probably shouldn't say that since I'm still some steps removed from that)
+
+[10:09:12.0000] <domfarolino>
+annevk: Gotcha, thanks for the info
+
+[15:43:54.0000] <MikeSmith>
+https://stackoverflow.com/questions/66534759/chrome-cors-error-on-request-to-localhost-dev-server-from-remote-site
+
+[15:44:45.0000] <MikeSmith>
+first question on SO from somebody who ran into CORS+RFC1918 (Private Network Access) behavior
+
+
+2021-03-10
+[20:12:04.0000] <br3nt>
+Hi! Does anyone know if there is a recommendation for html includes?  Eg to include html custom elements, or vue components, etc?
+
+[00:35:57.0000] <domfarolino>
+annevk: Regarding your comment on my HTML PR, can you clarify? In the same algorithm step 17 seems to be "Run process a navigate response with navigationType , the source browsing context , and navigationParams ." I don't see reservedEnvironment though
+
+[00:38:07.0000] <annevk>
+domfarolino: I was looking at the live HTML version, so it might be a slightly different number in your local copy
+
+[00:38:37.0000] <annevk>
+domfarolino: it's the Let navigationParams be step
+
+[00:39:05.0000] <annevk>
+domfarolino: so one before
+
+[00:39:32.0000] <domfarolino>
+annevk: Ugh, good call. I thought I got them all
+
+[00:39:37.0000] <domfarolino>
+thx
+
+[00:40:38.0000] <annevk>
+domfarolino: can you also fix the other one while there? you'd want to replace it with navigationParams's reserved environment I suppose
+
+[00:40:54.0000] <domfarolino>
+annevk: Yep I was just going to do that too
+
+[00:41:01.0000] <annevk>
+thanks!
+
+[00:41:11.0000] <annevk>
+I'll let Domenic verify and land later today
+
+[05:39:40.0000] <zcorpan>
+When running html-build as of recently I get this error:
+
+[05:39:44.0000] <zcorpan>
+Traceback (most recent call last):
+
+[05:39:44.0000] <zcorpan>
+  File "/usr/local/bin/bs-highlighter-server", line 5, in <module>
+
+[05:39:46.0000] <zcorpan>
+    from highlighter.server import cli
+
+[05:39:48.0000] <zcorpan>
+ModuleNotFoundError: No module named 'highlighter'
+
+[05:41:28.0000] <zcorpan>
+Is https://github.com/tabatkins/highlighter the expected module?
+
+[05:41:46.0000] <zcorpan>
+MikeSmith: Domenic: ^
+
+[06:00:09.0000] <annevk>
+zcorpan: I think so
+
+[06:00:32.0000] <annevk>
+I thought it was optional though, but I haven't checked recently
+
+[06:05:02.0000] <zcorpan>
+it's optional in that I can skip highlighting with -h
+
+[06:05:42.0000] <zcorpan>
+but I wonder why I get the error now. Is there a step missing in https://github.com/whatwg/wattsi#building-and-running-wattsi-manually ?
+
+[06:36:40.0000] <annevk>
+littledan: I saw something come by on Twitter that makes me suspect you'll find yourself having opinions on https://github.com/whatwg/fetch/issues/1175 in due course
+
+[06:37:30.0000] <nox>
+No ETA at all, and I may not do anything at all in the end, but the idea of writing a spec to parse an HTTP answer, looking at Blink/Gecko/WebKit/cURL/Squid/nginx is growing on em.
+
+[06:37:41.0000] <nox>
+On me*, I don't think Eminem does HTTP parsing.
+
+[06:40:09.0000] <annevk>
+Keep me posted
+
+[06:44:25.0000] <littledan>
+annevk: wow, well, I thought the status quo meshed well with the stuff I am working on. I have to learn some more before I will manage to have my own opinion here.
+
+[06:44:33.0000] <littledan>
+Thanks for the pointer
+
+[07:41:28.0000] <Domenic>
+zcorpan: html-build should install the highlighter for you: https://github.com/whatwg/html-build/blob/main/build.sh#L223
+
+[07:42:55.0000] <noamr>
+annevk, yoav: I've made a lot of changes to https://github.com/whatwg/fetch/pull/1185/files. Instead of saving a redirectStart/redirectEnd in FETCH, I'm saving a list of redirects, and RT/NT can extrapolate data from it later. It makes the processing model a bit less wonky IMO, and makes it clearer about things like workerStart in its current form. Still missing cache processing, which I'm going to do next, but it's ready
+
+[07:42:55.0000] <noamr>
+for an intermediate look.
+
+[07:44:39.0000] <annevk>
+noamr: I'd like for the data that Fetch hands out to be safe, which that would not be, although I suppose there are some violations of that already...
+
+[07:44:56.0000] <zcorpan>
+Domenic: thanks. deleting /usr/local/bin/bs-highlighter-server  and running html-build/build.sh again made it install again and now it works
+
+[07:45:07.0000] <Domenic>
+Fun times...
+
+[07:45:50.0000] <noamr>
+annevk: it's cleaned up for TAO before handing out, it's as safe as previous data that's handed out.
+
+[07:46:41.0000] <annevk>
+noamr: k
+
+[07:57:45.0000] <noamr>
+annevk: regarding yesterday's chat about responseEnd, it's true that the different callers enqueue RT at different times, but I dug deep into the chromium implementation, and regardless of when it is queued, `responseEnd` is indeed either the stream's EOF or when the connection is closed.
+
+[07:58:24.0000] <noamr>
+so it might be OK to enqueue the RT as a response to stream EOF rather than deal with the different callers, as we need that anyway in order to compute responseEnd
+
+[07:59:16.0000] <noamr>
+^^^ yoav
+
+[08:00:04.0000] <annevk>
+noamr: so I think that works (assuming it's true for service worker responses too), but I think the larger question with the callers is RT object creation and whether or not we want to have some kind of relationship between that object and the caller at some point (e.g., loadEvent.rtObject)
+
+[08:00:41.0000] <annevk>
+noamr: that is, I'd like us to define in what task these objects get created
+
+[08:00:44.0000] <noamr>
+annevk: yea, it's true for service worker responses as well (the service worker creates the stream, and stream EOF generates responseEnd)
+
+[08:01:11.0000] <yoav>
+(in meetings... :/ )
+
+[08:04:17.0000] <noamr>
+annevk: I believe the RT object creation should be done on the main thread by RT and not by FETCH. Isn't there some kind of mechanism to "queue a task on the global object's main thread"?
+
+[08:04:28.0000] <annevk>
+noamr: and for that I think we can maybe get away with a default implementation that does the right thing (the EOF task does the creation of the object; and the caller does the firing of the load/error event in it), but there needs to be some way to override prolly for media at least
+
+[08:05:30.0000] <noamr>
+annevk: I don't believe media is different from the default; it would enqueue the RT object once it's fully streamed
+
+[08:05:56.0000] <annevk>
+noamr: media can do range requests and as you said it would likely do its stuff off the main thread
+
+[08:06:32.0000] <annevk>
+(though maybe we can gloss over that as an optimization)
+
+[08:07:03.0000] <noamr>
+annevk: yea, so in the end we would get to something like streams.EOF -> FETCH.report-timing -> RT.queue task on the main thread to add an RT object
+
+[08:07:18.0000] <noamr>
+the fact that media decoder runs on some thread is not relevant to that
+
+[08:09:39.0000] <annevk>
+noamr: the caller that is reading the response body should also be able to perform actions in that task though, that's what I'm trying to say
+
+[08:10:56.0000] <noamr>
+annevk: ah I see. so for that purpose we can, like you said, keep the off-thread decoding et al as an optimization that has to deal with its own thread safety
+
+[08:12:18.0000] <annevk>
+So for instance, https://html.spec.whatwg.org/#default-fetch-and-process-the-linked-resource step 11.5 would happen in this task (and not queue its own task)
+
+[08:12:44.0000] <annevk>
+And that probably has to happen after RT object creation, but Fetch can handle that ordering
+
+[08:16:23.0000] <noamr>
+annevk: I don't think ordering matters in this case. There is no guarantee that RT would be enqueued before/after the contents of the resource are handled in practice. it's ok if it's racy
+
+[08:16:45.0000] <annevk>
+noamr: right I disagree with that
+
+[08:19:05.0000] <noamr>
+annevk: fair enough. by "fetch can handle that ordering", you mean something like "send the EOF state forward, and only then enqueue an RT entry"?
+
+[08:23:12.0000] <annevk>
+noamr: with recent changes fetch queues the task and calls a callback from the caller
+
+[08:23:45.0000] <annevk>
+noamr: before it calls that callback it could call the instruction that creates the RT object
+
+[08:24:52.0000] <annevk>
+noamr: this would require something special for reading response bodies I suspect
+
+[08:25:18.0000] <noamr>
+annevk: ok, let me tinker with it
+
+[08:48:01.0000] <yoav>
+/me catching up
+
+[08:58:28.0000] <yoav>
+So, right now that ordering is not defined, but it would be good if we can make it well defined and queue the RT entry in a task that's somehow relative to other tasks such as the onload event and the resource processing
+
+[08:59:51.0000] <yoav>
+If Fetch can make sure that happens that would be ideal
+
+[10:02:25.0000] <EveryOS>
+I've been using the spec to aid my in writing a simple web browserBut I've not gotten very far lol https://usercontent.irccloud-cdn.com/file/IZoDHgO1/browser.png
+
+[10:29:55.0000] <noamr>
+yoav: yea, I'll check if that's doable inside fetch or if caller integration is needed.
+
+[11:20:18.0000] <yoav>
+👍
+
+
+2021-03-11
+[03:06:13.0000] <noamr>
+annevk: new version submitted. Using `TransformStream` with a custom flush to monitor EOF, and also handling cached responses.
+
+[03:08:25.0000] <noamr>
+annevk: Made several style passes on it, I think it's pretty clean but it's a big patch so hopefully I didn't miss anything
+
+[03:08:29.0000] <noamr>
+yoav ^^
+
+[03:17:26.0000] <jgraham>
+Is there some common spec pattern for pausing an in-parallel algorithm until some other spec invokes a specific hook?
+
+[03:17:56.0000] <annevk>
+jgraham: "Wait for x"
+
+[03:18:12.0000] <annevk>
+jgraham: we don't have a dfn for Wait currently, but that's the pattern
+
+[03:18:40.0000] <annevk>
+noamr: thanks, I'll take a look in a bit
+
+[03:19:45.0000] <jgraham>
+annevk: But just "wait for x" isn't defining steps for x so if you have "run any steps for x defined in other applicable specifications", it arguably doesn't work
+
+[03:20:25.0000] <annevk>
+jgraham: is parallel queue what you're looking for perhaps?
+
+[03:43:01.0000] <jgraham>
+Not quite, I think? So the concrete example is something like a hook that is invoked when the load event has been fired for a specific document. And in WebDriver we have two things that might happen in response: we might emit an (webdriver, not dom) event to the client indicating that load happened, and we might unblock an async navigation command that is waiting on the load. So the event  on its own is
+
+[03:43:07.0000] <jgraham>
+pretty simple, you just define steps that happen in reponse to the hook. And one option is that those steps say something like "now unblock any tasks that are [=waiting=] for an event named <code>load</code> with |navigation id|" where "waiting" is something defined in that spec to explictly handle unblocking the command. But I was wondering if there's an easier way. The parallel queue doesn't seem quite
+
+[03:43:13.0000] <jgraham>
+right because it's not something where we're trying to serialise running a set of tasks that may otherwise happen in parallel.
+
+[03:51:58.0000] <annevk>
+jgraham: I guess a parallel queue might still fit as it seems you need some kind of "in parallel" loop
+
+[03:53:23.0000] <annevk>
+hmm maybe not
+
+[03:56:59.0000] <jgraham>
+Right, you could model it as a queue and whenever you want to wait for something you push the subsequent steps to the relevant queue and when the hook is invoked you empty the queue running all the steps. But that seems suspiciously like it's reinventing callbacks inside the spec whereas something that looks more like awaiting a promise is going to be easier to read and write
+
+[04:05:50.0000] <annevk>
+jgraham: I think the issue is that you need some kind of queue as "in parallel" is still an ordered set of steps; I guess you could have some while true setup and inside you wait for any of the events you care about to fire and then you do something...
+
+[04:43:59.0000] <annevk>
+TabAtkins: somehow I missed your reply to https://github.com/whatwg/fetch/issues/1143 :/ let me know if it would help to have some elaboration in the issue or if you're happy to wait a bit longer, I'm getting to the point where I can address it I think
+
+[05:36:56.0000] <EveryOS>
+I noticed that it seems the only way to get a password from an input[type=password] is via `.value`, which returns a plain old immutable string. Do UAs typically zero out strings when a site is closed?
+
+[05:54:20.0000] <annevk>
+EveryOS: they get GC'd
+
+[05:57:38.0000] <annevk>
+MikeSmith: do you have plans to work on https://github.com/w3c/webappsec-upgrade-insecure-requests?
+
+[05:58:41.0000] <EveryOS>
+Annevk: Thanks
+
+[06:14:25.0000] <EveryOS>
+But does the garbage collector zero out the strings? (Wondering since they may contain sensitive data)
+
+[06:16:35.0000] <annevk>
+EveryOS: if someone has physical access to your computer there's a lot to be worried about
+
+[06:16:48.0000] <annevk>
+EveryOS: and just writing over something once doesn't really help aiui
+
+[06:17:00.0000] <EveryOS>
+Oh, ok, thanks
+
+[06:25:28.0000] <noamr>
+annevk: I didn't quite understand your comment about the transform stream
+
+[06:27:11.0000] <noamr>
+ah I think I get it, put all of it in the existing "consuming a body" rather than as a TransformStream
+
+[06:30:38.0000] <annevk>
+noamr: not quite
+
+[06:31:19.0000] <annevk>
+noamr: 1. I think we want to store stuff on response earlier (basically when we might return it to the caller)
+
+[06:31:53.0000] <noamr>
+re 1. - yes, I got that. we know everything apart from responseEnd at that time
+
+[06:32:23.0000] <noamr>
+... and can clean up TAO etc
+
+[06:33:07.0000] <annevk>
+noamr: 2. I think we want to define "incrementally read" and "fully read" algorithms that take a response (rather than a body); these would use the body variants underneath but also store the additional timing data on response (if applicable per TAO) and since they have the callback from the document they can execute the RT object creation before executing that callback
+
+[06:33:54.0000] <annevk>
+s/from the document/from the caller/
+
+[06:34:15.0000] <noamr>
+annevk: TAO doesn't play a role at this point, as responseEnd is not TAO-protected
+
+[06:34:21.0000] <noamr>
+does that change anything?
+
+[06:34:28.0000] <annevk>
+noamr: not really
+
+[06:35:01.0000] <annevk>
+noamr: I guess that only matters for the byte length numbers
+
+[06:35:22.0000] <noamr>
+annevk: right
+
+[06:35:34.0000] <noamr>
+so it's a new export that callers would have to re-attach to instead of "consume a body"? something like "consume a response body"?
+
+[06:36:18.0000] <annevk>
+noamr: we haven't migrated all callers yet to use the modern conventions of Fetch (except for XHR), but yes
+
+[06:36:42.0000] <noamr>
+annevk: OK understood, thanks
+
+[06:37:10.0000] <annevk>
+noamr: I suspect most would actually use processResponseEndOfBody which we'd refactor to use "fully ready" _response_
+
+[06:38:02.0000] <annevk>
+noamr: as for naming, maybe <dfn for=response>incrementally read</dfn> / <dfn for=response>fully read</dfn> is good enough?
+
+[06:38:22.0000] <annevk>
+s/ready/read/
+
+[06:39:13.0000] <annevk>
+We might still need some configuration here for special cases, e.g., I have no idea how Background Fetch would integrate into this cc JakeA
+
+[06:39:31.0000] <noamr>
+annevk: as in, "To incrementally read a response" ?
+
+[06:40:16.0000] <noamr>
+ah I see your dfn, got it
+
+[06:40:19.0000] <annevk>
+noamr: "To <dfn export for=response>incrementally read</dfn> a <a for=/>response</a> <var>response</var>" yeah
+
+[06:56:45.0000] <MikeSmith>
+annevk: yeah, planning to deal with https://github.com/w3c/webappsec-upgrade-insecure-requests
+
+[06:57:14.0000] <MikeSmith>
+what in particular are you wanting about it?
+
+[06:57:22.0000] <annevk>
+MikeSmith: I ended up poking Mixed Content instead
+
+[06:57:30.0000] <annevk>
+MikeSmith: I mostly want the modern setup so it's easier to do PRs
+
+[06:57:44.0000] <annevk>
+MikeSmith: I was looking at fixing https://github.com/whatwg/fetch/issues/409
+
+[06:58:43.0000] <MikeSmith>
+ah OK
+
+[06:59:12.0000] <MikeSmith>
+yeah I will it up for that
+
+[06:59:20.0000] <TabAtkins>
+annevk: I can wait, no worries
+
+[07:01:04.0000] <MikeSmith>
+TabAtkins: is it intentional that https://drafts.csswg.org/css-backgrounds/ has no MDN annotations?
+
+[07:02:08.0000] <MikeSmith>
+it seems like in general, CSS drafts that are at CR have no MDN annotations
+
+[07:04:20.0000] <TabAtkins>
+Dunno, I'd have to check
+
+[07:05:31.0000] <MikeSmith>
+k
+
+[07:56:19.0000] <MikeSmith>
+annevk: OK https://w3c.github.io/webappsec-mixed-content/ now being autopublished
+
+[08:21:03.0000] <noamr>
+annevk: for "unsafe shared current time", I don't see it in the export list for HR-TIME when running `bikeshed refs`. Do I need to twist some bolt in bikeshed somewhere?
+
+[08:21:33.0000] <annevk>
+noamr: HR-TIME should use <dfn export>
+
+[08:21:48.0000] <annevk>
+noamr: then it should get indexed and then we get to use it
+
+[08:22:11.0000] <noamr>
+annevk: everything in HR-TIME is using <dfn data-export="">, is that the problem?
+
+[08:22:31.0000] <noamr>
+it's an HTML file and not .bs
+
+[08:22:37.0000] <annevk>
+noamr: that means you consider everything a public API, so maybe then the problem is that it's not indexed
+
+[08:23:09.0000] <noamr>
+annevk: yes, seems like everything else there is indexed. which button needs to be pressed?
+
+[08:23:48.0000] <annevk>
+noamr: hmm, https://w3c.github.io/hr-time/#dfn-shared-monotonic-clock if I inspect that element I don't see export
+
+[08:24:06.0000] <noamr>
+annevk: yes, that one is private
+
+[08:24:17.0000] <noamr>
+it should be "unsafe shared current time"
+
+[08:24:37.0000] <annevk>
+my bad, okay yeah, not sure why that's not indexed
+
+[08:24:50.0000] <annevk>
+TabAtkins: is Shepherd stuck again?
+
+[08:25:05.0000] <Domenic>
+Is it because it's a ReSpec spec?
+
+[08:26:55.0000] <annevk>
+Oh maybe, in the source it only has <dfn data-export="">unsafe shared current time</dfn> without ID and such
+
+[08:30:00.0000] <annevk>
+Yeah I don't know how that would work
+
+[08:30:15.0000] <noamr>
+all the dfns there don't have IDs
+
+[08:30:17.0000] <annevk>
+When I do bikeshed refs spec=hr-time I get back /TR/hr-time-2/ refs
+
+[08:30:22.0000] <noamr>
+do I need to add one specifically to that one?
+
+[08:30:45.0000] <noamr>
+yea I think it's not the ID, but reading an old version of the spec
+
+[08:31:02.0000] <annevk>
+I guess it might have to get published on TR/? WHATWG doesn't do ReSpec though somehow we often end up having to do tech support :/
+
+[08:40:49.0000] <noamr>
+gotcha. CC yoav
+
+[08:41:36.0000] <Domenic>
+I've always manually added ReSpec specs to the anchors block
+
+[08:44:21.0000] <yoav>
+I'm pinging folks to make sure it's published
+
+[08:44:39.0000] <yoav>
+it's hr-time-3 though
+
+[08:45:10.0000] <yoav>
+Do Bikeshed refs work differently?
+
+[08:47:15.0000] <TabAtkins>
+annevk: Shepherd's not stuck, but it's also not showing any processes at all at the moment, which is pretty rare. Is something late?
+
+[08:48:03.0000] <TabAtkins>
+Ah, note that I don't have hr-time-3 in the refs data.
+
+[08:48:46.0000] <TabAtkins>
+Moving over to Reffy data by the end of this month is my big goal, btw.
+
+[08:49:57.0000] <noamr>
+annevk: for now I pushed with a dfn inside FETCH so that we can progress on the other stuff... I put all the different reporting streams - it actually seems kinda similar to what happens in chromium, where there is a common "Resource Loader" that  wraps FETCH and adds things like the response_end time.
+
+[08:50:49.0000] <annevk>
+noamr: yeah fair, maybe add an XXX near it or some such?
+
+[08:51:10.0000] <noamr>
+will do
+
+[08:52:37.0000] <TabAtkins>
+Okay I just added hr-time-3, hopefully its markup is sufficient despite being ReSpec.
+
+[08:53:42.0000] <TabAtkins>
+But yeah, since the source doesn't have IDs, I don't think it'll work.
+
+[09:04:53.0000] <annevk>
+TabAtkins: I suspect they're generated by script and hopefully the post-script version is what gets published
+
+[09:05:17.0000] <TabAtkins>
+On /TR it looks like it, but the ED is source+JS.
+
+[09:05:31.0000] <TabAtkins>
+So better hope you're okay with getting the /TR links.
+
+[09:06:40.0000] <annevk>
+Right yeah, not sure I care enough, but it is icky (and so is the -3)
+
+[09:46:56.0000] <domfarolino>
+Random question: if I get NickServ messages sying I'm "already logged in as domfarolino" sometimes.. does this imply someone is trying to log in with my name or something? Or does this "just happen" sometimes on IRC
+
+[09:49:35.0000] <annevk>
+domfarolino: this could happen if you connect to a new server, I think, but not sure
+
+[09:50:33.0000] <annevk>
+domfarolino: I have had this happen and no reason to believe I'm compromised...
+
+[09:50:43.0000] <EveryOS>
+domfarolino: It's happened to me before. It *could* mean that somebody is impersonating you, but for me, it usually happens because there was a network glitch, or I had not closed my previous session.
+
+[09:51:07.0000] <domfarolino>
+OK that sounds good thanks for roughly confirming
+
+[10:07:30.0000] <annevk>
+Domenic: FYI corrected a typo in OP of https://github.com/whatwg/participate.whatwg.org/pull/178
+
+[10:07:43.0000] <Domenic>
+Ah cool, thank you
+
+
+2021-03-12
+[19:35:02.0000] <MikeSmith>
+annevk: dunno if you still need it but anyway https://w3c.github.io/webappsec-upgrade-insecure-requests/ is now set up for autopublishing
+
+[21:25:36.0000] <annevk>
+MikeSmith: I do, thank you! PRs later today 😊
+
+[23:59:33.0000] <JakeA>
+annevk: Can you think of any kinds of navigation response that result in a no-op in terms of history traversal? There's `Content-Disposition`, any others?
+
+[00:12:36.0000] <annevk>
+JakeA: 204/205 maybe?
+
+[00:13:15.0000] <annevk>
+JakeA: redirect to an unknown scheme
+
+[00:13:35.0000] <JakeA>
+annevk: wouldn't that navigate to an error page?
+
+[00:14:23.0000] <annevk>
+JakeA: I'm not sure, but if you redirect to zoommtg for instance I'm pretty sure it would not
+
+[00:14:32.0000] <annevk>
+JakeA: note that navigate does its own redirect handling
+
+[00:15:10.0000] <annevk>
+JakeA: and 204/205 responses don't change the current document, so probably don't affect history either
+
+[00:53:27.0000] <JakeA>
+annevk: cheers. Need to test what happens when you traverse to a history entry that does one of those things & come up with a reasonable behaviour.
+
+[03:51:45.0000] <hsivonen>
+annevk: What are the next steps for https://github.com/whatwg/html/pull/1752 ?
+
+[03:52:44.0000] <hsivonen>
+The only intentional difference from WebKit and Blink is limiting the scanning of `>` to the first 1024 bytes.
+
+[04:14:56.0000] <annevk>
+hsivonen: the pull request template should be added to OP so test coverage, impl support, and impl bugs are documented
+
+[04:15:26.0000] <annevk>
+hsivonen: if that’s all good it can land
+
+[04:15:47.0000] <annevk>
+Seems this PR was created before the template was a thing
+
+[04:16:56.0000] <hsivonen>
+I guess I need to file bugs on WebKit and Blink to limit to 1024 bytes, then.
+
+
+2021-03-13
+[17:02:04.0000] <croraf_>
+Is this blocked by browser security: ref.innerHTML = "<script>console.log(5)</script>";
+
+[17:02:10.0000] <croraf_>
+?
+
+[01:13:41.0000] <sup-bot>
+sup
+
+
+2021-03-15
+[19:31:00.0000] <EveryOS>
+Oh, I didn't realize that Domenic#5160 used Discord. Mildly interesting.
+
+[19:33:20.0000] <EveryOS>
+I was browsing some random things on Reddit when I happened to come across it
+
+[20:07:52.0000] <EveryOS>
+Domenic: Oh, hey, can I send you a friend request?
+
+[21:38:07.0000] <EveryOS>
+I noticed that https://github.com/whatwg/html/issues/2997 was still open. The infobox on the specs seemed to mention that the child text content was meant to be used, but do not define how it is converted to CSS rules. I presume that https://www.w3.org/TR/css-syntax-3/#parse-list-of-rules is the missing step here?
+
+[23:03:49.0000] <annevk>
+EveryOS: the section above, rather
+
+[23:04:58.0000] <annevk>
+But that also seems insufficient in terms of arguments, e.g., how does it know about quirks mode?
+
+[03:09:32.0000] <noamr>
+morning annevk, https://github.com/whatwg/fetch/pull/1185/files is ready for another look when you get the chance
+
+[03:12:24.0000] <noamr>
+annevk: with the whole streams thing, the direction I took that seems the cleanest (and closest to implementations) is that the streams inside FETCH mark the `response end time` and clean up TAO, and the caller needs to do the actual reporting to RT/NT. It allows the caller to make certain decisions, such as using different threads and deciding to report early (e.g. an image decode error before the end of response).
+
+[03:34:28.0000] <annevk>
+noamr: I guess that's reasonable, I wonder if we might still want something for callers that don't want to do that work, but perhaps such an abstraction is best created outside of Fetch
+
+[03:35:30.0000] <noamr>
+annevk: yes, it could like like "fetch resource" or such in HTML spec that wraps the FETCH stream and reports
+
+[03:40:58.0000] <noamr>
+annevk: since RT also has an `initiator` field, I think callers would anyway have to do something, like opt-in to reporting to RT. It's not the case that every caller to fetch is a "resource" and should have an RT entry, and using FETCH's initiatorType for that is not a 1:1 match. For example, there could be cases where FETCH is used as an implementation detail that is not web-exposed
+
+[03:47:36.0000] <annevk>
+noamr: I was hoping we could make initiator work somehow, what are the problematic cases?
+
+[03:48:19.0000] <noamr>
+annevk: it's not *THAT* problematic, but e.g. RT knows whether the initiator is XHR or fetch()
+
+[03:48:48.0000] <noamr>
+annevk: and the whole CSS thing is unclear in FETCH initiators
+
+[03:50:02.0000] <noamr>
+I don't mind if there is a flag that's passed to FETCH telling it to opt-in/opt-out to reporting to RT with the initiator, but it wouldn't be too different from doing the actual reporting
+
+[03:51:26.0000] <annevk>
+Yeah fair, and if we want to expose the RT object on an event or other object the caller would need a handle to it anyway
+
+[04:31:32.0000] <jgraham>
+Where is it documented how to buld HTML?
+
+[04:31:34.0000] <jgraham>
+*build
+
+[04:32:06.0000] <andreubotella>
+jgraham: https://github.com/whatwg/html-build/
+
+[04:32:28.0000] <jgraham>
+Thanks!
+
+[04:33:21.0000] <EveryOS>
+annevk: Sorry for the late reply; I was sleeping. Thanks for the clarification. As far as I can tell (after using word search on multiple CSS specs), CSS seems to ignore quirks mode. That is, unless it goes by a different name.
+
+[04:34:27.0000] <annevk>
+EveryOS: first two subsections of https://quirks.spec.whatwg.org/#css and they should really be uplifted
+
+[04:35:59.0000] <annevk>
+/me files issue on that
+
+[04:39:37.0000] <EveryOS>
+annevk: Oh, thanks (: I missed that (as you can tell)
+
+[04:44:42.0000] <annevk>
+https://github.com/w3c/csswg-drafts/issues/6100 and https://github.com/w3c/csswg-drafts/issues/6101
+
+[04:51:27.0000] <EveryOS>
+Thanks. I've enabled notifications on those issues.
+
+[06:54:01.0000] <nox>
+My HTTP adventures continue https://github.com/seanmonstar/httparse/issues/87#issuecomment-799417589
+
+[06:55:42.0000] <annevk>
+nox: lol
+
+[07:30:51.0000] <annevk>
+nox: I'm glad I can focus exclusively on silly servers
+
+[08:49:30.0000] <hsivonen>
+annevk: Now the only thing blocking the merging of https://github.com/whatwg/html/pull/1752 is getting either a Blink implementor or a WebKit implementor to express interest, right?
+
+[08:50:13.0000] <annevk>
+hsivonen: yeah that seems right
+
+[08:54:03.0000] <hsivonen>
+thanks
+
+[08:57:33.0000] <EveryOS>
+If an implementation does not follow the specs word-for-word, but still have the same behavior as the specs, is it still considered spec-compliant?
+
+[08:58:03.0000] <hsivonen>
+EveryOS: You are always allowed to as-if.
+
+[08:58:33.0000] <EveryOS>
+hsivonen: Ok, thanks!
+
+[09:09:51.0000] <nox>
+annevk: At least I found a colleague to take care of the SIMD bits
+
+[09:18:29.0000] <annevk>
+nox: SIMD seemed like fun until I learned via hsivonen that it's a bit of a mess
+
+[09:19:42.0000] <nox>
+I find SIMD really fun when someone is holding my hand, or there is at least some comments about how the stuff I am reading works 😅
+
+[09:46:46.0000] <devsnek>
+if you have a page like https://example.com, should you be able to create an iframe to http://localhost:xyzw and communicate with it via postMessage?
+
+[09:47:57.0000] <devsnek>
+found smth using https://localhost:xyzw with self signed certs, which seems weird cuz i thought normal localhost is already a secure origin
+
+[09:48:28.0000] <annevk>
+devsnek: the former maybe yes, the latter dunno
+
+[09:48:50.0000] <annevk>
+devsnek: though note https://wicg.github.io/private-network-access/
+
+[09:48:59.0000] <devsnek>
+:notlikethis:
+
+[09:49:04.0000] <devsnek>
+yeah i tried reading through some of that stuff
+
+[09:49:08.0000] <devsnek>
+it confuses the hell out of me though
+
+[09:49:19.0000] <devsnek>
+and browsers all seem to do it differently
+
+[09:51:13.0000] <annevk>
+Private Network Access isn't really deployed yet
+
+[09:51:44.0000] <devsnek>
+so maybe like, *theoretically* http://localhost should work but its just not implemented fully yet
+
+[09:52:01.0000] <annevk>
+But the tl;dr is that local networks and localhost are under attack, so they will get preflighted soonish
+
+[09:52:34.0000] <annevk>
+devsnek: I think there was a proposal to make mixed content operate on potentially trustworthy URLs, I'm not sure if that made it in and who adopted it
+
+[10:19:57.0000] <nox>
+annevk: Are there docs on how to bootstrap a new spec?
+
+[10:28:49.0000] <Domenic>
+devsnek: annevk: my understanding is that per spec you can create the iframe, and any iframe you can create you can communicate to via postMessage
+
+[10:29:16.0000] <Domenic>
+That said I recently found that browsers seem to prohibit iframeing file: URLs from the open web and that's not in any spec
+
+[10:29:35.0000] <devsnek>
+interesting
+
+[10:36:36.0000] <jgraham>
+nox: https://whatwg.org/workstream-policy but note that making an actual new WHATWG workstream/spec isn't trivial.
+
+[10:37:07.0000] <jgraham>
+It might make sense to write an unofficial spec document first
+
+[10:37:51.0000] <jgraham>
+(and you do *that* by using bikeshed)
+
+[10:40:12.0000] <annevk>
+Domenic: Fetch + Mixed Content don't prohibit file URLs even there?
+
+[10:40:44.0000] <Domenic>
+Hmm I think I failed to check that
+
+[10:41:10.0000] <annevk>
+Domenic: it might well be something that's overlooked and we should define though
+
+[10:41:15.0000] <Domenic>
+I'd be surprised if http: -> file: was prohibited by MIX though
+
+[10:41:24.0000] <Domenic>
+https: -> file: probably prohibited
+
+[10:41:55.0000] <Domenic>
+Oh right I remember now
+
+[10:41:59.0000] <annevk>
+Domenic: file a bug against Fetch? I guess we want to look at the client and then forbid things, similar to what we did for ftp: URLs
+
+[10:42:19.0000] <Domenic>
+"For now, unfortunate as it is, file URLs are left as an exercise for the reader. / When in doubt, return a network error." Browsers indeed return a network error for http: -> file: fetches
+
+[10:42:48.0000] <Domenic>
+I guess we could tighten that up to give specific cases where you return a network error
+
+[10:43:05.0000] <annevk>
+Yeah file: URLs should always network error in a web context, it's just that when you navigate to a file: URL they can work
+
+[10:43:22.0000] <annevk>
+As in, blob: and data: URLs shouldn't be able to access them either
+
+[10:49:46.0000] <Domenic>
+Filed https://github.com/whatwg/fetch/issues/1195 .
+
+[10:53:56.0000] <EveryOS>
+People here are really smart. Annevk works at Mozilla, Domenic works at Google.
+
+[11:03:23.0000] <EveryOS>
+Is it just me, or does this note feel a bit redundant? https://usercontent.irccloud-cdn.com/file/5gM0LjTC/image.png
+
+[11:10:45.0000] <nox>
+jgraham: Yeah I meant how to setup bikeshed :)
+
+[11:11:42.0000] <Domenic>
+annevk: do you remember if we ever set window's associated Document correctly? I thought we did but currently it seems broken...
+
+[11:15:56.0000] <Domenic>
+Oh, I think it happens via history traversal
+
+[11:16:20.0000] <annevk>
+Domenic: yep
+
+[11:16:41.0000] <annevk>
+EveryOS: redundant how?
+
+[11:20:39.0000] <EveryOS>
+annevk: The name of the algorithm is "create a new top-level browsing context". The note mentions that "this creates a top-level browsing context".  I thought it seemed as if that could be easily implied from the name.
+
+[11:20:39.0000] <EveryOS>
+Now that I think of it, though, perhaps the note is just pointing out the significance of the algorithm.
+
+[11:25:22.0000] <annevk>
+EveryOS: it's somewhat redundant but it's useful to have a pointer to the concept of what it creates, in case you want to dig into that further
+
+[11:25:52.0000] <nox>
+Like, is there a bikeshed template from which to start or something
+
+[11:26:15.0000] <nox>
+Oh, read the documentation, stupid me hah.
+
+[11:27:44.0000] <EveryOS>
+Oh, I see. I didn't notice that only the infobox had the purple link to the concept at first.
+
+[15:07:36.0000] <zcorpan_>
+MikeSmith: is w3c-test.org/submissions/ still active? (context https://github.com/web-platform-tests/rfcs/pull/76 )
+
+[16:14:47.0000] <MikeSmith>
+zcorpan_: timestamps in the shell filesystem show http://w3c-test.org/submissions/19694/ was updated on March 11 and http://w3c-test.org/submissions/25247/ on March 5 but otherwise the newest PR that got mirrored is http://w3c-test.org/submissions/27130/, with a Feb 21 timestamp
+
+[16:16:41.0000] <MikeSmith>
+but https://github.com/web-platform-tests/wpt/pull/27130 was raised Jan 11
+
+[16:17:18.0000] <MikeSmith>
+so I guess from that it seems it has been failing for new PRs since some time on Jan 11 or Jan 12
+
+[16:20:12.0000] <MikeSmith>
+discussion around https://github.com/web-platform-tests/rfcs/pull/76 seems to imply that nobody cared about http://wptpr.live nor will miss it
+
+[16:20:57.0000] <MikeSmith>
+but as that comment from Dom indicates, some people were actually using it
+
+[16:22:05.0000] <MikeSmith>
+and I see the same thing happening every time w3c-test.org/submissions/ breaks — I start hearing from people who have been relying on it and want it to be working again
+
+[16:23:33.0000] <MikeSmith>
+hmm, doing a git pull from the shell, it says:
+
+[16:23:33.0000] <zcorpan_>
+MikeSmith: so we had both wptpr.live and w3c-test.org with this functionality at the same time?
+
+[16:23:35.0000] <MikeSmith>
+error: some local refs could not be updated; try running 'git remote prune origin' to remove any old, conflicting branches
+
+[16:23:43.0000] <MikeSmith>
+zcorpan_: yeah we did
+
+[16:24:20.0000] <MikeSmith>
+and the plan was that once wptpr.live was working reliably, we would redirect w3c-test.org
+
+[16:24:57.0000] <MikeSmith>
+but we never got wptpr.live working reliably — I think for the same reasons I told everybody from the beginning
+
+[16:26:49.0000] <MikeSmith>
+...which is that the instability problems on w3c-test.org are not unique to the w3c-test.org environment but instead in inherit in how we are using the Python SimpleHTTPServer stuff
+
+[16:27:32.0000] <zcorpan_>
+MikeSmith: so where does that leave w3c-test.org/submissions functionality? w3c continues to maintain it, or shut it down too?
+
+[16:27:59.0000] <MikeSmith>
+zcorpan_: I will continue running it for as long as anybody has need for it
+
+[16:28:08.0000] <MikeSmith>
+*continue to try to keep it running
+
+[16:29:13.0000] <zcorpan_>
+ok
+
+[16:30:50.0000] <MikeSmith>
+I just now cleaned up the git breakage and pulled to the current head of the master branch, and restarted wptserve
+
+[16:31:03.0000] <MikeSmith>
+so maybe that will fix the submissions problem
+
+[16:31:40.0000] <MikeSmith>
+but I have never before seen that “error: some local refs could not be updated; try running 'git remote prune origin' to remove any old, conflicting branches” message in any other git project
+
+[16:32:25.0000] <MikeSmith>
+everything we do with wpt seems to be a stress test for every system we through at it
+
+[16:33:10.0000] <zcorpan_>
+set up a cron job to rm -rf wpt; git clone ...
+
+[16:33:14.0000] <MikeSmith>
+e.g., how we manage to break github previously by the way we were doing labels
+
+[16:34:29.0000] <MikeSmith>
+well rm -rf wpt; git clone would wipe out all the submissions too, at least in the current filesystem structure we are using
+
+[16:35:00.0000] <MikeSmith>
+all this stuff is really hacks on top of hacks on top of hacks
+
+[16:35:21.0000] <MikeSmith>
+...with wptserve being the biggest hack of all
+
+[16:36:08.0000] <MikeSmith>
+wptserve is just never going to be very reliable when it’s run as a persistent process over days and weeks and months
+
+[16:36:47.0000] <zcorpan_>
+wptpr.live has a different setup though, which I guess you know
+
+[16:37:01.0000] <MikeSmith>
+well now that I say that, I am pretty sure we already have a cron job that just stops and restarts wptserve on w3c-test.org at least once a day
+
+[16:37:33.0000] <MikeSmith>
+yeah I know wptpr.live has a different setup, but I guess that setup did not fix the underlying problems
+
+[16:38:51.0000] <zcorpan_>
+https://github.com/web-platform-tests/wpt.live#overview
+
+[16:38:56.0000] <MikeSmith>
+/me looks
+
+[16:40:20.0000] <zcorpan_>
+https://github.com/web-platform-tests/wpt.live/pull/38/files#diff-b335630551682c19a781afebcf4d07bf978fb1f8ac04c6bf87428ed5106870f5L120 has a nice diagram of the submissions process
+
+
+2021-03-16
+[01:10:06.0000] <noamr>
+hi annevk, reminding you the new Fetch/RT integration revision is waiting for another review pass :) thanks
+
+[03:59:56.0000] <annevk>
+noamr: thanks, I'll take a look now, got distracted yesterday somehow
+
+[04:10:59.0000] <noamr>
+Thanks annevk, happens
+
+[05:02:13.0000] <noamr>
+annevk: I updated the small things. Still need to revive the PR template and investigate how we're doing with test coverage. Regarding the new "streams for response", not sure what the best course of action is - maybe export only the incremental one and "update timing info"? this way FETCH and other non-incremental clients can update the repsonse time themselves at the end instead of relying on the "fully read" operation
+
+[05:02:13.0000] <noamr>
+to do that for them
+
+[05:08:45.0000] <annevk>
+noamr: I think it might help to write a PR for XHR (and in this PR add coverage for fetch()) to help answer that question; that way it's a little clearer what the cost for callers is and how we could minimize that and make the architecture fit
+
+[05:10:40.0000] <annevk>
+noamr: also, if there's only one time remaining it seems we could update timings for a response earlier (right before we expose response to the caller), is there a reason you didn't pursue that?
+
+[05:24:22.0000] <noamr>
+A neck: We do update response timing earlier, at the fetch finale. We would have to take extra TAO care of decoded/encoded body size, but maybe that would be best, and we might not even need the stream override
+
+[05:24:42.0000] <noamr>
+Annevk (was autocorrected :)) ^
+
+[05:25:14.0000] <noamr>
+Let me prototype with xhr/fetch and see how that looks, maybe with a few options
+
+[05:31:21.0000] <annevk>
+noamr: that sounds good! So encoded/decoded size and response end are the tricky bits?
+
+[05:57:35.0000] <noamr>
+annevk : yes.
+
+[10:44:22.0000] <annevk>
+TabAtkins: I can file a separate bug for this, but I was wondering a similar thing about <url>
+
+[10:44:43.0000] <annevk>
+TabAtkins: presumably that's parsed as a URL, which requires a base URL, which comes from where?
+
+[10:45:16.0000] <annevk>
+TabAtkins: (I guess this would happen as the last step of parsing per your comments as the parser only seems to obtain a string from it.)
+
+[10:45:20.0000] <TabAtkins>
+https://drafts.csswg.org/css-values/#relative-urls
+
+[10:45:29.0000] <TabAtkins>
+url of the stylesheet
+
+[10:46:04.0000] <annevk>
+TabAtkins: right, but the parser stylesheet doesn't have any fields
+
+[10:46:31.0000] <TabAtkins>
+yeah, interpreting values happens outside the parser's responsibility. all it knows is that it emitted a function
+
+[10:47:38.0000] <annevk>
+TabAtkins: so what calls the parser and handles that?
+
+[10:47:54.0000] <TabAtkins>
+i dunno, the CSS implementation?
+
+[10:48:19.0000] <annevk>
+TabAtkins: I guess I don't understand why the parser doesn't create CSSOM objects, similar to the HTML parser
+
+[10:48:41.0000] <annevk>
+TabAtkins: it just seems like there's a bunch of details not really defined anywhere
+
+[10:48:48.0000] <TabAtkins>
+oh no, i absolutely wouldn't want to do that. The parser gets invoked by a lot of things that wouldn't want anything to do with CSSOM
+
+[10:49:25.0000] <TabAtkins>
+Plus CSSOM doesn't have objects for most levels of "things" in CSS; beyond the basic outer stuff it's mostly strings
+
+[10:50:52.0000] <annevk>
+Yeah, creating intermediate data structure is indeed better, but it should at least be clear how these things end up being created
+
+[10:51:04.0000] <annevk>
+an*
+
+[10:53:18.0000] <annevk>
+Like ideally you can read <style>, follow links, and understand how it all works; and ideally we wouldn't have multiple definitions of stylesheet or if we need to have them at least it would be clear they are meant to be diff
+
+[12:10:51.0000] <annevk>
+wanderview: might have to avoid empty hosts too, come to think of it
+
+[12:11:24.0000] <wanderview>
+I am in the middle of typing a long response
+
+[12:14:48.0000] <annevk>
+😊
+
+[12:15:40.0000] <annevk>
+Looking forward to reading that tomorrow!
+
+
+2021-03-17
+[09:45:00.0000] <noamr>
+annevk, yoav: I have a POC for using the new FETCH/RT integration in fetch() and XHR, and how the RT side looks like. Seems like the easiest way was to handle things at the caller, with a reusable function in FETCH that those callers can reuse. See https://github.com/whatwg/xhr/pull/319, https://github.com/w3c/resource-timing/pull/261 and https://github.com/whatwg/fetch/pull/1185
+
+[09:49:01.0000] <annevk>
+noamr: thank you, I should be able to look at this in the morning I think
+
+[09:49:26.0000] <noamr>
+thanks annevk
+
+[11:11:06.0000] <yoav>
+I'll similarly queue it up for tomorrow. Thanks!
+
+
+2021-03-18
+[22:46:00.0000] <MikeSmith>
+https://web.dev/cross-origin-isolation-guide/ seems like a pretty good resource
+
+[05:29:46.0000] <noamr>
+annevk: looking at the thorough review, especially wondering what to do with this: https://github.com/whatwg/fetch/pull/1185#discussion_r596654405
+
+[05:31:01.0000] <annevk>
+noamr: it probably needs to be tested to see what actually happens
+
+[05:31:14.0000] <noamr>
+RT should also be created when the body is not read
+
+[05:31:16.0000] <noamr>
+(I tested it)
+
+[05:31:30.0000] <noamr>
+Digging more into chromium, there is an event coming from the network stack called "OnComplete" which happens on either errors, connection closed, or EOF
+
+[05:31:32.0000] <annevk>
+And I guess we need to decide what we want to happen as well
+
+[05:32:27.0000] <annevk>
+And I guess you don't have that with service workers?
+
+[05:33:35.0000] <annevk>
+Fetch has that as well, kinda, processResponseEndOfBody, but the problem is that currently that also reads the response; I guess here you want a non-consuming variant
+
+[05:34:33.0000] <annevk>
+(Maybe part of the difficulty is created by Fetch trying to accommodate full duplex while implementations are not.)
+
+[05:40:00.0000] <noamr>
+annevk: yes, what I want is a non-consuming event for a response that gets triggered when the response is either errored or EOF'ed.
+
+[05:43:33.0000] <noamr>
+annevk: There is an EOF moment in HTTP network-fetch, maybe something can be fired at that moment. In service-workers there's a newly created stream, which can also have an explicit EOF/error moment.
+
+[05:43:58.0000] <annevk>
+noamr: yeah, I think that's feasible in theory
+
+[05:44:39.0000] <noamr>
+"If stream doesn’t need more data ask the user agent to suspend the ongoing fetch." At that moment I can fire the event for response
+
+[05:45:14.0000] <annevk>
+I'm not sure about service workers, mostly because I have a hard time recalling some details
+
+[05:45:55.0000] <annevk>
+noamr: no that's wrong, you need to do it when the stream is closed
+
+[05:46:29.0000] <noamr>
+annevk: ok, yes, one line after.
+
+[05:47:04.0000] <noamr>
+annevk: a service worker creates a stream in `respondWith`, which has an end-of-body. The response created from SW can fire its own `on response complete` when that happens
+
+[05:51:14.0000] <noamr>
+this simplifies fetch/xhr a lot, and also the other callers... all they need is to handle the 'on response complete event', which would already set the response-end time, and call `report resource timing` with the stuff they know (global object, initiator type).
+
+[05:56:54.0000] <noamr>
+WDYT?
+
+[05:57:00.0000] <annevk>
+noamr: I don't think it affects xhr one way or another? xhr actively consumes the response
+
+[05:57:23.0000] <noamr>
+annevk: right, I guess XHR is ok the way it is.
+
+[05:57:26.0000] <annevk>
+noamr: I think it will help fetch and we should do it because of that
+
+[05:57:55.0000] <noamr>
+annevk: cool, new revision on its way. thanks!
+
+[05:57:57.0000] <annevk>
+noamr: other callers might be okay with an approach similar to xhr, I think, but perhaps we can group things more
+
+[05:58:42.0000] <annevk>
+e.g., repurpose the current processResponseEndOfBody to also do this, so that if you can use that callback, you're all set basically
+
+[05:59:06.0000] <annevk>
+but we might want to wait with doing too much until we investigate more callers
+
+[05:59:32.0000] <noamr>
+annevk: most of the caller in HTML are kinda behind... they call fetch but don't specify how they process the response
+
+[05:59:49.0000] <noamr>
+... call FETCH with a request and no response algorithms
+
+[06:00:47.0000] <noamr>
+So, for now: `on response complete` will fix the issue with `fetch`, and we can leave XHR as is, and see what more is needed once we try to handle more callers
+
+[06:01:36.0000] <annevk>
+yeah, HTML has a lot of old text unfortunately. Some of them should be fairly straightforward to tackle and I guess we should approach that incrementally
+
+[06:03:30.0000] <annevk>
+noamr: bikeshed: processResponseDone (and ideally it's equivalent to processResponseEndOfBody except that also reads)
+
+[06:03:59.0000] <noamr>
+annevk: re HTML, absolutely. Not sure if to add RT handling to places where it says "Fetch the request" without further information, or put it in prose. For now
+
+[06:03:59.0000] <annevk>
+noamr: we can also use this for the "done flag" I suppose
+
+[06:04:37.0000] <noamr>
+annevk: OK, so it's an algorithm that is part of the parameterse of FETCH?
+
+[06:06:22.0000] <annevk>
+noamr: I think it has to be for fetch() to use it
+
+[06:06:44.0000] <noamr>
+annevk: got it
+
+[06:08:53.0000] <noamr>
+annevk: you mean the existing "request done flag" that has the "Really bad" note?
+
+[06:09:25.0000] <annevk>
+noamr: yeah
+
+[06:09:32.0000] <noamr>
+would be nice to fix that and get rid of the comment :)
+
+[07:16:28.0000] <noamr>
+annevk, yoav: done with another pass, using "process response done" for fetch() and leaving XHR mostly as is. Looks much nicer to me. note that now SW "handle fetch" accepts a "process response done" parameter, which would have to be handled in the SW spec.
+
+[07:33:30.0000] <ondras>
+so I've heard that <image> (non-<svg>) is backwards-compatibly mapped to <img>; can someone please point me to the proper place in HTML spec for this?
+
+[07:34:03.0000] <ondras>
+looking at https://html.spec.whatwg.org/multipage/images.html now, not sure if that is the right place
+
+[07:55:49.0000] <EveryOS>
+ondras: https://html.spec.whatwg.org/multipage/parsing.html#parsing-main-inbody
+
+[07:56:37.0000] <EveryOS>
+Scroll down to " a start tag whose tag name is  \"image\""
+
+[08:00:05.0000] <ondras>
+EveryOS: thanks! what on earth is that "don't ask" remark, I would love to ask? ;)
+
+[08:01:15.0000] <EveryOS>
+ondras: My guess is that people get confused a ton and use <image> instead of <img>, and that's partly why they keep that tag.
+
+[08:01:15.0000] <EveryOS>
+Also, don't ask...
+
+[08:01:49.0000] <ondras>
+.)
+
+[09:22:12.0000] <annevk>
+noamr: so I was looking at hr-time again and one thing I don't understand is https://w3c.github.io/hr-time/#dfn-shared-monotonic-clock
+
+[09:22:44.0000] <annevk>
+noamr: that says everything has to share a time origin, but what is the time origin when we invoke https://w3c.github.io/hr-time/#dfn-unsafe-shared-current-time?
+
+[09:23:35.0000] <annevk>
+noamr: it seems it would be undefined...
+
+[09:23:39.0000] <annevk>
+yoav: ^
+
+[09:25:34.0000] <noamr>
+yea this is more for yoav... I think the timeOrigin of the shared monotonic clock is not defined (some OS value)
+
+[09:29:31.0000] <annevk>
+noamr: but yeah, I was thinking we add something to hr-time whereby we get a coarsened timestamp depending on a boolean parameter with the boolean indicating whether or not we have the cross-origin isolated capability
+
+[09:30:04.0000] <annevk>
+noamr: I'm happy to write that PR and also patch your Fetch PR accordingly, but I do need to understand this time origin business better
+
+[09:30:53.0000] <noamr>
+annevk: cool :) any help is appreciated.
+
+[09:32:01.0000] <EveryOS>
+I should contribute to the specs some day, but I doubt I would be much help. Half the time, it is already hard enough just understanding them.
+
+[09:32:35.0000] <annevk>
+EveryOS: I think that's how most of us started out, or I can say that at least I did
+
+[09:33:26.0000] <EveryOS>
+Oh, ok. And you kind of just got used to it?
+
+[09:33:28.0000] <noamr>
+EveryOS: I definitely started that way. A few failed PRs with rookie mistakes and I was good to go.
+
+[09:34:04.0000] <annevk>
+EveryOS: what helps me a lot is writing demos/tests, although sometimes that leads you into interop rabbit holes rather than actually getting to understand it, but then at least you know something is wrong
+
+[09:36:02.0000] <EveryOS>
+annevk: Sure, I'll do it that way
+
+[09:37:44.0000] <yoav>
+annevk: It's somewhat defined in https://w3c.github.io/hr-time/#dfn-shared-monotonic-clock, pointing back to https://tc39.es/ecma262/#sec-time-values-and-time-range
+
+[09:38:04.0000] <annevk>
+EveryOS: also, if you're looking for general contributor advice, https://github.com/whatwg/meta/blob/main/CONTRIBUTING.md has some, including some good references at the end
+
+[09:38:17.0000] <EveryOS>
+Thanks
+
+[09:38:31.0000] <yoav>
+basically, a monotonically increasing clock that starts at epoch
+
+[09:38:55.0000] <annevk>
+yoav: so what does "that is shared by time origins" mean there?
+
+[09:40:27.0000] <yoav>
+all time origins need to use the same monotonic clock (and similarly not skew if the user e.g. changes their system clock)
+
+[09:40:33.0000] <yoav>
+agree that the phrasing is odd
+
+[09:40:36.0000] <annevk>
+yoav: if it's indeed all epoch I guess what I need to define is coarsened shared current time which takes the boolean
+
+[09:41:04.0000] <annevk>
+yoav: and adjust coarsen time and callers of that in a similar manner
+
+[09:42:44.0000] <annevk>
+I'll poke at this tomorrow / Monday I suspect, I'm rather tired; thanks for the help so far!
+
+[09:43:11.0000] <yoav>
+I'm not 100% clear on why https://w3c.github.io/hr-time/#dfn-current-high-resolution-time is not sufficient for your needs, but happy to discuss more tomorrow/Monday :)
+
+[09:44:55.0000] <annevk>
+yoav: I cannot pass a global from in parallel I think
+
+[09:45:27.0000] <annevk>
+yoav: and it's not clear I have a time origin in parallel either
+
+[09:45:39.0000] <annevk>
+(pretty sure I don't)
+
+[09:46:05.0000] <EveryOS>
+I signed the CLA (https://github.com/whatwg/participant-data), don't know when I'll get to actually working on making a PR. I'll take a look at open issues to see what is available to do.
+
+[09:47:15.0000] <yoav>
+The global bit sounds easy
+
+[09:47:48.0000] <yoav>
+For the time origin bit, you'd need to grab a timestamp from the monotonic clock and do the diffing later
+
+[09:50:55.0000] <annevk>
+yoav: right, which I think my design allows for, it coarsens the value from the monotonic clock (I guess it won't prevent having to normalize it to a relative time later though, so you still have some redundant words)
+
+
+2021-03-19
+[03:28:48.0000] <noamr>
+annevk: with FETCH/RT, I'm contemplating between the current approach (responseDone -> the caller calls FETCH.report) and an approach of passing initiatorType as a param to FETCH , and having FETCH report it instead of passing it as a param... this way in the HTML spec all we have to do is "Fetch the request with initiatorType set to link" and FETCH can report with that param and the request's client's global object
+
+[03:31:06.0000] <annevk>
+noamr: I think it's okay to add initiator type to request, though maybe we should call it legacy destination or some such to avoid more folks taking a dependency
+
+[03:31:44.0000] <noamr>
+annevk: it's not really a legacy destination, it's the "resource initiator type" for Resource Timing
+
+[03:32:39.0000] <noamr>
+annevk: that would mean FETCH does all the reporting, and perhaps queues the task on the global object so that RT doesn't have to deal with that. Sounds good?
+
+[03:40:09.0000] <annevk>
+noamr: well, it is, but if RT was done today that wouldn't have been a thing is what I'm saying
+
+[03:40:35.0000] <annevk>
+noamr: yeah, I think that makes sense for all main thread callers of fetch
+
+[03:41:22.0000] <annevk>
+noamr: well, hmm, it depends a bit on the specifics of how we integrate all this, as e.g. I still think it makes sense that if the caller dispatches a load event, that happens in the same task
+
+[03:41:50.0000] <annevk>
+that is possible, to be clear, but it requires processResponseEndOfBody to be a superset of processResponseDone
+
+[03:44:27.0000] <noamr>
+annevk: I'm thinking to do this outside the whole streams thing, and do it when there are no more bytes in the response. That way, it's done before those bytes are fed to the stream and processResponseEndOfBody is called
+
+[03:46:09.0000] <noamr>
+where I do reporting in my current PR, there is not really a real connection with processResponseEndOfBody, not sure why it needs to be a superset
+
+[03:46:46.0000] <noamr>
+can be HTTP receives bytes -> if no more bytes, report to RT and mark "request done" -> pass bytes to stream that the body consumer is reading
+
+[03:50:16.0000] <noamr>
+annevk: otherwise, I'd rather keep the current setup where the processResponseDone event is separate from streams
+
+[03:58:12.0000] <annevk>
+noamr: the way I was thinking about it is that if someone passes processResponseEndOfBody, and processResponseDone happens, we'd fully read and pass on the data as well as do the RT steps, and the caller would fire the load event from there; or are RT objects consistently created way before the load event?
+
+[03:59:22.0000] <annevk>
+noamr: it seems likely that implementations do things incrementally and once all bytes are in they'd create the RT object, update state, and fire the load event all at once
+
+[04:03:28.0000] <noamr>
+annevk: implementations set the response_end right when all the bytes come from the HTTP source, and report it at some unspecified time in the future, sometimes after a timer
+
+[04:05:30.0000] <noamr>
+ah `processResponseEndOfBody`, got confused with `processEndOfBody`. does any spec use that one?
+
+[04:05:51.0000] <annevk>
+noamr: I think it would be good to align the reporting with the load event
+
+[04:06:58.0000] <annevk>
+noamr: processEndOfBody is for body read algorithms only, right? XHR prolly does
+
+[04:07:25.0000] <annevk>
+(I was talking about the fetch algorithm itself)
+
+[04:11:02.0000] <noamr>
+annevk: XHR callse processEndOfBody
+
+[04:11:07.0000] <noamr>
+not processResponseEndOfBody
+
+[04:11:52.0000] <noamr>
+ah it uses processResponseEndOfBody for sync responses
+
+[04:11:56.0000] <annevk>
+noamr: right, I thought that's what you were asking. processResponseEndOfBody isn't used at the moment, but I would expect HTML to use that as HTML typically wants all the bytes in one go
+
+[04:12:04.0000] <annevk>
+oh right, XHR uses it too
+
+[04:13:44.0000] <noamr>
+annevk: so you're proposing the caller would report RT in its processResponseEndOfBody, or that FETCH would report RT right before calling processResponseEndOfBody if that exists? I'm a bit confused
+
+[04:16:02.0000] <noamr>
+annevk: we can do a thing where FETCH reports RT right before calling processResponseEndOfBody, otherwise report it at EOF, and in either case only if it has a "resource initiator type" as a FETCH param. but maybe instead we can keep the current design where the caller reports RT, and some callers can report in their  processResponseEndOfBody, leaviing processResponseDone for callers like fetch()
+
+[04:16:54.0000] <noamr>
+since from what you're saying seems like we might want to have callers do slightly different things so that reporting is synchornized with load events, maybe the latter would be best (keep current design and align with processResponseBodyEnd for some callers)
+
+[04:18:17.0000] <annevk>
+noamr: I think you got the idea, but I tend to agree that we should maybe only do this once we have a better understanding of the callers
+
+[04:20:00.0000] <noamr>
+annevk: yea, so for now the PR uses processResponseDone for fetch(), and XHR knows by itself when to report. Can we try to move forward with this, and iterate on the following callers?
+
+[04:21:06.0000] <noamr>
+most of the rest of the callers are not properly integrated with fetch
+
+[04:25:49.0000] <annevk>
+noamr: yeah I think so, I'm not sure I'll get to review today, I do have the hr-time proposal ready
+
+[04:26:51.0000] <noamr>
+annevk: cool. looking forward!
+
+[04:32:03.0000] <annevk>
+noamr: yoav: https://github.com/w3c/hr-time/pull/112
+
+[04:45:00.0000] <yoav>
+/me Will look after lunch
+
+[05:15:06.0000] <yoav>
+Merged!
+
+[05:15:32.0000] <yoav>
+I'll ping folks to get it published, so that it will get picked up by the bots
+
+[06:58:19.0000] <annevk>
+yoav: thanks, I guess I somehow convinced you of this approach since yesterday then? 🙂
+
+[06:58:52.0000] <yoav>
+yeah, you did :)
+
+[07:01:34.0000] <yoav>
+I'm not convinced there's a real risk in storing timestamps in renderers, but seems fair to enable browsers to do so if they disagree
+
+[07:36:16.0000] <nox>
+https://github.com/hyperium/hyper/issues/2470 Fascinating, I didn't think of that.
+
+[08:01:33.0000] <annevk>
+nox: heh, I wrote those tests very recently 🙂
+
+[08:01:49.0000] <nox>
+I assumed it was you :D
+
+[08:01:52.0000] <annevk>
+well, actually, I wrote a lot of them in 2018 and then recently got around to getting them merged
+
+[15:41:02.0000] <howdoi>
+any browser that has implemented Sanitizer API under a flag as of now?
+
+[15:41:27.0000] <howdoi>
+Also, there is no way to print the version on javascriptcore REPL?
+
+
+2021-03-20
+[18:44:19.0000] <wroathe>
+The Document type in this library https://github.com/fgnass/domino and jsdom both have a .serialize() method, but I can't seem to find where that's documented in the standards. jsdom links to a general serialization algorithm, but there's no mention that I see of the "serialize" method being added to Document.
+
+[18:44:46.0000] <wroathe>
+The issue I'm running into is that the TypeScript declaration for Document, which I'm assuming is based on the standards, doesn't seem to contain "serialize"
+
+[18:45:18.0000] <wroathe>
+So it's flagging it as ill-typed when I try to call serialize() on the object (even though that property definitely does exist)
+
+[19:01:33.0000] <MikeSmith>
+wroathe: how does document.serialize() differ from document.documentElement.innerHTML
+
+[19:03:36.0000] <wroathe>
+I think it's actually similar to .outerHTML
+
+[19:03:41.0000] <wroathe>
+I'm not clear on the distinction
+
+[19:04:15.0000] <wroathe>
+https://github.com/jsdom/jsdom#serializing-the-document-with-serialize
+
+[19:04:33.0000] <wroathe>
+They show it as correctly including the doctype
+
+[19:05:33.0000] <wroathe>
+https://html.spec.whatwg.org/#serialising-html-fragments and this is the standard they reference
+
+[19:09:39.0000] <MikeSmith>
+right yeah there is no standard document.serialize() method
+
+[19:10:01.0000] <wroathe>
+Yeah, that's what I was thinking
+
+[19:10:15.0000] <wroathe>
+How odd for them to include it and not mention that it's non-standard anywhere
+
+[19:12:06.0000] <MikeSmith>
+I dunno maybe I guess since the serializtion algorithm is standard, and they cite that, they figure they’re just providing a method that implements that standard algorithm
+
+[19:12:23.0000] <MikeSmith>
+so the behavior is standard at least (I guess)
+
+[19:12:24.0000] <wroathe>
+Yup. That seems to be the case.
+
+[19:12:28.0000] <MikeSmith>
+yeah
+
+[19:12:52.0000] <wroathe>
+That domino library follows the same precedent
+
+[19:13:16.0000] <wroathe>
+So it seems to be "standard" between pure-javascript implementations of the DOM standard, at least
+
+[19:13:39.0000] <MikeSmith>
+right, de facto standard in that context
+
+[19:13:59.0000] <MikeSmith>
+just not in browsers
+
+[19:15:05.0000] <wroathe>
+MikeSmith: Well, thanks! :)
+
+[19:15:16.0000] <MikeSmith>
+I don’t know anything about domino but if a goal of domino is interoperability with code that people wrote for jsdom use, then it’d seem to make sense to add that
+
+[19:15:22.0000] <MikeSmith>
+wroathe: cheers
+
+[19:15:57.0000] <wroathe>
+I don't know if that's their high-level goal or not. Domino doesn't claim to be fully standards-compliant anyway
+
+[19:16:14.0000] <wroathe>
+But their lack of standards compliance is more about what they omit because it doesn't fit their stated use-case
+
+[19:16:22.0000] <wroathe>
+And not about adding extra things like this
+
+[19:16:55.0000] <wroathe>
+Either way, I'm happy it exists. Just a little annoyed I ran into this first thing while trying out Typescript on a node.js project
+
+[19:18:12.0000] <MikeSmith>
+> Domino sticks to DOM level 4, which means that Attributes do not inherit the Node interface.
+
+[19:18:16.0000] <MikeSmith>
+hmm
+
+[19:18:36.0000] <MikeSmith>
+ah wait I misread taht
+
+[19:19:01.0000] <MikeSmith>
+that’s good anyway
+
+[19:19:31.0000] <MikeSmith>
+was just reading from https://www.npmjs.com/package/domino
+
+[19:19:49.0000] <wroathe>
+Yup
+
+[19:20:41.0000] <wroathe>
+I'm playing around with the idea of creating an "isomorphic" app using just the DOM APIs instead of enthralling myself to the React gods.
+
+[19:20:47.0000] <MikeSmith>
+using ther term “DOM level 4” is confusing
+
+[19:20:52.0000] <MikeSmith>
+I wish they would not do that
+
+[19:21:06.0000] <MikeSmith>
+there is no such thing as “DOM level 4”
+
+[19:21:26.0000] <MikeSmith>
+it’s just current standard DOM
+
+[19:21:44.0000] <wroathe>
+Hmm, I seem to recall something about DOM levels from back in the day though
+
+[19:22:25.0000] <wroathe>
+Maybe I'm wrong about that
+
+[19:22:58.0000] <wroathe>
+I don't know what the current state of the world is standards-wise. I took a break from web programming in the middle of 2018, and since then it seems to me that everyone is abandoning w3c
+
+[19:23:26.0000] <MikeSmith>
+nah
+
+[19:23:55.0000] <wroathe>
+Oh, I see. https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/
+
+[19:24:12.0000] <wroathe>
+So "level 3" must have been the last one, and they're calling the current whatwg standard "level 4" for some reason
+
+[19:24:55.0000] <wroathe>
+MikeSmith: Care to elaborate on that "nah"? I'm guessing you know what the politics are much better than I do.
+
+[19:24:56.0000] <MikeSmith>
+yeah it was not called "level 4" even in the bad W3C DOM fork
+
+[19:25:23.0000] <MikeSmith>
+I meant that DOM and HTML technical work has actually not been happening at the W3C for a quite a long time now
+
+[19:26:11.0000] <wroathe>
+I suppose yeah. I seem to recall the W3C hosting the HTML5 standard for a long time though
+
+[19:26:13.0000] <MikeSmith>
+it has instead always been happening at the WHATWG — the actual technical work
+
+[19:26:44.0000] <wroathe>
+There was the current HTML5 "recommendation" spec on the w3c site, and then another more current HTML5 spec on the whatwg site, from what I remember
+
+[19:26:51.0000] <MikeSmith>
+right
+
+[19:27:39.0000] <MikeSmith>
+W3C HTML started out in 2007 as a friendly joint effort with the WHATWG
+
+[19:27:53.0000] <wroathe>
+I started web programming around that time
+
+[19:28:12.0000] <MikeSmith>
+yeah it was a long time ago now
+
+[19:28:47.0000] <MikeSmith>
+but anyway, after 2012 it basically became a hostile fork of the actual HTML standard at WHATWG
+
+[19:29:09.0000] <MikeSmith>
+and it took us a lot of years to get that situation corrected
+
+[19:29:21.0000] <MikeSmith>
+but it’s now corrected
+
+[19:29:23.0000] <MikeSmith>
+basically
+
+[19:29:31.0000] <MikeSmith>
+and some thing for the DOM spec
+
+[19:30:23.0000] <MikeSmith>
+but anyway, meanwhile at W3C, the CSS work just continued on successfully, unaffected by the HTML/DOM drama
+
+[19:30:38.0000] <MikeSmith>
+well they have enough drama of their own
+
+[19:30:51.0000] <wroathe>
+Haha. I can only imagine.
+
+[19:31:52.0000] <MikeSmith>
+from recent years, the specs in the W3C WebAppSec working group are another W3C success story
+
+[19:32:00.0000] <MikeSmith>
+mostly
+
+[19:32:07.0000] <wroathe>
+I noticed recently that service workers seem to be reinventing the wheel of HTTP caching. It's made me start thinking that what JS programmers really want is for every detail of programming for a browser to be subsumed into JS (including HTML and CSS)
+
+[19:32:10.0000] <MikeSmith>
+Content Security Policy for one
+
+[19:32:54.0000] <MikeSmith>
+well there is a good reason for service workers that make it much more than just HTTP caching
+
+[19:33:22.0000] <wroathe>
+Oh? This was just my first impression. I'm definitely still looking into what they offer beyond the simple caching examples I saw.
+
+[19:34:01.0000] <MikeSmith>
+yeah I recommend reading up on it more
+
+[19:34:17.0000] <MikeSmith>
+it solves a lot of problems and pain for developers
+
+[19:34:51.0000] <wroathe>
+MikeSmith: If they're more powerful than HTTP caching wouldn't that just indicate that HTTP caching needs to evolve?
+
+[19:35:08.0000] <wroathe>
+MikeSmith: It seems like it should be a protocol concern, and not a concern of a scripting language
+
+[19:35:17.0000] <MikeSmith>
+they are two different things
+
+[19:35:38.0000] <MikeSmith>
+service workers is not a replacemen for HTTP caching
+
+[19:35:41.0000] <andreubotella>
+wroathe: One of the ways they're more powerful is that you can generate responses on the fly. That's not a caching concern
+
+[19:35:44.0000] <wroathe>
+The examples I've seen this far all revolve around building offline-able apps by caching assets on the client
+
+[19:35:53.0000] <wroathe>
+andreubotella: Oh, I see
+
+[19:36:26.0000] <wroathe>
+andreubotella: That is interesting... Lots of implications there.
+
+[19:37:48.0000] <wroathe>
+Take this, for example: https://developers.google.com/web/tools/workbox. I haven't looked too far into the details of what they mean by "background sync", but the examples they give all revolve around caching
+
+[19:37:53.0000] <MikeSmith>
+wroathe: and as far as subsuming every detail of programming for a browser into JS, the work is more about not having a bunch of secret magic happening in browsers that developers can’t hook into when they want — it’s about identifying set of primitives that developers can innovate on top of, and exposing those to JS
+
+[19:39:15.0000] <wroathe>
+MikeSmith: But to some degree we hook into the behavior of browsers through the protocols themselves, don't we? For example, sending a Cache-Control header in a response
+
+[19:39:49.0000] <wroathe>
+MikeSmith: It seems inelegant to me to have two models for asset caching, instead of just blessing one and making it as powerful as it needs to be.
+
+[19:39:52.0000] <MikeSmith>
+wroathe: as far as service workers go, I guess the thing is, if in your app development you don’t suffer from the pain and problems that service workers solve, then you can count yourself lucky and just safely ignore service workes
+
+[19:40:10.0000] <MikeSmith>
+ah, inelegant
+
+[19:40:40.0000] <MikeSmith>
+yeah well with the web platform we are already way past being elegant
+
+[19:40:47.0000] <wroathe>
+LOL :)
+
+[19:40:57.0000] <wroathe>
+Fair enough. Still felt worth saying out loud.
+
+[19:41:15.0000] <MikeSmith>
+yeah we have holes punched in abstractions all over the place
+
+[19:41:27.0000] <MikeSmith>
+new stuff less so
+
+[19:42:03.0000] <MikeSmith>
+but the problem with building the new stuff is that we have to build it all on top of this creaky foundation that we cannot replace
+
+[19:42:13.0000] <wroathe>
+What I'm wondering is if it makes sense to use HTTP caching if your service-worker enabled application already goes through and caches everything of interest anyway
+
+[19:42:36.0000] <wroathe>
+Cache on cache on cache on cache
+
+[19:42:52.0000] <MikeSmith>
+well HTTP caching is something that most developers don’t need to spend much time worrying abou
+
+[19:43:07.0000] <MikeSmith>
+ideally it just all gets handled automatically by the browser
+
+[19:43:48.0000] <wroathe>
+Oh, and on the workbox thing... AFAiK the "prefetching" thing they're showing can also be implemented via rel="prefetch" <links> and HTTP caching
+
+[19:45:20.0000] <MikeSmith>
+wroathe: https://www.w3.org/TR/html-design-principles/ is something worth reading through, to understand some of the high-level principles that have guided the work
+
+[19:45:29.0000] <MikeSmith>
+for example, https://www.w3.org/TR/html-design-principles/#solve-real-problems
+
+[19:45:40.0000] <wroathe>
+MikeSmith: Cool. I'll give it a look.
+
+[19:45:44.0000] <MikeSmith>
+> Abstract architectures that don't address an existing need are less favored than pragmatic solutions to problems that web content faces today.
+
+[19:46:03.0000] <MikeSmith>
+https://www.w3.org/TR/html-design-principles/#priority-of-constituencies
+
+[19:46:13.0000] <MikeSmith>
+> In case of conflict, consider users over authors over implementors over specifiers over theoretical purity.
+
+[19:46:49.0000] <wroathe>
+MikeSmith: Also, on the subsuming thing... A recent development I noticed is that people have started using CSS "modules", whereby importing a CSS file creates an object that lets a web component reference classes. It's starting to feel like what we really want is a way to define a DSL for CSS within Javascript
+
+[19:48:18.0000] <wroathe>
+MikeSmith: I'll definitely read this, but is there something I should be taking away from those two passages you just shared?
+
+[19:48:38.0000] <wroathe>
+MikeSmith: I'm not naive enough to think that all of this will always be perfect, if that's what you're getting at :P
+
+[19:49:29.0000] <wroathe>
+Nor am I criticizing the work of anyone here. I'm just thinking out loud about some of my recent observations of the web programming world lately.
+
+[19:50:23.0000] <MikeSmith>
+elegance gets sacrificed making things work well for users — prioritizing users first — and then secondarily, making things work well for developers (since they are they ones who actually use the stuff we make, to solve problems for their users)
+
+[19:50:54.0000] <MikeSmith>
+and concerns of everybody other than users and developers are a distant third place
+
+[19:51:20.0000] <wroathe>
+Well, I'm a user and a developer :P
+
+[19:51:23.0000] <MikeSmith>
+with theoretical purity hardly even in the running
+
+[19:51:43.0000] <MikeSmith>
+yeah we are all users of course
+
+[19:51:52.0000] <wroathe>
+Well, there's a difference between theoretical purity and just pointing out potential architectural shortcomings
+
+[19:51:58.0000] <MikeSmith>
+sure
+
+[19:53:16.0000] <wroathe>
+Anyway, I appreciate the work you do, and also thanks for the help on tracking down that serialization thing.
+
+[19:56:53.0000] <MikeSmith>
+cheers
+
+[07:29:37.0000] <Domenic>
+wroathe: the JSDOM library's serialize() method is on the non-standard container JSDOM class, not on the standard Document class.
+
+
+2021-03-21
+[18:51:02.0000] <TimothyGu>
+annevk: I noticed that URL's PR template no longer has Node.js as an implementation file bugs for. How should we fix it? Can we just change the template file in whatwg/url or should we need to change spec-factory as well?
+
+[22:02:04.0000] <annevk>
+TimothyGu: it never did I think; we need to change spec-factory
+
+
+2021-03-22
+[20:54:42.0000] <wroathe>
+Does whatwg publish a machine-readable list of valid html names and attribute names anywhere?
+
+[20:59:41.0000] <wroathe>
+And, actually, for enumerable attribute values for attributes like "rel" as well? I'm considering writing an HTML AST for Haskell in a standalone library.
+
+[21:00:04.0000] <wroathe>
+And the thought occurs to me to just generate most of the code for it from a machine-readable spec (if one exists)
+
+[21:05:12.0000] <Domenic>
+wroathe: no; see https://github.com/whatwg/html/issues/1246 for some discussion
+
+[21:05:53.0000] <wroathe>
+Domenic: Thanks. Reading.
+
+[21:08:06.0000] <wroathe>
+Domenic: Hah. Looks like that design proposal never came through.
+
+[21:09:45.0000] <wroathe>
+Domenic: So what you guys would need is an expected format for the data then?
+
+[21:10:07.0000] <wroathe>
+Domenic: That indices table looks to be a good start, but I'm sure there are edge cases to account for
+
+[21:10:10.0000] <Domenic>
+wroathe: well honestly what we'd need is someone to do the work of creating the data, then updating our tooling to generate the spec indices from the data
+
+[21:10:25.0000] <Domenic>
+Regarding edge cases, if you want those, then a machine-readable form is hopeless
+
+[21:10:37.0000] <Domenic>
+See discussion in https://www.w3.org/Bugs/Public/show_bug.cgi?id=26491
+
+[21:11:32.0000] <wroathe>
+Domenic: Before I dig in, do you have an example of an edge case that makes this hopeless right off the top of your head?
+
+[21:11:44.0000] <wroathe>
+And thanks again, reading the bug discussion.
+
+[21:12:53.0000] <Domenic>
+wroathe: just clicking around, trying to capture https://html.spec.whatwg.org/#attr-area-coords in a declarative form seems more or less hopeless
+
+[21:14:46.0000] <Domenic>
+It requires something more imperative so that you can do something like `if (in rectangle state) { let coords = splitAccordingToTrickyRules(coords attribute value); assert(coords.length === 4); assert(coords[0] < coords[2]); assert(coords[1] < coords[3]); }`
+
+[21:15:29.0000] <Domenic>
+Even simpler things like "what attributes are valid" is very hard for, e.g., <source>, since it depends on its ancestor tree
+
+[21:15:53.0000] <Domenic>
+Or what attributes are valid for <link> and <meta> depends on the value of other attributes
+
+[21:17:53.0000] <wroathe>
+Yeah, so you'd need to pair some sort of machine-readable predicate along with an attribute, which would rapidly get tricky
+
+[21:18:12.0000] <wroathe>
+if x is true, then attribute y is valid
+
+[21:20:13.0000] <wroathe>
+Man hours aside to work on this, I'm wondering if it still wouldn't be useful to generate a machine-readable index for the elements/attributes/categories/content models that aren't dependent on anything?
+
+[21:20:39.0000] <wroathe>
+As sort of a version one, until some form of assertion syntax could be decided on for the trickier cases
+
+[21:21:17.0000] <wroathe>
+Anyway, I don't want to take up your time on this too much. Thanks for pointing me to some of the ongoing discussions around this.
+
+[21:28:34.0000] <Domenic>
+Yeah, IMO transposing the existing data from HTML table format into JSON and then generating the HTML tables from it would be useful
+
+[21:28:48.0000] <Domenic>
+Worthwhile, unclear. But useful, yes.
+
+[21:32:29.0000] <wroathe>
+Domenic: Actually, for the complex cases I think I have a solution. There could be a table of "named" predicates in the spec that map a string identifier to a description of the algorithm, for example: in-video-or-audio: the element is in a video or audio element, and then in the machine-readable spec it could be "contentAttributes": [..., { "attribute": "src", "validWhen": "in-video-or-audio", ... }, ...]
+
+[21:32:55.0000] <wroathe>
+Domenic: So the logic itself wouldn't be contained within the machine-readable index, but an identifier for it would be
+
+[21:33:13.0000] <wroathe>
+Domenic: And then whomever is using it just needs to map that string to a validation routine that implements the logic
+
+[21:33:41.0000] <wroathe>
+Like a big hash table of predicates
+
+[21:35:08.0000] <wroathe>
+Domenic: And then attributes that are always valid for an element would then just omit that "validWhen" key
+
+[21:36:45.0000] <wroathe>
+And to clarify on the above, I was thinking that "in-video-or-audio: the element is in a video or audio element
+
+[21:36:48.0000] <wroathe>
+"
+
+[21:36:57.0000] <wroathe>
+wouldn't be in the machine-readable spec, but in a table in the main spec
+
+[21:38:21.0000] <wroathe>
+So that the only references you'd then find in the machine-readable spec would be identifiers like "in-video-or-audio" or "in-picture"
+
+[21:40:28.0000] <Domenic>
+At that point I'd have to question what problem you're solving. If a human is in the loop already then the current spec has many years of working well for that.
+
+[21:40:59.0000] <Domenic>
+And if a machine is doing the work then imperative algorithms (validators/conformance checkers) similarly have a good track record.
+
+[21:41:14.0000] <Domenic>
+Such a hybrid approach doesn't seem to solve any common problem I'm aware of
+
+[21:42:19.0000] <wroathe>
+Domenic: Well, the human would then only have to implement these predicates and store them in a hash table. After doing so you could then generate a validator with nothing but the information contained in the machine-readable spec and the predicate table you build
+
+[21:42:20.0000] <Domenic>
+A machine-readable list of tags and attributes can be nice for e.g. a syntax highlighter or IDE auto complete, but conformance requirements in some hybrid format... I'm not seeing it.
+
+[21:42:34.0000] <wroathe>
+Domenic: And in my case I was thinking about including validation in my HTML AST for Haskell
+
+[21:42:52.0000] <Domenic>
+I don't think that gives significant advantages over how validators are currently written.
+
+[21:43:32.0000] <Domenic>
+(Just my opinion)
+
+[21:44:27.0000] <wroathe>
+Yeah, I was just trying to think through what might be the next step beyond "just put the simple cases from that index table in a JSON file and omit anything complex"
+
+[21:44:40.0000] <wroathe>
+I think you'd need to have _something_ like this
+
+[21:45:54.0000] <wroathe>
+Without this you'd then only be able to include the global attributes and "type" in contentAttributes for <source>. Everything else in the list is conditional, as you pointed out
+
+[21:46:16.0000] <wroathe>
+So to take the next step you'd have to have some way of indicating that that set of conditions is
+
+[21:48:44.0000] <wroathe>
+If it was really vital that there be absolutely no human involvement you could include that predicate table itself in the machine-readable spec with a pseudo-code of the implementation instead of just a description, and then consumers could generate code based on it. Or a shared library could be distributed that contains an implementation of the predicates, and a user could then link it into their program
+
+[21:48:50.0000] <wroathe>
+and just call the appropriate predicates
+
+[21:49:39.0000] <wroathe>
+(that shared library thing I mentioned probably wouldn't work, now that I think about it)
+
+[02:57:41.0000] <noamr>
+hi annevk! Reminding you about the FETCH/RT PR :) I saw that the HR-time PR is in, what else is missing?
+
+[03:23:06.0000] <annevk>
+noamr: thanks, I hope to have some time later today
+
+[06:04:29.0000] <ondras>
+interesting - and a bit disappointing - that fetch's Response has json() and not xml()/document() :-(
+
+[06:29:34.0000] <annevk>
+yoav: you were also going to do another pass, right?
+
+[06:31:05.0000] <annevk>
+ondras: that's somewhat intentional, but the lack of a coherent alternative is not (the idea was to offer stream-based parsers fetch could feed into, but I suppose that never really garnered enough demand for someone to put sufficient time into it)
+
+[06:33:44.0000] <annevk>
+noamr: looking at the output of CI it seems there's several markup problems still
+
+[06:52:41.0000] <annevk>
+noamr: "Not exactly. It's called when the steps are aborted, which also happens when there are no more bytes to read." is not true
+
+[06:53:09.0000] <annevk>
+noamr: in particular, once you hit
+
+[06:53:11.0000] <annevk>
+> Otherwise, if the bytes transmission for response’s message body is done normally and stream is readable, then close stream and abort these in-parallel steps.
+
+[06:53:19.0000] <annevk>
+you go straight to step 19 to return a response
+
+[06:55:46.0000] <noamr>
+annevk: ah gotcha. So I need to queue responseDone also in that 'Otherwise'
+
+[06:57:40.0000] <noamr>
+annevk: Should I put the queuing of responseDone on the global task here, or is leaving it inside RT sufficient?
+
+[07:01:28.0000] <annevk>
+noamr: if taskDestination is a global that should be used I think
+
+[07:03:00.0000] <annevk>
+RT should not queue as that doesn’t give callers control
+
+[07:06:56.0000] <noamr>
+annevk: ok, fixed fetch, xhr and resource-timing to reflect all we've just spoke.
+
+[07:14:08.0000] <ondras>
+annevk: i see, thanks for explanation
+
+[07:41:13.0000] <annevk>
+noamr: it still fails build on HTML validation
+
+[07:41:24.0000] <annevk>
+noamr: I'll wait for yoav to do a pass
+
+[07:41:49.0000] <yoav>
+ok, on it
+
+[07:41:49.0000] <noamr>
+annevk:trying to debug the HTML validation. make deploy succeeds locally and the line numbers don't give a clue, but I think I'll figure it out.
+
+[07:44:33.0000] <annevk>
+yoav: do you know when hr-time will be auto-published? Might be worth asking MikeSmith; he converted a bunch of WebAppSec stuff (that did all use Bikeshed but I think the infra supports both)
+
+[07:45:17.0000] <yoav>
+I'll re-ping to just get it re-published
+
+[07:45:39.0000] <yoav>
+auto publishing requires me to send a WG CfC, it seems
+
+[07:45:56.0000] <yoav>
+I'll do that as well, but it'll take some time
+
+[07:57:16.0000] <annevk>
+yoav: there's a tool where you can autopublish on GitHub pages in a way that would allow us to index the editor's draft
+
+[07:57:47.0000] <annevk>
+yoav: the problem is that currently the editor's draft is partially a pile of script
+
+[07:58:25.0000] <yoav>
+Yeah, but it seems like I need WG consensus to do that
+
+[07:58:38.0000] <yoav>
+which I need to gather
+
+[07:58:40.0000] <noamr>
+annevk: fixed the HTML validation
+
+[07:59:25.0000] <annevk>
+yoav: huh okay
+
+[09:44:34.0000] <annevk>
+Anyone with a Gitlab account want to file a bug at https://gitlab.com/inkscape/inbox/-/issues/ for not supporting https://resources.whatwg.org/logo-infra.svg?
+
+
+2021-03-23
+[04:19:25.0000] <rakuco>
+annevk: do you recall off the top of your head if anything in webidl or infra explicitly talks about changing the "value pairs to iterate over" during iteration? I'm looking at a blink XHR bug that might be just working as intended (plus gecko and webkit behave identically)
+
+[04:24:08.0000] <annevk>
+rakuco: I came across this for Headers recently and I think that unless the specification says to make a copy, making changes during iteration will yield "unexpected" results
+
+[04:24:20.0000] <annevk>
+rakuco: see https://bugzilla.mozilla.org/show_bug.cgi?id=1697114
+
+[04:50:07.0000] <rakuco>
+annevk: I see, thanks. FWIW I'm looking at https://crbug.com/1190240 which is about FormData
+
+[04:58:01.0000] <annevk>
+rakuco: seems invalid
+
+[05:44:19.0000] <rakuco>
+annevk: yeah, I agree. thanks for checking too
+
+[08:17:09.0000] <noamr>
+hi yoav, annevk: I think all the comments on the FETCH/RT PR were handled, what's next? :)
+
+[08:30:30.0000] <yoav>
+From my perspective, I LGTMed
+
+[08:46:38.0000] <annevk>
+noamr: it seems the current setup doesn't quite allow for aligning the load event with the RT object
+
+[08:46:59.0000] <noamr>
+annevk: the load event for which caller?
+
+[08:47:07.0000] <annevk>
+noamr: say the <img> element
+
+[08:47:27.0000] <annevk>
+or <link rel=stylesheet> or some such
+
+[08:47:30.0000] <noamr>
+annevk: we said that we'll deal with FETCH and XHR, and deal with additional callers at the next phase. the <img> element is currently not integrated with FETCH
+
+[08:48:22.0000] <annevk>
+noamr: I was hoping that the setup in Fetch would at least work though
+
+[08:49:34.0000] <noamr>
+annevk: this is different from what I understood from our earlier conversations. we said that we'd use XHR and FETCH as the first proof of concept, and when we can integrate other callers we will add the setup for them in FETCH
+
+[08:49:41.0000] <annevk>
+noamr: ah okay, they can call "finalize and report timing" themselves
+
+[08:49:48.0000] <noamr>
+annevk: yes, exactly
+
+[08:50:45.0000] <noamr>
+we can do something with processEndOfBody but no callers use it as of yet (except sync XHR, which doesn't need this for the purpose of RT)
+
+[08:51:01.0000] <noamr>
+(I mean processResponseEndOfBody)
+
+[08:52:12.0000] <annevk>
+Yeah I was wondering if that should move to finalize response, but maybe it's okay this way
+
+[08:53:38.0000] <noamr>
+annevk: I was wondering the same initially, but I think this way allows the caller to control the order with its load event etc., and to do special handling like fire the event on image-decode error
+
+[08:54:33.0000] <annevk>
+I don't think there is a difference? Other than that the status quo setup starts reading sooner which is arguably better even in "hand wave" land
+
+[08:55:33.0000] <noamr>
+not sure I follow
+
+[08:55:46.0000] <noamr>
+reading sooner?
+
+[08:57:36.0000] <noamr>
+I think the difference is that the control of the order is resource-specific rather than something internal in FETCH. The resource-specific caller also might have extra knowledge about the global object and about the "initiator type" (which might be a tag name), which also makes this slightly different
+
+[08:57:39.0000] <annevk>
+noamr: "finalize response" is invoked once the network sees the final byte of the response (or an error)
+
+[08:57:58.0000] <annevk>
+noamr: "fetch finalize" is invoked once the response headers have been parsed, basically
+
+[08:58:27.0000] <annevk>
+noamr: so if you invoke "fully read" in the former, it'd be much later in the process
+
+[08:59:20.0000] <annevk>
+I guess you're talking about who gets to call "finalize and report timing"?
+
+[08:59:33.0000] <noamr>
+annevk: yes
+
+[09:00:31.0000] <noamr>
+I don't think images and other callers would use "process response done" as a trigger for reading. For now it's for FETCH, where the response and the reading are somewhat parallel in nature
+
+[09:01:04.0000] <annevk>
+Yeah, that's another thing and might well end up being caller-specific; we'll see
+
+[09:22:30.0000] <annevk>
+noamr: I'm gonna do an editorial pass and push that to your branch; I also want to change the unsafe timing bits which I can do tomorrow and read it through once more
+
+[09:32:12.0000] <noamr>
+annevk: sounds good!
+
+[09:32:54.0000] <annevk>
+noamr: for ALPN, is there a specific form of percent-encoding used? Can we reference https://url.spec.whatwg.org/#percent-encoded-bytes somehow?
+
+[09:35:13.0000] <noamr>
+yoav ^^
+
+[09:37:33.0000] <yoav>
+I'm not sure, but can loop in folks that would know
+
+[10:06:01.0000] <noamr>
+annevk: according to IETF (https://tools.ietf.org/html/rfc7639#section-2.2), it's URL percent encoding (https://tools.ietf.org/html/rfc3986#section-2.1)
+
+[10:07:10.0000] <annevk>
+noamr: oh so wait, so we shouldn't really say anything here
+
+[10:07:36.0000] <annevk>
+noamr: because the ALPN Protocol ID is already percent-encoded by the time we see it and we're not going to remove the percent-encoding I assume
+
+[10:09:07.0000] <noamr>
+annevk: not sure about the specifics of this
+
+[10:14:00.0000] <noamr>
+judging by the code in chromium, the list of possible ALPN protocols doesn't have any percent encoding or percent-encoded characters  (https://source.chromium.org/chromium/chromium/src/+/master:net/http/http_response_info.cc;l=542;drc=846866e2fd11fab4534420c06375bcaa54f1b823;bpv=1;bpt=1)
+
+[10:25:51.0000] <annevk>
+noamr: is worker start time only for service workers?
+
+[10:34:24.0000] <annevk>
+noamr: I pushed a commit with some nits and TODO comments, hopefully we can sort those out tomorrow and land this
+
+[10:34:54.0000] <annevk>
+If anyone else wants to review Resource Timing integration into Fetch, now would be a good time: https://github.com/whatwg/fetch/pull/1185
+
+[10:39:56.0000] <noamr>
+annevk: re worker start, yes it is.
+
+[10:40:18.0000] <noamr>
+I will look at the TODOs tomorrow morning, thanks a lot
+
+[10:41:43.0000] <annevk>
+noamr: I'm happy to finish the TODOs btw, just want your feedback/take on them; I think we should rename worker time in that case to service worker time, even if it ends up exposed as workerTime in the API
+
+[10:47:34.0000] <noamr>
+Got it
+
+
+2021-03-24
+[03:01:09.0000] <annevk>
+yoav: it seems "coarsened shared current time" isn't indexed
+
+[03:34:56.0000] <annevk>
+noamr: so the way I ended up doing coarsening is that for connection we still catch raw and then coarsen it when fetch handles the connection
+
+[03:35:15.0000] <annevk>
+noamr: I can push a commit with that approach to show it
+
+[03:35:25.0000] <annevk>
+noamr: I also was wondering if you'd mind if I moved some things a bit
+
+[03:35:37.0000] <annevk>
+noamr: I think all the connection timing stuff we can define in the Connections section
+
+[03:35:40.0000] <annevk>
+for instance
+
+[03:36:47.0000] <noamr>
+annevk: I don’t mind, sounds good
+
+[03:41:38.0000] <annevk>
+yoav: https://github.com/w3c/hr-time/pull/113
+
+[04:07:57.0000] <annevk>
+noamr: another question, why is redirect timing info list not a list of start times?
+
+[04:08:15.0000] <annevk>
+noamr: I'm not sure the current approach even works as it's not making a copy of the struct
+
+[04:08:36.0000] <annevk>
+ah maybe it does if elsewhere we create new structs
+
+[04:11:38.0000] <annevk>
+I still think it's worth simplifying this though
+
+[04:13:30.0000] <noamr>
+annevk: it's possible to go back to changing redirectStartTime/redirectEndTime as we go along
+
+[04:16:56.0000] <noamr>
+annevk: it might be a better solution and not too difficult... I can do that
+
+[04:18:53.0000] <annevk>
+noamr: okay, I don't have anything in my queue anymore so feel free to push as you see fit
+
+[04:19:04.0000] <noamr>
+annevk: got it
+
+[04:24:06.0000] <andreubotella>
+annevk: So I put something together for defining multipart/form-data
+
+[04:24:06.0000] <andreubotella>
+https://andreubotella.github.io/multipart-form-data/
+
+[04:25:54.0000] <noamr>
+annevk: pushed a simplification for redirects
+
+[04:32:24.0000] <annevk>
+andreubotella: oh wow, that's great, although section 3 leaves a bit to be desired :-)
+
+[04:32:49.0000] <andreubotella>
+yeah 😆
+
+[04:33:38.0000] <noamr>
+annevk: so seems like currently it doesn't build until the HR-TIME PR is in and is recognized by bikeshed etc. do we have anything else left there?
+
+[04:34:36.0000] <annevk>
+noamr: I don't think so, the <iframe> concern no longer applies as we'll have to fix that as part of updating <iframe>
+
+[04:34:48.0000] <annevk>
+and all the filtering related to that was dropped from the PR afaict
+
+[04:35:13.0000] <annevk>
+so yeah, I think we're pretty close to landing this, which is great!
+
+[04:35:22.0000] <noamr>
+yay!
+
+[05:05:44.0000] <annevk>
+andreubotella: btw, I think we could stop calling it a boundary string and just call it a boundary?
+
+[05:07:57.0000] <annevk>
+I really like all the serialization bits
+
+[07:11:28.0000] <yoav>
+annevk: managed to get the latest hr-time republished at https://www.w3.org/TR/hr-time-3/
+
+[07:11:49.0000] <yoav>
+and working on getting a WG decision to autopublish all the things
+
+[07:13:18.0000] <annevk>
+Cool, hopefully it'll get indexed soonish (probably done by tomorrow at the latest)
+
+[07:55:18.0000] <nox>
+https://fetch.spec.whatwg.org/#dom-response I wonder why this cannot be used to construct, say, a 103 response.
+
+[08:06:26.0000] <noamr>
+annevk: it's indexed and the build passes for the PR
+
+[08:34:30.0000] <annevk>
+noamr: so I guess the main thing is the IPR bit? And maybe prepare a suitable commit message and leave it in a comment?
+
+[08:34:52.0000] <annevk>
+noamr: oh, and the specific integration with RT I suppose, we need to land the RT change too and get that indexed
+
+[08:35:12.0000] <noamr>
+annevk: they're co-dependent, as the RT bit relies on the new struct in FETCH
+
+[08:36:22.0000] <noamr>
+so the way I was thinking to do this is to land this (once we're good to go with IPR), land the RT fix, and then add the link to "mark" in FETCH
+
+[08:36:22.0000] <annevk>
+noamr: does RT not build if it's not exported or does it not matter?
+
+[08:37:02.0000] <noamr>
+annevk: yes, the RT PR does not build without it.
+
+[08:37:24.0000] <annevk>
+noamr: why is it called mark btw?
+
+[08:37:39.0000] <noamr>
+annevk: similar to mark/measure in user timing, and to "mark paint timing"
+
+[08:37:42.0000] <noamr>
+consistency
+
+[08:38:07.0000] <noamr>
+but open to other naming suggestions of course
+
+[08:38:09.0000] <annevk>
+those all end up creating objects? bit alien to me
+
+[08:38:40.0000] <annevk>
+If it's consistent it seems fine, but generally I wouldn't expect "mark" to end up creating objects
+
+[08:39:18.0000] <noamr>
+the way I see it, as far as FETCH/HTML are concerned, they're marking a point in time with some data. The fact that an object is created for that is a performance-API concern
+
+[08:40:31.0000] <noamr>
+the "marking" is the important bit for the caller, while object creation is more of an API mechanism
+
+[08:41:29.0000] <annevk>
+I think it's important for spec callers to know when objects get created so they only call those things at a safe point, but again, if the other mark things already do this
+
+[08:44:45.0000] <noamr>
+yea if it wasn't for consistency I could go with other names
+
+[10:35:08.0000] <MikeSmith>
+annevk: r? https://github.com/whatwg/xhr/pull/321
+
+[10:35:55.0000] <MikeSmith>
+just a retitle of the “Feature Policy integration” section to “Permissions Policy integration”
+
+[15:59:22.0000] <MikeSmith>
+https://spin.atomicobject.com/2021/03/22/makefiles-vs-package-json-scripts/
+
+[15:59:30.0000] <MikeSmith>
+“Why I Prefer Makefiles Over package.json Scripts
+
+[16:00:02.0000] <MikeSmith>
+> JSON was meant for serializing objects. It's a lousy config format, and it's even worse at expressing a complicated build.
+
+[16:02:57.0000] <Rik`>
+YAML is even worse :)
+
+[16:05:41.0000] <MikeSmith>
+Rik`: yeah no argument there
+
+[16:08:20.0000] <Rik`>
+for watch scenarios, I like http://eradman.com/entrproject/ to avoid complex node toolchains
+
+[16:17:05.0000] <Rik`>
+and https://marmelab.com/blog/2016/02/29/auto-documented-makefile.html is pretty cool too
+
+
+2021-03-25
+[17:05:02.0000] <MikeSmith>
+Rik`: ah wow those both look very useful
+
+[17:05:19.0000] <MikeSmith>
+the second one, I wish make supported that natively
+
+[17:06:57.0000] <MikeSmith>
+I use bash completion with make a lot, but of course that’s just for the target names — doesn’t tell you what the targets actually do
+
+[00:41:35.0000] <ondras>
+I think that "auto documented makefile" is kinda missing a point by using `make` as a script runner.
+
+[00:41:51.0000] <ondras>
+if you "only" want to run scripts, you have probably many more better options
+
+[00:42:41.0000] <Rik`>
+ondras: such as ?
+
+[00:42:55.0000] <ondras>
+such as a package.json script or a shellscript or basically anything
+
+[00:43:06.0000] <ondras>
+make's power lies elsewhere
+
+[00:43:38.0000] <ondras>
+people often translate their "run this-script" needs 1:1 to Makefile
+
+[00:44:18.0000] <Rik`>
+the conversation started with that article "Why I Prefer Makefiles Over package.json Scripts"
+
+[00:44:50.0000] <ondras>
+but make's true advantage is the automatic dependency tracking and graph sub-path selection via automatic rules, such as "%.svg: %.dot" etc
+
+[00:46:17.0000] <ondras>
+yes, it is nice to see package.json scripts replaced with something more robust
+
+[00:46:50.0000] <ondras>
+but the article's point is "package.json sucks for non-trivial tasks", and not "make is an ideal replacement" IMHO :)
+
+[00:47:11.0000] <ondras>
+because using make *only* as a task runner... well... whatever.
+
+[00:50:28.0000] <ondras>
+(the article is correctly mentioning that in the "Avoid Extra Work" chapter)
+
+[01:30:46.0000] <annevk>
+Hey noamr, I gave things a bit more thought and I think I understand the time values better now, but I still have some questions
+
+[01:31:12.0000] <annevk>
+noamr: in the case where there are no redirects, is there a meaningful difference between start time and fetch start time or would it be okay to define those as identical?
+
+[01:31:40.0000] <noamr>
+annevk: they are identical by defiintion when there are no redirects
+
+[01:32:20.0000] <annevk>
+noamr: well, we set fetch start time twice, first in fetch and then in main fetch; we could make them identical by guarding the second setter by _recursive_ having to be true, I think
+
+[01:32:46.0000] <noamr>
+/me is checking
+
+[01:33:23.0000] <annevk>
+noamr: also, in that case, why doesn't https://whatpr.org/fetch/1185.html#finalize-and-report-timing use start time rather than fetch start time as the reset value?
+
+[01:34:23.0000] <noamr>
+annevk: we don't set the fetch start time twice
+
+[01:34:31.0000] <noamr>
+annevk: we set it only in main fetch
+
+[01:34:43.0000] <annevk>
+noamr: it seems that going through the redirect start time isn't really needed there (I'm not sure if redirect start time can be set to start time however, I guess if you have a 401 and then authenticate and then get a redirect it would be different...)
+
+[01:35:50.0000] <annevk>
+noamr: oh wait, so where do we set start time?
+
+[01:36:35.0000] <annevk>
+noamr: it seems like we should set start time and fetch start time together in https://whatpr.org/fetch/1185.html#concept-fetch step 5 or so
+
+[01:36:49.0000] <annevk>
+noamr: and then update fetch start time in main fetch on recursive invocations
+
+[01:39:47.0000] <annevk>
+noamr: I have some more questions/suggestions; I could also try to write them up if that would be easier
+
+[01:52:42.0000] <annevk>
+I summarized my issues in a new comment
+
+[01:54:05.0000] <annevk>
+I'm happy to help address them; I'd be interested in knowing if it's intentional that fetchStart doesn't update for 401s and CORS preflights and such; i.e., that it only updates with redirects
+
+[02:01:17.0000] <noamr>
+annevk: I replied to the comments. I would be happy if some of the smaller details were done in a follow up, if needed.
+
+[02:07:04.0000] <annevk>
+noamr: as I said, I'm happy to help with the edits, but I do think it's important to get this right
+
+[02:10:55.0000] <noamr>
+annevk: ok, I now understand all your proposals, can you suggest them as edits?
+
+[02:11:54.0000] <annevk>
+noamr: yeah I can push a commit later, if that's what you mean; I have to do something else first, but shouldn't take long
+
+[02:12:31.0000] <noamr>
+annevk: that's what I mean. thanks!
+
+[02:13:47.0000] <annevk>
+noamr: the one final subtlety that seems hard to convey is that while post-redirect start time works well for fetchStart, we cannot really use the same term for network request start time as that would update with a 401 scenario
+
+[02:14:41.0000] <annevk>
+noamr: and if we did "final network request/response start time" it might be misleading with 1xx, but maybe not enough and it's still clear enough?
+
+[02:14:49.0000] <noamr>
+annevk: it's true for most of those connection-based metrics though, no? secure connection start etc, all depends on timings that are affected by the different protocol s
+
+[02:15:30.0000] <annevk>
+noamr: yeah, I was thinking that maybe that should be "final connection timing info" too
+
+[02:15:48.0000] <noamr>
+annevk: I'm ok with that
+
+[02:15:50.0000] <annevk>
+noamr: as we only hand back details from the final connection
+
+[02:16:14.0000] <noamr>
+yup
+
+[02:16:50.0000] <annevk>
+okay, so I'll use "final" for all of those that just record the last instance
+
+[02:17:23.0000] <annevk>
+and post-redirect start time for fetchStart
+
+[02:19:37.0000] <noamr>
+annevk: sounds good! I like that FETCH uses more accurate naming, and the backwards capability concerns can remain inside Resource Timing spec
+
+[03:34:02.0000] <annevk>
+noamr: I pushed a commit, I also ended up being able to simplify a few things as a result of this discussion; it looks very solid now, but I might be missing something of course
+
+[03:34:30.0000] <noamr>
+Thanks annevk. Giving it another look
+
+[03:34:36.0000] <annevk>
+yoav: you should probably have another look as well; nothing substantive should have changed, but a few things got correct and streamlined
+
+[03:35:02.0000] <annevk>
+yoav: and we adjusted the spec-internal names to be as clear as they could be
+
+[03:35:15.0000] <yoav>
+SG, looking
+
+[03:35:15.0000] <annevk>
+corrected*
+
+[03:57:22.0000] <noamr>
+annevk: lgtm for last two commits
+
+[05:52:08.0000] <annevk>
+noamr: alright, step 1 is done \o/ https://github.com/whatwg/fetch/commit/73f01f7b7e51626231e1911390b8dee669090b6d congrats
+
+[05:59:05.0000] <annevk>
+noamr: though looking at older Fetch issues I wonder if what we did with processResponseDone is correct, in particular https://bugs.chromium.org/p/chromium/issues/detail?id=805069 suggests you do need to invoke arrayBuffer() for it to be created?
+
+[06:05:09.0000] <noamr>
+annevk: yay! thanks for helping get this to the finish line (of the first step)
+
+[06:05:56.0000] <noamr>
+annevk: fetch() definitely creates RT without calling relying on a call to `arrayBuffer()`. not sure about the specifics of that bug, yoav?
+
+[06:12:37.0000] <annevk>
+noamr: I guess if there's backpressure the current approach would end up delaying creation of the entry as well, so maybe all is fine
+
+[06:13:16.0000] <noamr>
+annevk: yes, I believe so
+
+[11:13:07.0000] <annevk>
+noamr: if I do fetch("https://www.google.com") and then check the last entry of window.performance.getEntriesByType("resource") it's there, so network errors do result in entries afaict
+
+[11:21:58.0000] <noamr>
+annevk: yes, network errors do, but not CORS errors
+
+[12:23:49.0000] <annevk>
+noamr: but that’s a CORS error
+
+[13:01:48.0000] <noamr>
+annevk: will look at the details on Sunday... Passover time starting here in Israel ☺️
+
+[13:30:08.0000] <annevk>
+Yeah, I’ll be off for two weeks, we can clean this up after; might investigate a bit more tomorrow
+
+
+2021-03-29
+[05:32:51.0000] <zcorpan>
+This confuses me. "If worker global scope's embedder policy is "require-corp" and is shared is true, then set agent's agent cluster's cross-origin isolation mode to "logical" or "concrete". The one chosen is implementation-defined."
+
+[05:32:56.0000] <zcorpan>
+https://html.spec.whatwg.org/multipage/workers.html#run-a-worker
+
+[05:33:15.0000] <zcorpan>
+later step: "If is shared is false and response's url's scheme is "data", then set worker global scope's cross-origin isolated capability to false."
+
+[05:34:10.0000] <zcorpan>
+as far as I can tell, nothing changes the cross-origin isolated capability to true for non-shared workers to begin with
+
+[05:34:53.0000] <zcorpan>
+is that intentional? or should the first step say "and is shared is *false*"?
+
+[05:40:06.0000] <annevk>
+Dedicated workers typically do not create their own agent cluster, but data: URL dedicated workers might; there’s an open issue
+
+[05:41:16.0000] <annevk>
+I guess as the capability is per global we should maybe say something though, not sure
+
+[07:18:22.0000] <zcorpan>
+annevk: for dedicated workers, nothing in the spec sets cross-origin isolated capability to true, yet it sets it to false for data: url dedicated workers (which seems to be a no-op)
+
+[07:40:45.0000] <annevk>
+> Set worker global scope's cross-origin isolated capability to true if agent's agent cluster's cross-origin isolation mode is "concrete".
+
+[07:46:23.0000] <zcorpan>
+annevk: where does it set the cross-origin isolation mode to "concrete" for dedicated workers?
+
+[07:50:13.0000] <annevk>
+zcorpan: it's for an entire agent cluster, so it's set in the document
+
+[07:50:24.0000] <annevk>
+zcorpan: (or shared worker)
+
+[07:51:09.0000] <zcorpan>
+annevk: oooh
+
+[07:52:27.0000] <zcorpan>
+annevk: thanks. I guess I don't have the right mental model for agent clusters
+
+[07:55:44.0000] <annevk>
+zcorpan: https://docs.google.com/presentation/d/1sadl7jTrBIECCanuqSrNndnDr82NGW1yyuXFT1Dc7SQ/edit#slide=id.g5641ecbac9_0_131 (and also, shared/service workers create them; dedicated workers in principle only join agent clusters except for the unsolved mess with data: URL dedicated workers and potentially sandboxed dedicated workers)
+
+[07:58:52.0000] <zcorpan>
+thx
+
+[15:26:43.0000] <howdoi>
+websockets have backgroundsync?
+
+[15:26:57.0000] <howdoi>
+as in they can queue the message and send it over when online again?
+
+
+2021-03-30
+[02:52:34.0000] <bor770>
+hello
+
+[02:53:17.0000] <bor770>
+anyone here?
+
+
+2021-03-31
+[06:44:23.0000] <zcorpan>
+Domenic: tobie: whatwg/html PR preview appears broken after the move of wattsi-server. https://github.com/whatwg/html/pull/6525
+
+[07:44:26.0000] <Domenic>
+zcorpan: looking into it... can reproduce locally.
+
+[08:11:19.0000] <Domenic>
+zcorpan: fixed I think. We needed 1 GiB of memory on the new server, not 512 MiB :)
+
+[08:32:52.0000] <tobie>
+Domenic: anything I should do? Or is it fixed, now?
+
+[08:33:17.0000] <Domenic>
+tobie: all good now, PR preview continues to be a well-oiled machine :)
+
+[08:49:06.0000] <tobie>
+Domenic: I'm glad!
+
+[09:05:09.0000] <zcorpan>
+Domenic: cheers!
+
+[09:05:38.0000] <zcorpan>
+I'll be offline for a few days now, back April 7 :)
+
