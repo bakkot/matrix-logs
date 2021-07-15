@@ -3348,3 +3348,83 @@ Transferable seems web api, not in ES spec. Hope we could include it in JS direc
 [21:19:56.0388] <devsnek>
 i can confirm that greedily taking all the primordials is expensive, it is one of the reasons nodejs moved to using v8 snapshots
 
+[21:20:03.0966] <bakkot>
+so optimizing for specifically that use case does not seem like something which needs language-level support
+
+[21:20:10.0999] <leobalter>
+ryzokuken: please check the queue because Greg is not used to the TC39 meetings yet
+
+[21:21:36.0510] <shu>
+i don't have this cache-originals problem space paged in very well, how does Realms solve this again?
+
+[21:21:46.0355] <shu>
+like even if you cache the Realm don't you still need to run before anything can run in the user Realm?
+
+[21:21:54.0232] <bakkot>
+yes, the assumption is that you are running first
+
+[21:22:08.0756] <ryzokuken>
+leobalter: sure. Did Greg remove his question? If not, could you please ask them to add it again? I saw their clarifying question for a second
+
+[21:22:13.0900] <ljharb>
+> <@shuyuguo:matrix.org> like even if you cache the Realm don't you still need to run before anything can run in the user Realm?
+
+yes, that isn't the problem being solved. but it makes it one thing instead of N things
+
+[21:22:14.0039] <shu>
+okay, and don't you still have to enumerate all reachable things from the Realm?
+
+[21:22:14.0054] <devsnek>
+ljharb wants to cache originals lazily 
+
+[21:22:14.0086] <bakkot>
+the question is, do you take a snapshot by making a new realm, or by walking the current one and saving stuff off of it
+
+[21:22:15.0641] <shu>
+you can't just cache the Realm
+
+[21:22:15.0662] <bakkot>
+assuming you are run-first
+
+[21:22:30.0004] <bakkot>
+uhhhh why not?
+
+[21:22:39.0338] <bakkot>
+no one else should be able to reach it
+
+[21:22:39.0893] <ljharb>
+why can't i just cache the realm, if nobody else can get to my realm, and i avoid leaking access to its primordials?
+
+[21:22:49.0353] <shu>
+oh, you make an entirely new realm for the sole purpose of getting primordials off it
+
+[21:22:52.0691] <bakkot>
+yup
+
+[21:22:57.0076] <shu>
+not that you try to reuse a user realm that's already used for something else
+
+[21:22:58.0193] <shu>
+got it, thanks
+
+[21:23:00.0421] <bakkot>
+yup
+
+[21:23:20.0383] <shu>
+my response to that is that that is a Bad Idea for performance
+
+[21:23:24.0492] <shu>
+which people have said
+
+[21:24:15.0046] <bakkot>
+yeah, and it seems like the thing ljharb doesn't like about the current approach is also performance, so this would not solve this, though maybe I am not understanding
+
+[21:24:34.0439] <ljharb>
+it's not really perf, it's that it's actually hard to grab everything dynamically
+
+[21:24:35.0322] <ryzokuken>
+`Realm.prototype`?
+
+[21:24:39.0003] <ljharb>
+especially since not all the instrinsics are globals
+
