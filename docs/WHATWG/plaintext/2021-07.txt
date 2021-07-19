@@ -1665,3 +1665,18 @@ Domenic: so it could be I don't understand BYOB, but I thought at a high-level t
 [10:42:55.0170] <annevk>
 Domenic: so what I don't understand in your PR is that there's a step where the API creates a buffer + view, when the size isn't sufficient
 
+[10:55:37.0488] <Domenic>
+annevk: the idea is that if your underlying source (i.e. network APIs) support it and the buffer is big enough, you write into it. E.g. for filesystem APIs were you can explicitly control how many bytes you request this works great. For network APIs you can't always control; flow control takes a while to propagate through TCP. So in that case we might have too many bytes to fit into the buffer.
+
+[10:57:29.0964] <Domenic>
+In actuality you wouldn't need to create any JS ArrayBuffer objects like the spec does so you do save a couple of mini-allocations. And since it's all hidden behind transferrability you could avoid copying in favor of slicing up memory regions and making making the new view point to the original region. But there's no way to write 64 KiB of data from the network into a 1 KiB developer-supplied buffer.
+
+[10:58:10.0041] <annevk>
+Maybe my confusion stems from the specification using JS views and buffers
+
+[10:59:14.0555] <annevk>
+Domenic: how does it work if you do read(largeView) and the network is slow? You have to wait a long time?
+
+[10:59:37.0760] <Domenic>
+annevk: no in that case you get back your buffer with however many bytes were available and a view onto only the bytes that were written into it
+
