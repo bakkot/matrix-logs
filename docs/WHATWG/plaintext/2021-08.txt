@@ -157,3 +157,68 @@ favonia: I don't think I understand the issue. Because those are forbidden host 
 [13:12:42.0938] <Domenic>
  * favonia: I don't think I understand the issue. Because those are forbidden host code points parsing will fail if they appear. It doesn't matter for the spec whether the parsing fails due to Unicode STD3 checking in step 5 or because of the explicit step 7 in https://url.spec.whatwg.org/#concept-host-parser
 
+[14:06:19.0998] <favonia>
+> <@domenicdenicola:matrix.org> favonia: I don't think I understand the issue. Because those are forbidden host code points parsing will fail if they appear. It doesn't matter for the spec whether the parsing fails due to Unicode STD3 checking in step 5 or because of the explicit step 7 in https://url.spec.whatwg.org/#concept-host-parser
+
+As far as I understand, Step 7 does not prevent such attacks. The attack is that the _same_ URL (record) has multiple Unicode normal forms that would be parsed differently. Here is an example: 
+```
+https://google.com\uFF03@evil.com
+```
+A parser would give the following results:
+- username: `google.com\uFF03`
+- host: `evil.com`
+
+But with its NFKC:
+```
+https://google.com#@evil.com
+```
+a parser would give these results instead:
+- host: `google.com`
+- fragment: `@evil.com`
+
+So, the string and one of its normal forms are both valid URL records, but with different structures. The discrepancies can be exploited in many IDNA-aware applications to fool users or even bypass security checking. This attack is known as HostSplit.
+
+[14:07:25.0388] <favonia>
+> <@domenicdenicola:matrix.org> favonia: I don't think I understand the issue. Because those are forbidden host code points parsing will fail if they appear. It doesn't matter for the spec whether the parsing fails due to Unicode STD3 checking in step 5 or because of the explicit step 7 in https://url.spec.whatwg.org/#concept-host-parser
+
+ * As far as I understand, Step 7 does not prevent such attacks. One attack is that the _same_ URL (record) has multiple Unicode normal forms that would be parsed differently. Here is an example:
+```
+https://google.com\uFF03@evil.com
+```
+
+A parser would give the following results:
+- username: `google.com\uFF03`
+- host: `evil.com`
+
+But with its NFKC:
+```
+https://google.com#@evil.com
+```
+
+a parser would give these results instead:
+- host: `google.com`
+- fragment: `@evil.com`
+
+So, the string and one of its normal forms are both valid URL records, but with different structures. The discrepancies can be exploited in many IDNA-aware applications to fool users or even bypass security checking. This attack is known as HostSplit.
+
+[14:08:36.0298] <favonia>
+ * As far as I understand, Step 7 does not prevent such attacks. One attack is that the _same_ URL (record) has multiple Unicode normal forms that would be parsed differently. Here is an example:
+```
+https://google.com\uFF03@evil.com
+```
+
+A parser would give the following results:
+- username: `google.com\uFF03`
+- host: `evil.com`
+
+But with its NFKC (where `\uFF03` is normalized to `#`):
+```
+https://google.com#@evil.com
+```
+
+a parser would give these results instead:
+- host: `google.com`
+- fragment: `@evil.com`
+
+So, the string and one of its normal forms are both valid URL records, but with different structures. The discrepancies can be exploited in many IDNA-aware applications to fool users or even bypass security checking. This attack is known as HostSplit.
+

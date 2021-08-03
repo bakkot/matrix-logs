@@ -59,6 +59,60 @@
 </td></tr>
   <tr class="msg" id="L23"><td class="ts-cell"><a class="ts" href="#L23" alt="Tue Aug 03 2021 13:12:16 GMT-0700 (Pacific Daylight Time)">20:12</a></td><td class="nick-cell">&lt;<span class="nick nick-1" title="@domenicdenicola:matrix.org">Domenic</span>&gt;</td><td class="msg-cell"><span class="nick-15">favonia</span>: I don't think I understand the issue. Because those are forbidden host code points parsing will fail if they appear. It doesn't matter for the spec whether the parsing fails due to Unicode STD3 checking or because of the explicit step 7 in <a href="https://url.spec.whatwg.org/#concept-host-parser">https://url.spec.whatwg.org/#concept-host-parser</a></td></tr>
   <tr class="msg" id="L24"><td class="ts-cell"><a class="ts" href="#L24" alt="Tue Aug 03 2021 13:12:42 GMT-0700 (Pacific Daylight Time)">20:12</a></td><td class="nick-cell">&lt;<span class="nick nick-1" title="@domenicdenicola:matrix.org">Domenic</span>&gt;</td><td class="msg-cell"> * <span class="nick-15">favonia</span>: I don't think I understand the issue. Because those are forbidden host code points parsing will fail if they appear. It doesn't matter for the spec whether the parsing fails due to Unicode STD3 checking in step 5 or because of the explicit step 7 in <a href="https://url.spec.whatwg.org/#concept-host-parser">https://url.spec.whatwg.org/#concept-host-parser</a></td></tr>
+  <tr class="msg" id="L25"><td class="ts-cell"><a class="ts" href="#L25" alt="Tue Aug 03 2021 14:06:19 GMT-0700 (Pacific Daylight Time)">21:06</a></td><td class="nick-cell">&lt;<span class="nick nick-15" title="@favonia:matrix.org">favonia</span>&gt;</td><td class="msg-cell"><mx-reply><blockquote> <span class="nick-15">favonia</span>: I don't think I understand the issue. Because those are forbidden host code points parsing will fail if they appear. It doesn't matter for the spec whether the parsing fails due to Unicode STD3 checking in step 5 or because of the explicit step 7 in <a href="https://url.spec.whatwg.org/#concept-host-parser">https://url.spec.whatwg.org/#concept-host-parser</a></blockquote></mx-reply><p>As far as I understand, Step 7 does not prevent such attacks. The attack is that the <em>same</em> URL (record) has multiple Unicode normal forms that would be parsed differently. Here is an example:</p>
+<pre><code>https://google.com\uFF03@evil.com
+</code></pre>
+<p>A parser would give the following results:</p>
+<ul>
+<li>username: <code><a href="http://google.com">google.com</a>\uFF03</code></li>
+<li>host: <code><a href="http://evil.com">evil.com</a></code></li>
+</ul>
+<p>But with its NFKC:</p>
+<pre><code>https://google.com#@evil.com
+</code></pre>
+<p>a parser would give these results instead:</p>
+<ul>
+<li>host: <code><a href="http://google.com">google.com</a></code></li>
+<li>fragment: <code>@<a href="http://evil.com">evil.com</a></code></li>
+</ul>
+<p>So, the string and one of its normal forms are both valid URL records, but with different structures. The discrepancies can be exploited in many IDNA-aware applications to fool users or even bypass security checking. This attack is known as HostSplit.</p>
+</td></tr>
+  <tr class="msg" id="L26"><td class="ts-cell"><a class="ts" href="#L26" alt="Tue Aug 03 2021 14:07:25 GMT-0700 (Pacific Daylight Time)">21:07</a></td><td class="nick-cell">&lt;<span class="nick nick-15" title="@favonia:matrix.org">favonia</span>&gt;</td><td class="msg-cell"><mx-reply><blockquote> <span class="nick-15">favonia</span>: I don't think I understand the issue. Because those are forbidden host code points parsing will fail if they appear. It doesn't matter for the spec whether the parsing fails due to Unicode STD3 checking in step 5 or because of the explicit step 7 in <a href="https://url.spec.whatwg.org/#concept-host-parser">https://url.spec.whatwg.org/#concept-host-parser</a></blockquote></mx-reply> * <p>As far as I understand, Step 7 does not prevent such attacks. One attack is that the <em>same</em> URL (record) has multiple Unicode normal forms that would be parsed differently. Here is an example:</p>
+<pre><code>https://google.com\uFF03@evil.com
+</code></pre>
+<p>A parser would give the following results:</p>
+<ul>
+<li>username: <code><a href="http://google.com">google.com</a>\uFF03</code></li>
+<li>host: <code><a href="http://evil.com">evil.com</a></code></li>
+</ul>
+<p>But with its NFKC:</p>
+<pre><code>https://google.com#@evil.com
+</code></pre>
+<p>a parser would give these results instead:</p>
+<ul>
+<li>host: <code><a href="http://google.com">google.com</a></code></li>
+<li>fragment: <code>@<a href="http://evil.com">evil.com</a></code></li>
+</ul>
+<p>So, the string and one of its normal forms are both valid URL records, but with different structures. The discrepancies can be exploited in many IDNA-aware applications to fool users or even bypass security checking. This attack is known as HostSplit.</p>
+</td></tr>
+  <tr class="msg" id="L27"><td class="ts-cell"><a class="ts" href="#L27" alt="Tue Aug 03 2021 14:08:36 GMT-0700 (Pacific Daylight Time)">21:08</a></td><td class="nick-cell">&lt;<span class="nick nick-15" title="@favonia:matrix.org">favonia</span>&gt;</td><td class="msg-cell"> * <p>As far as I understand, Step 7 does not prevent such attacks. One attack is that the <em>same</em> URL (record) has multiple Unicode normal forms that would be parsed differently. Here is an example:</p>
+<pre><code>https://google.com\uFF03@evil.com
+</code></pre>
+<p>A parser would give the following results:</p>
+<ul>
+<li>username: <code><a href="http://google.com">google.com</a>\uFF03</code></li>
+<li>host: <code><a href="http://evil.com">evil.com</a></code></li>
+</ul>
+<p>But with its NFKC (where <code>\uFF03</code> is normalized to <code>#</code>):</p>
+<pre><code>https://google.com#@evil.com
+</code></pre>
+<p>a parser would give these results instead:</p>
+<ul>
+<li>host: <code><a href="http://google.com">google.com</a></code></li>
+<li>fragment: <code>@<a href="http://evil.com">evil.com</a></code></li>
+</ul>
+<p>So, the string and one of its normal forms are both valid URL records, but with different structures. The discrepancies can be exploited in many IDNA-aware applications to fool users or even bypass security checking. This attack is known as HostSplit.</p>
+</td></tr>
 </tbody></table>
 </div></div></div>
 </body></html>
