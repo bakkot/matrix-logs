@@ -1129,3 +1129,45 @@ Right, and I suppose this is observable by the user, because they can observe wh
 [19:44:47.0476] <bakkot>
 It's not just about order; it's about only accessing the property once
 
+[19:45:02.0203] <bakkot>
+e.g. if you have a getter for `Symbol.iterator`, `Array.from` should only invoke that getter one time
+
+[19:45:37.0097] <jschoi>
+Ah, okay.
+
+[19:45:39.0958] <jschoi>
+Thanks!
+
+[19:46:16.0415] <bakkot>
+I don't think we actually cared much about the order of the call to `C` vs to `Symbol.iterator`, but we definitely do care that the property is only accessed a single time
+
+[19:46:59.0059] <jschoi>
+I guess I’m confused why step 4 isn’t what step 5c currently is.
+
+[19:47:10.0577] <bakkot>
+uh
+
+[19:47:16.0109] <bakkot>
+I don't know what that means
+
+[19:48:01.0624] <jschoi>
+Another way to put it: why would “Let _iteratorRecord_ be ? GetIterator(items, sync)” result in two accesses of item’s Symbol.iterator property?
+
+[19:48:08.0714] <bakkot>
+oh, you mean, why is step 4 not `GetIterator`? it's because GetIterator unconditionally attempts to call the `Symbol.iterator` property, even if it's `undefined`
+
+[19:48:09.0716] <jschoi>
+ * Another way to put it: why would “Let _iteratorRecord_ be ? GetIterator(_items_, sync)” result in two accesses of item’s Symbol.iterator property?
+
+[19:48:44.0784] <jschoi>
+Mm, yeah, I see now that’s true in GetIterator’s definition. That’s a bit surprising.
+
+[19:48:58.0468] <bakkot>
+that is, there's two things happening here:
+- step 4 can't use `GetIterator` because `GetIterator` will _throw_ if Symbol.iterator is missing
+- step 5c needs to forward `usingIterator` so that it doesn't do another access of Symbol.iterator
+
+[19:49:32.0066] <jschoi>
+ * Mm, yeah, I see now that’s true in GetIterator’s definition. That’s a bit surprising.
+It does check that the result of the Symbol.iterator-value’s function call is an object.
+
