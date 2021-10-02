@@ -1,0 +1,279 @@
+2021-09-04
+[08:39:06.0545] <ljharb>
+this room's logo is a blue T for me instead of the orange TC39 circle
+
+[13:17:23.0950] <ljharb>
+oh hm, now the entire tc39 space lost its orange tc39 logo :-/ is that just me, or are others seeing that?
+
+
+2021-09-05
+[18:14:39.0133] <jschoi>
+This room never had an orange TC39 logo for me; the other rooms are still the same.
+
+
+2021-09-06
+[21:46:33.0726] <ljharb>
+ah ok, on reload everything else got its logo back
+
+
+2021-09-07
+[08:26:19.0771] <shu>
+this room also never had an orange TC39 logo for me
+
+[08:26:25.0950] <shu>
+dunno how this stuff works
+
+[08:31:51.0227] <asumu>
+At 9AM PDT I'll be talking a bit about the connection between Wasm GC & this proposal (among other things) at the Wasm GC subgroup: https://github.com/WebAssembly/gc/issues/237
+
+[08:32:19.0383] <asumu>
+ * At 9AM PDT I'll be talking a bit about the connection between Wasm GC & this proposal (among other things) at the Wasm GC subgroup: https://github.com/WebAssembly/gc/issues/237
+
+[10:00:53.0646] <shu>
+sorry i missed this, i don't have the GC subgroup meetings on my calendar, though always happy to attend fewer meetings
+
+[10:00:56.0100] <shu>
+how did it go, asumu?
+
+[10:09:59.0819] <asumu>
+I think it went well! There was a lot of agreement overall. One of the bigger points of discussion was what can be done about type-checking in the JS->Wasm direction. There was some discussion on how that might be possible by extending Wasm's API, perhaps even without adding more types to the JS structs proposal (which of course we had agreed wasn't part of the initial proposal).
+
+[10:10:05.0071] <asumu>
+Slides here: https://docs.google.com/presentation/d/1XwCwOQvTTuV5mU74d2wLnEqsdpi20ReCxtFRZLcW0EA/edit?usp=sharing
+
+[12:36:57.0783] <shu>
+cool, thanks for the slides
+
+[12:37:22.0004] <shu>
+makes me think i should attend the GC subgroup meetings, if only mostly as an observer
+
+[12:38:41.0677] <rbuckton>
+One thing that Shu and I were discussing was the possibility of using decorators to handle marshaling behavior for things like FFIs. I'm still interested in RTT support and how to align that with TypeScript
+
+[12:47:18.0927] <rbuckton>
+In the proposal draft I was working on, I used `: type` (similar to TypeScript) for a restricted subset of types, with the possibility of using something like TS generics for specific subtyping (i.e., `kind: i32<Kind>`, where the `<Kind>` would be erased by TS on emit). Another approach was a prefix `(type)` similar to what I was thinking for operator overloading:
+```
+struct Point {
+  (i32) x;
+  (i32) y;
+  static (Point + i32) (a, b) { return new Point(a.x + b, a.y + b); }
+  ...
+}
+```
+But this could also theoretically be handled by decorators under the current proposal:
+```
+struct class Point {
+  @WebAssembly.Type("i32") x;
+  @WebAssembly.Type("i32") y;
+}
+// or
+const { i32 } = WebAssembly.Types;
+struct class Point {
+  @i32 x;
+  @i32 y;
+}
+```
+
+[13:57:29.0126] <shu>
+using decorators makes sense if types (really, "size + representation" instead of "type" writ large) were always applied via API like a WebAssembly API
+
+[13:58:10.0965] <shu>
+but i think a desire exists to declare size+representation for JS structs for use within JS as well, and how would that work?
+
+[13:58:53.0915] <shu>
+and to be clear, i think a world where the size+repr are only the purview of WebAssembly is actually fine
+
+[13:59:16.0947] <shu>
+but that might ruffle some feathers for platforms that don't want to include wasm but do want sized fields
+
+[16:00:18.0863] <rbuckton>
+The `@type` decorator approach wouldn't be the first time we've seen a similar proposal. I think littledan considered something for user-defined numeric literal suffixes as well (i.e., `123@px`).
+
+Also, it wouldn't necessarily need to be tied to `WebAssembly` if we went with that approach. There are a few use cases it doesn't solve though (like fixed size arrays, etc.) that I was considering here: https://github.com/rbuckton/proposal-struct#field-types
+
+[16:17:51.0545] <rbuckton>
+Specific cases being something like:
+1. `i32[8]` for a fixed-size array of 8 32-bit signed integers (derived from standard C/C++ array field declarators and C# array field declarators)
+2. `i32[length]` for a dependent-sized array whose size is derived from another field on the object (roughly based on https://docs.microsoft.com/en-us/windows/win32/midl/midl-arrays, though possibly not feasible if `length` is mutable).
+3. `i32[]` for a flexible-sized array (based on C99 flexible array members https://en.wikipedia.org/wiki/Flexible_array_member)
+
+[16:19:23.0076] <rbuckton>
+ * Specific cases being something like:
+1. `i32[8]` for a fixed-size array of 8 32-bit signed integers (derived from standard C/C++ array field declarators and C# array field declarators)
+2. `i32[length]` for a dependent-sized array whose size is derived from another field on the object (roughly based on https://docs.microsoft.com/en-us/windows/win32/midl/midl-arrays, though possibly not feasible if `length` is mutable).
+3. `i32[]` for a flexible-sized array (based on C99 flexible array members https://en.wikipedia.org/wiki/Flexible_array_member)
+
+[16:20:07.0036] <shu>
+you think those can be done with decorators instead of building them in?
+
+[16:20:10.0182] <rbuckton>
+(2) may be unlikely. In most cases where I've seen a similar construct it has been purely informative and primarily intended for describing marshaling.
+
+[16:20:10.0658] <shu>
+or should be done with decorators?
+
+[16:20:39.0380] <rbuckton>
+I think either are feasible, though building in syntax might be preferred.
+
+[16:20:43.0059] <shu>
+(3) is enshrining a common pattern in the kind of programming i do, i'd be happy with that
+
+[16:28:29.0235] <rbuckton>
+Decorators do provide some flexibility, and we could leverage _MetaProperty_, i.e.:
+```
+struct class Foo {
+  @struct.type(struct.i32)
+  x;
+  @struct.type(struct.i32, { size: 8 })
+  y;
+  @struct.type(struct.i32, { size: "flexible" })
+  z;
+}
+```
+
+You would run into the same issue decorators has with circular references though:
+
+```
+struct class A {
+  @struct.type(struct.i32)
+  size;
+  @struct.type(B, { size: "flexible" })
+  bArray;
+}
+struct class B {
+  @struct.type(struct.i32)
+  size;
+  @struct.type(A, { size: "flexible" })
+  aArray;
+}
+```
+
+That was one of the other motivators for `ref`:
+
+```
+struct class A {
+  @struct.type(struct.i32)
+  size;
+  @struct.type(ref B, { size: "flexible" }) // reference `B`
+  bArray;
+}
+struct class B {
+  @struct.type(struct.i32)
+  size;
+  @struct.type(A, { size: "flexible" })
+  aArray;
+}
+```
+
+[16:29:50.0460] <rbuckton>
+Downsides of _MetaProperty_ are the repetition and the fact you can't destructure.
+
+[16:29:54.0613] <shu>
+sorry, would like to engage more fully here but am busy today. are you mainly interested in discussing the syntax space for a unified future-proof mechanism for both types and arrays?
+
+[16:30:11.0534] <shu>
+(more top of mind for me is whether we should pull arrays into scope)
+
+[16:30:33.0885] <rbuckton>
+I'm interested in that among other things, yes.
+
+[16:31:41.0218] <rbuckton>
+Arrays are definitely useful, otherwise your only option for shared lists will be linked lists
+
+[16:34:19.0305] <rbuckton>
+Of course, `struct` isn't a reserved word, so it wouldn't be a _MetaProperty_ anyways...
+
+[16:37:23.0977] <rbuckton>
+*If* types are defined via decorators we'd need some place to put them. That same place would be as good as any other for defining possible marshalling behavior for other things as well (like pseudo-blittable representations, struct layout and packing behavior, marshalling strings and arrays, FFI interop mechanisms, etc.)
+
+[16:39:10.0859] <rbuckton>
+Maybe a global `Interop` object (since anything non-Proxy related can't go on `Reflect`). Then you could write:
+```
+const { type, i32 } = Interop;
+struct class Foo {
+  @type(i32) x;
+  @type(i32) y;
+}
+```
+But there's plenty to bikeshed there.
+
+
+2021-09-09
+[12:13:57.0584] <rbuckton>
+quick FYI, I'll be AFK until Wednesday. Flying back east to take my daughter to college and visit family. I'll try to catch up on everything in here when I get back.
+
+[12:33:37.0615] <shu>
+have fun!
+
+
+2021-09-14
+[15:58:35.0541] <asumu>
+shu: BTW, we were thinking of starting to draft some spec text for this proposal and help draft some more documentation with examples of the semantics (corner cases, etc), if that sounds like some useful next steps we can help out with. WDYT?
+
+[16:00:31.0201] <shu>
+sure, be happy to review
+
+[16:01:01.0970] <shu>
+though tbh i don't think spec text is the most helpful next step
+
+[16:01:19.0520] <shu>
+for non-shared structs this is probably fairly straightforward and a worthwhile exercise
+
+[16:01:23.0658] <shu>
+err
+
+[16:01:27.0796] <shu>
+ * for non-shared structs this is probably fairly straightforward and a worthwhile exercise
+
+[16:01:44.0160] <shu>
+for shared structs more exploration is needed i think before writing specese
+
+[16:05:16.0128] <asumu>
+That sounds fair, we can focus on just the non-shared part for now. Do you have any thoughts on other useful next steps?
+
+[16:23:11.0292] <shu>
+i was planning to take the time to think through different ways to make the proposal marginally safer than full-blown unordered races while still supporting the WasmGC eventual goal of supporting Java
+
+[16:23:19.0520] <shu>
+would certainly welcome thoughts there
+
+
+2021-09-23
+[14:36:32.0897] <shu>
+i've been chatting some more with internal partners here, and i think we _do_ need to make arrays (i.e. the ability to express a list of things instead of individual fields) in scope
+
+[14:36:58.0771] <shu>
+without arrays, this may be too hard to use
+
+[14:37:22.0511] <shu>
+probably needs to be fixed length instead of arbitrarily resizable
+
+[14:37:23.0797] <shu>
+thoughts?
+
+[15:07:21.0390] <rbuckton>
+Something like a TypedArray for a struct type instead of a number type, or do you mean something else? 
+
+[15:14:42.0488] <shu>
+not sure how that would look exactly, i just meant some way to share arrays as part of structs
+
+[15:14:51.0442] <shu>
+either arrays of other structs or arrays of primitives
+
+[15:15:07.0600] <shu>
+oh, sorry, i meant for the shared structs part
+
+[15:20:16.0470] <rbuckton>
+I agree that arrays are essential for shared structs. Without them you are left with building linked lists for anything collection like
+
+[15:27:46.0025] <shu>
+yeah
+
+
+2021-09-29
+[08:34:23.0722] <shu>
+we should probably have a monthly working session/brainstorming call among the champion group
+
+[08:34:37.0280] <shu>
+ah but i see rbuckton is ooo until oct, i'll re-raise it when he's back
+

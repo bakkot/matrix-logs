@@ -1,0 +1,161 @@
+2021-07-16
+[08:29:12.0337] <Jack Works>
+the recent topic in the repo is quite board
+
+[08:29:22.0637] <Jack Works>
+I guess I didn't caught up
+
+[08:31:15.0399] <Jack Works>
+are we still investigating the syntax and semantics now? any record of previous consensus about what direction we should go? thanks
+
+
+2021-07-23
+[15:38:40.0897] <tabatkins>
+At this point we're still *technically* open for syntax/semantics changes, if someone comes up with something *really good*, but in practice what's in the repo is what we're going with, modulo a small number of still-open questions (mainly the spelling of or/and).
+
+[15:40:43.0202] <rkirsling>
+anything but `||`/`&&` gang 
+
+[16:05:14.0859] <tabatkins>
+same; i think we should just decide on `or` and `and` ^_^
+
+[16:20:25.0050] <ljharb>
+agreed on that decision
+
+[16:20:40.0891] <ljharb>
+the one thing we still need to firm up is the RHS syntax
+
+[16:20:52.0101] <ljharb>
+currently it's just "curly braces, do expression"
+
+[16:29:57.0586] <tabatkins>
+yup
+
+
+2021-07-25
+[20:20:11.0099] <HE Shi-Jun>
+It seems current syntax still has the issue of confusion of the identifiers which looks like reserved words? I mean `when null { ... }` works but `when undefined { ... }` doesn't work as expect?
+
+[20:22:05.0255] <HE Shi-Jun>
+tabatkins: BTW, do we have matrix room for pipeline op just like this for pattern matching? 😀
+
+
+2021-07-26
+[09:25:50.0235] <tabatkins>
+No, we should start one, since I'm assembling slides for the next meeting now. One sec.
+
+[09:26:26.0095] <tabatkins>
+`when undefined` should work as expected - `undefined` is a literal matcher that matches the undefined value.
+
+
+2021-07-27
+[14:10:32.0804] <ljharb>
+`when ^null` vs `when ^undefined`, though, would behave the same way null vs undefined behaves in a normal expression context
+
+
+2021-07-28
+[13:21:54.0700] <tabatkins>
+given the matching semantic we're using (sameValue or sameValueZero, whatever), that gives the same results, right? `when ^null` will match `null` but not `undefined`, right?
+
+[14:55:57.0812] <ljharb>
+`when ^null` will match `when (null)`, yes - only `null` - but `when ^undefined` will only match `when (undefined)` (ie, only `undefined`) when there's no shadowed `undefined` identifier set to "not `undefined`"
+
+[14:58:22.0045] <tabatkins>
+Right. `when ^undefined` is just doing a variable lookup for the name "undefined", which can theoretically be bound to whatever.
+
+[14:58:38.0953] <tabatkins>
+As that's the meaning of `undefined` in a normal expression context, which `^` provides.
+
+
+2021-07-29
+[01:53:05.0294] <HE Shi-Jun>
+> <@tabatkins:matrix.org> `when undefined` should work as expected - `undefined` is a literal matcher that matches the undefined value.
+
+So we have decided to treat `undefined`, `NaN`, `Infinity`, `-Infinity` special cases? Is it possible to add some other identifiers in the future? (seems we can't?)
+
+[01:54:58.0310] <HE Shi-Jun>
+And do we allow hosts to add some special cases? (I guess no?)
+
+[02:13:51.0690] <Jack Works>
+undefined is undefined for sure
+
+[02:14:10.0240] <Jack Works>
+To make it useful, I think NaN must be NaN too
+
+[02:14:20.0297] <Jack Works>
+What about +0 -0?
+
+[02:21:56.0440] <HE Shi-Jun>
+Another question is: we support `when /fo+/`, do we also support `when [1, /fo+/]` ?
+
+[02:24:41.0910] <HE Shi-Jun>
+> <@jackworks:matrix.org> What about +0 -0?
+
+I hope we could support `when +0` `when -0`, and I even wish we could support `when ±0` 😅
+
+[02:27:25.0363] <Jack Works>
+> <@haxjs:matrix.org> Another question is: we support `when /fo+/`, do we also support `when [1, /fo+/]` ?
+
+Interesting. And can we create named capture group bindings in nested pattern? 
+
+[02:27:57.0264] <HE Shi-Jun>
+I hope so.
+
+[02:40:46.0511] <Jack Works>
+A complex pattern is like a complex condition in if statement, it's bad but that's the natural result of expressiveness in our language
+
+[02:41:22.0174] <Jack Works>
+I think it's ok when the pattern goes complex. (Nested regex binding, ...etc)
+
+[02:46:17.0604] <HE Shi-Jun>
+I think it's the linter's role to decide how complex (nest level) could be allowed  :) 
+
+[07:38:18.0091] <ljharb>
+> <@haxjs:matrix.org> So we have decided to treat `undefined`, `NaN`, `Infinity`, `-Infinity` special cases? Is it possible to add some other identifiers in the future? (seems we can't?)
+
+yes
+
+[07:39:21.0334] <ljharb>
+I hope to support when +0 vs -0. `when (+0 or -0)` would give you both in that case.
+
+[07:39:40.0741] <ljharb>
+and yes, everything you can do at the top level or in object/array patterns can be recursively nested
+
+[14:19:59.0511] <HE Shi-Jun>
+ljharb: You mean we can add special cases in the future? But it seems such addition would be breaking change?
+
+[14:27:44.0190] <ljharb>
+why would it be?
+
+[14:27:56.0173] <ljharb>
+a "special case" would be a new leaf pattern
+
+[14:28:06.0753] <ljharb>
+eg `when (hax)` wouldn't break anyone, since it'd be a syntax error until then
+
+[14:43:35.0678] <HE Shi-Jun>
+I may miss something because I think `when (hax)` will always match?
+
+[16:16:47.0324] <ljharb>
+oh right duh, you are correct
+
+[16:16:58.0043] <ljharb>
+so then yeah, it means we couldn't add any new identifier patterns
+
+[16:17:39.0602] <ljharb>
+is there a specific identifier that you think we'd want to add?
+
+
+2021-07-30
+[16:37:06.0196] <tabatkins>
+HE Shi-Jun: Yes, undefined/NaN/Infinity are all literal matchers. So are negative numbers (which are technically, per the grammar, expressions - an unary minus followed by a numeric literal).
+
+[16:37:19.0017] <tabatkins>
+And yes, regex literals can nest just like anything else can.
+
+[16:38:12.0417] <tabatkins>
+Adding new literal patterns is compat-risky, yeah, but it's compat-risky to add new literals to JS *at all*, for exactly the same reasons.
+
+[16:39:09.0292] <tabatkins>
+If JS tomorrow decided it wanted to add `SuperInfinity` as a new numeric literal, we'd have to do compat analysis to see if that's already used as a variable/function/etc name enough to be problematic.
+
