@@ -824,3 +824,39 @@ the proposal is about syntactic call or bind, which requires there be an actual 
 [14:08:43.0001] <ljharb>
  * the proposal is about syntactic call or bind, which requires there be an actual receiver-sensitive function present in scope first. whether that function came from a data property or a getter is irrelevant.
 
+[14:11:16.0261] <TabAtkins>
+I can try to explain it again? `a.b()` is a method call; `a::b()` is a faked method call, where `b` is an arbitrary function; it desugars to `b.call(a)`. Similarly, `a.b` is property access, but can also be getter/setter invocation if `a.b` is set up appropriately; my proposal is making `a::b` possibly to be a faked getter/setter, where `b` is an arbitrary object advertising some get/set behavior (likely thru a Symbol property); it desugars to `b[Symbol.bindGet](a)`
+
+[14:11:33.0034] <ljharb>
+right but that's still what i don't understand
+
+[14:11:40.0966] <ljharb>
+it's not actually a faked method call
+
+[14:11:43.0759] <ljharb>
+it's sugar for `.call`
+
+[14:11:48.0861] <ljharb>
+which requires a reified function
+
+[14:12:36.0629] <ljharb>
+and i also don't understand how the symbol protocol would play in, nor what actual use case motivates it
+
+[14:12:48.0547] <TabAtkins>
+Yes, under the covers it's `.call` sugar. But in *practice* it's a fake method call. That's the whole purpose of doing things like `const map = Array.prototype.map; foo::map(...)`; it lets you *pretend* that an arbitrary `foo` object has a `map()` method, without actually having to install a property on the `foo` object at all.
+
+[14:13:11.0849] <ljharb>
+sure, ok - and getters are methods too. you can do the same thing by extracting the getter and using .call or `::`
+
+[14:13:41.0065] <ljharb>
+adding a new symbol protocol is a lot of overhead, and encouraging/endorsing use of getters and setters is an ideological position i'm not understanding why we'd want to take
+
+[14:14:29.0409] <TabAtkins>
+"getters are methods too" yeah and they're invoked by `a.b`. So just like `a::b()` is a way to fake `a.b()`, `a::b` as a way to fake `a.b` (the getter/setter) is what I"m talking about.
+
+[14:14:30.0277] <ljharb>
+it would also mean that `::` couldn't be transpiled into an actually robust check, because it'd have to do a runtime lookup for the presence of the protocol (altho to be fair transpiling it would still require a robust callBind abstraction)
+
+[14:14:57.0017] <ljharb>
+ * it would also mean that `::` couldn't be transpiled into an actually robust check, because it'd have to do a runtime lookup for the presence of the protocol (altho to be fair transpiling it would still require a robust callBind abstraction)
+
