@@ -860,3 +860,33 @@ it would also mean that `::` couldn't be transpiled into an actually robust chec
 [14:14:57.0017] <ljharb>
  * it would also mean that `::` couldn't be transpiled into an actually robust check, because it'd have to do a runtime lookup for the presence of the protocol (altho to be fair transpiling it would still require a robust callBind abstraction)
 
+[14:15:35.0075] <ljharb>
+so `a::b` and `a::c` would, depending on whether `a` had the Symbol method, invoke the same Symbol method with 'b' or 'c' depending?
+
+[14:15:46.0536] <TabAtkins>
+No, that's exactly the opposite. >_<
+
+[14:16:46.0876] <TabAtkins>
+The whole point of `a::b()` is that you can pretend `b` is a method of `a` *without `a` having to know anything about it*. This is the same - in `a::b`, it's the *`b`* that advertises it has get/set functionality, allowing you to use it on any object `a` without `a` having to know about it.
+
+[14:17:12.0984] <TabAtkins>
+(I've explained this both here and in the issue, and wrote a short code example showing it off.)
+
+[14:17:28.0143] <ljharb>
+i'm sorry that none of those explanations have made it clear to me, thanks for bearing with me
+
+[14:17:44.0239] <ljharb>
+ok so i have to have a `b` in scope, that has this symbol method defined on it, and then instead of doing `b.bind(a)` it calls the symbol method?
+
+[14:18:39.0885] <TabAtkins>
+Yeah. (This is obviously in conflict with using `a::b` as an unforgeable `b.bind(a)`.) This lets you use arbitrary "keys" or "properties" on an object without the object having to know how to deal with them.
+
+[14:19:00.0453] <TabAtkins>
+My first example was using a weakmap as an ephemeron key, but Ron's example of a Slice object applying to array-likes works just as well.
+
+[14:19:03.0786] <ljharb>
+ok so i think i understand the mechanics. but i definitely don't a) want to lose the critically important bind semantics, and b) i don't see any value in making anything about getters more ergonomic
+
+[14:19:35.0061] <ljharb>
+and while this shouldn't have much weight in language design, this would add a TON of weight to the transpiler emit for any usage of `::`, which would heavily discourage its use for many years
+
