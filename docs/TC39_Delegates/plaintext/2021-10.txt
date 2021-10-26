@@ -1529,3 +1529,32 @@ and toJson is for giving the objects being serialized control
 [02:59:24.0444] <bakkot>
 though, I guess a global well-known symbol means we'd be imposing a cost on all _existing_ serialization calls, which seems bad
 
+[03:01:38.0248] <shu>
+extra get per object in the graph to be stringified does seem bad
+
+[03:01:47.0170] <shu>
+though isn't that an issue even with a per-stringify symbol
+
+[03:02:46.0597] <bakkot>
+yeah
+
+[03:02:54.0437] <bakkot>
+not with an opaque object though!
+
+[03:03:29.0873] <shu>
+well, not an extra get but an extra slot check, which ought to be much cheaper, yes
+
+[03:03:37.0761] <bakkot>
+so, ok, here is an alternate possible design which I don't hate:
+
+add a new `JSON.rawString` which returns an opaque, frozen, null-prototype object with a new internal slot holding a string (which has been checked to be valid JSON - maybe even a valid JSON primitive?). this can be called by any code. if JSON.stringify encounters such an object, it serializes it to its internal slot
+
+[03:03:59.0955] <bakkot>
+then toJson can use this function, and revivers can as well
+
+[03:04:41.0174] <bakkot>
+basically just the "allow it to be not per-invocation" approach, but with internal slots instead of symbols
+
+[03:04:58.0652] <shu>
++1 from me. if the opaque object has gensym behavior it also complicates the performance of the slot check
+
