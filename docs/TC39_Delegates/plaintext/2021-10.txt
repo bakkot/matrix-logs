@@ -1648,3 +1648,78 @@ what do you do with isRawString
 [03:19:58.0906] <rbuckton>
 If you do custom serialization of any kind you need to know if the object you get in your custom serializer/replacer is this special exotic object or some other object.
 
+[03:20:35.0846] <nicolo-ribaudo>
+fwiw, in the R&T repository there has been a bunch of discussion about tagged strings (https://github.com/tc39/proposal-record-tuple/issues/258#issuecomment-947115796). This feels similar, since it's a string tagged with `JSON.rawString`.
+
+(we are not looking to include tagged strings in the R&T proposal)
+
+[03:20:49.0528] <devsnek>
+why do you need to know
+
+[03:20:53.0010] <nicolo-ribaudo>
+ * fwiw, in the R&T repository there has been a bunch of discussion about tagged strings (https://github.com/tc39/proposal-record-tuple/issues/258#issuecomment-947115796). This feels similar, since it's a string tagged with `JSON.rawString`.
+
+(we are not looking to include tagged strings in the R&T proposal)
+
+[03:21:55.0777] <devsnek>
+> <@nicolo-ribaudo:matrix.org> fwiw, in the R&T repository there has been a bunch of discussion about tagged strings (https://github.com/tc39/proposal-record-tuple/issues/258#issuecomment-947115796). This feels similar, since it's a string tagged with `JSON.rawString`.
+> 
+> (we are not looking to include tagged strings in the R&T proposal)
+
+this issue makes me very sad, previously we said that Box(v) should always work without you having to care what v is
+
+[03:22:25.0904] <rbuckton>
+A naive replacer might do:
+```js
+function serializer(value) {
+  if (typeof value === "object") {
+    if (Array.isArray) { ... }
+    const result = {};
+    for (const key in value) { ... } 
+    return result; // uh oh, we've replaced the exotic object with an empty normal object.
+  }
+  ...
+}
+```
+
+[03:22:51.0618] <rbuckton>
+If there's no way to test, you have to expect to pass through objects with no keys, which adds complexity.
+
+[03:23:08.0765] <bakkot>
+rbuckton: `JSON.isRawString = o => o && typeof o === 'object' && !(toJSON in o) && !['{', '['].includes(JSON.stringify(o))`
+
+[03:23:13.0692] <Michael Ficarra>
+> <@nicolo-ribaudo:matrix.org> fwiw, in the R&T repository there has been a bunch of discussion about tagged strings (https://github.com/tc39/proposal-record-tuple/issues/258#issuecomment-947115796). This feels similar, since it's a string tagged with `JSON.rawString`.
+> 
+> (we are not looking to include tagged strings in the R&T proposal)
+
+I really don't like attaching state to strings or any object in a way that is not only immediately consumed
+
+[03:23:36.0064] <Michael Ficarra>
+if we do that, we'd have to at least have a testing function like what Ron's talking about
+
+[03:23:57.0006] <Michael Ficarra>
+but then you force anyone using this feature to test anything that goes into their returned object
+
+[03:23:59.0872] <bakkot>
+> <@bakkot:matrix.org> rbuckton: `JSON.isRawString = o => o && typeof o === 'object' && !(toJSON in o) && !['{', '['].includes(JSON.stringify(o))`
+
+(assuming that `isRawString` enforces that its argument is a primitive JSON string or digit sequence)
+
+[03:24:05.0902] <rbuckton>
+The upside of a symbol is its something you can check for.
+
+[03:24:09.0259] <bakkot>
+(to be clear, not saying this is great, just saying that it's possible-ish without a new function)
+
+[03:24:25.0076] <nicolo-ribaudo>
+> <@bakkot:matrix.org> rbuckton: `JSON.isRawString = o => o && typeof o === 'object' && !(toJSON in o) && !['{', '['].includes(JSON.stringify(o))`
+
+A `JSON.rawString("{}")` would be observabily the same as `Object.freeze({ __proto__: null })`
+
+[03:24:47.0271] <rbuckton>
+bakkot: So, your suggestion is to JSON.stringify an arbitrarily complex/large object that may have its own nested toJSON just to check for an exotic raw string object?
+
+[03:24:56.0523] <bakkot>
+nicolo-ribaudo: "assuming that isRawString enforces that its argument is a primitive JSON string or digit sequence"
+
