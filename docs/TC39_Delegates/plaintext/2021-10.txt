@@ -1401,3 +1401,76 @@ you don't
 [02:49:39.0045] <Michael Ficarra>
 is the value of the slot fresh?
 
+[02:50:08.0564] <devsnek>
+oh you mean per-invocation
+
+[02:50:28.0599] <devsnek>
+in terms of spec language you could say its `{[[Index]]: n, [[String]]: s}`
+
+[02:50:48.0056] <devsnek>
+and expect that index back
+
+[02:50:55.0002] <devsnek>
+or you could expect the whole object i guess
+
+[02:50:57.0873] <devsnek>
+cuz it has identity
+
+[02:52:14.0216] <bakkot>
+Michael Ficarra: you can't ensure they don't escape, but like devsnek says you have a field which indicates which invocation it is
+
+[02:52:25.0301] <bakkot>
+s/field/internal slot/
+
+[02:52:28.0336] <shu>
+> <@bakkot:matrix.org> syg: right now, JSON.stringify of an object without a `toString` is guaranteed to do the thing you expect absent a reviver, but if the symbol is shared that's no longer true
+
+is that something that's generally depended upon?
+
+[02:52:41.0243] <devsnek>
+```js
+let thing;
+let raw = (v) => {
+  thing = { v };
+  return thing;
+};
+const result = callback(key, value, { raw });
+if (thing && result === thing) {
+```
+
+[02:52:48.0816] <Michael Ficarra>
+okay I mean a counter is just a fresh value, so I'm fine with that
+
+[02:52:55.0095] <shu>
+like, wouldn't the new guidance be "here's another hook we need, if you hook into it, well, you get hook behavior"
+
+[02:52:55.0098] <bakkot>
+and stringify encounters an object with this slot holding a different value than for the current invocation it can throw
+
+[02:53:03.0030] <devsnek>
+what happens if you call raw multiple times in one callback
+
+[02:53:05.0811] <bakkot>
+ * and stringify encounters an object with this slot holding a different value than for the current invocation it can throw
+
+[02:53:14.0277] <Michael Ficarra>
+devsnek: same index
+
+[02:53:15.0893] <devsnek>
+i feel like that should work, you could compose a sub-object
+
+[02:53:45.0596] <nicolo-ribaudo>
+Tbh I would expect the argument to `raw` to always be a string
+
+[02:53:48.0879] <nicolo-ribaudo>
+Otherwise it's not raw
+
+[02:53:54.0446] <devsnek>
+no i mean like
+
+[02:54:16.0910] <devsnek>
+`(key, value, { raw }) => ({ a: raw(foo), b: raw(bar) })`
+
+[02:54:32.0225] <nicolo-ribaudo>
+uh ok, that makes sense
+
