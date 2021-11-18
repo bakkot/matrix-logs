@@ -131,3 +131,45 @@ local GCs defer sweeping local objects in an ephemeron edge with a shared object
 [11:29:48.0470] <shu>
 when the shared GC happens, process shared ephemeron edges
 
+[11:30:59.0509] <Mathieu Hofman>
+right, you're basically getting into collaborative gc territory ;) Being able to trace exits to other gc from a local ephemeron is basically the crux of my idea
+
+[11:31:08.0638] <shu>
+ah okay, cool
+
+[11:31:21.0075] <shu>
+i'm just thinking out loud that there might be a "good enough" implementation strategy that we can implement in the meantime
+
+[11:31:22.0169] <Mathieu Hofman>
+as a 3rd phase style
+
+[11:31:23.0997] <shu>
+without a huge performance cliff
+
+[11:31:33.0572] <shu>
+until we get a shared heap architecture
+
+[11:32:24.0199] <Mathieu Hofman>
+And introducing a reification of that mechanism is what my proposal hoped to accomplish. I just haven't had time to work on it in the past couple years
+
+[11:32:38.0156] <shu>
+so i'm cautiously optimistically now changing my position to: we'll allow these in WeakCollections, and we can probably implement it, but it'll likely be not as fast as you'd like and you'll incur some GC pause penalty if you heavily use shared structs in WeakMaps
+
+[11:32:56.0712] <shu>
+but the GC pause penalty won't be catastrophic
+
+[11:33:21.0070] <shu>
+(i'm cautiously optimistic because the ephemeron collection is already a separate phase and already complicated, so why not tack on more? :P)
+
+[11:33:41.0781] <Mathieu Hofman>
+yeah the drawback is that it might take a much longer time to figure out distributed cycles, but the pause can be made so that it's not worse than a regular local gc
+
+[11:34:01.0773] <shu>
+right, it'll definitely take longer for shared structs to get collected from weak collections
+
+[11:34:15.0615] <shu>
+because shared structs will be collected at a lower frequency, period, until rearchitected to a single heap
+
+[11:34:58.0109] <shu>
+but this matches well with my intuition that JS is still staunchly "single-threaded first", and we're carving out multithreading here as explicit opt-ins with its own caveats
+
