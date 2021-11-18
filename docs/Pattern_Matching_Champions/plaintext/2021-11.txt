@@ -441,3 +441,71 @@ Except C# has a `Deconstruct` method that it uses for extraction (so syntax+prot
 [10:39:55.0902] <rbuckton>
  * Except C# has a `Deconstruct` method that it uses for extraction (so syntax+protocol)
 
+
+2021-11-18
+[17:40:23.0443] <Jack Works>
+> <@rbuckton:matrix.org> I've amended the proposal to align more with scala extractor objects (i.e., no built-in instanceof check, renamed `@@destructure` to `@@unapply` and moved it off the instance and onto the _QualifiedName_, dropped `QualifiedName{x,y}` and only have `QualifiedName(x)`). There's plenty of places I could see this being useful as it allows you to apply custom logic during destructuring:
+> ```js
+> const MapExtractor = {
+>   [Symbol.unapply](value) { 
+>     const obj = {};
+>     for (const [key, value] of map) {
+>       obj[typeof key === "symbol" ? key : `${key}`] = value;
+>     }
+>     return [obj];
+>   }
+> }
+> 
+> const obj = {
+>   map: new Map().set("a", 1).set("b", 2)
+> };
+> 
+> const { map: MapExtractor({ a, b }) } = obj;
+> ```
+> 
+> The ability to evaluate custom logic in the middle of a destructuring is something I've often wanted.
+
+If you dropped the {} form, how it works with ADT objects? Match on the 1st argument? That creates a syntax irsymmetry
+
+[17:42:44.0125] <Jack Works>
+> <@rbuckton:matrix.org> Also, `@@unapply` isn't too different from `@@matcher`. An `@@unapply` method could just return null/undefined in place of a `matched` property, and instead of `^Expr as { x, y }` you would use `Expr({ x, y})`
+
+So why not merging them? 
+
+[17:42:48.0070] <rbuckton>
+There's no syntax asymmetry for usage/extraction:
+
+```js
+enum Message of ADT {
+   Move{x, y},
+}
+
+const msg = Message.Move({ x: 1, y: 1 });
+const Message.Move({ x, y }) = msg;
+```
+
+[17:44:03.0541] <rbuckton>
+It might even make sense to drop `PropertyName{x, y}` from ADT enums in favor of `PropertyName({x, y})` for declaration symmetry
+
+[17:44:32.0293] <rbuckton>
+```js
+enum Message of ADT {
+  Write(message),
+  Move({ x, y })
+}
+```
+
+[17:44:33.0450] <Jack Works>
+> <@rbuckton:matrix.org> There's no syntax asymmetry for usage/extraction:
+> 
+> ```js
+> enum Message of ADT {
+>    Move{x, y},
+> }
+> 
+> const msg = Message.Move({ x: 1, y: 1 });
+> const Message.Move({ x, y }) = msg;
+> ```
+
+Hmm this is interesting. I was thinking of the definition body in the Enum and deconstruction syntax is asymmerty
+
