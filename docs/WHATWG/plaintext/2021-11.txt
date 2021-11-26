@@ -1986,3 +1986,13 @@ You're right, there's no way for a TransformStream to observe cancel or abort on
 [09:10:50.0034] <jgraham>
 annevk: Yeah that's kind of what I planned to do and then when it came to writing it turned out to be hard to reason about how precise one needs to be when this is interacting with existing specs to avoid breaking their models/invariants. Usually the answer is "everything needs to be precise, but here it's more like "you need to look like you're doing something reputable from the outside, whilst furiously handwaving the internals". So I think that's been pushing me towards something that looks more like a "real" definition, but maybe it's not actually helping :)
 
+[10:01:12.0741] <Jim Pryor>
+Mattias Buelens: I've seen this in some code with nodestreams too. The scenario is, you have some outside-supplied readable stream (may be the readable end of a pipeline), that you want to observe and/or catch errors in. With node streams, I've seen code do `stream.pipeline(suppliedStream, new stream.PassThrough (), callback)` in order to catch errors raised by the supplied stream. I guess we're close to being able to do the same with webstreams, something like `suppliedStream.pipeThrough(new IdentityTransform()).catch(callback)`. Only issue is that `pipeThrough` returns the readable end of the TransformStream, instead of a promise. Whereas `pipeTo` provides a promise, but expects a writable destination.
+
+[10:01:14.0186] <Jim Pryor>
+I guess what we'd have to do is: `function installCallback(suppliedStream: ReadableStream, callback): ReadableStream { const t = new TransformStream(); suppliedStream.pipeTo(t.writable).catch(callback); return t.readable; }`
+
+
+[10:04:40.0171] <Jim Pryor>
+Thanks, was helpful to talk this through.
+
