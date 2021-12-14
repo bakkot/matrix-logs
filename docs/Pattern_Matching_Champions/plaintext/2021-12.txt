@@ -163,3 +163,662 @@ No, a throw would just throw, same as anything else
 [19:25:19.0340] <ljharb>
 Promises are plenty magical try/catch for one language tyvm
 
+[14:04:57.0712] <TabAtkins>
+yup, throw just percolates up as normal
+
+
+2021-12-10
+[10:36:10.0554] <TabAtkins>
+ljharb: Before I post in issue 216 (about caching) - our intention is that Gets are cached by path, right? So a `when({a, b}) ...; when({a}) ...;` will only result in `matchable.a` being observably retrieved a single time?
+
+[10:38:18.0571] <TabAtkins>
+The OP of the thread, as far as I can tell, is interpreting the caching behavior as caching by object identity (of the matchable compared to the array matcher) only, so we'll still retrieve properties multiple times, but the same iterator fetched in two different ways will cache across instances.
+
+[10:39:32.0915] <TabAtkins>
+So:
+```js
+const log = console.log;
+const foo = {iter1: (function* () { log("1"); yield 1; log("2"); yield 2; log("3");yield 3; })};
+foo.iter2 = foo.iter1;
+match(foo) {
+ when({iter1: [a]}) log("this fails to match, due to length check");
+ when({iter2: [a,b,c]}) log("matches, with 1, 2, 3");
+}
+```
+
+[10:39:39.0443] <TabAtkins>
+ * So:
+```js
+const foo = {iter1: (function* () { yield 1; yield 2; yield 3; })};
+foo.iter2 = foo.iter1;
+```
+
+[10:42:02.0849] <TabAtkins>
+ * So:
+```js
+const log = console.log;
+const foo = {iter1: (function* () { log("1"); yield 1; log("2"); yield 2; log("3");yield 3; })};
+foo.iter2 = foo.iter1;
+match(foo) {
+ when({iter1: [a]}) log("this fails to match, due to length check");
+ when({iter2: [a,b,c]}) log("matches, with 1, 2, 3");
+}
+```
+
+[10:42:25.0730] <TabAtkins>
+will result in logging "1", "2", "3", then the "matches, with 1, 2, 3" message.
+
+[10:44:00.0070] <TabAtkins>
+In what I assumed we were leaning towards (caching by path), the two would be considered separate, so we'd cache their results separately, and both would fail; the second because the iterator only has a single item left in it.
+
+[10:44:03.0146] <ljharb>
+oh, no it’d be both
+
+[10:44:12.0440] <ljharb>
+caching the object, and also the propertykey
+
+[10:44:29.0043] <ljharb>
+iow you should see only one Get for any property name, ideally 
+
+[10:45:12.0626] <TabAtkins>
+sure. by "both", do you mean we *also* cache iterators themselves, so if the same iterator is accessed via multiple paths it reuses the cached results (as in the example I gave)?
+
+[10:45:55.0964] <ljharb>
+if the access is done by a pattern yes
+
+[10:46:40.0597] <ljharb>
+not if they it.next() themselves tho, that’s just one the match will “miss”
+
+[10:46:53.0635] <TabAtkins>
+yeah def, that's not in question
+
+[10:47:27.0782] <ljharb>
+I’m undecided about whether an inner match can share the cache of an outer match, but i think probably not?
+
+[10:47:41.0924] <TabAtkins>
+okay so this implies two separate caching mechanism, one that caches iterators specifically as {iterator => [items]} and another that's {(object, key) => item} for property access?
+
+[10:47:54.0499] <ljharb>
+yes, exactly.
+
+[10:48:02.0300] <TabAtkins>
+Okay, cool.
+
+[10:48:48.0974] <ljharb>
+object caching is not a necessity, it’s just a nicety to increase determinism and reduce observability. But iterator caching is a necessity because otherwise matching on an iterator is useless
+
+[10:50:03.0873] <TabAtkins>
+yeah, just wasn't sure if the iterator caching was being done *solely* thru paths, or by object identity of the thing we're matching against an array matcher
+
+[10:50:37.0958] <TabAtkins>
+if it was solely thru paths, then my code above would throw, since neither would match; it wouldn't recognize the iterator was the same both times.
+
+[10:50:51.0245] <ljharb>
+right, a good thing to clarify 
+
+[10:51:11.0725] <TabAtkins>
+I'm writing a comment with this right now; I'll let you review it after posting before I fold it into the README
+
+[10:56:39.0632] <TabAtkins>
+k, https://github.com/tc39/proposal-pattern-matching/issues/216#issuecomment-991216880
+
+[11:01:02.0765] <TabAtkins>
+did we decide on an error to throw for lack of match?
+
+[11:14:58.0231] <ljharb>
+We didn’t. TypeError is the generic choice here; RangeError would be whimsically appropriate; there’s not really another builtin error type that would fit, and making a new one is probably unwarranted
+
+[11:16:27.0973] <mpcsh>
++1 for TypeError - in languages with ADTs, you're often concerned about covering every <del>case</del> variant of an enum type; that's the intuition for me here too
+
+[11:16:39.0453] <mpcsh>
+ * +1 for type error - in languages with ADTs, you're often concerned about covering every ~case~ variant of an enum type; that's the intuition for me here too
+
+[11:16:46.0696] <mpcsh>
+ * +1 for type error - in languages with ADTs, you're often concerned about covering every ~~case~~ variant of an enum type; that's the intuition for me here too
+
+[11:16:57.0463] <mpcsh>
+ * +1 for type error - in languages with ADTs, you're often concerned about covering every <del>case</del> variant of an enum type; that's the intuition for me here too
+
+[11:19:24.0372] <mpcsh>
+ * +1 for TypeError - in languages with ADTs, you're often concerned about covering every <del>case</del> variant of an enum type; that's the intuition for me here too
+
+[11:25:10.0851] <TabAtkins>
+works for me
+
+[12:58:00.0681] <TabAtkins>
+Writing more examples for the README makes me really think we might want a separator between the LHS and RHS.
+
+[14:38:51.0072] <TabAtkins>
+All right, I think the README is up-to-date with our decisions, and has all the discussed future extensions catalogued as well.
+
+[15:19:05.0249] <rbuckton>
+> <@tabatkins:matrix.org> Writing more examples for the README makes me really think we might want a separator between the LHS and RHS.
+
+Looking at it, I would agree. `:` or `=>` or `->` or something like it? I wasn't fond of `{}` as it was confusing when the result was an object literal, and `do {}` could give you block syntax if necessary. 
+
+[15:32:37.0910] <TabAtkins>
+We're rejecting => immediately because it suggests arrow function semantics we absolutely do not have, but : and -> are the leading two ideas, yeah
+
+[15:34:06.0795] <TabAtkins>
+Previous iterations used ->, which I rather like, but it's novel, prevents future usages (like adding type hints a la Python)
+
+[15:34:18.0550] <TabAtkins>
+: is quite possible, tho
+
+[15:36:19.0220] <TabAtkins>
+I feel like we should also come up with a name for the `when()` part, specifically
+
+[15:36:58.0703] <ljharb>
+"the LHS of the matcher clause" could be more succinct, i suppose
+
+[15:37:15.0609] <ljharb>
+"the when" works too
+
+[15:40:55.0388] <TabAtkins>
+Yeah I mean specifically the when part, not guards or else
+
+[15:41:24.0426] <TabAtkins>
+I have to talk about it a little in the readme, and it's awkward
+
+[15:41:39.0610] <TabAtkins>
+Fine with clause LHS for the whole thing
+
+
+2021-12-11
+[16:35:49.0480] <rbuckton>
+Had a silly thought, based on the extractor object idea: `if-let` and `let-in` as an alternative to `match-when`:
+```js
+let x =
+  if let { statusCode: 200, body } in expr(body) 
+```
+
+[16:36:12.0781] <mpcsh>
+rust does that
+
+[16:36:20.0049] <mpcsh>
+https://doc.rust-lang.org/rust-by-example/flow_control/if_let.html
+
+[16:36:40.0255] <mpcsh>
+I think it's useful, but not an alternative
+
+[18:22:31.0406] <Jack Works>
+how to do computed property key matching?
+
+[18:22:54.0251] <Jack Works>
+```js
+when ({ [expr]: 1 })
+when ({ [${expr}]: 1 })
+```
+
+[18:22:57.0372] <Jack Works>
+which one?
+
+[18:35:01.0748] <ljharb>
+Jack Works: it’d have to be the second one, unless it’s a string literal
+
+[18:42:29.0628] <mpcsh>
+is that worth opening an issue for? my gut instinct was the second way, but that'd diverge from destructuring... I don't see why we couldn't have the first way?
+
+[19:24:00.0887] <rbuckton>
+Won't `${` step on possible syntax space? I'd like to bring extractor objects to committee next year, and it would conflict because $ is a valid identifier
+
+[19:25:37.0006] <rbuckton>
+* Won't `${` step on possible syntax space? I'd like to bring extractor objects to committee next year, and it would conflict because $ is a valid identifier
+
+[19:58:45.0126] <ljharb>
+> <@mpcsh_:matrix.org> is that worth opening an issue for? my gut instinct was the second way, but that'd diverge from destructuring... I don't see why we couldn't have the first way?
+
+i think it’d be very confusing if anything in pattern space had expression semantics outside of the placeholder syntax
+
+[19:59:11.0761] <ljharb>
+> <@rbuckton:matrix.org> Won't `${` step on possible syntax space? I'd like to bring extractor objects to committee next year, and it would conflict because $ is a valid identifier
+
+an identifier can’t appear directly before a curly brace, so there shouldn’t be any issue.
+
+[20:01:14.0114] <mpcsh>
+> <@ljharb:matrix.org> i think it’d be very confusing if anything in pattern space had expression semantics outside of the placeholder syntax
+
+I mostly agree, but isn't there a corresponding argument that confusion can arise wherever patterns and destructuring diverge?
+
+[20:05:25.0865] <ljharb>
+sure, but this particular one already exists because computed keys in destructuring require colon-renaming, which we don’t have i think?
+
+[20:06:02.0114] <mpcsh>
+oh
+
+[20:06:25.0315] <mpcsh>
+yknow I don't think I've ever used computed properties in destructuring
+
+[20:06:28.0285] <mpcsh>
+so that makes sense
+
+[21:05:06.0867] <Jack Works>
+Another problem. 
+
+[21:05:38.0187] <Jack Works>
+when (x) is an ir???(how to spell that word)? match
+
+[21:06:08.0238] <mpcsh>
+> <@jackworks:matrix.org> when (x) is an ir???(how to spell that word)? match
+
+irrefutable. though in my current revision to the README I'm starting to call that an "identifier pattern" instead
+
+[21:06:50.0926] <Jack Works>
+But it only holds for the default match case (when you're in the last clause and want to catch the binding). (It also serve for the removed "as")
+
+[21:06:51.0405] <rbuckton>
+> <@ljharb:matrix.org> an identifier can’t appear directly before a curly brace, so there shouldn’t be any issue.
+
+Identifier before curly brace is part of that proposal, however.
+
+[21:07:46.0086] <ljharb>
+then that would obviously conflict, yes.
+
+[21:08:09.0931] <ljharb>
+but I’m immediately skeptical about that being part of a proposal regardless, to be honest
+
+[21:08:27.0508] <Jack Works>
+I think the current semantics of  "when(identifier)" doesn't worth this concise syntax.
+Maybe we should use "when (identifier)" for Matchables because that will be more important. 
+
+[21:08:34.0191] <mpcsh>
+> <@jackworks:matrix.org> But it only holds for the default match case (when you're in the last clause and want to catch the binding). (It also serve for the removed "as")
+
+what "only holds"? (I'm confused what "it" refers to)
+
+[21:09:20.0123] <Jack Works>
+E.g. "when(identifier)" should means calling identifier@@matcher(val)
+
+[21:10:02.0584] <Jack Works>
+That will be more useful than an irrefutable match
+
+[21:10:24.0168] <ljharb>
+i definitely don’t agree custom matchers are more important 
+
+[21:10:46.0683] <ljharb>
+and irrefutable matcher are strictly required for object values and array values
+
+[21:10:55.0286] <mpcsh>
+agree with Jordan. I would block the proposal myself if we did that. identifier patterns are a hard necessity inside of object / array patterns; disallowing them at the top level would be really inconsistent
+
+[21:10:56.0068] <ljharb>
+and they should mean the same thing nested as at the top
+
+[21:11:23.0657] <mpcsh>
+ * agree with Jordan. I would block the proposal myself if we did that. identifier patterns are a hard necessity inside of object / array patterns; disallowing them at the top level would be really inconsistent
+
+[21:11:24.0184] <ljharb>
+(I’m pretty sure we’ve been over this in multiple champion group calls in the beginning)
+
+[21:11:37.0643] <Jack Works>
+I only want to change the top level irrefutable match, not doing anything with Array / object pattern
+
+[21:11:42.0645] <ljharb>
+but even in general, i think custom matchers will be an element minority of use cases
+
+[21:11:56.0877] <ljharb>
+> <@jackworks:matrix.org> I only want to change the top level irrefutable match, not doing anything with Array / object pattern
+
+Jack Works: right, that inconsistency would be unacceptable
+
+[21:12:01.0675] <mpcsh>
+> <@ljharb:matrix.org> (I’m pretty sure we’ve been over this in multiple champion group calls in the beginning)
+
+yes, we had strong consensus that top-level identifier patterns must be allowed for consistency
+
+[21:12:05.0155] <ljharb>
+they need to be the same at the top or nested.
+
+[21:12:41.0992] <Jack Works>
+Ok, I agree with the consistency argument
+
+[21:13:42.0416] <Jack Works>
+But I still think top level irrefutable match doesn't worth the current syntax. It can be more useful if we agree some inconsistent
+
+[21:13:55.0821] <ljharb>
+i don’t think it would be more useful 
+
+[21:14:07.0082] <ljharb>
+custom matchers are very likely to be the minority imo
+
+[21:14:30.0493] <ljharb>
+and it’s very important for folks ability to learn how nested patterns work by seeing how top-level ones work
+
+[21:14:50.0338] <mpcsh>
+even disregarding majority/minority, we're talking about three keystrokes - `identifier` vs `${identifier}`. I think it would be an egregious sin of language design to violate consistency here
+
+[21:14:52.0417] <Jack Works>
+> <@ljharb:matrix.org> custom matchers are very likely to be the minority imo
+
+I don't think so, I expect library developers will use this feature to create expressive matchers
+
+[21:15:04.0987] <mpcsh>
+arguing which will be more common is a red herring imo
+
+[21:15:07.0897] <ljharb>
+they might. But that doesn’t mean that’ll be the majority use case by language users.
+
+[21:15:48.0058] <ljharb>
+i agree we can’t come to any objective agreement over what will be more common :-) I’m illustrating that there’s strong disagreement about our predictions, which means we shouldn’t be designing based on them
+
+[21:16:04.0885] <ljharb>
+and thus consistency should win out, as opposed to subjective ideas of usefulness
+
+[21:16:21.0481] <ljharb>
+* and thus consistency should win out, as opposed to subjective ideas of usefulness
+
+[21:16:24.0064] <mpcsh>
+I would honestly block the proposal even if we expected custom matchers to be the 99% use-case. we have an explicit delineation right now: anything outside `${}` is pattern mode, anything inside is expression mode. I think it would be a downright travesty to break that delineation. pattern matching is already conceptually hard, we shouldn't make it harder
+
+[21:17:05.0144] <ljharb>
+remember that code is read far more often than it’s written; compared to how simple it is to read and understand, it is *unimportant* how easy it is to write
+
+[21:18:33.0054] <Jack Works>
+> <@mpcsh_:matrix.org> I would honestly block the proposal even if we expected custom matchers to be the 99% use-case. we have an explicit delineation right now: anything outside `${}` is pattern mode, anything inside is expression mode. I think it would be a downright travesty to break that delineation. pattern matching is already conceptually hard, we shouldn't make it harder
+
+I don't mean custom matcher will be majority and normal matching is minority. I think they're equally important (and normal matching wins a little bit on the importancy IMO).
+
+[21:21:59.0399] <Jack Works>
+So... Except this problem, what about "when (identifier(binding, binding2))"? The unapply syntax. It is not a valid destructing pattern, can we use it for custom matcher? 
+
+[21:22:54.0342] <mpcsh>
+is the idea that `when (identifier(binding, binding2))`, as you wrote, would be equivalent to `when (${identifier} with [binding, binding2])` in the current syntax?
+
+[21:23:37.0001] <Jack Works>
+Yes I guess
+
+[21:23:52.0898] <ljharb>
+I’m not sure why that sugar would be worth the complexity 
+
+[21:24:14.0750] <ljharb>
+especially if identifier isn’t a function - it’d be very confusing to use syntax that suggests it’s a function being called 
+
+[21:24:54.0491] <Jack Works>
+Or if we have the unapply proposal, it will also in the deconstruction syntax and we can have it in pattern matching? 
+
+[21:25:38.0589] <mpcsh>
+yeah Jack I agree with your motivation - I think `with` is a little painful but I don't think we have another option besides hoping for Ron's extractor objects proposal
+
+[21:25:50.0012] <mpcsh>
+this proposal is already _so_ big
+
+[21:25:58.0665] <ljharb>
+i would expect any kind of unapply proposal to advance only if it worked well with existing proposals, including this one
+
+[21:26:29.0013] <ljharb>
+but since there’s no actual proposal yet, at any stage, it’s not super useful to speculate on how it’d work
+
+[21:34:17.0781] <Jack Works>
+Does the readme reflect the latest consensus? I want to review the whole proposal again, I see it last commit is 1 minute ago 👀 or is it WIP and I shall wait
+
+[21:34:37.0572] <Jack Works>
+* Does the readme reflect the latest consensus? I want to review the whole proposal again, I see it last commit is 1 minute ago 👀 or is it WIP and I shall wait
+
+[21:35:20.0578] <mpcsh>
+I'd say call it a WIP. I'm trying to pare it down and make it easier to read so might as well wait and review it after that
+
+[21:38:25.0776] <rbuckton>
+> <@ljharb:matrix.org> but I’m immediately skeptical about that being part of a proposal regardless, to be honest
+
+My point is that, extractors or not, using `${` would carve out an entire swath of syntax space since it would prevent identifiers from being used there, which would be unfortunate. 
+
+[21:39:16.0756] <mpcsh>
+I'm definitely sympathetic to that but I think the opportunity to align with existing dev knowledge around expression mode in template literals (which is the exact same thing) is too good to pass up
+
+[21:42:06.0157] <rbuckton>
+Especially when `()` might be sufficient to break out of declaration/pattern territory on its own. `when((expr))` might seem redundant, but it's one char shorter than `when(${expr})` and doesn't lock up `id{`
+
+[21:42:21.0677] <mpcsh>
+(really, I think it's unfortunate that `$` was ever allowed to be a literal 😂)
+
+[21:43:05.0827] <mpcsh>
+> <@rbuckton:matrix.org> Especially when `()` might be sufficient to break out of declaration/pattern territory on its own. `when((expr))` might seem redundant, but it's one char shorter than `when(${expr})` and doesn't lock up `id{`
+
+this was actually the first incarnation but it was rejected universally by everyone in the champions group for being too subtle
+
+[21:44:05.0603] <ljharb>
+if it helps, i don’t think I’d ever be on board with an actual identifier followed by a curly brace, for any proposal (unrelated to pattern matching)
+
+[21:44:17.0173] <rbuckton>
+I'd much prefer a different sigil than `$`, regardless of its precedence in template literals. It's precedence as an ID is much older. 
+
+[21:44:26.0835] <ljharb>
+* if it helps, i don’t think I’d ever be on board with an actual identifier followed by a curly brace, for any proposal (unrelated to pattern matching)
+
+[21:45:31.0323] <mpcsh>
+> <@rbuckton:matrix.org> I'd much prefer a different sigil than `$`, regardless of its precedence in template literals. It's precedence as an ID is much older.
+
+I don't really care about seniority though. `$` as an identifier is bad DX; `${}` in template literals is good DX
+
+[21:45:38.0638] <rbuckton>
+And I really do believe that there is a future for ADT enum and extractors in JS, and that could fall apart if `id{` is disallowed because of `${`
+
+
+[21:46:01.0140] <mpcsh>
+(I'm not making an argument one way or another, I'm just saying that your beef shouldn't be with pattern matching, it should be with the identifier grammar)
+
+[21:47:13.0378] <rbuckton>
+> <@mpcsh_:matrix.org> I don't really care about seniority though. `$` as an identifier is bad DX; `${}` in template literals is good DX
+
+That didn't stop ljharb from being strongly against using `$` as a topic in pipeline for the exact same reason, not trodding on identifier space
+
+[21:47:50.0105] <rbuckton>
+The identifier grammar isn't going to change, though. This can
+
+[21:50:13.0643] <ljharb>
+tbh i wouldn’t have used $ in template literals, because it’s an identifier, but that ship sailed before i was on tc39
+
+[21:50:46.0470] <rbuckton>
+I find `match (x) when (Move{x, y})` to be much more appealing than having  `${` as opposed to another sigil
+
+[21:51:22.0479] <mpcsh>
+> <@rbuckton:matrix.org> And I really do believe that there is a future for ADT enum and extractors in JS, and that could fall apart if `id{` is disallowed because of `${`
+
+but this ^ is the entire argument that we shouldn't use the good DX option here, and I don't really buy it - `Move.{x, y}`, `Move<-{x, y}`, `Move@{x, y}`...
+
+[21:51:40.0115] <ljharb>
+imo `Move{` is super ugly and i would never want a feature that made that possible
+
+[21:51:45.0281] <rbuckton>
+Worst case, I revert extractors to be iterator-only, but I was convinced by conversations in this channel to more broadly support regular destructuring as well. 
+
+[21:52:05.0874] <ljharb>
+curly braces wrap things - a scope/block or an object literal. they don't modify what comes before them
+
+[21:52:42.0407] <rbuckton>
+> <@ljharb:matrix.org> imo `Move{` is super ugly and i would never want a feature that made that possible
+
+Have you tried using that in Rust? It is super useful there. 
+
+[21:53:04.0415] <ljharb>
+nope, i've never used rust. but the feature's usefulness is entirely unrelated to the aesthetics of the specific syntax
+
+[21:53:35.0119] <mpcsh>
+I think the canonical rust format (`rustfmt`) puts a space there which I don't think(?) we could do?
+
+[21:53:45.0855] <mpcsh>
+(and I think the version without a space would be really ugly in rust)
+
+[21:54:30.0702] <mpcsh>
+but also, rust has full-fat ADTs, I think we have to be careful about how much inspo we take from rust
+
+[21:54:32.0641] <rbuckton>
+I find the asthetics fairly pleasing, along with the duality of construction and extraction for ADT enums. 
+
+[21:54:36.0958] <mpcsh>
+(I say this as someone who uses & loves rust)
+
+[21:55:57.0267] <mpcsh>
+what about `:`? you could have your enum variants be `Move: {x, y}` and your extractor patterns be `Move:{x, y}`
+
+[21:56:15.0393] <ljharb>
+that already works as a labelled statement, in statement position
+
+[21:56:20.0597] <rbuckton>
+ADT enums for structures could be optimized by vms in ways normal objects can't (or at least, haven't yet). Checking type kind on an ADT enum could by monomorphic, which isn't currently possible for objects. 
+
+[21:57:31.0847] <rbuckton>
+The worst case I mentioned above would have been `Move({x, y}) = z`, which is an iterator destructuring
+
+[21:57:51.0522] <rbuckton>
+> <@mpcsh_:matrix.org> I think the canonical rust format (`rustfmt`) puts a space there which I don't think(?) we could do?
+
+Space would be fine
+
+[21:58:23.0186] <mpcsh>
+> <@rbuckton:matrix.org> Space would be fine
+
+does that just resolve the whole thing then?
+
+[21:58:25.0591] <ljharb>
+it'd have to be an NLTH tho
+
+[21:58:50.0615] <rbuckton>
+* The worst case I mentioned above would have been `Move({x, y}) = z`, which is an iterator destructuring
+
+[21:59:08.0333] <rbuckton>
+No, it wouldn't. 
+
+[21:59:30.0294] <rbuckton>
+Object destructuring already requires you to be in an expression context
+
+[21:59:45.0440] <mpcsh>
+I'd be fine with some carve-out like "inside a pattern, `${` is always treated as the interpolation operator; if a user wants to use an extractor pattern on an identifier named `$` they must use a space"
+
+[21:59:58.0137] <rbuckton>
+`{x} = y` is a syntax error
+
+[22:00:03.0079] <mpcsh>
+ * I'd be fine with some carve-out like "inside a pattern, `${` is always treated as the interpolation operator; if a user wants to use an extractor pattern on an identifier named `$` they must use a space"
+
+[22:00:23.0173] <rbuckton>
+`({x} = y)` is not
+
+[22:01:03.0388] <ljharb>
+oh this isn't an expression, it's a destructuring LHS?
+
+[22:01:10.0113] <rbuckton>
+So `(Move{x} = y)` would align and wouldn't require a NLT
+
+[22:01:19.0560] <rbuckton>
+Yes, it's a destructuring LHS
+
+[22:01:32.0926] <rbuckton>
+Which is why it matters to `when`
+
+[22:01:36.0836] <ljharb>
+someone could still type:
+```
+(Move
+{ x } = y)
+```
+tho
+
+[22:01:44.0898] <rbuckton>
+Yeah, not an issue
+
+[22:01:56.0769] <rbuckton>
+ASI won't trigger inside an expression
+
+[22:01:57.0956] <ljharb>
+maybe not in the grammar, but why should we permit someone to write that atrocity
+
+[22:02:28.0043] <rbuckton>
+Because some people like to put braces on a separate line. Not me, but some people
+
+[22:03:14.0130] <ljharb>
+sure but those people already have bugs in their code and violate every JS styleguide out there, they don't matter.
+
+[22:03:27.0300] <rbuckton>
+Which is why pattern matching was using something other than `match(x) {` before, because it requires the NLT and some didn't like that
+
+[22:03:33.0669] <ljharb>
+JS doesn't work with K&R or allman or whichever that is; it only really works with OTBS
+
+[22:03:55.0662] <rbuckton>
+> <@ljharb:matrix.org> sure but those people already have bugs in their code and violate every JS styleguide out there, they don't matter.
+
+Thats a very aggressive take
+
+[22:04:00.0300] <ljharb>
+i am aware
+
+[22:04:38.0810] <ljharb>
+but i'm not going to give consensus for something gross just to appease people that want an inappropriate brace style, just like the committee's already decided not to block something good just because it creates ASI hazards
+
+[22:04:47.0356] <mpcsh>
+I think we've lost sight of my original point a bit: using `${}` for interpolation doesn't _doom_ extractor patterns, at worst it introduces a token between the identifier and the pattern (which is arguably a bit worse, arguably a bit better). I see very little reason to abandon the fantastic DX and conceptual overlap that `${}` gives us
+
+[22:05:21.0660] <mpcsh>
+I'm with Ron here - those _people_ matter. maybe we don't care to further contort the JS spec to support that use case, but that's a very different statement
+
+[22:05:28.0266] <mpcsh>
+> <@ljharb:matrix.org> sure but those people already have bugs in their code and violate every JS styleguide out there, they don't matter.
+
+ * I'm with Ron here - those _people_ matter. maybe we don't care about further contorting JS spec to support that use case, but that's a very different statement
+
+[22:05:54.0056] <mpcsh>
+ * I'm with Ron here - those _people_ matter. maybe we don't care to further contort the JS spec to support that use case, but that's a very different statement
+
+[22:06:02.0714] <rbuckton>
+principle_skinner_its_the_children_who_are_wrong.jpeg
+
+[22:06:42.0472] <mpcsh>
+https://sailbo.at/out-of-touch.jpg
+
+[22:07:16.0757] <ljharb>
+> <@mpcsh_:matrix.org> I'm with Ron here - those _people_ matter. maybe we don't care to further contort the JS spec to support that use case, but that's a very different statement
+
+ok fair enough. the people do matter, which is why we shouldn't encourage their problematic style by bending over backwards to support it.
+
+[22:07:21.0342] <mpcsh>
+(check out sailbo.at - it's my old tech lead's personal meme dumpster and it's so good)
+
+[22:08:27.0664] <mpcsh>
+inspired: those people matter and we should guide them towards better practices through the spec, canonical examples, teaching materials, web platform docs, etc etc
+
+[22:09:03.0918] <ljharb>
+sure, that's fine too
+
+[22:09:25.0121] <ljharb>
+but guiding can be done with both a carrot and a nudge
+
+[22:09:38.0247] <ljharb>
+ps this just happened https://twitter.com/ljharb/status/1469549744343044098
+
+[22:09:58.0882] <mpcsh>
+F
+
+[22:10:14.0440] <rbuckton>
+Got to go, family time anyways
+
+[22:10:35.0519] <mpcsh>
+thanks for hacking through the weeds! enjoy 💜
+
+[23:15:11.0541] <Jack Works>
+🤔
+
+[01:30:59.0553] <mpcsh>
+ljharb I think our branch protection settings are conflicting with GH actions. looking at the logs it looks like everyone but you is getting a "cannot push to protected branch" when merging. probably not relevant until we're working on spec text but would be good to get a green build
+
+[01:31:25.0936] <mpcsh>
+ * ljharb I think our branch protection settings are conflicting with GH actions. looking at the logs it looks like everyone but you is getting a "cannot push to protected branch" when merging. probably not relevant until we're working on spec text but would be good to get a green build
+
+[01:32:05.0861] <mpcsh>
+sidebar, I like [temporal's approach](https://github.com/tc39/proposal-temporal/blob/main/.github/workflows/deploy.yml) of keeping rendered spec text on `gh-pages`
+
+[08:36:12.0234] <ljharb>
+hm, I’ll take a look
+
+[08:36:35.0863] <ljharb>
+i pretty intentionally chose not to use the gh-pages branch when building the repo template
+
+[13:42:58.0004] <ljharb>
+k i think i fixed the branch protections; we'll know the next time someone commits something that changes the spec file
+
+
+2021-12-13
+[23:57:14.0477] <ljharb>
+k, looks like they're not fixed yet. working on it.
+

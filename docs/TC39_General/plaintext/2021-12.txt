@@ -377,3 +377,107 @@ That’s fair. At least in this case “syntax” is just about as clear as “o
 [18:11:12.0518] <jschoi>
 * For what it’s worth, I do personally find value in distinguishing “things that combine expressions into expressions” (operators) from “things that don’t result in expressions” (not operators)—and I suspect that this distinction may have teaching value to learners too—but that’s my own intuition, and I am only one being of many, haha.
 
+[02:32:28.0356] <joepie91 🏳️‍🌈>
+I do agree that it's valuable to teach that distinction actually (I also tend to put a lot of focus on expression vs. statement in what I teach, for example), I'm just not sure that an operator reference is the right place :D
+
+[14:07:59.0773] <TabAtkins>
+Question ended up being moot, fwiw; I went with "interpolation pattern" instead.
+
+
+2021-12-09
+[09:44:05.0225] <devsnek>
+is there anyone security-minded from the v8 team i can dm real quick? shu maybe?
+
+[10:04:54.0607] <shu>
+i don't know if i'm security minded
+
+[10:05:00.0066] <shu>
+but sure, feel free to DM
+
+
+2021-12-10
+[14:54:27.0164] <jugglinmike>
+shu: Did you see https://github.com/tc39/proposal-resizablearraybuffer/pull/72#issuecomment-967323881 ?
+
+[15:04:34.0171] <shu>
+yes, i am just terribly behind
+
+[15:05:27.0751] <jugglinmike>
+Then say no more :)
+
+
+2021-12-12
+[09:13:05.0616] <Andreu Botella (he/they)>
+Hey. I was trying to understand the ShadowRealm proposal, and I noticed that the requirements for `HostResolveImportedModules` don't say anything about realms
+
+[09:13:36.0119] <Andreu Botella (he/they)>
+and IIUC the security properties of ShadowRealms need the realm to not share a module map with any other realms
+
+[09:13:57.0865] <Andreu Botella (he/they)>
+ * and IIUC the security properties of ShadowRealms need the realm to not share a module map with any other realms
+
+[09:27:11.0442] <Andreu Botella (he/they)>
+Also, the HTML spec's implementation of `HostResolveImportedModules` doesn't follow the requirements, since it always uses the current realm's module map, and if `referencingScriptOrModule` is `null`, that might result in different calls to that operation returning different module records
+
+[09:27:30.0027] <Andreu Botella (he/they)>
+I'd argue that's a bug with the TC39 spec
+
+[12:20:58.0632] <Mathieu Hofman>
+> <@andreubotella:mozilla.org> and IIUC the security properties of ShadowRealms need the realm to not share a module map with any other realms
+
+That is not my understanding. What made you think this? My recollection is that the shadow realms would share a module map, but would be keyed by realm. Cc leobalter 
+
+[12:24:27.0686] <Mathieu Hofman>
+I believe this is the issue where it was discussed: https://github.com/tc39/proposal-shadowrealm/issues/261
+
+[12:24:38.0722] <Mathieu Hofman>
+I think there is a related whatwg issue
+
+[12:27:14.0932] <Mathieu Hofman>
+I believe this comment on the integration PR: https://github.com/whatwg/html/pull/5339#issuecomment-874588585
+
+[12:28:18.0639] <Andreu Botella (he/they)>
+Thanks for those links, I hadn't been following the conversations and was trying to figure out how things worked purely from the spec proposal and how it interacts with the HTML spec as it is currently
+
+[12:28:57.0271] <Andreu Botella (he/they)>
+But my understanding was that, if a module is first instantiated in the parent realm, and then imported from a ShadowRealm, you could access the parent realm's intrinsic objects that way
+
+[12:29:04.0890] <Andreu Botella (he/they)>
+I don't think there's anything to stop that currently
+
+[12:36:34.0840] <Mathieu Hofman>
+Ah no, you don't get the same module instance. It's keyed on the realm. But the resolution is shared per document
+
+[12:37:25.0173] <Andreu Botella (he/they)>
+oh, so the actual fetch for a module script only happens once per document, but you have different module records per realm?
+
+[12:37:33.0145] <Mathieu Hofman>
+So you can observe with timing if the parent has the module in it's map, but you never directly share any objects
+
+[12:40:34.0704] <Andreu Botella (he/they)>
+But in that case, `HostResolveImportedModules` would still need to say something about realms
+
+[14:06:26.0017] <Andreu Botella (he/they)>
+I filed https://github.com/tc39/proposal-shadowrealm/issues/342
+
+
+2021-12-13
+[09:24:34.0777] <leobalter>
+Andreu Botella (he/they), Mathieu Hofman the understanding for the ES proposal and the HTML integration was to have the ShadowRealms reusing part of the modules resolution in the sense the loading and static parsing is done once for all Realms and runtime evaluation is done individually for each Realm (including ShadowRealms) when they "request" it. 
+
+So calling the Module Map the same or different depends if you - like me - use a web dev practicioner point of view. It's the same map for the io and static parsing (syntax errors might be caught earlier), but runtime evaluation is where the map splits per each ShadowRealm.
+
+[11:42:21.0255] <Andreu Botella (he/they)>
+leobalter: When I posted that, I wasn't very clear on the details of how the HTML integration had to happen, so thanks for the clarification. But the issue I filed doesn't mention module maps, which are an HTML spec concept – it mentions module records, which are tied to a realm.
+
+[11:43:50.0371] <Andreu Botella (he/they)>
+The issue is about how the hook requirements are not only insufficient for the security properties, but conflict with them. Though I haven't checked out the HTML integration PR yet, my understanding is that it gets around that by violating the requirements.
+
+[13:05:50.0551] <leobalter>
+Would you mind forwarding this to the github issue? I’m on pto and the github thread might help with an async discussion. Thanks!
+
+[13:45:09.0232] <Andreu Botella (he/they)>
+> <@leobalter:matrix.org> Would you mind forwarding this to the github issue? I’m on pto and the github thread might help with an async discussion. Thanks!
+
+I think the comments I've made on the github issue since then should be enough
+

@@ -55,3 +55,313 @@ Trying to unscope `with` is pretty meta.
 Ha! Yeah I only noticed because the find/replace method rename introduced a syntax error into the test https://github.com/tc39/proposal-change-array-by-copy/blob/77494051d1fca9f1ee878ae567f89e79af636609/polyfill.test.js#L135
 tdd spec writing ftw
 
+[06:57:47.0277] <nicolo-ribaudo>
+I uploaded a new version of the Records and Tuples slides, so if anyone already read them you might want to quickly read them again (I only changed the wording of some concepts, but the contents are the same; also, I flipped the "decision tree").
+
+[07:01:02.0146] <nicolo-ribaudo>
+ * I uploaded a new version of the Records and Tuples slides, so if anyone already read them you might want to quickly read them again (I only changed the wording of some concepts, but the contents are the same; also, I flipped the "decision tree").
+
+
+2021-12-09
+[08:22:53.0560] <Rob Palmer>
+The Ecma GA has acknowledged Aki  with an Ecma Recognition award for her contributions serving as Chair for three years  🎉
+
+[08:25:37.0700] <Rob Palmer>
+André Bargull was also acknowleged with an Ecma Recognition award for his contributions to the quality of the JavaScript language over 7 years  🎉
+
+[08:41:53.0674] <Rob Palmer>
+(thanks to Yulia for pulling together the evidence for these awards, and the contributors who passed on feedback)
+
+
+2021-12-12
+[09:05:12.0669] <ljharb>
+https://es.discourse.group/t/atomics-wait-waitasync-as-native-settimeout/1120 seems interesting; cc erights - would it maybe be possible to specify setTimeout in the language?
+
+[09:06:06.0860] <Jack Works>
+> <@ljharb:matrix.org> https://es.discourse.group/t/atomics-wait-waitasync-as-native-settimeout/1120 seems interesting; cc erights - would it maybe be possible to specify setTimeout in the language?
+
+I thought that idea was already rejected
+
+[09:08:28.0006] <Jack Works>
+This post is interesting but it requires SAB and worker (?) so it isn't so useful
+
+[09:19:14.0444] <ljharb>
+It doesn’t appear to require a worker
+
+[09:20:16.0563] <ljharb>
+it was rejected for a number of reasons, but one was that there’s no concept of time like this in the spec - but if Atomics.waitAsync already provided it - iow, if setTimeout can be polyfilled without using new Date/Date.now, and with only things in 262 - I’m not sure what the remaining reasons would be to reject it.
+
+[09:22:07.0586] <Jack Works>
+So his polyfill dont need current thread to be blockable? 
+
+[09:22:33.0626] <Jack Works>
+And is Atomics normative optional? 
+
+[09:24:25.0556] <bakkot>
+`waitAysnc` works on the main thread, yeah; that's the point of it
+
+[09:24:51.0376] <bakkot>
+and no, atomics is not normative optional
+
+[09:26:00.0502] <Jack Works>
+Hmm. SAB is normative optional and Atomics only works with SAB, is that true? 
+
+[09:30:44.0870] <bakkot>
+SAB is not exactly normative optional, though it's complicated
+
+[09:31:45.0878] <bakkot>
+the "SharedArrayBuffer" property of the global object is normative optional in hosts which do not provide multithreading, and that's the only built-in way to get access to a SAB in ES, but other hosts provide other mechanisms to get at it
+
+[09:32:12.0497] <bakkot>
+also the only reason we made that change was web-compat when everyone turned off SABs for a while because of spectre
+
+[09:34:53.0872] <Jack Works>
+Is there any case that SAB is not exposed on global but will be returned by a host API? 
+
+[09:35:31.0684] <bakkot>
+yes, let me dig it up
+
+[09:36:13.0227] <bakkot>
+`new WebAssembly.Memory({ shared:true, initial:0, maximum:0 }).buffer.constructor`
+
+[09:36:33.0885] <Jack Works>
+And it can be called to create new SAB? 
+
+[09:36:33.0945] <bakkot>
+works even when multithreading is disabled
+
+[09:36:38.0594] <bakkot>
+yes
+
+[09:36:46.0550] <Jack Works>
+It's crazy
+
+[09:37:17.0598] <Jack Works>
+Then what's the meaning of hiding it... 
+
+[09:37:39.0497] <bakkot>
+web compat
+
+[09:37:41.0741] <bakkot>
+like I said
+
+[09:38:10.0161] <bakkot>
+a lot of code assumes that if the SAB constructor was present then they could do multithreading, and had a fallback for when it was not available
+
+[09:38:18.0868] <bakkot>
+ * a lot of code assumes that if the SAB constructor was present then they could do multithreading, and had a fallback for when it was not available
+
+[09:38:38.0185] <bakkot>
+so when browsers turned of multithreading, for spectre, they needed to also remove the SAB property of the global
+
+[09:38:46.0632] <bakkot>
+note that just getting an SAB doesn't give you the ability to do multithreading
+
+[09:38:56.0896] <Jack Works>
+I mean, if they want to hide SAB, why not hide it completely but leave an escape path in WebAssembly
+
+[09:39:03.0798] <bakkot>
+they don't want to hide SAB
+
+[09:39:14.0211] <bakkot>
+that was not the goal
+
+[09:40:00.0323] <bakkot>
+the goal was, "remove multithreading, and do not break websites which assume that the existence of the SAB property on the global implies the ability to do multithreading"
+
+[09:40:27.0470] <Jack Works>
+Isn't Shared WebAssembly memory is used for multithreading? 
+
+[09:40:37.0640] <bakkot>
+(sorry, and by "multithreading" I mean specifically "multhreaded access to shared memory", not just the ability to spawn workers)
+
+[09:40:55.0488] <bakkot>
+yes, but what browsers did is disabled the ability to pass a SAB between workers
+
+[09:41:20.0982] <bakkot>
+if you can't pass an SAB between workers, you don't have shared memory
+
+[09:41:51.0693] <bakkot>
+but the WASM api is spec'd to be backed by an SAB regardless of whether multithreading is enabled
+
+[09:42:42.0012] <Jack Works>
+Aren't WebAssembly also affected by spectre when necessary methods provided? 
+
+[09:44:08.0627] <bakkot>
+if the necessary methods (i.e. the ability to use multithreaded access to shared memory to make a high-res timer) are provided, yes
+
+[09:44:50.0757] <bakkot>
+but I believe this ability is not provided in the relevant case
+
+[09:45:25.0549] <bakkot>
+you can read more of the discussion in https://github.com/whatwg/html/issues/4175, 
+https://github.com/whatwg/html/issues/3740,
+https://github.com/tc39/ecma262/issues/1435, https://github.com/tc39/ecma262/pull/1903
+
+[09:45:26.0565] <Jack Works>
+Okay I guess I understand what happened to SAB now... 
+
+[09:47:23.0817] <Jack Works>
+So back to Atomics was added, how the committee decided about adding a clock API? Was there any security concerns raised? Is that possible to add things like Promise.timeout?
+
+[09:48:05.0421] <bakkot>
+honestly I think people may have just not noticed at the time waitAsync was being added
+
+[09:48:45.0262] <bakkot>
+unfortunately it's hard to get in touch with erights, short of making a proposal and bringing it to plenary
+
+[09:48:56.0146] <bakkot>
+I think it's worth a shot
+
+[09:49:24.0332] <Jack Works>
+😰
+
+[09:50:36.0477] <bakkot>
+oh, or just asking him during plenary, at the lunch break
+
+[09:50:39.0268] <bakkot>
+that's what I usually do
+
+[10:00:40.0857] <devsnek>
+I'm down for timers in the stdlib
+
+[10:06:04.0510] <bakkot>
+`let delay = ms => new Promise(res => setTimeout(res, ms))` is one of those incantations I put at the top of many of my scripts; would be nice to not do that
+
+[10:09:00.0506] <bakkot>
+though looking around some, it seems like chrome (or at least Domenic) is of the opinion that it would need to be in HTML instead of ES and also that it would need to have AbortController integration: https://github.com/whatwg/html/issues/617#issuecomment-702774052
+
+[10:09:05.0587] <bakkot>
+so I guess it's not gonna happen anyway
+
+[10:09:06.0084] <bakkot>
+sigh
+
+[10:09:58.0196] <devsnek>
+don't worry in 15 years half of html will be merged with 262
+
+[10:10:43.0697] <bakkot>
+that is gonna depend highly on the specifics of the individuals working on these specs in the next decade, is my feeling
+
+[10:11:28.0058] <bakkot>
+though, abortcontroller is probably the thing most likely to end up in 262, I guess
+
+[11:18:55.0177] <bterlson>
+I like Ron's proposal around this personally. A protocol would be useful.
+
+[11:20:24.0947] <bterlson>
+cancelSignal and dispose would be so nice in my world
+
+[11:59:05.0222] <rbuckton>
+A protocol is the most flexible approach, but I've been getting push back against it in favor of a host hook instead. 
+
+
+2021-12-13
+[22:52:42.0133] <ljharb>
+abortcontroller is grossly named and should never be in 262
+
+[22:55:38.0779] <legendecas>
+> <@ljharb:matrix.org> abortcontroller is grossly named and should never be in 262
+
+That's a strong word, could you elaborate why do you think so?
+
+[22:56:31.0929] <ljharb>
+i mean, one big part of it is that a past delegate has insisted that it inherit from DOMException, and DOMException categorically doesn't belong in 262 - and the alternative, a host-defined exception type, is imo way too much nonportable determinism to put in the spec
+
+[22:57:35.0453] <ljharb>
+there's more to my opinion but i don't think i want to write about it further in a public setting
+
+[23:19:56.0406] <legendecas>
+Thanks for sharing the thoughts!
+
+[23:40:01.0412] <Jack Works>
+and we also don't have EventTarget yet.
+
+[08:59:40.0840] <Michael Ficarra>
+are there really 2 delegates named Sebastian McKenzie (SMK and SME)?
+
+[09:25:29.0364] <devsnek>
+i think that's the same person
+
+[09:26:23.0531] <Michael Ficarra>
+if it is, can we remove one of their abbreviations?
+
+[09:46:11.0730] <shu>
+i don't recall our ever having done that before so there's no procedure AFAIK
+
+[09:46:39.0244] <shu>
+it seems reasonable for to reach out to them with a reasonable deadline (1mo?) and then make an arbitrary decision after that if no resopnse
+
+[10:39:54.0749] <ljharb>
+https://github.com/tc39/notes/pull/135 added SME recently, and i think they haven't spoken at a meeting since then, so i think you could just revert that PR now?
+
+[10:41:10.0313] <Rob Palmer>
+my bad - I will revert
+
+[10:44:59.0585] <Rob Palmer>
+Please could I get a review:  https://github.com/tc39/notes/pull/173
+
+
+2021-12-14
+[18:31:35.0347] <Mathieu Hofman>
+> <@bakkot:matrix.org> honestly I think people may have just not noticed at the time waitAsync was being added
+
+I think you're right, it might be one of those things that slipped through.
+
+First, my understanding is that `waitAsync` is still at Stage 3. And while `Atomics` is not normative optional, it relies on `SharedArrayBuffer`, for which the constructor being added to the global object is currently normative optional. That means from an ECMA262 point of view, even when `waitAsync` reaches stage 4, the host is not obligated to offer a clock API, as it can simply deny SAB.
+
+Now I'd go even further, and say there is a way to reconcile a clock API with the requirement some environments have to not allow time measurement of any sort. Let's assume a clock API is modeled like `waitAsync`, i.e. the host resolves a promise after a certain time has elapsed. The promise job queue works by requiring the host to eventually execute promise jobs in the same order as they were enqueued. There is no requirement that the host must instantly make forward progress in processing the promise queue. What a host (or virtualization of one) can do is stop processing any more promise jobs until the wait time has elapsed, then enqueue the resolution of the clock promise. As long as the program doesn't have another way to observe the elapsing of time, that behavior is entirely within spec.
+
+That means that without a `Date` or other API which reveals elapsing time, then a `Promise.timeout = () => Promise.resolve().then(() => {})` would be spec compliant (modulo ordering of multiple `Promise.timeout` calls with different timeout values within the same synchronous execution, or infinite timeouts). You can even fake the value of `Date` based on the clock API (e.g. with all code executing "instantly" until it reaches a wait).
+
+Now of course that doesn't mean all code using a clock API would be compatible with such behavior, as some would expect consistent forward progress to continue during the wait time. I'd argue however such code would be prone to async race conditions.
+
+[18:39:28.0019] <Mathieu Hofman>
+And of course some programs would expect the Web behavior of `setTimeout` which drains the promise job queue before processing I/O jobs (which clocks are)
+
+[19:28:09.0868] <shu>
+Mathieu Hofman: `Atomics` relies on SABs only for `wait` and `waitAsync`. the rest was made to work with ABs (not that there's a way to observe that it's atomic with a single thread of execution)
+
+[19:28:39.0448] <shu>
+but your point still stands for `wait` that even if it isn't explicitly marked as normative optional, the fact that SABs can be denied makes it so in practice
+
+[19:29:17.0002] <shu>
+actually, i take that back
+
+[19:29:46.0599] <shu>
+there is a way to observe something is atomic with a single thread of execution, if you count looking at compiled code output in your model of observability, to see that there's never any unfriendly reorderings
+
+[19:31:05.0155] <Mathieu Hofman>
+> looking at compiled code output in your model of observability
+
+My model of observability is the program at runtime, so I don't think that counts?
+
+[19:31:11.0774] <Mathieu Hofman>
+ * > looking at compiled code output in your model of observability
+
+My model of observability is the program at runtime, so I don't think that counts?
+
+[19:33:04.0386] <shu>
+anyway i'm missing the broader context
+
+[19:33:14.0231] <shu>
+you want to add a clock API? or just thinking through the exercise?
+
+[19:34:19.0037] <Mathieu Hofman>
+Thinking through the exercise since people were asking why not if there is `waitAsync`. Also justifying why the presence of `waitAsync` is not such a problem
+
+[19:36:56.0450] <shu>
+it's not a problem for the web platform at least because the timeout value is pretty detached from wall clock time in when the promise handler gets run
+
+[19:37:20.0372] <shu>
+the extent to which it is it not a problem for mark is, i suspect, along the lines of what kevin said :)
+
+[19:37:29.0854] <shu>
+ * the extent to which it is it not a problem for mark is, i suspect, along the lines of what kevin said :)
+
+[19:44:57.0543] <Mathieu Hofman>
+Right, and I'm arguing that you can, according to the way job enqueuing is specified, offer a clock API to "schedule" future promise resolutions that does not in fact allow the program to observe time passing or how complex the code executed in-between was, as long as there is not an independent way to observe time passing.
+
+[19:46:23.0214] <shu>
+i'm inclined to agree at first blush
+
