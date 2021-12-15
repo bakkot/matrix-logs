@@ -1937,3 +1937,81 @@ typeof seems a bit strong on only the "it expresses additional intent" argument
 [12:19:17.0202] <sarahghp>
 Thank you for shitposting. It makes me feel good. 😆
 
+[12:21:42.0688] <Justin Ridgewell>
+Re the earlier `Promise.prototype.finally` discussion, I mixed up `.then` and thenable access.
+
+[12:21:46.0707] <Justin Ridgewell>
+But the same power still holds
+
+[12:21:52.0759] <Justin Ridgewell>
+```
+var iframe = document.createElement('iframe');
+iframe.src = location.href;
+document.body.appendChild(iframe)
+
+var final = iframe.contentWindow.eval('(onThen, onCatch) => { window.data = {onThen, onCatch}; }')
+
+var thenFinally, catchFinally;
+Promise.prototype.finally.call({
+  then(thenFinally_, catchFinally_) {
+    thenFinally = thenFinally_;
+    catchFinally = catchFinally_;
+  }
+}, final);
+
+console.log('thenFinally', thenFinally.constructor === Function);
+console.log('catchFinally', catchFinally.constructor === Function);
+
+Promise.resolve({
+  then: final
+});
+Promise.resolve().then(() => {
+  console.log('onThen', iframe.contentWindow.data.onThen.constructor === Function);
+  console.log('onCatch', iframe.contentWindow.data.onCatch.constructor === Function);
+});
+```
+
+[12:22:03.0467] <Mathieu Hofman>
+One thing I didn't get into is how having an explicit intent for an ObjectPlaceholder being an exit from the immutable structure is that it allows predicates that compare the immutable shape of a record/tuple oblivious of the exits, without running into the collision issues that strings have (and for which unique symbols were created in the first place):
+```
+const eventHandlerTag = Symbol('EventHandler');
+const domElementTag = Symbol('Element');
+const rec1 = #{type: eventHandlerTag, ref: ObjectPlaceholder(() => {})};
+const rec2 = #{type: eventHandlerTag, ref: ObjectPlaceholder(() => {})};
+const rec3 = #{type: domElementTag, ref: ObjectPlaceholder(document)};
+assert(rec1 !== rec2);
+assert(sameShape(rec1, rec2) === true);
+assert(sameShape(rec1, rec3) === false);
+```
+
+[12:22:28.0585] <Mathieu Hofman>
+ * One thing I didn't get into is how having an explicit intent for an ObjectPlaceholder being an exit from the immutable structure is that it allows predicates that compare the immutable shape of a record/tuple oblivious of the exits, without running into the collision issues that strings have (and for which unique symbols were created in the first place):
+```
+const eventHandlerTag = Symbol('EventHandler');
+const domElementTag = Symbol('Element');
+const rec1 = #{type: eventHandlerTag, ref: ObjectPlaceholder(() => {})};
+const rec2 = #{type: eventHandlerTag, ref: ObjectPlaceholder(() => {})};
+const rec3 = #{type: domElementTag, ref: ObjectPlaceholder(document)};
+assert(rec1 !== rec2);
+assert(sameShape(rec1, rec2) === true);
+assert(sameShape(rec1, rec3) === false);
+```
+
+[12:22:46.0474] <shu>
+Mathieu Hofman: that is why the proposal is symbols, instead of strings
+
+[12:22:49.0657] <rickbutton>
+assuming that there was a predicate like `Symbol.isTie` you could do the same
+
+[12:23:00.0482] <rickbutton>
+or just try to unwrap every symbol
+
+[12:24:31.0384] <Mathieu Hofman>
+Unwrapping test wouldn't work in the no-unwrap-if-different realm case
+
+[12:24:41.0522] <Mathieu Hofman>
+which is still relevant for both approaches
+
+[12:24:55.0505] <Mathieu Hofman>
+ * Unwrapping test wouldn't work in the no-unwrap-if-different realm case
+
