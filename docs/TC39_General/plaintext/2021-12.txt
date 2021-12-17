@@ -775,3 +775,51 @@ The promise itself is received as a normal completion, but it's either rejected 
 [17:24:33.0641] <Mathieu Hofman>
 and from what I understand `AsyncFromSyncIteratorContinuation` grabs `done` and `value` from the result, awaits the `value` and resolves a promise with `{done, value: awaitedValue}`
 
+[17:25:10.0206] <Justin Ridgewell>
+If we pass `capibility.[[Reject]]` to `PerformPromiseThen`, then it'll eventually call that reject
+
+[17:25:24.0906] <Mathieu Hofman>
+if the await throws, it rejects the promise, but the `syncIterator` is not touched anymore
+
+[17:25:37.0877] <Justin Ridgewell>
+There's a close step
+
+[17:26:05.0541] <Mathieu Hofman>
+right but rejecting the promise does nothing besides giving a rejected promise to the async iterator consumer
+
+[17:27:21.0987] <bakkot>
+one fix to this would be to add a handler to `valueWrapper` which closes the iterator, though that seems kinda silly
+
+[17:27:36.0528] <Mathieu Hofman>
+aye that's what I'm arguing we need to do
+
+[17:27:40.0939] <bakkot>
+another fix is to have for-await-of explicitly coordinate with the wrapper, which seems kinda painful
+
+[17:27:54.0892] <Mathieu Hofman>
+why is it silly ?
+
+[17:28:12.0761] <Mathieu Hofman>
+what we have right now is basically the wrapper not cleaning up after itself
+
+[17:28:28.0770] <bakkot>
+because we'd be unwrapping the promise twice
+
+[17:28:35.0561] <Mathieu Hofman>
+it missed a `try-catch` when `await`ing the value
+
+[17:29:17.0808] <Mathieu Hofman>
+how so, the 3rd argument in step 10 does nothing right now, instead it needs to cleanup and passthrough the error
+
+[17:29:28.0712] <bakkot>
+yeah, that's fair
+
+[17:29:38.0821] <Mathieu Hofman>
+ * it missed a `try-catch` when `await`ing the value
+
+[17:29:45.0795] <bakkot>
+not really unwrapping it twice so much as handling both branches
+
+[17:29:59.0045] <bakkot>
+sgtm, needs-consensus PRs welcome
+
