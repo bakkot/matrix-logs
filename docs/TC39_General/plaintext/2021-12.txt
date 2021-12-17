@@ -841,3 +841,80 @@ For us, `iteratorRecord` is the wrapped asyncSync iterable, `iterationKind` is `
 [17:34:52.0393] <Justin Ridgewell>
  * For us, `iteratorRecord` is the wrapped asyncSync iterable, `iterationKind` is `iterate`, and `iteratorKind` is `async`
 
+[17:35:24.0775] <Justin Ridgewell>
+Step 6.b says "If iteratorKind is async, set nextResult to ? Await(nextResult)."
+
+[17:35:32.0845] <bakkot>
+ForIn/OfBodyEvaluation isn't really in a position to handle the issue, because it can't tell the difference between an async iterator which threw and a sync iterator which returned a rejected promise
+
+[17:35:37.0980] <Mathieu Hofman>
+Step 6.
+> b. If iteratorKind is async, set nextResult to ? Await(nextResult).
+> c. If Type(nextResult) is not Object, throw a TypeError exception.
+
+There is no cleanup of the iterator
+
+[17:35:38.0543] <bakkot>
+it's the wrapper which has to deal with it
+
+[17:35:51.0822] <Mathieu Hofman>
+ * Step 6.
+> b. If iteratorKind is async, set nextResult to ? Await(nextResult).
+> c. If Type(nextResult) is not Object, throw a TypeError exception.
+
+There is no cleanup of the iterator
+
+[17:36:15.0156] <Justin Ridgewell>
+We can't make those different cases
+
+[17:36:36.0219] <bakkot>
+Which?
+
+[17:36:43.0320] <bakkot>
+I agree we can't make `ForIn/OfBodyEvaluation` differentiate
+
+[17:36:45.0194] <Justin Ridgewell>
+https://github.com/tc39/ecma262/issues/1849#issuecomment-584961565
+
+[17:37:09.0357] <Justin Ridgewell>
+They should both be calling the cleanup function
+
+[17:37:20.0088] <bakkot>
+no, neither of them should be
+
+[17:37:39.0957] <bakkot>
+_the wrapper_ should do be calling cleanup when its underlying iterator returns a promise which rejects
+
+[17:37:46.0756] <Mathieu Hofman>
+iterator throw / reject on `next` exits the iteration abruptly
+
+[17:37:48.0363] <bakkot>
+because at that point it's going to stop iterating the underlying iterator
+
+[17:38:15.0836] <bakkot>
+and when you stop iterating over a well-behaved iterator, you close it
+
+[17:38:16.0951] <bakkot>
+cf https://github.com/tc39/rationale/issues/2
+
+[17:38:57.0705] <bakkot>
+from ForIn/OfBodyEvaluation's point of view, the thing being iterated is not well-behaved, because its next method returned a promise which rejects
+
+[17:39:04.0614] <bakkot>
+so ForIn/OfBodyEvaluation should not be doing any cleanup
+
+[17:39:25.0564] <Justin Ridgewell>
+I disagree
+
+[17:39:33.0362] <bakkot>
+Which with part?
+
+[17:39:48.0080] <Justin Ridgewell>
+Non-well behaved iterators should cleanup
+
+[17:39:54.0693] <bakkot>
+Well, they don't, anywhere
+
+[17:39:58.0159] <Justin Ridgewell>
+If my iterator throws, it needs to clean up
+
