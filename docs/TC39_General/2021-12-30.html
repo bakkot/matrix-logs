@@ -48,6 +48,21 @@
   <tr class="msg" id="L19"><td class="ts-cell"><a class="ts" href="#L19" alt="Wed Dec 29 2021 23:56:42 GMT-0800 (Pacific Standard Time)">07:56</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-6" title="@ljharb:matrix.org">ljharb</span>&gt;</div></td><td class="msg-cell">i also often write eslint code that works sync with dependencies - like the ExportsMap in eslint-plugin-import - but it doesn't accept a user-provided file reading mechanism, it just hardcodes it</td></tr>
   <tr class="msg" id="L20"><td class="ts-cell"><a class="ts" href="#L20" alt="Wed Dec 29 2021 23:58:06 GMT-0800 (Pacific Standard Time)">07:58</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell">yeah, if you hardcode all your IO the issue comes up less; I generally try pretty hard to keep the IO at the boundaries, so that the core logic doesn't do any IO itself</td></tr>
   <tr class="msg" id="L21"><td class="ts-cell"><a class="ts" href="#L21" alt="Wed Dec 29 2021 23:58:17 GMT-0800 (Pacific Standard Time)">07:58</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell">except by invoking user-provided stuff</td></tr>
+  <tr class="msg" id="L22"><td class="ts-cell"><a class="ts" href="#L22" alt="Thu Dec 30 2021 00:00:04 GMT-0800 (Pacific Standard Time)">08:00</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell">it does still come up, though; the last time I ran into this problem was when I wanted to offload some expensive computation to a worker, which meant the result of the computation was suddenly async, and I had to go rewrite everything to add <code>async</code> in a bunch of places and the library was no longer usable in sync contexts</td></tr>
+  <tr class="msg" id="L23"><td class="ts-cell"><a class="ts" href="#L23" alt="Thu Dec 30 2021 00:01:27 GMT-0800 (Pacific Standard Time)">08:01</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-6" title="@ljharb:matrix.org">ljharb</span>&gt;</div></td><td class="msg-cell">why do you need <code>async</code> everywhere versus <code>return isPromise(p) ? p.then(f) : f(p)</code> or something?</td></tr>
+  <tr class="msg" id="L24"><td class="ts-cell"><a class="ts" href="#L24" alt="Thu Dec 30 2021 00:01:45 GMT-0800 (Pacific Standard Time)">08:01</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell">because the function call is in the middle of a bunch of other logic</td></tr>
+  <tr class="msg" id="L25"><td class="ts-cell"><a class="ts" href="#L25" alt="Thu Dec 30 2021 00:03:07 GMT-0800 (Pacific Standard Time)">08:03</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell"><pre><code>for (let item of items) {
+  try {
+    let init = foo(item);
+    // 10 more lines here
+    result = await expensiveCompute(result, init);
+  } catch (e) {
+    // 10 more lines here
+  }
+}
+</code></pre>
+</td></tr>
+  <tr class="msg" id="L26"><td class="ts-cell"><a class="ts" href="#L26" alt="Thu Dec 30 2021 00:03:43 GMT-0800 (Pacific Standard Time)">08:03</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell">it is definitely <em>possible</em> to refactor this so that it just uses <code>.then</code> instead of <code>await</code>, but it's extremely annoying</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>

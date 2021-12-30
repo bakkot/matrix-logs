@@ -1183,3 +1183,44 @@ yeah, if you hardcode all your IO the issue comes up less; I generally try prett
 [23:58:17.0677] <bakkot>
 except by invoking user-provided stuff
 
+[00:00:04.0153] <bakkot>
+it does still come up, though; the last time I ran into this problem was when I wanted to offload some expensive computation to a worker, which meant the result of the computation was suddenly async, and I had to go rewrite everything to add `async` in a bunch of places and the library was no longer usable in sync contexts
+
+[00:00:22.0112] <bakkot>
+ * it does still come up, though; the last time I ran into this problem was when I wanted to offload some expensive computation to a worker, which meant the result of the computation was suddenly async, and I had to go rewrite everything to add `async` in a bunch of places and the library was no longer usable in sync contexts
+
+[00:01:27.0448] <ljharb>
+why do you need `async` everywhere versus `return isPromise(p) ? p.then(f) : f(p)` or something?
+
+[00:01:45.0762] <bakkot>
+because the function call is in the middle of a bunch of other logic
+
+[00:03:07.0289] <bakkot>
+```
+for (let item of items) {
+  try {
+    let init = foo(item);
+    // 10 more lines here
+    result = await expensiveCompute(result, init);
+  } catch (e) {
+    // 10 more lines here
+  }
+}
+```
+
+[00:03:43.0405] <bakkot>
+it is definitely _possible_ to refactor this so that it just uses `.then` instead of `await`, but it's extremely annoying
+
+[00:04:18.0198] <bakkot>
+ * ```
+for (let item of items) {
+  try {
+    let init = foo(item);
+    // 10 more lines here
+    result = await expensiveCompute(result, init);
+  } catch (e) {
+    // 10 more lines here
+  }
+}
+```
+
