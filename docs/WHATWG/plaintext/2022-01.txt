@@ -230,3 +230,63 @@ I think this is related to https://github.com/whatwg/html/issues/3691 . Basicall
 [12:48:21.0468] <Domenic>
 So in theory implementations could maybe special-case dedicatedWorker.postMessage() to make that work even in the presence of busy loops. In practice that'd probably be quite involved as they'd essentially have to create a parallel message-queuing infrastructure for dedicated workers only.
 
+[12:54:06.0434] <bakkot>
+huh, ok, it looks like I was actually wrong (I wrote a test case but it was bugged) and the MDN page is are also wrong
+
+[12:54:21.0188] <bakkot>
+here's my test case (now that I've fixed it)
+
+```
+let workerSrc = `
+let arr;
+self.addEventListener('message', e => {
+  switch (e.data.message) {
+    case 'init': {
+      console.log('worker: got init');
+      arr = new Int32Array(e.data.buf);
+      Atomics.notify(arr, 0);
+      break;
+    }
+    case 'next': {
+      console.log('worker: got next');
+      arr[1] = 1;
+      break;
+    }
+  }
+});
+`;
+let blob = new Blob([workerSrc], {type: 'application/javascript'});
+let worker = new Worker(URL.createObjectURL(blob));
+
+(async () => {
+  let buf = new SharedArrayBuffer(16);
+  let arr = new Int32Array(buf);
+  worker.postMessage({ message: 'init', buf });
+
+  if (typeof Atomics.waitAsync === 'function') {
+    await Atomics.waitAsync(arr, 0, 0).value;
+  } else {
+    // give the worker time to start
+    await new Promise(res => setTimeout(res, 1000));
+  }
+
+  console.log('init');
+  worker.postMessage({ message: 'next' });
+
+  console.log('now we busy-wait, with arr[1] initially =', arr[1]);
+  for (let i = 0; i < 1e8; ++i) {
+    if (arr[1] === 1) {
+      console.log('done! took until i =', i);
+      return;
+    }
+  }
+  console.log('never initialized');
+})().catch(e => console.error('error', e));
+```
+
+[12:54:47.0964] <bakkot>
+in chrome and FF this does actually finish; FF seems to take literally no iterations of the loop, where chrome takes a couple hundred
+
+[12:54:56.0127] <bakkot>
+apologies for the confusion
+
