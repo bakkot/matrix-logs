@@ -282,3 +282,98 @@ I will admit tho, that a major motivation for this particular shape is to solve 
 [11:34:50.0317] <jschoi>
 My argument for bind-this had been that .call’s frequency (as well as, to a lesser extent, .bind’s) is sufficiently high to justify optimizing its word order and brevity with syntax, even in spite of its overlap with the pipe operator, similarly to how Function.pipe is useful in spite of the pipe operator. But if we can solve word order and brevity by combining with pipe instead of overlapping with it, so much the better. The syntax of call-on is simpler, too.
 
+[11:35:28.0327] <jschoi>
+* My argument for bind-this had been that .call’s frequency (as well as, to a lesser extent, .bind’s) is sufficiently high to justify optimizing its word order and brevity with syntax, even in spite of its overlap with the pipe operator, similarly to how Function.pipe is useful in spite of the pipe operator. But if we can solve word order and brevity by combining with pipe instead of overlapping with it, so much the better. The syntax of call-on is simpler, too. And, although call-on does not improve using .bind, .bind’s frequency is not nearly as high as .call’s.
+
+[11:35:34.0797] <jschoi>
+* My argument for bind-this had been that .call’s frequency (as well as, to a lesser extent, .bind’s) is sufficiently high to justify optimizing its word order and brevity with syntax, even in spite of its overlap with the pipe operator, similarly to how Function.pipe is useful in spite of the pipe operator. But if we can solve word order and brevity by combining with pipe instead of overlapping with it, so much the better. The syntax of call-on is simpler, too. And, although call-on does not improve using .bind, .bind’s frequency is not nearly as high as .call’s, so it is less important.
+
+[11:36:21.0060] <TabAtkins>
+And when .bind is just used to hard-bind a method to the object it's already sitting on, PFA covers that well on its own. The remaining "hard-bind a method to an unrelated object" is, afaict, a lot less common.
+
+[11:36:22.0930] <jschoi>
+* My argument for bind-this had been that .call’s frequency (as well as, to a lesser extent, .bind’s) is sufficiently high to justify optimizing its word order and brevity with syntax, even in spite of its overlap with the pipe operator, similarly to how Function.pipe is useful in spite of the pipe operator. But if we can optimize .call’s word order and brevity by combining with the pipe instead of overlapping with it, so much the better. The syntax of call-on is simpler, too. And, although call-on does not improve using .bind, .bind’s frequency is not nearly as high as .call’s, so it is less important.
+
+[11:36:34.0234] <Ashley Claymore>
+Another potential solution to avoiding `Function.prototype.call` tampering. Is a build step.
+A tool that looks for `someMethod.$call(obj, ...args)` and transforms it to `reflectApply(someMethod, obj, args)`.
+It could install `Function.prototype.$call` during development to avoid needing to transform during fast dev builds. And only transform for production.
+
+[11:36:44.0288] <ljharb>
+TabAtkins:  i definitely would prefer something that's ordered like receiver, function, arguments tho
+
+[11:37:00.0550] <ljharb>
+build steps don't solve the problem for packages, and it's very dangerous to transpile code you didn't author, so i wouldn't want us to recommend that.
+
+[11:37:07.0681] <ljharb>
+ * TabAtkins:  i definitely would prefer something that's ordered like receiver, function, arguments tho
+
+[11:37:17.0161] <ljharb>
+ * build steps don't solve the problem for packages, and it's very dangerous to transpile code you didn't author
+
+[11:37:22.0056] <ljharb>
+ * build steps don't solve the problem for packages, and it's very dangerous to transpile code you didn't author, so i wouldn't want us to recommend that.
+
+[11:37:26.0437] <jschoi>
+The receiver–function–arguments word order is solved (albeit slightly more verbosely) with pipe operator + call-on.
+
+[11:37:54.0142] <TabAtkins>
+I understand why that order is appealing, but note that using that order makes it easy to publish modules that are *intended* to be called with this syntax, promoting ecosystem forking that we don't want.
+
+[11:38:01.0747] <ljharb>
+how? `fn |> ^::(receiver, ...args)` has the same ordering issue as `fn::(receiver, ...args)`
+
+[11:38:06.0937] <jschoi>
+`receiver |> fn::(#, ...args)` has the desired word order. @ljharb 
+
+[11:38:10.0334] <TabAtkins>
+Thus the overlap with pipe that makes some committee members uncomfortable, yeah
+
+[11:38:20.0073] <ljharb>
+any function that looks at `this` is intended to be called with this syntax - which includes most builtin methods. no explicit intention beyond that is or should be required.
+
+[11:38:24.0624] <ljharb>
+ * any function that looks at `this` is intended to be called with this syntax - which includes most builtin methods
+
+[11:38:34.0875] <ljharb>
+ * any function that looks at `this` is intended to be called with this syntax - which includes most builtin methods. no explicit intention is or should be equired.
+
+[11:38:36.0210] <ljharb>
+ * any function that looks at `this` is intended to be called with this syntax - which includes most builtin methods. no explicit intention is or should be required.
+
+[11:38:38.0380] <jschoi>
+* `receiver |> fn::(#, ...args)`.
+
+[11:38:39.0334] <ljharb>
+ * any function that looks at `this` is intended to be called with this syntax - which includes most builtin methods. no explicit intention beyond that is or should be required.
+
+[11:38:43.0843] <TabAtkins>
+Right, publishing a module where *free-floating functions* are authored to use `this` is, imo, bad.
+
+[11:39:18.0030] <ljharb>
+i'm not sure what you mean, that's already a thing people can (and sometimes do) do
+
+[11:39:18.0500] <jschoi>
+* `receiver |> fn::(#, ...args)` has the desired word order.
+
+[11:39:37.0933] <TabAtkins>
+Who does that today? You'd have to use `.call()` to invoke the functions.
+
+[11:39:40.0676] <ljharb>
+it's not our place to discourage `export default function (...args) { this }`, that's a normal part of the language
+
+[11:39:43.0894] <ljharb>
+yes, that's right, you would
+
+[11:39:50.0087] <jschoi>
+* `receiver |> fn::(#, ...args)` has the desired word order. @ljharb 
+
+[11:39:59.0438] <ljharb>
+and "use `.call()`" is the thing that needs to be made easier/more robust
+
+[11:40:02.0326] <ljharb>
+ * and "use `.call()`" is the thing that needs to be made easier/more robust
+
+[11:40:02.0403] <TabAtkins>
+Okay, well that's werid and people can be weird if they want. But that's not something normal libraries do.
+
