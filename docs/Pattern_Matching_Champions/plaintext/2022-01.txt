@@ -348,3 +348,52 @@ sure, but that doesn't mean that's a *good* thing or that we should increase it
 [10:18:38.0998] <TabAtkins>
 Yeah, I'm not particularly happy with a syntax difference between statement vs expression
 
+
+2022-01-25
+[17:13:09.0456] <TabAtkins>
+I was fiddling around with enum/ADT stuff and realized it wasn't hard to define custom matchers to be ADT-like, so I replaced our previous trivial custom matcher example with one based on Option: https://github.com/tc39/proposal-pattern-matching#custom-matcher-protocol-interpolations
+
+[17:13:37.0223] <TabAtkins>
+And then I realized that decorators should be able to help here as well:
+```js
+// A predefined ADT decorator
+const ADT = (mapper=()=>null) => (_, c) => {
+	if(c.kind == "method" && c.isStatic) {
+		c.addInitializer(function(){
+			// `this` is the class
+			const method = this[c.name];
+			method[Symbol.matcher] = (matchable) => {
+				if(matchable instanceof this && matchable._kind == method) {
+					return {matched: true, value:mapper(matchable)};
+				}
+				return {matched:false};
+			}
+		});
+	} else {
+		throw new Exception("only usable on static methods");
+	}
+}
+
+class Option {
+	constructor(val, kind) {
+		this.value = val;
+		this._kind = kind;
+	}
+
+	@ADT(x=>x.value)
+	static Some(val) {
+		return new Option(val, Option.Some);
+	}
+	
+	@ADT
+	static None() {
+		return new Option(null, Option.None);
+	}
+}
+
+match(result) {
+	when (${Option.Some} with val) -> console.log(val);
+	when (${Option.None}) -> console.log("none");
+}
+```
+
