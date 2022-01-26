@@ -1536,3 +1536,109 @@ it just won't happen
 [13:24:28.0884] <ljharb>
 certainly some rebels will try to do something terrible and clever with that approach! but that doesn't mean it'll go anywhere
 
+[13:25:13.0006] <yulia>
+i've seen a whole lot of bind and call
+
+[13:25:28.0556] <yulia>
+and a lot of people being like "why is this not the this that it was called on"
+
+[13:25:35.0344] <jschoi>
+> <@tabatkins:matrix.org> jschoi: Yes, `obj |> slice@(#, 0, 2)` kinda works
+
+`obj |> slice@(#, 0, 2)` arguably works as well as `obj |> slice(#, 0, 2)` works.
+
+[13:26:00.0341] <TabAtkins>
+Yes it does, it's just admittedly clearly worse than `obj::slice(0, 2)`
+
+[13:26:04.0914] <ljharb>
+right
+
+[13:26:08.0799] <yulia>
+yep
+
+[13:26:17.0607] <ljharb>
+i hope we can all agree that all three forms are better than status quo
+
+[13:26:27.0940] <ljharb>
+and that the third is better than the other two, looking at it in isolation
+
+[13:26:34.0996] <ljharb>
+(better, for this use case)
+
+[13:26:44.0356] <yulia>
+i believe we do have the problem pipeline solves: functional chaining. We do have a problem with binding
+
+[13:26:56.0600] <yulia>
+oh, i think i misread
+
+[13:27:19.0448] <yulia>
+i would rather have obj::slice.
+
+[13:27:28.0147] <Justin Ridgewell>
+By function chaining, do you mean nested functions or method chaining?
+
+[13:28:16.0291] <Justin Ridgewell>
+I think we will continue to have method chaining (including patching onto the global prototypes) as long as we do not have a bind-op.
+
+[13:28:32.0154] <sarahghp>
+I would rather not have `::` at all
+
+[13:28:34.0651] <Justin Ridgewell>
+Pipeline will solve some of it, but the explicit topic token will always be less fluent than a regular method chain.
+
+[13:28:44.0881] <Justin Ridgewell>
+So we will continue to see method chaining regarless.
+
+[13:28:46.0159] <ljharb>
+i mean given
+```
+arr
+  .slice(…)
+  .flat(…)
+  ::somethingNew(…)
+  .filter(…)
+```
+vs
+```
+arr
+  .slice(…)
+  .flat(…)
+  |> somethingNew@(#, …)
+  .filter(…)
+```
+
+the former is clearly better to me.
+
+[13:28:57.0060] <pokute>
+Is `arrayLike |> Array.slice@(#, 0, 2)` valid?
+
+[13:29:09.0700] <sarahghp>
+I think both of those are undesirable, honestly
+
+[13:29:11.0775] <TabAtkins>
+Justin Ridgewell: So, right, call-this is intentionally not as "fluent" as bind-this in the .call() case, specifically to avoid overlapping with pipeline. It achieves the functionality (terse, reliable .call()) without anything else. Self-binding (aka method extraction) is imo best done by PFA; `obj.method~()` is clearly better than `obj::obj.method`, imo.  Other-binding is the final leftover case, but I think this is (a) the least common of these cases, afaict from the collected data and (b) sufficiently okay to just use arrow functions with - `that=>slice@(that, 0, 2)` seems fine for this.
+
+[13:29:13.0956] <ljharb>
+pokute: `Array.slice` doesn't exist, but otherwise yes
+
+[13:29:14.0695] <TabAtkins>
+pokute: yes
+
+[13:29:29.0100] <ljharb>
+sarahghp: i do that exact pattern in a ton of libraries, i just break it up because i don't have a chaining affordance
+
+[13:29:30.0507] <TabAtkins>
+Well, sorry, `Array.slice` is undefined
+
+[13:29:42.0694] <ljharb>
+use `Array.prototype.slice`, and it works
+
+[13:29:49.0713] <TabAtkins>
+yeah
+
+[13:29:55.0109] <TabAtkins>
+Or `[].slice`
+
+[13:30:03.0150] <Justin Ridgewell>
+Next let's not have optional chaining, because we already have `&&` and regular dot accses...
+
