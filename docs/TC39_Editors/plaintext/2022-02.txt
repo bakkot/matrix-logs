@@ -880,3 +880,46 @@ oh fun
 [11:36:26.0852] <bakkot>
 ok but like half of the uses are in one specific algorithm, that's weird
 
+[12:14:04.0833] <bakkot>
+shu: the GetFunctionRealm issue I mention in https://github.com/tc39/ecma262/issues/253#issuecomment-1050185177 is gonna be fun
+
+[12:14:16.0618] <bakkot>
+I _think_ it's possible to trigger it with
+
+```
+function wrap() {
+  return Reflect.construct(HTMLButtonElement, [], new.target);
+}
+let protoCount = -100;
+let x = Proxy.revocable(
+  wrap,
+  {
+    get(...args) {
+      console.log('get', args);
+      if (args[1] === 'prototype') {
+        ++protoCount;
+        if (protoCount === 2) {
+          x.revoke();
+          console.log('revoked');
+        }
+      }
+      return Reflect.get(...args);
+    },
+  }
+);
+
+customElements.define('x-rev', x.proxy, { extends: 'button' });
+wrap.prototype = null;
+protoCount = 0;
+new x.proxy();
+```
+
+[12:14:19.0013] <bakkot>
+but not 100% sure
+
+[12:14:38.0797] <bakkot>
+that does have an entertaining error message in chrome, though, so it probably does trigger it
+
+[12:14:50.0614] <bakkot>
+> Uncaught TypeError: Cannot perform 'undefined' on a proxy that has been revoked
+
