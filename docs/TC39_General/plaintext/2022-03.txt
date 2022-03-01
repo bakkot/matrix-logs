@@ -22,3 +22,29 @@ search for those proposals:
 - struct (shared struct section)
 - module block
 
+[18:41:56.0618] <bakkot>
+> <@gibson042:matrix.org> can someone verify my assessment that https://github.com/mishoo/UglifyJS/issues/5370 represents a deviation of V8 from other major implementations in FunctionDeclarationInstantiation with respect to non-simple parameter lists when VarDeclaredNames includes "arguments"?
+> ```
+> $ eshost -se '[].concat(...["function arguments(){}", "var arguments"].map(occluding => ["()", "(..._)", "(_=0)"].map(params => { const r="return typeof arguments; ", f=Function(params.slice(1,-1), r+occluding); return `${f().padEnd(9)} // function${params}{${r+occluding}}`; }))).join("\n")'
+> #### ChakraCore, engine262, JavaScriptCore, Moddable XS, SpiderMonkey
+> function  // function(){return typeof arguments; function arguments(){}}
+> function  // function(..._){return typeof arguments; function arguments(){}}
+> function  // function(_=0){return typeof arguments; function arguments(){}}
+> object    // function(){return typeof arguments; var arguments}
+> object    // function(..._){return typeof arguments; var arguments}
+> object    // function(_=0){return typeof arguments; var arguments}
+> 
+> #### V8
+> function  // function(){return typeof arguments; function arguments(){}}
+> function  // function(..._){return typeof arguments; function arguments(){}}
+> function  // function(_=0){return typeof arguments; function arguments(){}}
+> object    // function(){return typeof arguments; var arguments}
+> undefined // function(..._){return typeof arguments; var arguments}
+> undefined // function(_=0){return typeof arguments; var arguments}
+> ```
+
+Tracing through the full machinery would take me a while, but I can at least confirm that there should not be a difference between simple and non-simple arguments lists in this case, so V8 is definitely wrong _somewhere_, and it seems quite likely to be wrong in the cases where it differs from other implementations
+
+[18:42:31.0371] <sirisian>
+Well intuitive as in all closed over variables and they automatically behave like SharedArrayBuffer items without the bloat. (And in scope functions can just be called without any module syntax). Creating a variable and using an atomic to increment it or other operation would just "work" without stuff like shared structs or shuffling stuff into TypedArrays like it's some separate API.
+
