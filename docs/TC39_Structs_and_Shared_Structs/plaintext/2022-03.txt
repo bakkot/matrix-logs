@@ -1,0 +1,16 @@
+2022-03-10
+[15:50:44.0290] <shu>
+interesting limitation i just ran into during implementation of the shared struct prototype: on shared structs, `Atomics` operations that need to inspect the value for its operation cannot work for values that don't have identity
+
+[15:51:11.0025] <shu>
+for example, suppose there's a shared struct `s` with a field `p` that has the value `42`
+
+[15:51:52.0033] <shu>
+`Atomics.load(s, 'p')`, `Atomics.store(s, 'p', whatever)`, `Atomics.exchange(s, 'p', whatever)` all work fine since they just treat the field as bits, there's no inspection of the contents
+
+[15:52:21.0246] <shu>
+`Atomics.compareExchange(s, 'p', 42, whatever)` or `Atomics.add(s, 'p')`, by contrast, can't be made to work on all implementations
+
+[15:54:24.0752] <shu>
+if an implementation chooses to box its values like V8, then '42' is not the integer 42, but a heap allocation. the implementation complexity for making those Atomics operations work is quite high, will be slow, and also defeats the purpose (lightweight synchronization). for heavier weight synchronization, use plain reads/writes and operations then synchronize separately on a mutex
+
