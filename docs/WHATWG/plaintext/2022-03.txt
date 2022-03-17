@@ -1205,3 +1205,33 @@ Domenic: so is the `dispose` leak essentially only a thing when the user manuall
 [09:14:16.0224] <annevk>
 Still trying to wrap my head around this not so important leak. 🙂
 
+[09:15:09.0824] <annevk>
+Because if you're the latest you don't really get `dispose` events until you hit 50 yourself, I'm guessing.
+
+[09:15:41.0526] <Domenic>
+I'm not sure... how many frames are involved in your example?
+
+[09:16:35.0137] <annevk>
+Domenic: good question; I've really only considered this from the perspective of top-level documents trying to attack each other in some way. I'm not sure how much nested documents are at risk due to (eventual) partitioning.
+
+[09:16:42.0478] <Domenic>
+Like... if there's only one frame, then I feel like the same-origin contiguous boundary is pretty strong protection.
+
+[09:17:08.0487] <Domenic>
+The nested documents are where I can see actual leaks happening, because of the global shared resource that is these 50 entries.
+
+[09:18:15.0458] <Domenic>
+I guess maybe with one frame... you put in 49 entries for your site, the user goes cross-site for 5 entries, the user goes back go(-6), if you are somehow still in bfcache, now you get 4 dispose events which told you the user visited 5 cross-site pages before coming back?
+
+[09:18:32.0676] <Domenic>
+ * I guess maybe with one frame... you put in 49 entries for your site, the user goes cross-site for 5 entries, the user goes back go(-6), if you are somehow still in bfcache, now you get 4 dispose events which told you the user visited 5 cross-site pages before coming back?
+
+[09:19:42.0510] <Domenic>
+You could also tell that with history.state/fragments/etc. if you were willing to do your own go(-49), go(-48), etc. until only go(-45) succeeded.
+
+[09:19:44.0859] <annevk>
+Yeah, I guess even with partitioning nested documents could be problematic. An ad could fill up the entries (though this would require some interaction iirc) and then as the user same-document navigates it would get `dispose` events.
+
+[09:20:07.0013] <annevk>
+ * Yeah, I guess even with partitioning nested documents could be problematic. An ad could fill up the entries (though this would require some interaction iirc) and then as the user same-document navigates it would get `dispose` events.
+
