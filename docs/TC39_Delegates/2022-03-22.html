@@ -37,6 +37,73 @@
   <tr class="msg" id="L8"><td class="ts-cell"><a class="ts" href="#L8" alt="Tue Mar 22 2022 10:05:05 GMT-0700 (Pacific Daylight Time)">17:05</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-13" title="@legendecas:matrix.org">legendecas</span>&gt;</div></td><td class="msg-cell">IIUC we can not resolve a promise off the thread, so blocking version of <code>await</code> sounds like a deadlock.</td></tr>
   <tr class="msg" id="L9"><td class="ts-cell"><a class="ts" href="#L9" alt="Tue Mar 22 2022 10:06:33 GMT-0700 (Pacific Daylight Time)">17:06</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-8" title="@shuyuguo:matrix.org">shu</span>&gt;</div></td><td class="msg-cell">it doesn't have to be, but you'd have to invent a radically different set of event loop semantics</td></tr>
   <tr class="msg" id="L10"><td class="ts-cell"><a class="ts" href="#L10" alt="Tue Mar 22 2022 10:06:42 GMT-0700 (Pacific Daylight Time)">17:06</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-8" title="@shuyuguo:matrix.org">shu</span>&gt;</div></td><td class="msg-cell">which makes me think it is probably an infeasible idea</td></tr>
+  <tr class="msg" id="L11"><td class="ts-cell"><a class="ts" href="#L11" alt="Tue Mar 22 2022 15:58:46 GMT-0700 (Pacific Daylight Time)">22:58</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-11" title="@gibson042:matrix.org">Richard Gibson</span>&gt;</div></td><td class="msg-cell"><p>GetSuperBase makes a supposedly fallible call <code>? _home_.[[GetPrototypeOf]]()</code>, but AFAICT every [[HomeObject]] is a code-inaccessible built-in object created by either ClassDefinitionEvaluation step 14–15 or §13.2.5.4 Evaluation of |ObjectLiteral|, in either case with an infallible (and ordinary) [[GetPrototypeOf]]. Can someone check me here, providing example source text where it fails—or even where GetSuperBase observes an undefined [[HomeObject]]?</p>
+<p>MakeMethod($f, <em>object</em>) sets $f.[[HomeObject]] to <em>object</em> and is called from only</p>
+<ul>
+<li>DefineMethod with argument <em>object</em></li>
+<li>MethodDefinitionEvaluation with argument <em>object</em></li>
+</ul>
+<p>MakeMethod($f, <em>homeObject</em>) sets $f.[[HomeObject]] to <em>object</em> and is called from only</p>
+<ul>
+<li>ClassFieldDefinitionEvaluation with argument <em>homeObject</em></li>
+<li>ClassStaticBlockDefinitionEvaluation with argument <em>homeObject</em></li>
+</ul>
+<p>DefineMethod is called with argument <em>object</em> from only</p>
+<ul>
+<li>MethodDefinitionEvaluation with argument <em>object</em></li>
+</ul>
+<p>DefineMethod is called with argument <em>proto</em> from only</p>
+<ul>
+<li>ClassDefinitionEvaluation
+<ul>
+<li>for the ConstructorMethod of the class body</li>
+<li>where <em>proto</em> is OrdinaryObjectCreate(<em>protoParent</em>), exposed as the "prototype" property of the returned class constructor</li>
+<li>where <em>protoParent</em> is <code>null</code> for <code>extends null</code>, x.prototype for <code>extends x</code> where it is <code>null</code> or an object, and %Object.prototype% for missing <code>extends</code></li>
+</ul>
+</li>
+</ul>
+<p>MethodDefinitionEvaluation is called with argument <em>object</em> from only</p>
+<ul>
+<li>PropertyDefinitionEvaluation with argument <em>object</em></li>
+<li>ClassElementEvaluation with argument <em>object</em></li>
+</ul>
+<p>ClassFieldDefinitionEvaluation is called with argument <em>object</em> from only</p>
+<ul>
+<li>ClassElementEvaluation with argument <em>object</em></li>
+</ul>
+<p>ClassStaticBlockDefinitionEvaluation is called with argument <em>object</em> from only</p>
+<ul>
+<li>ClassElementEvaluation with argument <em>object</em></li>
+</ul>
+<p>ClassElementEvaluation is called with argument <em>proto</em> from only</p>
+<ul>
+<li>ClassDefinitionEvaluation
+<ul>
+<li>for non-static class elements</li>
+<li>where <em>proto</em> is OrdinaryObjectCreate(<em>protoParent</em>), exposed as the "prototype" property of the returned class constructor</li>
+<li>where <em>protoParent</em> is <code>null</code> for <code>extends null</code>, x.prototype for <code>extends x</code> where it is <code>null</code> or an object, and %Object.prototype% for missing <code>extends</code></li>
+</ul>
+</li>
+</ul>
+<p>ClassElementEvaluation is called with argument <em>F</em> from only</p>
+<ul>
+<li>ClassDefinitionEvaluation
+<ul>
+<li>for static class elements</li>
+<li>where <em>F</em> is the returned class constructor (and subject to later prototype mutation)</li>
+</ul>
+</li>
+</ul>
+<p>PropertyDefinitionEvaluation is called with argument <em>obj</em> from only</p>
+<ul>
+<li>Evaluation of |ObjectLiteral|
+<ul>
+<li>where <em>obj</em> is OrdinaryObjectCreate(%Object.prototype%)</li>
+<li>where <em>obj</em> is returned (and subject to later prototype mutation)</li>
+</ul>
+</li>
+</ul>
+</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>

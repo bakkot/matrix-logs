@@ -548,3 +548,51 @@ which makes me think it is probably an infeasible idea
 [10:07:40.0336] <shu>
  * bakkot: probably a terrible idea?
 
+[15:58:46.0113] <Richard Gibson>
+GetSuperBase makes a supposedly fallible call `? _home_.[[GetPrototypeOf]]()`, but AFAICT every [[HomeObject]] is a code-inaccessible built-in object created by either ClassDefinitionEvaluation step 14–15 or §13.2.5.4 Evaluation of |ObjectLiteral|, in either case with an infallible (and ordinary) [[GetPrototypeOf]]. Can someone check me here, providing example source text where it fails—or even where GetSuperBase observes an undefined [[HomeObject]]?
+
+MakeMethod($f, _object_) sets $f.[[HomeObject]] to _object_ and is called from only
+* DefineMethod with argument _object_
+* MethodDefinitionEvaluation with argument _object_
+
+MakeMethod($f, _homeObject_) sets $f.[[HomeObject]] to _object_ and is called from only
+* ClassFieldDefinitionEvaluation with argument _homeObject_
+* ClassStaticBlockDefinitionEvaluation with argument _homeObject_
+
+
+DefineMethod is called with argument _object_ from only
+* MethodDefinitionEvaluation with argument _object_
+
+DefineMethod is called with argument _proto_ from only
+* ClassDefinitionEvaluation
+  * for the ConstructorMethod of the class body
+  * where _proto_ is OrdinaryObjectCreate(_protoParent_), exposed as the "prototype" property of the returned class constructor
+  * where _protoParent_ is `null` for `extends null`, x.prototype for `extends x` where it is `null` or an object, and %Object.prototype% for missing `extends`
+
+MethodDefinitionEvaluation is called with argument _object_ from only
+* PropertyDefinitionEvaluation with argument _object_
+* ClassElementEvaluation with argument _object_
+
+ClassFieldDefinitionEvaluation is called with argument _object_ from only
+* ClassElementEvaluation with argument _object_
+
+ClassStaticBlockDefinitionEvaluation is called with argument _object_ from only
+* ClassElementEvaluation with argument _object_
+
+
+ClassElementEvaluation is called with argument _proto_ from only
+* ClassDefinitionEvaluation
+  * for non-static class elements
+  * where _proto_ is OrdinaryObjectCreate(_protoParent_), exposed as the "prototype" property of the returned class constructor
+  * where _protoParent_ is `null` for `extends null`, x.prototype for `extends x` where it is `null` or an object, and %Object.prototype% for missing `extends`
+
+ClassElementEvaluation is called with argument _F_ from only
+* ClassDefinitionEvaluation
+  * for static class elements
+  * where _F_ is the returned class constructor (and subject to later prototype mutation)
+
+PropertyDefinitionEvaluation is called with argument _obj_ from only
+* Evaluation of |ObjectLiteral|
+  * where _obj_ is OrdinaryObjectCreate(%Object.prototype%)
+  * where _obj_ is returned (and subject to later prototype mutation)
+
