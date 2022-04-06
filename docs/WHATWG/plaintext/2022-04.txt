@@ -110,3 +110,24 @@ But we do have primitives such as "remove all listeners" in the platform, but th
 [04:59:41.0350] <freddy>
 Yeah, so the thing is that there's an apparent lack of "inside knowledge" from the sanitizer folks (freddy, otherdaniel, koto) about the potential state that could be attached to the document. The lack of knowledge lead to a security-conservative "we want it all gone" design goal. Similar to the other security-conservative choices we made (can't just a string-to-string API and hope for the best, can't parse a string with implicit/wrong context element, etc.).
 
+[05:00:17.0222] <freddy>
+So, one ideas is that I'm trying to find out if there's an algorithm that would a) shine some light on the apparent lack of details and b) alleviate the concerns by being an existing thing.
+
+[05:00:54.0823] <annevk>
+Again though, what's the actual input here? If you start with a tree, don't you have to trust that tree already?
+
+[05:01:08.0909] <freddy>
+On the other hand, I know that all other sanitizer libraries traverse a DOM tree based on the input (or parse it based on the input) and not even re-use those elements but create completely new ones and copy the bits over selectively. Which is a bit like a clone, but more... iterative
+
+[05:01:56.0050] <freddy>
+No. You don't. E.g., `<iframe sandbox="allow-same-origin" src="bad stuff>` contains attacker-controlled stuff and you want to "promote" it into the current document, but need it to be sanitized first
+
+[05:02:13.0997] <freddy>
+so `sanitize(iframe.contentDocument)`
+
+[05:03:50.0083] <freddy>
+OK, admittedly a `sandbox`ed iframe wouldn't have event listeners (because it doesnt script). But maybe your privilege-separation mechanism is `<iframe sandbox="allow-script" src="some-sandbox-domain-for-user-content">` (google, github, mdn, bugzilla use those sandbox-domains _A LOT_). And if you'd want to promote that into a current document you wouldn't iframe it, but instead `XHR()` it and sanitize the returned `document`
+
+[05:04:03.0954] <freddy>
+ * OK, admittedly a `sandbox`ed iframe wouldn't have event listeners (because it doesnt script). But maybe your privilege-separation mechanism is `<iframe sandbox="allow-script" src="some-sandbox-domain-for-user-content">` (google, github, mdn, bugzilla use those sandbox-domains _A LOT_). And if you'd want to promote that into a current document you wouldn't iframe it, but instead `XHR()` it and sanitize the returned `document`
+
