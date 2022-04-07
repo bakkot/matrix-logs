@@ -530,3 +530,20 @@ And can coëxist under different names in every options bag that accepts either.
 [10:49:00.0675] <Kris Kowal>
 I did not take the time to scroll up. Is there a possibility that cancel token and bulk revocation token are the same thing?
 
+[10:50:55.0231] <rbuckton>
+I do wonder if it makes sense to define a Host hooks for the whole thing, or move some of the logic into ECMA-262 with a host hook for allocating the prototype chain. That would allow us to internally spec and use cancellation without relying on a host hook
+
+[10:52:01.0468] <rbuckton>
+> <@kriskowal:matrix.org> I did not take the time to scroll up. Is there a possibility that cancel token and bulk revocation token are the same thing?
+
+I'd have to look at the proposal, but it sounds likely. I consider cancellation a "primitive" for a reason. It's not directly tied to async execution/promises, but is a general purpose mechanism for canceling things.
+
+[10:53:24.0293] <rbuckton>
+I think the issue with using AbortSignal for proxy revocation is the async callback nature of EventTarget. When you revoke a proxy you want it revoked immediately. Yes, a proxy can check if the AbortSignal has been aborted when the proxy is used, but that still introduces GC issues.
+
+[10:54:18.0887] <rbuckton>
+Ideally, when you would use `abort` for bulk revocation, not only should everything be revoked immediately but you should be able to clean up references to targets and proxy handlers so they can be garbage collected.
+
+[10:55:02.0795] <rbuckton>
+You could do both, but if EventTarget callbacks are async, there's a delay in that cleanup.
+
