@@ -596,3 +596,40 @@ Pardon, `const childToken = token.withTimeout(ms)` and `const {cancel, childToke
 [11:04:37.0330] <Kris Kowal>
 In any case, `withTimeout` is trivial to implement in userspace in terms of `token`, as long as you have something like `token.spawn()` to create a child that gets synchronously cancelled when its parent is cancelled.
 
+[11:05:57.0527] <Kris Kowal>
+Tragically, what you end up with is a subset of a Promise implementation, but that particular subset is good because it can be sync where Promise cannot 😅
+
+[11:06:00.0605] <rbuckton>
+The way I do it in `@esfx/async-canceltoken` would be something like:
+
+```js
+const timeoutToken = CancelToken.timeout(ms);
+const childToken = CancelToken.race([token, timeoutToken]);
+```
+
+[11:06:52.0061] <rbuckton>
+Or just
+```js
+const childToken = CancelToken.race([token, CancelToken.timeout(ms)]);
+```
+
+[11:07:19.0147] <rbuckton>
+No new source is created in this case.
+
+[11:07:28.0235] <Kris Kowal>
+Yeah, likewise, it’s analogous to `Promise.race([Promise.delay(ms, context), context])`, where `Promise.delay` is also cancellable.
+
+[11:07:50.0557] <rbuckton>
+(see `@esfx/async-delay`, same idea)
+
+[11:09:08.0739] <Kris Kowal>
+I’d suggest `CancelToken.timeout(ms, token)` to cancel the timeout if the parent gets cancelled faster.
+
+[11:09:13.0885] <rbuckton>
+Though I really need to rename `@esfx/async-canceltoken` to just `@esfx/canceltoken` (since, like I said, cancellation isn't solely for async operations)
+
+[11:10:02.0529] <rbuckton>
+> <@kriskowal:matrix.org> I’d suggest `CancelToken.timeout(ms, token)` to cancel the timeout if the parent gets cancelled faster.
+
+That's fair, esp. since one of my biggest concerns has been GC and cleanup. 
+
