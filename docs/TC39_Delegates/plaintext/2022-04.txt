@@ -587,3 +587,12 @@ https://pkg.go.dev/context
 
 Can you expand on this?
 
+[11:01:58.0349] <Kris Kowal>
+Yeah, suppose we had `token`, we would not want `const {cancel, token: childToken} = token.withTimeout(100)` because that would mean `Token.prototype.withTimeout` would provide a timing side-channel that’s hard to scour in a `lockdown()`. We already do this kind of work for `Date.now` and `Math.random`, but not growing that burden is ideal. For this reason, there’s no reasonable way to get `Intl` into a lockdown environment. The API has to be different almost entirely so the prototype can’t be shared. Something like `Token.withTimeout(token, ms)` is better for this purpose.
+
+[11:02:46.0815] <Kris Kowal>
+Pardon, `const childToken = token.withTimeout(ms)` and `const {cancel, childToken} = token.spawn()` is a more coherent strawman.
+
+[11:04:37.0330] <Kris Kowal>
+In any case, `withTimeout` is trivial to implement in userspace in terms of `token`, as long as you have something like `token.spawn()` to create a child that gets synchronously cancelled when its parent is cancelled.
+
