@@ -184,3 +184,49 @@ Ixjs has this with a `concurrent` param for `flatMap` https://github.com/Reactiv
 [14:02:48.0183] <bakkot>
 for the particular example you give I think the thing you actually want is a helper to bound how many invocations of an async function can be running simultaneously
 
+[14:07:25.0823] <bakkot>
+```
+function boundAsyncFunctionConcurrency(f, N) {
+  let waiting = [];
+  let available = N;
+  function lock() {
+    if (available > 0) {
+      --available;
+      return;
+    }
+    return new Promise(res => {
+      waiting.push(res);
+    });
+  }
+  function unlock() {
+    if (waiting.length > 0) {
+      waiting.shift()();
+    } else {
+      ++available;
+    }
+  }
+
+  return async function(...args) {
+    try {
+      await lock();
+      return await f.apply(this, args);
+    } finally {
+      unlock();
+    }
+  };
+}
+```
+
+
+[14:07:29.0425] <bakkot>
+or something to that effect
+
+[14:07:58.0564] <bakkot>
+so you can do `.map(boundAsyncFunctionConcurrency(async url => await op(url), 5))`
+
+[14:08:11.0084] <bakkot>
+rather than getting the iterator helpers involved directly
+
+[14:08:27.0078] <bakkot>
+but there are probably other cases where you'd want the iterator helpers to be involved
+

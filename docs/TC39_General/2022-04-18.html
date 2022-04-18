@@ -32,6 +32,41 @@
   <tr class="msg" id="L3"><td class="ts-cell"><a class="ts" href="#L3" alt="Mon Apr 18 2022 13:49:50 GMT-0700 (Pacific Daylight Time)">20:49</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell">I haven't thought about it really hard but I expect it should be. and at the very least nothing in this proposal is likely to make it harder.</td></tr>
   <tr class="msg" id="L4"><td class="ts-cell"><a class="ts" href="#L4" alt="Mon Apr 18 2022 13:50:54 GMT-0700 (Pacific Daylight Time)">20:50</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@aclaymore:matrix.org">Ashley Claymore</span>&gt;</div></td><td class="msg-cell">Ixjs has this with a <code>concurrent</code> param for <code>flatMap</code> <a href="https://github.com/ReactiveX/IxJS/blob/master/src/asynciterable/operators/flatmap.ts">https://github.com/ReactiveX/IxJS/blob/master/src/asynciterable/operators/flatmap.ts</a></td></tr>
   <tr class="msg" id="L5"><td class="ts-cell"><a class="ts" href="#L5" alt="Mon Apr 18 2022 14:02:48 GMT-0700 (Pacific Daylight Time)">21:02</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell">for the particular example you give I think the thing you actually want is a helper to bound how many invocations of an async function can be running simultaneously</td></tr>
+  <tr class="msg" id="L6"><td class="ts-cell"><a class="ts" href="#L6" alt="Mon Apr 18 2022 14:07:25 GMT-0700 (Pacific Daylight Time)">21:07</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell"><pre><code>function boundAsyncFunctionConcurrency(f, N) {
+  let waiting = [];
+  let available = N;
+  function lock() {
+    if (available &gt; 0) {
+      --available;
+      return;
+    }
+    return new Promise(res =&gt; {
+      waiting.push(res);
+    });
+  }
+  function unlock() {
+    if (waiting.length &gt; 0) {
+      waiting.shift()();
+    } else {
+      ++available;
+    }
+  }
+
+  return async function(...args) {
+    try {
+      await lock();
+      return await f.apply(this, args);
+    } finally {
+      unlock();
+    }
+  };
+}
+</code></pre>
+</td></tr>
+  <tr class="msg" id="L7"><td class="ts-cell"><a class="ts" href="#L7" alt="Mon Apr 18 2022 14:07:29 GMT-0700 (Pacific Daylight Time)">21:07</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell">or something to that effect</td></tr>
+  <tr class="msg" id="L8"><td class="ts-cell"><a class="ts" href="#L8" alt="Mon Apr 18 2022 14:07:58 GMT-0700 (Pacific Daylight Time)">21:07</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell">so you can do <code>.map(boundAsyncFunctionConcurrency(async url =&gt; await op(url), 5))</code></td></tr>
+  <tr class="msg" id="L9"><td class="ts-cell"><a class="ts" href="#L9" alt="Mon Apr 18 2022 14:08:11 GMT-0700 (Pacific Daylight Time)">21:08</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell">rather than getting the iterator helpers involved directly</td></tr>
+  <tr class="msg" id="L10"><td class="ts-cell"><a class="ts" href="#L10" alt="Mon Apr 18 2022 14:08:27 GMT-0700 (Pacific Daylight Time)">21:08</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell">but there are probably other cases where you'd want the iterator helpers to be involved</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>
