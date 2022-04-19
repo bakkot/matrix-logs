@@ -413,3 +413,48 @@ bakkot: https://jsfiddle.net/xs1brkL8/ Wait, I don't use these much. Can you det
 [20:27:37.0620] <bakkot>
 sirisian: i don't understand the question
 
+[20:32:01.0814] <bakkot>
+oh, do you mean, the `break` in the bottom loop? yes: it will cause the `yield` to be a `return`, and you can use a try/finally to do cleanup 
+
+[20:32:12.0243] <sirisian>
+oh it throws. I see.
+
+[20:32:35.0648] <bakkot>
+it doesn't throw
+
+[20:32:40.0165] <bakkot>
+it puts a `return`
+
+[20:32:55.0645] <bakkot>
+a `finally` will trigger, but not a `catch`
+
+[20:33:01.0004] <bakkot>
+```
+async function* map(tasks, n) {
+  try {
+    // Start n work
+    const parallel = new Set();
+    for (let i = 0; !tasks.done && i < n; ++i) {
+      parallel.add(makeWork((await tasks.next()).value));
+    }
+    // Process the work yielding the first one done in the set of n work
+    while (parallel.length != 0 && !tasks.done) {
+      const task = await Promise.race([...parallel].map(t => t.promise));
+      parallel.delete(task);
+      yield task;
+      // Add 1 more work
+      parallel.add(makeWork((await tasks.next()).value));
+    }
+  } finally {
+    console.log('map done');
+    tasks?.return();
+  }
+}
+```
+
+[20:33:09.0269] <bakkot>
+ * it doesn't throw
+
+[20:34:40.0951] <sirisian>
+https://jsfiddle.net/xs1brkL8/1/ neat, is this composable?
+

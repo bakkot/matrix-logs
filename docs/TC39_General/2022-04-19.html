@@ -61,6 +61,34 @@ for await (const i of gen.map(async item =&gt; {
   <tr class="msg" id="L13"><td class="ts-cell"><a class="ts" href="#L13" alt="Mon Apr 18 2022 19:54:30 GMT-0700 (Pacific Daylight Time)">02:54</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell">so you can't do it twice with different mapping functions</td></tr>
   <tr class="msg" id="L14"><td class="ts-cell"><a class="ts" href="#L14" alt="Mon Apr 18 2022 20:26:43 GMT-0700 (Pacific Daylight Time)">03:26</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@sirisian:matrix.org">sirisian</span>&gt;</div></td><td class="msg-cell"><span class="nick-2">bakkot</span>: <a href="https://jsfiddle.net/xs1brkL8/">https://jsfiddle.net/xs1brkL8/</a> Wait, I don't use these much. Can you detect the break in code like that to print "map done"?</td></tr>
   <tr class="msg" id="L15"><td class="ts-cell"><a class="ts" href="#L15" alt="Mon Apr 18 2022 20:27:37 GMT-0700 (Pacific Daylight Time)">03:27</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell"><span class="nick-15">sirisian</span>: i don't understand the question</td></tr>
+  <tr class="msg" id="L16"><td class="ts-cell"><a class="ts" href="#L16" alt="Mon Apr 18 2022 20:32:01 GMT-0700 (Pacific Daylight Time)">03:32</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell">oh, do you mean, the <code>break</code> in the bottom loop? yes: it will cause the <code>yield</code> to be a <code>return</code>, and you can use a try/finally to do cleanup</td></tr>
+  <tr class="msg" id="L17"><td class="ts-cell"><a class="ts" href="#L17" alt="Mon Apr 18 2022 20:32:12 GMT-0700 (Pacific Daylight Time)">03:32</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@sirisian:matrix.org">sirisian</span>&gt;</div></td><td class="msg-cell">oh it throws. I see.</td></tr>
+  <tr class="msg" id="L18"><td class="ts-cell"><a class="ts" href="#L18" alt="Mon Apr 18 2022 20:32:35 GMT-0700 (Pacific Daylight Time)">03:32</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell">it doesn't throw</td></tr>
+  <tr class="msg" id="L19"><td class="ts-cell"><a class="ts" href="#L19" alt="Mon Apr 18 2022 20:32:40 GMT-0700 (Pacific Daylight Time)">03:32</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell">it puts a <code>return</code></td></tr>
+  <tr class="msg" id="L20"><td class="ts-cell"><a class="ts" href="#L20" alt="Mon Apr 18 2022 20:32:55 GMT-0700 (Pacific Daylight Time)">03:32</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell">a <code>finally</code> will trigger, but not a <code>catch</code></td></tr>
+  <tr class="msg" id="L21"><td class="ts-cell"><a class="ts" href="#L21" alt="Mon Apr 18 2022 20:33:01 GMT-0700 (Pacific Daylight Time)">03:33</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell"><pre><code>async function* map(tasks, n) {
+  try {
+    // Start n work
+    const parallel = new Set();
+    for (let i = 0; !tasks.done &amp;&amp; i &lt; n; ++i) {
+      parallel.add(makeWork((await tasks.next()).value));
+    }
+    // Process the work yielding the first one done in the set of n work
+    while (parallel.length != 0 &amp;&amp; !tasks.done) {
+      const task = await Promise.race([...parallel].map(t =&gt; t.promise));
+      parallel.delete(task);
+      yield task;
+      // Add 1 more work
+      parallel.add(makeWork((await tasks.next()).value));
+    }
+  } finally {
+    console.log('map done');
+    tasks?.return();
+  }
+}
+</code></pre>
+</td></tr>
+  <tr class="msg" id="L22"><td class="ts-cell"><a class="ts" href="#L22" alt="Mon Apr 18 2022 20:34:40 GMT-0700 (Pacific Daylight Time)">03:34</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@sirisian:matrix.org">sirisian</span>&gt;</div></td><td class="msg-cell"><a href="https://jsfiddle.net/xs1brkL8/1/">https://jsfiddle.net/xs1brkL8/1/</a> neat, is this composable?</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>
