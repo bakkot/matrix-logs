@@ -96,3 +96,108 @@ i'd be happy to make the PR if that's the kind of feature flag that's acceptable
 [08:57:58.0306] <ptomato>
 that is a problem that I've heard other polyfills having as well
 
+[09:02:34.0277] <Richard Gibson>
+What do you mean by "basically all of them use parseInt as a canonical non-constructor function"? I see only minimal overlap:
+
+```sh
+$ git grep -l isConstructor '*.js' | xargs grep -l parseInt
+test/built-ins/Number/parseInt/not-a-constructor.js
+test/built-ins/parseInt/not-a-constructor.js
+```
+
+I'm also not sure what you mean by "can't be shimmed", because neither arrow functions nor those returned by `Function.prototype.call.bind(fn)` are \[\[Construct\]\]able (although in both cases access to the receiver is lost, so maybe that's the problem?).
+
+Regardless, it does seem reasonable to have a feature flag for the checks, but doesn't it already exist as `Reflect.construct`?
+
+```sh
+$ git grep -l isConstructor test/ | \
+  xargs sed -n '/^features:/,/^---/ { s/[*][/]$//; p }' | \
+  python3 -c "$(printf 'import sys,yaml\nfor doc in yaml.safe_load_all(sys.stdin):\n if doc:\n  print("\x1F".join(doc["features"]))\n')" | \
+  awk 'BEGIN { FS="\x1F" } { for(i=1; i<=NF; i++) m[$i]++; } END { for(flag in m) print m[flag], flag; print NR, "TOTAL" }' | \
+  sort -n | \
+  tail
+13 SharedArrayBuffer
+14 Reflect
+16 Symbol
+21 DataView
+24 ArrayBuffer
+51 TypedArray
+175 Temporal
+383 arrow-function
+623 Reflect.construct
+623 TOTAL
+```
+
+[09:03:35.0458] <Richard Gibson>
+ * What do you mean by "basically all of them use parseInt as a canonical non-constructor function"? I see only minimal overlap:
+
+```sh
+$ git grep -l isConstructor '*.js' | xargs grep -l parseInt
+test/built-ins/Number/parseInt/not-a-constructor.js
+test/built-ins/parseInt/not-a-constructor.js
+```
+
+I'm also not sure what you mean by "can't be shimmed", because neither arrow functions nor those returned by `Function.prototype.call.bind(fn)` are \[\[Construct\]\]able (although in both cases access to the receiver is lost, so maybe that's the problem?).
+
+Regardless, it does seem reasonable to have a feature flag for the checks, but doesn't it already exist as `Reflect.construct`?
+
+```sh
+$ git grep -l isConstructor test/ | \
+  xargs sed -n '/^features:/,/^---/ { s/[*][/]$//; p }' | \
+  python3 -c "$(printf 'import sys,yaml\nfor doc in yaml.safe_load_all(sys.stdin):\n  if doc:\n    print("\x1F".join(doc["features"]))\n')" | \
+  awk 'BEGIN { FS="\x1F" } { for(i=1; i<=NF; i++) m[$i]++; } END { for(flag in m) print m[flag], flag; print NR, "TOTAL" }' | \
+  sort -n | \
+  tail
+13 SharedArrayBuffer
+14 Reflect
+16 Symbol
+21 DataView
+24 ArrayBuffer
+51 TypedArray
+175 Temporal
+383 arrow-function
+623 Reflect.construct
+623 TOTAL
+```
+
+[09:03:58.0443] <Richard Gibson>
+ * What do you mean by "basically all of them use parseInt as a canonical non-constructor function"? I see only minimal overlap:
+
+```sh
+$ git grep -l isConstructor '*.js' | xargs grep -l parseInt
+test/built-ins/Number/parseInt/not-a-constructor.js
+test/built-ins/parseInt/not-a-constructor.js
+```
+
+I'm also not sure what you mean by "can't be shimmed", because neither arrow functions nor those returned by `Function.prototype.call.bind(fn)` are \[\[Construct\]\]able (although in both cases access to the receiver is lost, so maybe that's the problem?).
+
+Regardless, it does seem reasonable to have a feature flag for the checks, but doesn't it already exist as `Reflect.construct`?
+
+```sh
+$ git grep -l isConstructor test/ | \
+  xargs sed -n '/^features:/,/^---/ { s/[*][/]$//; p }' | \
+  python3 -c "$(printf 'import sys,yaml\nfor doc in yaml.safe_load_all(sys.stdin):\n if doc:\n  print("\x1F".join(doc["features"]))\n')" | \
+  awk 'BEGIN { FS="\x1F" } { for(i=1; i<=NF; i++) m[$i]++; } END { for(flag in m) print m[flag], flag; print NR, "TOTAL" }' | \
+  sort -n | \
+  tail
+13 SharedArrayBuffer
+14 Reflect
+16 Symbol
+21 DataView
+24 ArrayBuffer
+51 TypedArray
+175 Temporal
+383 arrow-function
+623 Reflect.construct
+623 TOTAL
+```
+
+[09:04:00.0265] <ljharb>
+bound functions are constructible, and arrows can’t be made in polyfills that support older engines
+
+[09:04:22.0625] <ljharb>
+indeed “all” may have been an exaggeration, but there’s a bunch in other filenames - species things, eg
+
+[09:04:54.0923] <ljharb>
+I’d be happy to use Reflect.construct as the feature flag for those missing it, but that seems specific to that reflect method, versus a generic “non-constructibles” thing
+
