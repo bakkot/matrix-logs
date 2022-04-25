@@ -69,6 +69,24 @@ test/built-ins/parseInt/not-a-constructor.js
   <tr class="msg" id="L14"><td class="ts-cell"><a class="ts" href="#L14" alt="Mon Apr 25 2022 10:06:28 GMT-0700 (Pacific Daylight Time)">17:06</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-6" title="@ljharb:matrix.org">ljharb</span>&gt;</div></td><td class="msg-cell">^ that</td></tr>
   <tr class="msg" id="L15"><td class="ts-cell"><a class="ts" href="#L15" alt="Mon Apr 25 2022 10:06:41 GMT-0700 (Pacific Daylight Time)">17:06</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-6" title="@ljharb:matrix.org">ljharb</span>&gt;</div></td><td class="msg-cell">namely, every browser pre-arrow-functions. all my stuff still targets IE 6</td></tr>
   <tr class="msg" id="L16"><td class="ts-cell"><a class="ts" href="#L16" alt="Mon Apr 25 2022 10:07:28 GMT-0700 (Pacific Daylight Time)">17:07</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-6" title="@ljharb:matrix.org">ljharb</span>&gt;</div></td><td class="msg-cell"><mx-reply><blockquote> but I think I would expect a maximally faithful polyfill to shim like <code>parseInt = bind(call, myParseInt)</code> rather than <code>parseInt = myParseInt</code> in order to ensure absence of [[Construct]]</blockquote></mx-reply>a shim has to provide a <em>new</em> function, so it can't just bind the original. also, ES3 doesn't have <code>.bind</code>.</td></tr>
+  <tr class="msg" id="L17"><td class="ts-cell"><a class="ts" href="#L17" alt="Mon Apr 25 2022 10:56:52 GMT-0700 (Pacific Daylight Time)">17:56</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-11" title="@gibson042:matrix.org">Richard Gibson</span>&gt;</div></td><td class="msg-cell"><p>ES3 doesn't have <code>Reflect</code> either, so the test262 code at <a href="https://github.com/tc39/test262/blob/main/harness/isConstructor.js">https://github.com/tc39/test262/blob/main/harness/isConstructor.js</a> won't recognize <em>anything</em> as constructible in such an environment. So to elaborate a bit, I think I would expect a maximally faithful ES3-compatible polyfill to shim like</p>
+<pre><code class="language-js">/*globalThis.*/parseInt = asNonConstructible(myParseInt);
+…
+function myParseInt(string, radix) { … }
+…
+function asNonConstructible(fn) {
+  if (nativeBind) {
+    // bind(nativeCall, fn) uses a derivatives of Function.prototype.bind with uncurried receiver
+    // to provide a robust version of Function.prototype.call.bind(fn)
+    // (i.e., returning a bound function that lacks [[Construct]] and calls fn with undefined receiver).
+    return bind(nativeCall, fn);
+  }
+
+  // In the absence of Function.prototype.bind, fall back to returning the provided function.
+  return fn;
+}
+</code></pre>
+</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>
