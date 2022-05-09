@@ -55,6 +55,22 @@
   <tr class="msg" id="L21"><td class="ts-cell"><a class="ts" href="#L21" alt="Mon May 09 2022 12:47:02 GMT-0700 (Pacific Daylight Time)">19:47</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-1" title="@jridgewell:matrix.org">Justin Ridgewell</span>&gt;</div></td><td class="msg-cell"><code>thenable.then(resolve)</code> and <code>resolve(thenable)</code> are supposed to take the same number of ticks.</td></tr>
   <tr class="msg" id="L22"><td class="ts-cell"><a class="ts" href="#L22" alt="Mon May 09 2022 12:48:05 GMT-0700 (Pacific Daylight Time)">19:48</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-1" title="@jridgewell:matrix.org">Justin Ridgewell</span>&gt;</div></td><td class="msg-cell">But because <code>resolve(thenable)</code> creates a new job for doing the <code><a href="http://then.call">then.call</a>(prom, onFul, onRej)</code> and the <code>then</code> internally creates a new job before calling <code>onFul</code>/<code>onRej</code>, we get 2 ticks instead of 1.</td></tr>
   <tr class="msg" id="L23"><td class="ts-cell"><a class="ts" href="#L23" alt="Mon May 09 2022 13:05:19 GMT-0700 (Pacific Daylight Time)">20:05</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@mhofman:matrix.org">Mathieu Hofman</span>&gt;</div></td><td class="msg-cell">It might be tricky to untangle this. <code>Promise.resolve()</code> should most likely not call <code>.then</code> in the same tick (It's already unfortunate it does a <code>[[Get]]</code> of the <code>constructor</code> and <code>then</code>). Maybe there is a way to not use a new callback job if we're already inside then callback job? I haven't thought this through yet.</td></tr>
+  <tr class="msg" id="L24"><td class="ts-cell"><a class="ts" href="#L24" alt="Mon May 09 2022 13:10:10 GMT-0700 (Pacific Daylight Time)">20:10</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-1" title="@jridgewell:matrix.org">Justin Ridgewell</span>&gt;</div></td><td class="msg-cell">Are you thinking about throws?</td></tr>
+  <tr class="msg" id="L25"><td class="ts-cell"><a class="ts" href="#L25" alt="Mon May 09 2022 13:11:05 GMT-0700 (Pacific Daylight Time)">20:11</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-1" title="@jridgewell:matrix.org">Justin Ridgewell</span>&gt;</div></td><td class="msg-cell">Note that <code>Promise.resolve</code> isn't part of A+, so we could diverge and do an tick before invoking the thenable's <code>then</code></td></tr>
+  <tr class="msg" id="L26"><td class="ts-cell"><a class="ts" href="#L26" alt="Mon May 09 2022 13:11:13 GMT-0700 (Pacific Daylight Time)">20:11</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@mhofman:matrix.org">Mathieu Hofman</span>&gt;</div></td><td class="msg-cell">I'm wondering how you could test this though. The <code>.then</code> call would always happen when no user code is on the stack. Maybe the test could create a resolved promise and attach a fulfillment handler (as a "next tick" detection) before returning the test thenable, and ensure that the <code>.then</code> is called before the "next tick" ?</td></tr>
+  <tr class="msg" id="L27"><td class="ts-cell"><a class="ts" href="#L27" alt="Mon May 09 2022 13:14:31 GMT-0700 (Pacific Daylight Time)">20:14</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-1" title="@jridgewell:matrix.org">Justin Ridgewell</span>&gt;</div></td><td class="msg-cell"><p>It's easy, I think:</p>
+<pre><code>new Promise(res =&gt; {
+  let sync = true;
+  res({
+    then(onFul) {
+      onFul(called);
+    }
+  });
+  sync = false;
+});
+</code></pre>
+</td></tr>
+  <tr class="msg" id="L28"><td class="ts-cell"><a class="ts" href="#L28" alt="Mon May 09 2022 13:15:07 GMT-0700 (Pacific Daylight Time)">20:15</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@mhofman:matrix.org">Mathieu Hofman</span>&gt;</div></td><td class="msg-cell">ah right, the constructor calls the resolve step, silly me</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>

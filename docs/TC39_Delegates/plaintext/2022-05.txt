@@ -536,3 +536,29 @@ But because `resolve(thenable)` creates a new job for doing the `then.call(prom,
 [13:05:19.0891] <Mathieu Hofman>
 It might be tricky to untangle this. `Promise.resolve()` should most likely not call `.then` in the same tick (It's already unfortunate it does a `[[Get]]` of the `constructor` and `then`). Maybe there is a way to not use a new callback job if we're already inside then callback job? I haven't thought this through yet.
 
+[13:10:10.0351] <Justin Ridgewell>
+Are you thinking about throws?
+
+[13:11:05.0912] <Justin Ridgewell>
+Note that `Promise.resolve` isn't part of A+, so we could diverge and do an tick before invoking the thenable's `then`
+
+[13:11:13.0452] <Mathieu Hofman>
+I'm wondering how you could test this though. The `.then` call would always happen when no user code is on the stack. Maybe the test could create a resolved promise and attach a fulfillment handler (as a "next tick" detection) before returning the test thenable, and ensure that the `.then` is called before the "next tick" ?
+
+[13:14:31.0790] <Justin Ridgewell>
+It's easy, I think:
+```
+new Promise(res => {
+  let sync = true;
+  res({
+    then(onFul) {
+      onFul(called);
+    }
+  });
+  sync = false;
+});
+```
+
+[13:15:07.0036] <Mathieu Hofman>
+ah right, the constructor calls the resolve step, silly me
+
