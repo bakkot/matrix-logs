@@ -303,3 +303,63 @@ The notion that `Promise.isPromise(X) === true` only for X that can _become_ a p
 [17:26:19.0959] <Kris Kowal>
  * The notion that `Promise.isPromise(X) === true` only for X that can _become_ a promise invites the possibility that `"hello"` is a promise.
 
+[17:35:14.0796] <bakkot>
+IME the main reason people use `isArray` is to make polymorphic APIs, where e.g. you take either a list of names or a single name. and I expect that's the main way people would use this as well: `if (Promise.isPromise(x)) x = await x`, say. but that doesn't do the right thing if `x` is thenable but not a Promise.
+
+[17:36:04.0928] <bakkot>
+this seems bad. especially for people who want to make proxies for stuff unless we make isPromise pierce proxies like isArray does, which we _definitely will not do_
+
+[17:36:25.0187] <ljharb>
+in practice tho it’s rarely a thenable
+
+[17:36:30.0075] <Mathieu Hofman>
+I would not expect proxies to pierce this
+
+[17:36:30.0605] <Kris Kowal>
+The example is not coherent because `await 1` works fine, but 1 is not a promise.
+
+[17:36:40.0707] <bakkot>
+the example is perfectly coherent
+
+[17:36:44.0567] <ljharb>
+non-Promise thenables largely died once Promise and async/await became commonplace
+
+[17:36:52.0062] <bakkot>
+ljharb: depends on how many proxies you have around
+
+[17:36:56.0984] <bakkot>
+proxy for a promise is thenable but not a promise
+
+[17:37:17.0151] <ljharb>
+“Any use of proxy” is incredibly niche automatically :-)
+
+[17:37:22.0231] <bakkot>
+fair enough
+
+[17:37:25.0736] <bakkot>
+Kris Kowal: how is the example not coherent?
+
+[17:37:50.0560] <bakkot>
+I mean, it's _wrong_, because it's treating "thenable" as the same as "is promise", but I guarantee people are going to do that; that's my point
+
+[17:38:24.0464] <bakkot>
+if we didn't have thenables and only had promises, the example would be correct for a polymorphic API which wants to skip the `await` when passed a value which is not boxed in a promise
+
+[17:38:25.0494] <Mathieu Hofman>
+I agree that using `isPromise` with the intent to skip an await would be misguided.
+
+[17:38:28.0479] <bakkot>
+which is a thing people do in fact want to do
+
+[17:38:30.0907] <bakkot>
+constantly
+
+[17:38:52.0507] <ljharb>
+not just polymorphic; these kinds of checks are always useful for helpful runtime validation of input types
+
+[17:39:10.0874] <ljharb>
+which includes an IsPromise check, which thus isn’t quite as niche as claimed
+
+[17:39:58.0137] <Mathieu Hofman>
+currently people do `Promise.resolve(val) === val`, but that can synchronously trigger user code attached to `val`
+
