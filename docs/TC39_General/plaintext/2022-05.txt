@@ -807,3 +807,35 @@ Ashley Claymore: `isSafePromise` would have to check for the proto
 [16:59:52.0903] <Justin Ridgewell>
 I don't understand how a "is safe promise" won't immediately be misused.
 
+
+2022-05-12
+[17:00:20.0314] <Justin Ridgewell>
+Eg, for a proxied promise, you want to wait to adopt the thenable into your native promise
+
+[17:00:57.0519] <Justin Ridgewell>
+It seems the goal isn't determine whether a promise is safe, it's to safely cast it to a native promise
+
+[17:01:03.0962] <Justin Ridgewell>
+Why not just add that instead?
+
+[17:03:23.0896] <Kris Kowal>
+I do believe `Promise.resolveSkepitcally(landmine)` would be equally satisfying for the hardened JavaScript trade-offs.
+
+[17:03:53.0233] <Mathieu Hofman>
+"is safe promise" is a user land thing
+
+[17:04:01.0960] <Justin Ridgewell>
+```
+Promise.safeResolve = (input) => {
+  if (input.[[PromiseState]]) {
+    // guaranteed to not be a proxy, so no GetOwnDesc traps
+    const constructor = GetOwnPropertyDescriptor(input, 'constrcutor);
+    const then = GetOwnPropertyDescriptor(input, 'then');
+    if (constructor?.value === %Promise% && then?.value === %Promise.p.then%) {
+      return input;
+    }
+  }
+  return Promise.resolve().then(() => input);
+};
+```
+
