@@ -1,0 +1,468 @@
+2022-06-06
+[21:18:13.0183] <Kris Kowal>
+Thank you ljharb for creating this space and welcome interested parties in module loader virtualization. I’ve invited as many handles as I could recognize at a glance and I will try to gather the missing champions and collaborators.
+
+[21:24:03.0794] <Kris Kowal>
+By wave of an update, I’m working with the champion group to narrow the focus of the Compartments proposal to just module loader virtualization https://github.com/tc39/proposal-compartments/pull/46
+
+[21:26:15.0964] <Kris Kowal>
+Specifically in order to present the narrowest profile to the wind. There’s enough interest in the topic and two years of experience vetting the Compartments proposal (stage 1) that it’s time to push for 2.
+
+[21:27:46.0767] <Kris Kowal>
+By which I mean I hope to present on behalf of champions and collaborators, not at this plenary, but the next one in July, resources and alignment willing.
+
+[21:31:28.0179] <Kris Kowal>
+I invite Luca Casonato and guybedford (Guy Bedford) specifically because of our mutual interest. Talking with Guy yesterday, there’s substantial overlap between the problems that import reflection seeks to solve https://github.com/tc39/proposal-import-reflection, and the solutions that Compartments provide. And, Compartments I believe solve those problems without needing new syntax (relitigating the original import assertions proposal (import as)), relaxing idempotent import, or complicating cache keys.
+
+[21:36:03.0402] <Kris Kowal>
+I invite Surma because I believe the Compartments design can help inform the conversation about module blocks. One of our goals with Compartments is to create a clear distinction between a StaticModuleRecord and a ModuleDescriptor, which 262 currently conflates. Separating those concerns makes clear to me at least that we should choose whether a module block is reïfied as a StaticModuleRecord or a ModuleDescriptor, the latter containing the former. If a block is a StaticModuleRecord, that suggests easy portability between workers but doesn’t imply a full module specifier or module metadata.
+
+[21:37:03.0559] <Kris Kowal>
+The Compartments API also cleanly separates module specifier namespaces from module metadata, since we find that import.meta.url in particular must be a host-specific extension, and must be omissible in some hosts.
+
+[21:37:43.0412] <Kris Kowal>
+I think that position also clarifies our feelings about some of the design tensions we see in module blocks and look forward to discussing that.
+
+[21:40:55.0474] <Kris Kowal>
+My hope is to recruit you all to our common cause 🙂
+
+
+2022-06-07
+[21:29:01.0191] <Jack Works>
+Hello ~
+
+[21:53:50.0131] <Jack Works>
+In the [current](https://github.com/tc39/proposal-compartments/blob/6a180313515f6faec2818dad229e6921109b50f5/README.md) `ThirdPartyStaticModuleRecord` API, the initialize function only receives a `ModuleEnvironmentRecord` (which looks like only containing `import` and `export` bindings). There is no way to access the `globalThis` of the current executing compartment.
+
+Lacking this ability make it impossible to compile a ES Module into a `ThirdPartyStaticModuleRecord`.
+
+[22:17:54.0323] <Kris Kowal>
+For folks tuning in, Jack is trying to build a no-eval shim for Compartments that precompiles ESM into a bundle.
+
+[22:18:25.0948] <Kris Kowal>
+I assume you’re aware that third-party static-module-records can’t emulate live bindings.
+
+[22:19:30.0107] <Kris Kowal>
+Jack Works: Have you looked at https://github.com/endojs/endo/blob/master/packages/compartment-mapper/src/bundle.js
+
+[22:20:06.0187] <Kris Kowal>
+That uses the SES shim’s static module record to create a bundle. It’s not a complete implementation, but it might be similar to your approach.
+
+[22:20:07.0298] <Jack Works>
+> <@kriskowal:matrix.org> I assume you’re aware that third-party static-module-records can’t emulate live bindings.
+
+I'm aware that it cannot get the globalThis of the current compartment (it didn't pass as an argument in the initialize function)
+
+[22:21:41.0513] <Kris Kowal>
+Yes. My point was tangential to that concern.
+
+[22:21:57.0796] <Kris Kowal>
+I imagine we could thread globalThis into the initialize options bag.
+
+[22:22:33.0092] <Kris Kowal>
+I’m not entirely sure why it’s necessary for your implementation.
+
+[22:22:58.0425] <Jack Works>
+For example, I write `Math`.
+
+[22:22:58.0894] <Kris Kowal>
+Oh, I see.
+
+[22:23:16.0079] <Jack Works>
+I need to look it up in the current compartment's globalThis 
+
+[22:23:35.0453] <Kris Kowal>
+Thanks, I understand. The crux of the issue is that static module records must be reusable between compartments, and the global environment varies from initialization to initialization.
+
+[22:23:39.0104] <Jack Works>
+And those unresolved global variable lookup should be per-compartment
+
+[22:23:51.0651] <Kris Kowal>
+So, indeed, we should thread globalThis into the initializer.
+
+[22:25:11.0417] <Jack Works>
+I previously understand ModuleRecordEnvironment as "an exotic object that is a reification of 'lexical scope(import export bindings) and dynamic scope (globalThis)" 
+
+[22:25:43.0491] <Jack Works>
+But you just clarified that Module environment record does not contain globalThis so I need a new mechanism for this
+
+[22:26:25.0809] <Kris Kowal>
+That is certainly a reasonable design and I’m open to entertaining the idea still. I will make a point to ask Moddable for a clarification about what they did in XS.
+
+[22:27:27.0190] <Kris Kowal>
+But otherwise, whether or not to have module environment record capture global environment record is something we will want engine vendors to motivate.
+
+[22:32:39.0222] <Kris Kowal>
+Oh, module environment record *mustn’t* capture global environment record, because that includes top-level declarations of Script eval. Modules aren’t supposed to see those.
+
+[22:33:24.0040] <Kris Kowal>
+So either module environment record needs to fall through to properties of globalThis, or we need to thread globalThis into the module initializer.
+
+[22:33:55.0951] <Kris Kowal>
+Again, either way is fine with me.
+
+[22:34:10.0968] <Kris Kowal>
+And I’ll make a note in the proposal README refresh PR.
+
+[22:34:11.0275] <Jack Works>
+Aren't decls created in Script either eval-by-eval or on globalThis? 
+
+[22:34:21.0744] <Jack Works>
+* Aren't decls created in Script either eval-by-eval or on globalThis? 
+
+[22:34:38.0450] <Kris Kowal>
+Yes, that’s true most of the time. 262 does not currently specify the behavior of REPLs.
+
+[22:34:49.0809] <Kris Kowal>
+But REPLs persist the “global contour” between evals.
+
+[22:35:33.0686] <Jack Works>
+Oh I didn't notice REPLs. Does that specified in the language? I thought it was made by implementation for debugging 
+
+[22:35:48.0048] <Kris Kowal>
+That’s not something I hope to address in Draft 1 but expressly supporting the REPL case in the language would be an obvious thing to add to Compartment.
+
+[22:35:57.0945] <Kris Kowal>
+It’s not specified in the language.
+
+[22:38:48.0368] <Jack Works>
+I'm ok with either, but in a normal ES module, if you import x, then you no longer be able to refer to the global x (globalThis.x is not a direct refer). So if we want to have binding shallow behavior, or you still want to have globalLexicals in the API, I guess making it all in one object will be easier. 
+
+[22:42:32.0982] <Kris Kowal>
+globalLexicals would be analogous to globalContour. The former applies to modules only, the latter to scripts only. I haven’t added globalLexicals to the proposal yet, and might not until we discuss the layering of Lockdown. globalLexicals have a very limited use, and we found a way to avoid it for now at Agoric. That is, metering guest code.
+
+[22:44:09.0232] <Kris Kowal>
+But your hint is good. If we did have globalLexicals, having the module environment record reflect the entire top of stack would be more desirable.
+
+[22:45:21.0284] <Kris Kowal>
+I think that convinces me that we should put the burden on the module environment record.
+
+[09:21:57.0126] <Kris Kowal>
+(Aside: Moddable’s invention of “module descriptors” is truly wonderful in simplifying the Compartment API. We’ve been able to remove the `compartment.module` method and the `moduleMapHook`.)
+
+
+2022-06-08
+[10:06:13.0502] <littledan>
+Hola
+
+[10:06:25.0430] <ryzokuken>
+hola ^2
+
+[10:06:26.0945] <Kris Kowal>
+Como etc
+
+[10:06:36.0469] <shu>
+are we repurposing this room to be for all module-related proposals?
+
+[10:06:57.0816] <shu>
+(could we rename if so?)
+
+[10:07:09.0240] <Kris Kowal>
+Yes, I’m repurposing the compartments proposal for module loader proposal.
+
+[10:07:19.0353] <shu>
+what is the module loader proposal?
+
+[10:07:50.0582] <littledan>
+the non-module-related parts of compartments are being split out
+
+[10:07:50.0653] <Kris Kowal>
+Module loading was a subset of tc39/proposal-compartments. I’ve an open PR to narrow the focus to modules.
+
+[10:08:02.0793] <littledan>
+I'm a huge fan of this change
+
+[10:08:14.0414] <Kris Kowal>
+https://github.com/tc39/proposal-compartments/pull/46
+
+[10:08:16.0477] <littledan>
+how about we call this room "TC39 Modules"
+
+[10:08:25.0847] <shu>
+no i was asking something else, are we repurposing this room to also include the discussion of module blocks and import reflection?
+
+[10:08:28.0799] <shu>
+if so, let's rename
+
+[10:08:32.0963] <shu>
+if not, let's make a new room called TC39 Modules, yes
+
+[10:09:22.0757] <Jack Works>
+> <@kriskowal:matrix.org> Module loading was a subset of tc39/proposal-compartments. I’ve an open PR to narrow the focus to modules.
+
+new globalThis for each compartment is a must on our needs, want to make sure it is not removed from compartment
+
+[10:09:54.0827] <Kris Kowal>
+Ah, I’m in favor of a venue called Modules since it’s not my intention to increase the scope of Compartments to close over blocks and “static import”
+
+[10:10:25.0648] <Kris Kowal>
+My intention is to champion both shared-global and unique-globals.
+
+[10:10:32.0330] <Kris Kowal>
+Both modes are useful.
+
+[10:11:42.0631] <guybedford>
+I guess one question is where should the new StaticModulRecord be specified?
+
+[10:11:49.0480] <guybedford>
+If we can agree that such a userland record should exist?
+
+[10:12:40.0736] <guybedford>
+not userland - user exposed
+
+[10:12:45.0212] <Jack Works>
+> <@guybedford:matrix.org> If we can agree that such a userland record should exist?
+
+for module block proposal, it must exist
+
+[10:14:09.0010] <shu>
+i am supportive of such a thing existing and is user-exposed, yes
+
+[10:14:31.0603] <shu>
+(also let's invite the module blocks folks in here like Surma, not sure how to do that)
+
+[10:14:37.0198] <littledan>
+there's clearly going to be some design which is shared between proposals. I think we should avoid too much churn between repos/URLs as we develop this though
+
+[10:14:52.0713] <Kris Kowal>
+I invited Surma when we created the room.
+
+[10:15:06.0487] <shu>
+ah excellent
+
+[10:15:19.0405] <littledan>
+maybe we should call the intersection of things the "loader proposal" and name things around that?
+
+[10:15:26.0177] <Jack Works>
+> <@littledan:matrix.org> there's clearly going to be some design which is shared between proposals. I think we should avoid too much churn between repos/URLs as we develop this though
+
+now we're going to have a proposal dependency graph to link 🎉
+
+[10:15:53.0770] <shu>
+The Loader of Things
+
+[10:16:04.0686] <Kris Kowal>
+I’m in favor of not thinking too hard about layering yet. We need the proposals to be cohesive and none of them can advance without a notion of StaticModuleRecord.
+
+[10:16:41.0440] <shu>
+let's talk administrative stuff, what's a cadence people are open to at first blush?
+
+[10:16:50.0567] <shu>
+1h @ monthly? too little time?
+
+[10:17:04.0157] <littledan>
+weekly or biweekly would work for me. Monthly seems too slow given the timelines that people mentioned already
+
+[10:17:14.0121] <littledan>
+we could do monthly if we do lots of async work though
+
+[10:17:23.0036] <Kris Kowal>
+> <@shuyuguo:matrix.org> The Loader of Things
+
+I have twin dark fates: to forever toposort dependencies and be in meetings that are thinly veiled parodies of LotR. My last long standing meeting was called “The Fellowship of the Hashring”
+
+[10:17:37.0373] <shu>
+yes i do think monthly is too slow, not sure why i led with that
+
+[10:18:01.0856] <shu>
+i'll put together a doodle for initial time, and lead with 1hr @ every 2 weeks
+
+[10:18:27.0605] <Kris Kowal>
+In the interest of conservation of weekly hours, I will entertain any module conversation at SES Strategy every week, probably forever.
+
+[10:18:59.0156] <Kris Kowal>
+I can participate in a supplementary meetings at a lower cadence.
+
+[10:19:04.0768] <shu>
+i'd rather we move all of it to a module call, unless the SES folks also want to repurpose the SES call to be just about modules
+
+[10:19:28.0202] <Kris Kowal>
+SES straddles Europe/Pacific. The other time should straddle Pacific/Asia
+
+[10:20:17.0112] <Jack Works>
+I can join any meetings (when I am awake), Europe/Pacific meetings usually too late for me
+
+[10:20:28.0711] <Kris Kowal>
+For a limited time, we will prioritize modules over other popular SES Strategy topics. ShadowRealms have mostly graduated. Records and Tuples can wait.
+
+[10:20:41.0742] <shu>
+i'd prefer that folks interested in the module proposals not feel pressured to attend SES calls
+
+[10:20:47.0194] <guybedford>
+Especially given the next meeting is so soon, perhaps a weekly call would be beneficial? There's a lot of material here.
+
+[10:21:10.0266] <guybedford>
+Ideally if we could work roughly to an agenda that might help too
+
+[10:22:00.0680] <shu>
+so i propose that module discussions move out of the SES calls into this new call, *or* non-module SES topics are suspended and we just have one call until the module charter runs out
+
+[10:23:19.0064] <shu>
+and given that SES calls have a set time already, i lean towards the first option
+
+[10:23:28.0722] <guybedford>
+Building cross-specification agreement seems to be the value proposition here, so having a dedicated meeting makes sense to me
+
+[10:23:34.0057] <Kris Kowal>
+Well, I can give you a meeting where SES topics that don’t overlap modules are indefinitely postponed.
+
+[10:23:48.0001] <Kris Kowal>
+ * Well, I can give you a meeting where SES topics that don’t overlap modules are indefinitely postponed.
+
+[10:24:17.0479] <Jack Works>
+do we need a new repo for the module record and all module related proposals refer to it?
+
+[10:24:32.0413] <shu>
+Kris Kowal: are you and the SES folks open to suspend the SES calls in favor of this one until the module topics runs its course in this independent call?
+
+[10:24:36.0490] <Jack Works>
+ * do we need a new repo for the module record and all module related proposals refer to it?
+
+[10:24:40.0123] <shu>
+ * Kris Kowal: are you and the SES folks open to suspend the SES calls in favor of this one until the module topics runs its course in this independent call?
+
+[10:24:55.0918] <shu>
+i really don't want multiple "rooms where it happens"
+
+[10:24:58.0264] <Kris Kowal>
+I can only say that I only have space in my workweek to run one meeting.
+
+[10:25:12.0313] <shu>
+understood, not asking you to convene
+
+[10:25:32.0608] <Kris Kowal>
+And I would be delighted to convene ;-)
+
+[10:31:21.0353] <Kris Kowal>
+shu:  But, by all means, please share a Doodle so we can find a good commons.
+
+[10:31:35.0760] <Kris Kowal>
+ * shu:  But, by all means, please share a Doodle so we can find a good commons.
+
+[10:32:27.0254] <shu>
+making a doodle as we speak
+
+[10:50:05.0798] <Kris Kowal>
+littledan: I could use your eyes on the compartments-as-loader proposal with an eye for how to fit import assertions in. That is one concern I’ve not written in.
+
+[10:51:26.0503] <Kris Kowal>
+There are some obvious places to account for it, like adding an options bag to the import method. Probably also obviously necessary to thread those options into the loadHook.
+
+[10:52:01.0103] <Kris Kowal>
+But also perhaps obviously _not_ thread it into the loadHook, because that invites the virtual host to abuse it for non-assertions.
+
+[10:53:00.0647] <Kris Kowal>
+In order for us to preserve the character of import assertions, it might be necessary to add a “type” property to module descriptors, such that the Compartment is in a position to maintain the assertion.
+
+[10:53:31.0426] <shu>
+reflector issue and doodle up: https://github.com/tc39/Reflector/issues/436
+
+[10:53:42.0588] <shu>
+i'll cross-post in TC39 Delegates for visibility
+
+[10:53:57.0751] <Kris Kowal>
+That in turn makes a case for continuing to encapsulate “link”
+
+[10:57:05.0469] <Kris Kowal>
+Is this intentionally Doodle with a little D, or am I looking at the spreadsheet a form reports to?
+
+[10:59:57.0404] <Kris Kowal>
+https://github.com/tc39/proposal-compartments/issues/37
+
+[13:12:39.0202] <Kris Kowal>
+I withdraw the question. This is clearly superior to Doodle with a big D regardless.
+
+[13:14:08.0515] <Kris Kowal>
+I went ahead and added a column for the 10:00 AM Pacific time slot. We can deconvene SES Strategy if that time slot is winful.
+
+[13:43:27.0866] <shu>
+it is intentionally doodle with little d
+
+[13:43:36.0848] <shu>
+but i have been incorrectly capitalizing it
+
+[13:44:31.0870] <shu>
+i stole the sheet from a PM internally, i was real tired of the huge amount of large banner ads on actual doodle
+
+[13:46:57.0698] <guybedford>
+it's incredibly impressive, certainly decapitalizing doodle there :P
+
+[13:48:18.0545] <shu>
+spreadsheets: the one true programming environment
+
+[14:00:39.0100] <littledan>
+I take it 2-weekly means "every two weeks" not "twice a week" right?
+
+[14:05:42.0388] <shu>
+that's correct
+
+[14:13:17.0893] <littledan>
+that's a relief
+
+[14:40:30.0314] <Kris Kowal>
+The CommonJS debates were about a month of continuous debate with thousands of messages. I definitely can’t sustain that kind of engagement anymore, but I certainly care enough to try 😂
+
+[14:44:39.0919] <Kris Kowal>
+> <@shuyuguo:matrix.org> spreadsheets: the one true programming environment
+
+Pitch: spreadsheets but comic sans.
+
+[14:52:58.0685] <littledan>
+I feel like we don't have all that many points to actually make opinionated decisions here, that most of the API should sort of flow through "naturally"
+
+[14:55:23.0057] <littledan>
+so many things are nailed down already by the nature of modules already
+
+[15:00:59.0070] <Kris Kowal>
+Mark and I have decided to get ahead of the inevitable bikeshed and suggest renaming the Compartments proposal to merely Loader. https://github.com/tc39/proposal-compartments/pull/48
+
+[15:01:55.0786] <littledan>
+love it
+
+[15:01:58.0508] <Kris Kowal>
+It’ll remain Compartment in the quiet of our hearts.
+
+[15:02:00.0950] <littledan>
+lean in
+
+[15:02:35.0159] <littledan>
+(if you want to keep it as compartments, that's fine with me)
+
+[15:02:49.0048] <littledan>
+I guess the sort of core of this being compartment-like is having its global specified
+
+[15:02:57.0774] <littledan>
+i wonder if there's some way to refer to that... I can't think of it
+
+[15:03:04.0761] <Kris Kowal>
+Further simplifications to come to court the majority.
+
+[15:04:22.0133] <Kris Kowal>
+Right, and in the majority use-case, folks will want to share the global environment record from host to guest, so we’re discussing making that the default, and keeping a carve-out for a new-global behavior. We don’t actually need much from the new-global carve-out to build Lockdown in userland.
+
+[15:07:25.0677] <Kris Kowal>
+And I would like to prepare a PR with an inside-out version of Loader like what Guy proposes, based on Compartment shim internals, to vet guybedford’s ModuleInstance by contrast. It will be interesting to see them side-by-side.
+
+[16:54:24.0037] <Kris Kowal>
+In [Guests share host by default #50](https://github.com/tc39/proposal-compartments/pull/50), I’m attempting to make the Loader proposal more juicy for SES-indifferent crowd by making Loader() as useful as possible to what I believe will be many people’s needs with no options provided.
+
+[16:54:59.0460] <Kris Kowal>
+It’s at the end of the day, just pivoting the defaults.
+
+
+2022-06-09
+[17:41:04.0562] <Kris Kowal>
+I sketched guybedford (Guy Bedford) and Luca Casonato ’s ModuleInstance in the context of the Loader née Compartments proposal https://github.com/tc39/proposal-compartments/pull/51
+
+[17:42:06.0018] <Kris Kowal>
+In short, it doesn’t obviate the need for Loader, because dynamic import has to fall through.
+
+[17:42:55.0065] <Kris Kowal>
+It may be interesting to include a `ModuleInstance` constructor regardless, but it doesn’t reduce the scope of the Loader proposal.
+
+[18:23:32.0181] <Kris Kowal>
+On further reflection (updated above PR, it’s possible to implement Loader in user code, with all of the “static import” part of Import Reflection, ModuleInstance, and a Global constructor for the hardened JavaScript case. The user-code Loader wouldn’t be able to do import reflection on your behalf, so you’d have to learn harder on that.
+
+[18:24:50.0500] <Kris Kowal>
+The user code loader would have to thread a dynamic import (or not).
+
