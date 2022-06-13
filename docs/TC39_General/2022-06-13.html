@@ -121,6 +121,31 @@ Promise.resolve(value);
 <p>this is not the greatest example, but it happens to be from yesterday so I still have it in my history: <a href="https://bpa.st/RZVQ#1L41">https://bpa.st/RZVQ#1L41</a> -- neither the <code>Promise.all</code> nor the <code>JSON.parse</code>/<code>IrcBookState.FromJson</code> logic really belongs inside of that <code>new Promise</code>, as both are business logic unrelated to wiring up non-Promise async APIs into a Promise. now in this specific case, there <em>is</em> no useful wiring within the <code>new Promise</code> callback and that shouldn't have been used at all, hence why it's not a great example :)</p>
 </td></tr>
   <tr class="msg" id="L67"><td class="ts-cell"><a class="ts" href="#L67" alt="Mon Jun 13 2022 10:10:24 GMT-0700 (Pacific Daylight Time)">17:10</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-11" title="@joepie91:pixie.town">joepie91 🏳️‍🌈</span>&gt;</div></td><td class="msg-cell">but I regularly see basically the same error being made within code that <em>does</em> use <code>new Promise</code> for a legitimate reason, but just puts entirely too much stuff within it that doesn't need to be there</td></tr>
+  <tr class="msg" id="L68"><td class="ts-cell"><a class="ts" href="#L68" alt="Mon Jun 13 2022 10:23:23 GMT-0700 (Pacific Daylight Time)">17:23</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell"><p><span class="nick-11">joepie91 🏳️‍🌈</span>: yeah, so, I feel like again the "there is too much stuff inside of <code>new Promise</code>" thing is a consequence of the design of the Promise constructor, and would be improved by <code>Promise.defer</code> in many cases.</p>
+<p>like, to talk a little more concretely, consider the case of an event emitter which emits a series of chunks and then a <code>done</code> event. you could promise-ify it in a few different ways:</p>
+<pre><code>let emitter = makeChunkEmitter();
+let chunks = [];
+emitter.on('chunk', chunk =&gt; chunks.push(chunk));
+return new Promise(resolve =&gt; emitter.on('done', () =&gt; resolve(chunks)));
+</code></pre>
+<p>which has the problem that the two <code>on</code> calls are weirdly separated, which makes it hard to follow, or</p>
+<pre><code>let emitter = makeChunkEmitter();
+return new Promise(resolve =&gt; {
+  let chunks = [];
+  emitter.on('chunk', chunk =&gt; chunks.push(chunk));
+  emitter.on('done', () =&gt; resolve(chunks))
+});
+</code></pre>
+<p>which has the problem that there is logic unrelated to promise resolution inside of the call to the Promise constructor, and that if <code>emitter</code> is null it will incorrectly put the error inside of the Promise even though the problem wasn't inside of the emitter itself at all, or</p>
+<pre><code>let emitter = makeChunkEmitter();
+let { resolve, promise } = Promise.defer();
+let chunks = [];
+emitter.on('chunk', chunk =&gt; chunks.push(chunk));
+emitter.on('done', () =&gt; resolve(chunks));
+return promise;
+</code></pre>
+<p>which I think is the cleanest, but which has the problem that <code>Promise.defer</code> does not exist.</p>
+</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>
