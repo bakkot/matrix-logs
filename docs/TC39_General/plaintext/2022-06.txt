@@ -347,3 +347,20 @@ the problem with a defer API, then, is that the pattern it encourages is "pass y
 
 (note: I'm currently sick and someone down the street seems to have just decided to start hammering something again, so I hope that all makes sense, and I don't know how long I can keep being engaged in this discussion for)
 
+[10:01:37.0254] <bakkot>
+> for the "making something non-promisey work with promises" usecase, the optimal implementation from a maintainability perspective is one that is a) self-contained and b) minimal; that is, you'd be using `new Promise`, and its body would contain only the minimal wiring necessary to convert some other non-standard async API into a Promise
+
+hm, I think I do not agree with this, or rather I agree in theory if the wiring happens to be cleanly expressed that way (say your sync API is in the `((val, err) => body` callback style) but that in many cases the wiring does happen to work out cleanly that way (say an event emitter style, where only certain events or events under particular conditions should be the trigger for the promise settling, and the other cases you're doing something else). this is kind of what your next paragraph gets at:
+
+> this already gets done wrong a lot due to lacking documentation on working with Promises, in that a lot of people tend to put additional business logic within the `new Promise`
+
+I think this is actually encouraged by the design of the Promise constructor, and part of the point of this proposal would be to make it easier to not do that. in my experience the business logic is often pretty entangled with the wiring, and can't be cleanly separated - if you only want to settle after a certain number of events, say, then the current design means that the "business" logic which counts the events _has_ to go inside of the callback to the Promise constructor (or you have to a `Promise.defer`-style helper), so that it has access to `resolve`.
+
+> which I've already seen lead to people passing resolve/reject functions through sometimes multiple layers of indirection (all of them using 'unsafe' async patterns), ending up with a huge pile of spaghetti async code that's nearly impossible to reason about or untangle even when you want to fix it
+
+that does seem like a bad outcome, thanks for the example.
+
+> note: I'm currently sick and someone down the street seems to have just decided to start hammering something again, so I hope that all makes sense, and I don't know how long I can keep being engaged in this discussion for
+
+yeah, no worries, if this does become a proposal there will be plenty of time to comment at that point
+
