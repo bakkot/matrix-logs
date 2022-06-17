@@ -1115,3 +1115,18 @@ Yeah I'm talking about the case where body is a ReadableStream.
 [06:08:30.0652] <Luca Casonato>
 I guess you are right annevk. Arguably all of `fetch` is current half duplex, because a server could technically respond with response headers before we have finished sending the request body (even a large static request body), but we don't allow the `Promise` returned from `fetch` to complete until the entire request body is uploaded. In an ideal world, full duplex would allow the `Promise` returned from `fetch` to be only blocked on the response headers, never on the request body sending.
 
+[06:10:04.0273] <Luca Casonato>
+Deno does implement it this way, where the `Promise` returned from `fetch` is only blocked on response headers, and request sending happens in a separate parallel task. I would not be suprised if switching this behavior in browsers at some point would break compatibility, so we probably have to make full duplex opt-in. That's very unfortunate.
+
+[06:10:15.0384] <Luca Casonato>
+Especially because CFW and Deno already do full duplex by default.
+
+[06:11:23.0707] <annevk>
+Yeah, I would be okay with requiring _duplex_ to be set for streams though as Yutaka suggested, to encourage some amount of thinking about it going forward.
+
+[06:12:24.0559] <Luca Casonato>
+Yeah, that would be reasonable. Deno and CFW would have a legacy interop issue where we'd default that to `"dupelx"`, but I think that's not the end of the world.
+
+[06:13:52.0577] <Luca Casonato>
+If browsers are ok with no default for `"duplex"`, and requiring `"duplex": "half"` to be set for `ReadableStream` bodies, I have no further concerns.
+
