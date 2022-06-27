@@ -1742,3 +1742,14 @@ i mean in a realm, but I’m not paged in on all the new terminology here
 I need some time to digest all of this, but I like this direction.
 For module blocks, having "module instances" and "module sources" easily explains why/how passing a module to a different realm (and back) looses the `import()` caching: you now have a new module, just with the same source (like having two identical files on the file system but in two different locations)
 
+[09:17:41.0745] <nicolo-ribaudo>
+The "import axioms" I think we shuold guarantee are (modulo `export function then`):
+- `await import("x")` and `import * as _ from "x"` in the same module must always evaluate to the same object 
+- `await import(fragment)` and `import * as _ from fragment` in the same realm must always evaluate to the same object
+
+And, with your proposed ModuleInstance/ModuleSource,
+- `await import(fragment)` and `await import(new ModuleInstance(fragment.source))` must re-evaluate the module two times
+
+The only thing I'm not sure about is if in module blocks the evaluation context should depend on where `import()` is called or where the module is defined. Given `realm` the `globalThis` of an `iframe`, I don't know if `await import(fragment)` and `await realm.Function("s", "import(s)")(fragment)` should return the same object (because they are importing the same ModuleInstance) or if they should evaluate the module twice (because they are in two different realms).
+For string-based imports they would evaluate the module twice, but with this ModuleSource/ModuleInstance thing maye they should return the same object.
+
