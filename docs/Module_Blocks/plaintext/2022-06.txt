@@ -424,3 +424,27 @@ Tomorrow between 15 and 18 CEST? (between 24 and 27 hours from now)
 [07:03:01.0217] <Surma>
 Yup, I’m free
 
+[08:58:23.0570] <nicolo-ribaudo>
+Regarding "keeping the same `import.meta.url`": that is something that should be done at the HTML level, and in ecma262 we just have to make sure to pass enough info to host hooks to make it possible. However, I would also like to guarantee that, when running in the same realm, the two dynamic imports in this file always return the same module:
+```js
+await import("./foo.js");
+const foo = module {
+  await import("./foo.js");
+};
+```
+This should be done at the ecma262 level, similarly to how it's already guaranteed when they are in the same module (in a pre-module-blocks world).
+
+In practice this will mean passing something like _parentModule_.[[HostData]] to _moduleBlock_.[[HostData]], however we might need to do it using a new host-reserved slot (for example, the currently non-existing [[Referrer]] mentioned in the loaders room) that is guaranteed to be realm-agnostic (because the same module block could be instantiated in multiple realms). This is because [[HostData]] can currently be anything.
+
+[08:59:00.0369] <littledan>
+I think the same import.meta object should be used, and the same referrer *module* should be passed up to HTML (rather than passing the module block up)
+
+[08:59:12.0218] <littledan>
+is this what your patch does?
+
+[08:59:28.0608] <nicolo-ribaudo>
+No, my patch didn't take care of that yet
+
+[08:59:41.0747] <nicolo-ribaudo>
+You cannot use the same `import.meta` object, because they could be in different realms
+
