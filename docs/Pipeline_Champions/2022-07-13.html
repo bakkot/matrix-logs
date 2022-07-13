@@ -41,14 +41,14 @@
   <tr class="msg" id="L9"><td class="ts-cell"><a class="ts" href="#L9" alt="Wed Jul 13 2022 12:16:51 GMT-0700 (Pacific Daylight Time)">19:16</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-9" title="@rbuckton:matrix.org">rbuckton (PTO: 7/5 - 7/16)</span>&gt;</div></td><td class="msg-cell">Yes. TS compiler wants to use pipes and we internally use bitmasks, so we would be strongly against banning <code>~</code> or <code>^</code> inside a pipe</td></tr>
   <tr class="msg" id="L10"><td class="ts-cell"><a class="ts" href="#L10" alt="Wed Jul 13 2022 12:17:20 GMT-0700 (Pacific Daylight Time)">19:17</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-6" title="@rkirsling:matrix.org">rkirsling</span>&gt;</div></td><td class="msg-cell">i.e. you can do <code>~~x |&gt; foo(#)</code> or <code>y |&gt; ~~bar(#)</code>, there's no need for <code>|&gt; ~~#</code></td></tr>
   <tr class="msg" id="L11"><td class="ts-cell"><a class="ts" href="#L11" alt="Wed Jul 13 2022 12:27:18 GMT-0700 (Pacific Daylight Time)">19:27</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-9" title="@rbuckton:matrix.org">rbuckton (PTO: 7/5 - 7/16)</span>&gt;</div></td><td class="msg-cell"><p>Inside the TS compiler, our <code>binarySearch</code> function returns the twos-complement of the greatest lower bound when a match isn't found, so <code>result &gt;= 0</code> equals an exact match, and <code>~result</code> indicates an potential insert location. I could potentially see a case where someone could leverage <code>~</code> in a pipe such that:</p>
-<pre><code class="language-js">binarySearch(array, value) |&gt; ~ &gt;= 0 ? array[~] : array[~~]; // greatest lower bound
-binarySearch(array, value) |&gt; ~ &gt;= 0 ? array[~] : array[~~ + 1]; // least upper bound
+<pre><code class="language-js">binarySearch(array, value) |&gt; (~ &gt;= 0 ? array[~] : array[~~]); // greatest lower bound
+binarySearch(array, value) |&gt; (~ &gt;= 0 ? array[~] : array[~~ + 1]); // least upper bound
 </code></pre>
 <p>As you can see, this wouldn't work with <code>~</code> or <code>~~</code> (or any arbitrary length of <code>~</code>).</p>
 </td></tr>
   <tr class="msg" id="L12"><td class="ts-cell"><a class="ts" href="#L12" alt="Wed Jul 13 2022 12:29:12 GMT-0700 (Pacific Daylight Time)">19:29</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-9" title="@rbuckton:matrix.org">rbuckton (PTO: 7/5 - 7/16)</span>&gt;</div></td><td class="msg-cell"><p>I much prefer the readability of an identifier here:</p>
-<pre><code class="language-js">binarySearch(array, value) |&gt; it &gt;= 0 ? array[it] : array[~it]; // greatest lower bound
-binarySearch(array, value) |&gt; it &gt;= 0 ? array[it] : array[~it + 1]; // least upper bound
+<pre><code class="language-js">binarySearch(array, value) |&gt; (it &gt;= 0 ? array[it] : array[~it]); // greatest lower bound
+binarySearch(array, value) |&gt; (it &gt;= 0 ? array[it] : array[~it + 1]); // least upper bound
 </code></pre>
 </td></tr>
   <tr class="msg" id="L13"><td class="ts-cell"><a class="ts" href="#L13" alt="Wed Jul 13 2022 12:32:39 GMT-0700 (Pacific Daylight Time)">19:32</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-9" title="@rbuckton:matrix.org">rbuckton (PTO: 7/5 - 7/16)</span>&gt;</div></td><td class="msg-cell"><p>Though we're much more likely to see the topic used with <code>~</code> in less ambiguous cases such as in the call to <code>setEmitFlags</code> below:</p>
@@ -58,6 +58,14 @@ binarySearch(array, value) |&gt; it &gt;= 0 ? array[it] : array[~it + 1]; // lea
   |&gt; setEmitFlags(~, getEmitFlags(node) &amp; ~EmitFlags.NoComments);
 </code></pre>
 </td></tr>
+  <tr class="msg" id="L14"><td class="ts-cell"><a class="ts" href="#L14" alt="Wed Jul 13 2022 12:40:19 GMT-0700 (Pacific Daylight Time)">19:40</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@jschoi:matrix.org">jschoi</span>&gt;</div></td><td class="msg-cell">For what it’s worth, I am slowly coming around to using an identifier.<br>But I think that it really ought to be considered a contextual keyword like <code>await</code> and <code>yield</code>.<br>The keyword would be something that, from now on, we would discourage developers from using as an ordinary variable, just like how developers should not use <code>await</code> and <code>yield</code> as ordinary variables.</td></tr>
+  <tr class="msg" id="L15"><td class="ts-cell"><a class="ts" href="#L15" alt="Wed Jul 13 2022 12:42:02 GMT-0700 (Pacific Daylight Time)">19:42</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-9" title="@rbuckton:matrix.org">rbuckton (PTO: 7/5 - 7/16)</span>&gt;</div></td><td class="msg-cell">If that's the case, I'd go for something like <code>$_</code> or <code>$$</code>. I've seen <code>__</code> used too often for unused parameters, i.e. <code>f((_, __, x) =&gt; { ... })</code></td></tr>
+  <tr class="msg" id="L16"><td class="ts-cell"><a class="ts" href="#L16" alt="Wed Jul 13 2022 12:42:03 GMT-0700 (Pacific Daylight Time)">19:42</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@jschoi:matrix.org">jschoi</span>&gt;</div></td><td class="msg-cell"><pre><code class="language-js">binarySearch(array, value) |&gt; ($$ &gt;= 0 ? array[$$] : array[~$$ + 1]);
+binarySearch(array, value) |&gt; (__ &gt;= 0 ? array[__] : array[~__ + 1]);
+</code></pre>
+</td></tr>
+  <tr class="msg" id="L17"><td class="ts-cell"><a class="ts" href="#L17" alt="Wed Jul 13 2022 12:42:13 GMT-0700 (Pacific Daylight Time)">19:42</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@jschoi:matrix.org">jschoi</span>&gt;</div></td><td class="msg-cell">Right, that makes sense.</td></tr>
+  <tr class="msg" id="L18"><td class="ts-cell"><a class="ts" href="#L18" alt="Wed Jul 13 2022 12:43:23 GMT-0700 (Pacific Daylight Time)">19:43</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-9" title="@rbuckton:matrix.org">rbuckton (PTO: 7/5 - 7/16)</span>&gt;</div></td><td class="msg-cell">I generally prefer <code>$_</code> over <code>$$</code> despite it being a bit tricker to type, since <code>_</code> often indicates a placeholder in multiple languages, and there's precedent in many shell scripts and some languages for <code>$_</code>.</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>
