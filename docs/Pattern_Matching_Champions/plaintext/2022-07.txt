@@ -1272,3 +1272,36 @@ Unless you're proposing a solution that works across the board, I don't agree th
 [11:18:52.0487] <ljharb>
 do you use hasInstance to make that work?
 
+[11:40:04.0353] <rbuckton>
+The issue is a case like this:
+
+```js
+export class Base {
+  ...
+  static create() {
+    const somethingInternal = ...;
+    return new Derived(somethingInternal);
+  }
+}
+// I only want the module to be able to create instances of Derived to protect/isolate `somethingInternal`
+class Derived extends Base {
+  constructor(somethingInternal) {
+    super();
+    // use somethingInternal
+  }
+}
+
+// Don't allow consumers to create new instances of Derived by walking the prototype chain:
+Derived.prototype.constructor = Base;
+
+// works
+Base.create() instanceof Base; // true
+Base.create() instanceof Derived; // true
+
+// wouldn't work
+match (Base.create()) {
+  when ${Derived}: ...; // doesn't work because obj.constructor is never `Derived`
+  when ${Base}: ...; // works
+}
+```
+

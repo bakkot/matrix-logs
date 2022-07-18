@@ -131,6 +131,36 @@
   <tr class="msg" id="L84"><td class="ts-cell"><a class="ts" href="#L84" alt="Mon Jul 18 2022 10:49:08 GMT-0700 (Pacific Daylight Time)">17:49</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-6" title="@ljharb:matrix.org">ljharb</span>&gt;</div></td><td class="msg-cell">fwiw i'd probably be fine calling <code>Symbol.hasInstance</code> on non-builtin constructors when present; that doesn't hurt anything</td></tr>
   <tr class="msg" id="L85"><td class="ts-cell"><a class="ts" href="#L85" alt="Mon Jul 18 2022 11:16:48 GMT-0700 (Pacific Daylight Time)">18:16</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell"><mx-reply><blockquote> instanceof is broken; we shouldn't propagate that breakage further</blockquote></mx-reply>Unless you're proposing a solution that works across the board, I don't agree that this should differ except in specific cases. i.e., I'm fine if it differs slightly for builtins (Object, Array, Function, Map, Set, Promise, etc.) but not for user constructors. I have code that wouldn't be able to use <code>match</code> if you use <code>obj.constructor === Foo</code></td></tr>
   <tr class="msg" id="L86"><td class="ts-cell"><a class="ts" href="#L86" alt="Mon Jul 18 2022 11:18:52 GMT-0700 (Pacific Daylight Time)">18:18</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-6" title="@ljharb:matrix.org">ljharb</span>&gt;</div></td><td class="msg-cell">do you use hasInstance to make that work?</td></tr>
+  <tr class="msg" id="L87"><td class="ts-cell"><a class="ts" href="#L87" alt="Mon Jul 18 2022 11:40:04 GMT-0700 (Pacific Daylight Time)">18:40</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell"><p>The issue is a case like this:</p>
+<pre><code class="language-js">export class Base {
+  ...
+  static create() {
+    const somethingInternal = ...;
+    return new Derived(somethingInternal);
+  }
+}
+// I only want the module to be able to create instances of Derived to protect/isolate `somethingInternal`
+class Derived extends Base {
+  constructor(somethingInternal) {
+    super();
+    // use somethingInternal
+  }
+}
+
+// Don't allow consumers to create new instances of Derived by walking the prototype chain:
+Derived.prototype.constructor = Base;
+
+// works
+Base.create() instanceof Base; // true
+Base.create() instanceof Derived; // true
+
+// wouldn't work
+match (Base.create()) {
+  when ${Derived}: ...; // doesn't work because obj.constructor is never `Derived`
+  when ${Base}: ...; // works
+}
+</code></pre>
+</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>
