@@ -2207,3 +2207,140 @@ yes
 
 It could also just print record wrappers as normal objects
 
+[13:50:06.0772] <Luca Casonato>
+and it already does for things like the isProxy detection code
+
+[13:50:19.0520] <bakkot>
+`isRecord(x)` is exactly `typeof x === 'record' || try { Record.omit.call(x, 'a'); return true; } catch { return false }`
+
+[13:50:32.0949] <bakkot>
+if I understand correctly
+
+[13:50:33.0851] <snek>
+yeah we like, reach into weakmaps and stuff to print out their values, we are very far from needing stdlib support for stuff :P
+
+[13:50:37.0196] <nicolo-ribaudo>
+bakkot: The proposal doesn't currently include `.omit`
+
+[13:50:48.0193] <bakkot>
+true
+
+[13:50:51.0936] <bakkot>
+but if it did that would work
+
+[13:50:54.0342] <rbuckton>
+Is there a mechanism to unwrap a Record wrapper if there's no `.valueOf`?
+
+[13:51:02.0858] <ljharb>
+> <@bakkot:matrix.org> to be clear, these exotic wrappers only come up when you invoke a method (presumably with `.call`) in sloppy code with the record or tuple as its `this`
+
+also an explicit `Object()` call
+
+[13:51:08.0063] <nicolo-ribaudo>
+> <@rbuckton:matrix.org> Is there a mechanism to unwrap a Record wrapper if there's no `.valueOf`?
+
+If wrappers are immutable, `Record(wrapper)`
+
+[13:51:28.0624] <rbuckton>
+Ah, thanks.
+
+[13:51:36.0490] <nicolo-ribaudo>
+> <@bakkot:matrix.org> but if it did that would work
+
+True (and maybe it would be nicer than `.isRecordWrapper`)
+
+[13:51:43.0660] <bakkot>
+rkirsling: did you volunteer to review?
+
+[13:51:51.0273] <bakkot>
+trying to capture reviewers in the notes
+
+[13:52:05.0334] <ljharb>
+> <@littledan:matrix.org> more like "true statement"
+
+> a statement or proposition which is regarded as being established, accepted, or self-evidently true.
+
+yes, that's what axiom means
+
+[13:52:25.0255] <bakkot>
+no, "happens to be true" is very different from "is an axiom"
+
+[13:52:32.0589] <shu>
+yes
+
+[13:52:36.0855] <rbuckton>
+> <@nicolo-ribaudo:matrix.org> If wrappers are immutable, `Record(wrapper)`
+
+Not 100% sure why that is a requirement:
+```js
+var obj = Object(1);
+obj.x = 2;
+obj.x; // 2
+var i = Number(obj);
+i; // 1
+i.x; // undefined
+```
+
+[13:52:39.0366] <ljharb>
+> <@nicolo-ribaudo:matrix.org> If wrappers are immutable, `Record(wrapper)`
+
+that would work whether they're mutable or immutable.
+
+[13:52:51.0443] <nicolo-ribaudo>
+Because `Record(...)` just copies the enumerable keys from the argument
+
+[13:53:02.0511] <nicolo-ribaudo>
+ * Because `Record(...)` just copies the enumerable keys from the argument
+
+[13:53:13.0387] <ljharb>
+it shouldn't, if it's passed a wrapper
+
+[13:53:14.0695] <rbuckton>
+Then it's not "unwrapping" the wrapper, its constructing a new record, which is not the same.
+
+[13:53:20.0780] <ljharb>
+it should just extract the slot and return it. if not, that's a bug
+
+[13:53:32.0264] <nicolo-ribaudo>
+> <@rbuckton:matrix.org> Then it's not "unwrapping" the wrapper, its constructing a new record, which is not the same.
+
+How is that different since two records with the same contents are the same record?
+
+[13:53:38.0890] <snek>
+the slide should say `mod instanceof WebAssembly.Module` i believe
+
+[13:53:45.0599] <snek>
+ * the slide should say `import module foo from "./bar.wasm"` i believe
+
+[13:54:10.0984] <rbuckton>
+Its different for the exact reason mentioned above. if it copies enumerable keys then it might construct a *new* record if its mutable, so its not unwrapping in that case.
+
+[13:54:12.0405] <snek>
+ * the slide should say `mod instanceof WebAssembly.Module` i believe
+
+[13:54:35.0607] <nicolo-ribaudo>
+> <@ljharb:matrix.org> it should just extract the slot and return it. if not, that's a bug
+
+```js
+let myStr = new String("abc")
+myStr.toString = () => "def";
+String(myStr) // "def"
+```
+```js
+Boolean(Object(false)) // true
+```
+
+[13:54:42.0369] <rickbutton>
+there is no difference between a "new record" with the same values, and the old record
+
+[13:54:45.0798] <rickbutton>
+they are the same value
+
+[13:54:53.0996] <nicolo-ribaudo>
+> <@rbuckton:matrix.org> Its different for the exact reason mentioned above. if it copies enumerable keys then it might construct a *new* record if its mutable, so its not unwrapping in that case.
+
+So it only matters if they are mutable
+
+[13:55:01.0371] <ljharb>
+filed https://github.com/tc39/proposal-record-tuple/issues/329
+
