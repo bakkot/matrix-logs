@@ -535,6 +535,48 @@ await x.next(); // throws
 </blockquote></mx-reply>The map issue is related to iterating over its entries by default, as opposed to explicitly mapping over <code>.keys</code>. Your point about incompatible <code>has</code> and <code>keys</code> stands, but is just as applicable to <code>has</code> and <code>size</code></td></tr>
   <tr class="msg" id="L465"><td class="ts-cell"><a class="ts" href="#L465" alt="Wed Jul 20 2022 16:24:43 GMT-0700 (Pacific Daylight Time)">23:24</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@aclaymore:matrix.org">Ashley Claymore</span>&gt;</div></td><td class="msg-cell">so size might also need some namespacing?</td></tr>
   <tr class="msg" id="L466"><td class="ts-cell"><a class="ts" href="#L466" alt="Wed Jul 20 2022 16:25:02 GMT-0700 (Pacific Daylight Time)">23:25</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell"><span class="nick-15">rbuckton</span>: yeah, true; the fundamental thing is that you need these methods to have a specific relationship to each other, and that relationship is not obvious for {string/well-known-symbol}-named methods</td></tr>
+  <tr class="msg" id="L467"><td class="ts-cell"><a class="ts" href="#L467" alt="Wed Jul 20 2022 16:25:23 GMT-0700 (Pacific Daylight Time)">23:25</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">It's unfortunate you can't intersect with an array, which instead has <code>length</code> and <code>includes</code>, and whose <code>keys</code> are indices, but you have to draw the line somewhere I suppose.</td></tr>
+  <tr class="msg" id="L468"><td class="ts-cell"><a class="ts" href="#L468" alt="Wed Jul 20 2022 16:25:37 GMT-0700 (Pacific Daylight Time)">23:25</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell"><mx-reply><blockquote> <pre><code>interface Setish {
+  hasKey(k): boolean;
+  size: number;
+  keys(): Iterator;
+}
+</code></pre>
+</blockquote></mx-reply>we <em>could</em> do something like that but that seems way worse than symbols</td></tr>
+  <tr class="msg" id="L469"><td class="ts-cell"><a class="ts" href="#L469" alt="Wed Jul 20 2022 16:26:01 GMT-0700 (Pacific Daylight Time)">23:26</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell"><mx-reply><blockquote> It's unfortunate you can't intersect with an array, which instead has <code>length</code> and <code>includes</code>, and whose <code>keys</code> are indices, but you have to draw the line somewhere I suppose.</blockquote></mx-reply>honestly I'm OK with that, since using <code>includes</code> would make it O(n^2), which would be very surprising</td></tr>
+  <tr class="msg" id="L470"><td class="ts-cell"><a class="ts" href="#L470" alt="Wed Jul 20 2022 16:26:40 GMT-0700 (Pacific Daylight Time)">23:26</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@aclaymore:matrix.org">Ashley Claymore</span>&gt;</div></td><td class="msg-cell"><p>This was why I suggested putting the whole protocol behind one symbol, so that serves as a single namespace for everything.</p>
+<pre><code>interface Setish {
+  [Symbol.Setish](): {
+    size: number:
+    has(v): boolean;
+    values(): Iterator;
+  }
+}
+
+Set.prototype[Symbol.Setish] = function() { return this; }
+</code></pre>
+</td></tr>
+  <tr class="msg" id="L471"><td class="ts-cell"><a class="ts" href="#L471" alt="Wed Jul 20 2022 16:26:45 GMT-0700 (Pacific Daylight Time)">23:26</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell">I'm considering the possibility of falling back to <code>Symbol.iterator</code> in <code>intersection</code> in the case that the argument lacks <code>has</code>/<code>setHas</code>; not sure how I feel about that yet</td></tr>
+  <tr class="msg" id="L472"><td class="ts-cell"><a class="ts" href="#L472" alt="Wed Jul 20 2022 16:27:27 GMT-0700 (Pacific Daylight Time)">23:27</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell"><mx-reply><blockquote> <p>This was why I suggested putting the whole protocol behind one symbol, so that serves as a single namespace for everything.</p>
+<pre><code>interface Setish {
+  [Symbol.Setish](): {
+    size: number:
+    has(v): boolean;
+    values(): Iterator;
+  }
+}
+
+Set.prototype[Symbol.Setish] = function() { return this; }
+</code></pre>
+</blockquote></mx-reply>yeah; this implies an extra property access, though, and I don't see any benefit over just having more symbol-named methods (though maybe I am missing what the benefit is?)</td></tr>
+  <tr class="msg" id="L473"><td class="ts-cell"><a class="ts" href="#L473" alt="Wed Jul 20 2022 16:27:46 GMT-0700 (Pacific Daylight Time)">23:27</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-7" title="@devsnek:matrix.org">snek</span>&gt;</div></td><td class="msg-cell">someone may have asked this but we have a pattern of keys/values/items on things, can we just always ask for keys?</td></tr>
+  <tr class="msg" id="L474"><td class="ts-cell"><a class="ts" href="#L474" alt="Wed Jul 20 2022 16:27:54 GMT-0700 (Pacific Daylight Time)">23:27</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">We could have symbols to produce a "view" over an object, ie, <code>@@setView()</code> returns a <code>Set</code>-like representation.</td></tr>
+  <tr class="msg" id="L475"><td class="ts-cell"><a class="ts" href="#L475" alt="Wed Jul 20 2022 16:28:16 GMT-0700 (Pacific Daylight Time)">23:28</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">Then even an <code>Array</code> could produce a set-like view</td></tr>
+  <tr class="msg" id="L476"><td class="ts-cell"><a class="ts" href="#L476" alt="Wed Jul 20 2022 16:28:42 GMT-0700 (Pacific Daylight Time)">23:28</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell">again, making Array set-like makes intersection O(n^2), which seems bad</td></tr>
+  <tr class="msg" id="L477"><td class="ts-cell"><a class="ts" href="#L477" alt="Wed Jul 20 2022 16:28:43 GMT-0700 (Pacific Daylight Time)">23:28</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">Or at least, a read-only representation.</td></tr>
+  <tr class="msg" id="L478"><td class="ts-cell"><a class="ts" href="#L478" alt="Wed Jul 20 2022 16:28:44 GMT-0700 (Pacific Daylight Time)">23:28</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@aclaymore:matrix.org">Ashley Claymore</span>&gt;</div></td><td class="msg-cell">cost is one single prop access per method call (seems low). Benefit is the protocol itself can be string based which is nicer to type. And also that it's low impact to implement the interface (only need one unique symbol)</td></tr>
+  <tr class="msg" id="L479"><td class="ts-cell"><a class="ts" href="#L479" alt="Wed Jul 20 2022 16:29:18 GMT-0700 (Pacific Daylight Time)">23:29</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell">yeah but it means the protocol is a lot more complicated; for anything for which it was not just <code>return this</code>; it would be a lot more work overall</td></tr>
+  <tr class="msg" id="L480"><td class="ts-cell"><a class="ts" href="#L480" alt="Wed Jul 20 2022 16:29:40 GMT-0700 (Pacific Daylight Time)">23:29</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell"><mx-reply><blockquote> again, making Array set-like makes intersection O(n^2), which seems bad</blockquote></mx-reply>And if you need that, you'd just be doing <code>set.intersection(new Set(ar))</code> anyways</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>

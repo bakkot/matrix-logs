@@ -4626,3 +4626,103 @@ so size might also need some namespacing?
 [16:25:02.0976] <bakkot>
 rbuckton: yeah, true; the fundamental thing is that you need these methods to have a specific relationship to each other, and that relationship is not obvious for {string/well-known-symbol}-named methods
 
+[16:25:23.0113] <rbuckton>
+It's unfortunate you can't intersect with an array, which instead has `length` and `includes`, and whose `keys` are indices, but you have to draw the line somewhere I suppose. 
+
+[16:25:37.0993] <bakkot>
+> <@aclaymore:matrix.org> ```
+> interface Setish {
+>   hasKey(k): boolean;
+>   size: number;
+>   keys(): Iterator;
+> }
+> ```
+
+we _could_ do something like that but that seems way worse than symbols
+
+[16:26:01.0150] <bakkot>
+> <@rbuckton:matrix.org> It's unfortunate you can't intersect with an array, which instead has `length` and `includes`, and whose `keys` are indices, but you have to draw the line somewhere I suppose.
+
+honestly I'm OK with that, since using `includes` would make it O(n^2), which would be very surprising
+
+[16:26:40.0782] <Ashley Claymore>
+This was why I suggested putting the whole protocol behind one symbol, so that serves as a single namespace for everything.
+
+```
+interface Setish {
+  [Symbol.Setish](): {
+    size: number:
+    has(v): boolean;
+    values(): Iterator;
+  }
+}
+
+Set.prototype[Symbol.Setish] = function() { return this; }
+```
+
+[16:26:45.0936] <bakkot>
+I'm considering the possibility of falling back to `Symbol.iterator` in `intersection` in the case that the argument lacks `has`/`setHas`; not sure how I feel about that yet
+
+[16:26:55.0720] <Ashley Claymore>
+ * This was why I suggested putting the whole protocol behind one symbol, so that serves as a single namespace for everything.
+
+```
+interface Setish {
+  [Symbol.Setish](): {
+    size: number:
+    has(v): boolean;
+    values(): Iterator;
+  }
+}
+
+Set.prototype[Symbol.Setish] = function() { return this; }
+```
+
+[16:27:27.0125] <bakkot>
+> <@aclaymore:matrix.org> This was why I suggested putting the whole protocol behind one symbol, so that serves as a single namespace for everything.
+> 
+> ```
+> interface Setish {
+>   [Symbol.Setish](): {
+>     size: number:
+>     has(v): boolean;
+>     values(): Iterator;
+>   }
+> }
+> 
+> Set.prototype[Symbol.Setish] = function() { return this; }
+> ```
+
+yeah; this implies an extra property access, though, and I don't see any benefit over just having more symbol-named methods (though maybe I am missing what the benefit is?)
+
+[16:27:46.0373] <snek>
+someone may have asked this but we have a pattern of keys/values/items on things, can we just always ask for keys?
+
+[16:27:54.0820] <rbuckton>
+We could have symbols to produce a "view" over an object, ie, `@@setView()` returns a `Set`-like representation. 
+
+[16:28:16.0083] <rbuckton>
+Then even an `Array` could produce a set-like view
+
+[16:28:42.0265] <bakkot>
+again, making Array set-like makes intersection O(n^2), which seems bad
+
+[16:28:43.0461] <rbuckton>
+Or at least, a read-only representation. 
+
+[16:28:44.0441] <Ashley Claymore>
+cost is one single prop access per method call (seems low). Benefit is the protocol itself can be string based which is nicer to type. And also that it's low impact to implement the interface (only need one unique symbol)
+
+[16:29:10.0844] <Ashley Claymore>
+> <@bakkot:matrix.org> yeah; this implies an extra property access, though, and I don't see any benefit over just having more symbol-named methods (though maybe I am missing what the benefit is?)
+
+ * cost is one single prop access per method call (seems low). Benefit is the protocol itself can be string based which is nicer to type. And also that it's low impact to implement the interface (only need one unique symbol)
+
+[16:29:18.0033] <bakkot>
+yeah but it means the protocol is a lot more complicated; for anything for which it was not just `return this`; it would be a lot more work overall
+
+[16:29:40.0768] <rbuckton>
+> <@bakkot:matrix.org> again, making Array set-like makes intersection O(n^2), which seems bad
+
+And if you need that, you'd just be doing `set.intersection(new Set(ar))` anyways
+
