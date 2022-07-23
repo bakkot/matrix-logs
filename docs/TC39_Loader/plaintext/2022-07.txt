@@ -3362,3 +3362,29 @@ This refactor is great because it makes it clear exactly where importHook is cal
 [18:00:04.0773] <littledan>
 IMO it would make sense to land separately in HTML and JS already, since it is a significant cleanup, or at least put out for review as a separated item
 
+[18:05:29.0611] <Kris Kowal>
+Would it be reasonable for HostLoadImportedModule to be the default [[ImportHook]] of a Realm, such that `Module` instances and module blocks can pick it up from their execution context?
+
+[18:05:51.0063] <Kris Kowal>
+That should be behaviorally equivalent, I think.
+
+[18:06:57.0548] <Kris Kowal>
+Or rather, in the case of the `Module` constructor, picked up from the ModuleConstructor.[[Context]].[[Realm]].[[ImportHook]]
+
+[18:07:47.0637] <nicolo-ribaudo>
+> <@kriskowal:matrix.org> Though, it would be nice if we could always route through module.[[ImportHook]], even when that is just a thunk for HostLoadImportedModule.
+
+I thought about that, but it has a problem: I expect that we will always call `Promise.resolve` on `[[ImportHook]]()`'s result, because its an user-exposed API. This forces a microtask for every imported module, while the old `HostResolveImportedModule` allowed everything to be synchronous (the new `.LoadRequiredModule` always returns a promise, but hosts can implement a sync `HostLoadImportedModule` and then `.LoadRequiredModule` always returns an _already resolved_ promise)
+
+[18:08:12.0808] <Kris Kowal>
+I see.
+
+[18:09:05.0678] <Kris Kowal>
+I think the ends I’m looking for could be accomplished another way, then…
+
+[18:09:52.0964] <nicolo-ribaudo>
+I know that Bun (a new experimental JS runtime) allows `require()` of ESM, and throws if it uses TLA. So there is at least one project that depends on modules loadnig being mostly synchroous (without TLA, `.Evaluate()` returns an already resolved promise)
+
+[18:09:57.0923] <Kris Kowal>
+That is, for there to be a slot that the HostLoadImportedModule fits into, which a VirtualHostLoadImportedModule would fit in.
+
