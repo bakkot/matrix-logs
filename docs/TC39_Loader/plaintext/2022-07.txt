@@ -3326,3 +3326,21 @@ I’ll pass Caridy’s work along when I get it.
 [14:17:28.0028] <Kris Kowal>
 TBD on making a new proposal repo for each layer of a “modules epic”. Going to put that on agendas.
 
+
+2022-07-23
+[17:49:18.0726] <nicolo-ribaudo>
+> <@kriskowal:matrix.org> nicolo-ribaudo: Caridy is working on First-class Modules spec text. It might be good for you to connect.
+
+Awesome! This week I started refactoring the `HostResolveImportedModule` and `HostImportModuleDynamically` host hooks, because I didn't want to go through host-defined behavior when importing module blocks/fragments (until they import external modules).
+
+I now have a single `HostLoadImportedModule` hook, used both for static and dynamic imports, that "returns" an unlinked Module Record. ECMA-262 takes care of iterating through its dependencies, and it recursively calls `HostLoadImportedModule` to visit the whole graph (cc guybedford: this matches your intuition in https://github.com/tc39/proposal-js-module-blocks/pull/65#discussion_r912412376 !).
+
+This is my proposed refactor: https://nicolo-ribaudo.github.io/modules-import-hooks-refactor/
+If you are curious, this is how the module blocks spec looks like on top of that refactor: https://nicolo-ribaudo.github.io/modules-import-hooks-refactor/proposals/module-blocks - the updates to `import()` are relevant for "layer 0", because they show how to import a "module object".
+
+I believe that the new logic closely resembles the loading logic introduced by "layer 0": we could probably just add a step tocheck to 2.d.ii of InnerModuleLoading that calls a `module.[[ImportHook]]` function, rather than always delegating to `HostLoadImportedModule`.
+
+It would probably also help with module reflection: assuming that `WebAssembly.Module` will be a module source, the proposal could use `HostLoadImportedModule(...).[[ModuleSource]]` instead of introducing a new `HostResolveModuleReflection` AO. This would also guarantee that `import module x from "x.wasm"` and `import * as ns from "x.wasm"` import the same module, even if they do two different things with it (probably we could guarantee `ns === await import(x)`).
+
+I would love to hear your thoughts on this 🙂
+
