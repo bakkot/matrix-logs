@@ -88,6 +88,75 @@ const str = match( user ) {
 </td></tr>
   <tr class="msg" id="L20"><td class="ts-cell"><a class="ts" href="#L20" alt="Thu Jul 28 2022 03:17:04 GMT-0700 (Pacific Daylight Time)">10:17</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@m-rutter:matrix.org">michael</span>&gt;</div></td><td class="msg-cell">yep, that is how it would roughly look I think in the current proposal </td></tr>
   <tr class="msg" id="L21"><td class="ts-cell"><a class="ts" href="#L21" alt="Thu Jul 28 2022 03:19:50 GMT-0700 (Pacific Daylight Time)">10:19</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@m-rutter:matrix.org">michael</span>&gt;</div></td><td class="msg-cell">I'm matching potentially on a union of possible values, and some of those values have nested properties that I want to match against</td></tr>
+  <tr class="msg" id="L22"><td class="ts-cell"><a class="ts" href="#L22" alt="Thu Jul 28 2022 03:20:30 GMT-0700 (Pacific Daylight Time)">10:20</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@yulia:mozilla.org">yulia</span>&gt;</div></td><td class="msg-cell"><p>in the fully layered version, we could have:</p>
+<pre><code class="language-js">function hasName(user) {
+  if (user.name) {
+    if (user.name.name) {
+       return MatchPattern({ result: true, value: user.name.name})
+    }
+    return MatchPattern({ result: true, value: user.name})
+  }
+  return MatchPattern({ result: false} )
+}
+const str = match( user ) {
+  let { name } when hasName { name }
+  when String { user }
+  when Number { getNameFromId(user) }
+  otherwise { "unknown user" }
+}
+</code></pre>
+</td></tr>
+  <tr class="msg" id="L23"><td class="ts-cell"><a class="ts" href="#L23" alt="Thu Jul 28 2022 03:21:08 GMT-0700 (Pacific Daylight Time)">10:21</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@m-rutter:matrix.org">michael</span>&gt;</div></td><td class="msg-cell">I suppose the issue is then that I have to now create a dedicated function for matching against this - I suppose this could be solved in userland </td></tr>
+  <tr class="msg" id="L24"><td class="ts-cell"><a class="ts" href="#L24" alt="Thu Jul 28 2022 03:21:26 GMT-0700 (Pacific Daylight Time)">10:21</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@m-rutter:matrix.org">michael</span>&gt;</div></td><td class="msg-cell">I can imagine that userland libraries will emerge that would allow you to construct that function </td></tr>
+  <tr class="msg" id="L25"><td class="ts-cell"><a class="ts" href="#L25" alt="Thu Jul 28 2022 03:21:43 GMT-0700 (Pacific Daylight Time)">10:21</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@yulia:mozilla.org">yulia</span>&gt;</div></td><td class="msg-cell"><p>but you could arguably do</p>
+<pre><code class="language-js">const str = match( user ) {
+  let when ( { name: { name } ) { name }
+  let when ( { name } ) { name }
+  when (${String}) { user }
+  when ($number}) { getNameFromId(user) }
+  otherwise { "unknown user" }
+}
+</code></pre>
+<p>this misses the string because i haven't thought that through</p>
+</td></tr>
+  <tr class="msg" id="L26"><td class="ts-cell"><a class="ts" href="#L26" alt="Thu Jul 28 2022 03:23:03 GMT-0700 (Pacific Daylight Time)">10:23</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@m-rutter:matrix.org">michael</span>&gt;</div></td><td class="msg-cell"><mx-reply><blockquote> <p>in the fully layered version, we could have:</p>
+<pre><code class="language-js">function hasName(user) {
+  if (user.name) {
+    if (user.name.name) {
+       return MatchPattern({ result: true, value: user.name.name})
+    }
+    return MatchPattern({ result: true, value: user.name})
+  }
+  return MatchPattern({ result: false} )
+}
+const str = match( user ) {
+  let { name } when hasName { name }
+  when String { user }
+  when Number { getNameFromId(user) }
+  otherwise { "unknown user" }
+}
+</code></pre>
+</blockquote></mx-reply>I think a consequence of this is that we will likely have a proliferation of user lands libraries that give you builders for these functions to build up complex patterns with nested values</td></tr>
+  <tr class="msg" id="L27"><td class="ts-cell"><a class="ts" href="#L27" alt="Thu Jul 28 2022 03:23:04 GMT-0700 (Pacific Daylight Time)">10:23</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@yulia:mozilla.org">yulia</span>&gt;</div></td><td class="msg-cell"><p>though this is also possible:</p>
+<pre><code class="language-js">const str = match( user ) {
+  let { name: name } when ( { name: { name: ${String} } ) { name }
+  let { name }  when ( { name: ${String} } ) { name }
+  when (${String}) { user }
+  when ($number}) { getNameFromId(user) }
+  otherwise { "unknown user" }
+}
+</code></pre>
+</td></tr>
+  <tr class="msg" id="L28"><td class="ts-cell"><a class="ts" href="#L28" alt="Thu Jul 28 2022 03:23:11 GMT-0700 (Pacific Daylight Time)">10:23</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@m-rutter:matrix.org">michael</span>&gt;</div></td><td class="msg-cell">which might not be a bad thing</td></tr>
+  <tr class="msg" id="L29"><td class="ts-cell"><a class="ts" href="#L29" alt="Thu Jul 28 2022 03:23:36 GMT-0700 (Pacific Daylight Time)">10:23</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@yulia:mozilla.org">yulia</span>&gt;</div></td><td class="msg-cell">it might give us more type safety in a dynamic language, which i guess is also an interest of mine</td></tr>
+  <tr class="msg" id="L30"><td class="ts-cell"><a class="ts" href="#L30" alt="Thu Jul 28 2022 03:23:37 GMT-0700 (Pacific Daylight Time)">10:23</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@m-rutter:matrix.org">michael</span>&gt;</div></td><td class="msg-cell">oh that is interesting </td></tr>
+  <tr class="msg" id="L31"><td class="ts-cell"><a class="ts" href="#L31" alt="Thu Jul 28 2022 03:23:50 GMT-0700 (Pacific Daylight Time)">10:23</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@yulia:mozilla.org">yulia</span>&gt;</div></td><td class="msg-cell">effectively matching on structures, and making that something that can be used almost anywhere</td></tr>
+  <tr class="msg" id="L32"><td class="ts-cell"><a class="ts" href="#L32" alt="Thu Jul 28 2022 03:24:12 GMT-0700 (Pacific Daylight Time)">10:24</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@yulia:mozilla.org">yulia</span>&gt;</div></td><td class="msg-cell">but with the way the syntax is right now, it shadows and overlaps with destructuring in a way that may be ambiguous</td></tr>
+  <tr class="msg" id="L33"><td class="ts-cell"><a class="ts" href="#L33" alt="Thu Jul 28 2022 03:24:27 GMT-0700 (Pacific Daylight Time)">10:24</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@m-rutter:matrix.org">michael</span>&gt;</div></td><td class="msg-cell">so in a way we are moving the pattern matching syntax slightly over to the right?</td></tr>
+  <tr class="msg" id="L34"><td class="ts-cell"><a class="ts" href="#L34" alt="Thu Jul 28 2022 03:24:39 GMT-0700 (Pacific Daylight Time)">10:24</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@yulia:mozilla.org">yulia</span>&gt;</div></td><td class="msg-cell">or the left, it can be <code>when { ... } as { ... } </code></td></tr>
+  <tr class="msg" id="L35"><td class="ts-cell"><a class="ts" href="#L35" alt="Thu Jul 28 2022 03:24:40 GMT-0700 (Pacific Daylight Time)">10:24</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@m-rutter:matrix.org">michael</span>&gt;</div></td><td class="msg-cell"><code>( { name: { name: ${String} } )</code> is going to create a funciton?</td></tr>
+  <tr class="msg" id="L36"><td class="ts-cell"><a class="ts" href="#L36" alt="Thu Jul 28 2022 03:24:57 GMT-0700 (Pacific Daylight Time)">10:24</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@m-rutter:matrix.org">michael</span>&gt;</div></td><td class="msg-cell">equivalent to <code>hasName</code></td></tr>
+  <tr class="msg" id="L37"><td class="ts-cell"><a class="ts" href="#L37" alt="Thu Jul 28 2022 03:24:59 GMT-0700 (Pacific Daylight Time)">10:24</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@yulia:mozilla.org">yulia</span>&gt;</div></td><td class="msg-cell"><mx-reply><blockquote> <code>( { name: { name: ${String} } )</code> is going to create a funciton?</blockquote></mx-reply>a matcher rather, but same idea</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>
