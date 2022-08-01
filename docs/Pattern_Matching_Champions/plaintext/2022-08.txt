@@ -360,3 +360,60 @@ calling is... preferred, but then we lose the history here and people can't enga
 [09:24:28.0515] <yulia>
  * (this all said -- it doesn't have to happen before or as a part of pattern matching. I think it could be, and it could be really nice. I also think leaving the door open is important)
 
+[09:31:40.0799] <rbuckton>
+>> How would this apply to Proxy?
+>
+> what precisely do you mean? can you give an example? Proxies is kind of a big region for me so I am not immediately grasping the issue you are pointing out.
+
+Specifically, function identities passed via the call and construct traps. Its essentially similar to the question around F.p.bind, but reframed to an overlapping problem space.
+
+I'm also concerned about evaluation order and side effects. Consider something like this:
+
+```js
+let counter = 0;
+function g() {
+  return counter++;
+}
+
+function f({ [g()]: a }, b when Number) { ... }
+function f({ [g()]: a }, b when String) { ... }
+
+f(["foo", "bar"], "baz");
+```
+What should we expect that `a` is in `f`? This is a contrived example, but showcases how side effects could introduce unintended or unexpected consequences in function evaluation. Whereas, with a non-overloaded function the caller doesn't have to be concerned about side effects in the call:
+
+```js
+function f({ [g()]: a }, b) {
+  match (b) {
+    when (Number): ...;
+    when (String): ...;
+  }
+}
+```
+
+[09:33:27.0891] <yulia>
+hm, interesting. Wouldn't this also be an issue in the current pattern matching proposal? Especially if you have a global counter like this
+
+[09:33:33.0611] <rbuckton>
+There's also the potential for side effects in the destructuring itself.
+
+[09:34:45.0676] <yulia>
+```js
+function f({ [g()]: a }, b) {
+  match (b) {
+    when (Number): ...;
+    when (String): ...;
+  }
+}
+```
+
+this is currently not legal js syntax yes? I guess you mean
+```js
+function f({ [${g()}]: a }, b) {
+  match (b) {
+    when (Number): ...;
+    when (String): ...;
+  }
+}
+```
+
