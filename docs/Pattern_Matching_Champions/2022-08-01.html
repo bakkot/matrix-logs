@@ -66,6 +66,85 @@
   <tr class="msg" id="L7"><td class="ts-cell"><a class="ts" href="#L7" alt="Mon Aug 01 2022 09:02:05 GMT-0700 (Pacific Daylight Time)">16:02</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">Also, let me know if there's a better way to handle this discussion given the issues with your wrist. I had a comminuted fracture in my left wrist about 15 years ago, and daily pain ever since (worse on some days than others), so I can at least partially relate to how difficult typing can be at times.</td></tr>
   <tr class="msg" id="L8"><td class="ts-cell"><a class="ts" href="#L8" alt="Mon Aug 01 2022 09:09:47 GMT-0700 (Pacific Daylight Time)">16:09</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@yulia:mozilla.org">yulia</span>&gt;</div></td><td class="msg-cell">ahaha yeah it would be better to have a call</td></tr>
   <tr class="msg" id="L9"><td class="ts-cell"><a class="ts" href="#L9" alt="Mon Aug 01 2022 09:09:56 GMT-0700 (Pacific Daylight Time)">16:09</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@yulia:mozilla.org">yulia</span>&gt;</div></td><td class="msg-cell">but, i already typed this up so</td></tr>
+  <tr class="msg" id="L10"><td class="ts-cell"><a class="ts" href="#L10" alt="Mon Aug 01 2022 09:13:23 GMT-0700 (Pacific Daylight Time)">16:13</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@yulia:mozilla.org">yulia</span>&gt;</div></td><td class="msg-cell"><blockquote>
+<p>with Type Annotations on the table</p>
+</blockquote>
+<p>(you also mentioned bin ast, and other things here so ill try to answer everything... but i lost it) I believe this is an <em>very interesting</em> companion to type annotations. In fact, I was thinking that it may be interesting to have matchers written via the interface keyword. This may allow us to share both runtime behavior (that, due to being able to throw, can have interesting implications for both safety and optimization) and static information. I don't see this as in opposition and have been chatting with the typescript folks. They don't hate it so far. These may work very well together in fact.</p>
+<p>bin-ast doesn't have much support at the moment. I am not sure why this would be in opposition to metadata or reflection. Maybe you have an example i can consider.</p>
+<blockquote>
+<p>True static typing may not be on the table now, but designing overloads purely for pattern matching could put us in a poor position in the future</p>
+</blockquote>
+<p>I rather strongly disagree. In fact i think the opposite. This has been described to me as one of the weaknesses of typescript -- that they have no impact at run time. What guards and typed objects were proposed to be were runtime checks that can also be used as static information.</p>
+<blockquote>
+<p>Would each overload be an independent function reference, or are they somehow nested inside the function?</p>
+</blockquote>
+<p>This is open for discussion. A reasonable implementation would to have a match inside of an intermediate function. Effectively pointing to a table that then routes you to the correct functionality.</p>
+<blockquote>
+<p>How would this apply to F.p.bind? Do we match during .bind or when the final function is invoked?</p>
+</blockquote>
+<p>yes, if we take the table approach, then</p>
+<pre><code class="language-js">function foo(x when a) { /*...*/} 
+
+function foo( x when b) { /*...*/}
+
+function foo( x) { /*...*/ }
+
+
+// under the hood, so to speak
+
+function foo (x) {
+  match(x) {
+    when a: _internal_shapedFoo_1(x)
+    when b: _internal_shapedFoo_2(x)
+    default : _internal_Foo_default(x)
+  }
+}
+</code></pre>
+<p>(but really, the interesting thing is when you <em>dont</em> have the default case.)</p>
+<p>From the engine perspective, if we see that everything is shaped, we might be able to remove the intermediary function. This can possibly result in more assumptions being made (similar to what was being attempted by the guard proposal). This shares a lot of features with guards.</p>
+<blockquote>
+<p>How would this apply to Proxy?</p>
+</blockquote>
+<p>what precisely do you mean? can you give an example? Proxies is kind of a big region for me so I am not immediately grasping the issue you are pointing out.</p>
+<blockquote>
+<p>How would this affect new F() and the resulting <a href="http://new.target">new.target</a>, prototypes, etc.</p>
+</blockquote>
+<p>One way to answer this might be: What happens when you have a match statement in the constructor of F? another way to answer it (though I am still absorbing it) is your comment here: <a href="https://github.com/tc39/proposal-pattern-matching/issues/281#issuecomment-1199706022">https://github.com/tc39/proposal-pattern-matching/issues/281#issuecomment-1199706022</a> for the new Book example.</p>
+<blockquote>
+<p>If a function decorator is applied to only one overload, what function does it get? If they're all the same function, how would we differentiate overloads in the decorator?</p>
+</blockquote>
+<p>An decorator would apply to its direct shaped function. So, for example:</p>
+<pre><code class="language-js">class HttpRoutes {
+
+  @route("GET", "/products")
+  get(req when { url: "/products" }) { ...}
+
+  @route("GET", "/products/{id}")
+  get(req when { url: /\/products\/\d+/ }) { ... }
+
+  // internal engine functions
+  @route("GET", "/products")
+  _internal_shapedget_1(req when { url: "/products" }) { ...}
+
+    @route("GET", "/products/{id}")
+  _internal_shapedget_2(req when { url: /\/products\/\d+/ }) { ... }
+
+  implementation_get(req) { 
+    match(req) {
+       when { url: "/products" }: // ...
+       when { url: /\/products\/\d+/ }: // ... 
+       default : // throw no such function
+    }
+  }
+}
+
+</code></pre>
+<p>and, you can likely imagine what would happen if the default behavior had a decorator</p>
+<blockquote>
+<p>If a parameter decorator is applied to only one overload, what function does it get? If they're all the same function, how would we differentiate overloads in the decorator?</p>
+</blockquote>
+<p>Hopefully the above answers this question?</p>
+</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>
