@@ -200,3 +200,66 @@ WrapForValidIteratorPrototype objects don't have any internal state
 [14:19:41.0461] <snek>
 well, the iterator record for it
 
+[14:20:57.0151] <ljharb>
+ok so like `map`. it has to hold on to the original iterator, and to the callback
+
+[14:21:15.0595] <ljharb>
+so presumably the iterator object returned by `map` holds that, in an internal slot
+
+[14:21:53.0713] <snek>
+they use closures
+
+[14:22:27.0105] <ljharb>
+so the iterator object doesn't use a shared `next` method, it makes a new one each time `map` is called?
+
+[14:22:39.0264] <snek>
+uhh
+
+[14:22:43.0674] <snek>
+it uses %IteratorHelperPrototype%.next
+
+[14:22:47.0801] <snek>
+ * it uses %IteratorHelperPrototype%.next
+
+[14:22:48.0948] <ljharb>
+right. but that's a shared method.
+
+[14:22:55.0382] <snek>
+which is just %GeneratorPrototype%.next but fancy
+
+[14:22:56.0847] <ljharb>
+so it can't close over something that's unique to a given `map` call
+
+[14:23:10.0849] <ljharb>
+because it exists before `map` is ever called.
+
+[14:23:11.0878] <snek>
+ * which is just %GeneratorPrototype%.next but fancy
+
+[14:23:24.0823] <ljharb>
+so where is that state held so that `next` can access it?
+
+[14:23:39.0873] <snek>
+same place that normal generators store it
+
+[14:23:50.0121] <snek>
+the only thing is
+
+[14:24:06.0149] <snek>
+you can grep for `[[GeneratorBrand]]` in the spec
+
+[14:24:06.0150] <ljharb>
+right but that's in a slot on the generator instance, no?
+
+[14:24:13.0324] <snek>
+https://tc39.es/ecma262/#sec-generatorvalidate
+
+[14:24:19.0829] <snek>
+this is the only way it tells them apart
+
+[14:24:28.0839] <snek>
+but that just tells you if it was a generator helper method
+
+[14:24:42.0969] <snek>
+tbh i'm not sure why we separate them at all, they just call `GeneratorResume`
+
