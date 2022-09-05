@@ -263,3 +263,80 @@ but that just tells you if it was a generator helper method
 [14:24:42.0969] <snek>
 tbh i'm not sure why we separate them at all, they just call `GeneratorResume`
 
+[14:25:04.0878] <ljharb>
+right. and [[GeneratorContext]] and [[GeneratorState]] are slots on the iterator object that hold the state
+
+[14:25:22.0708] <snek>
+yeah its a generator
+
+[14:25:27.0530] <ljharb>
+right
+
+[14:26:03.0805] <ljharb>
+and GeneratorValidate brand-checks the iterator. it doesn't matter what its [[Prototype]] is, it matters if it has the expected slots.
+
+[14:26:12.0585] <snek>
+ye
+
+[14:26:25.0083] <ljharb>
+so i assume that Iterator Helper methods all do the same validation
+
+[14:26:51.0015] <snek>
+iterator helper methods do not know about those brand checks, they perform them via calling stuff like `GeneratorResume`
+
+[14:26:57.0036] <ljharb>
+right but they still exist
+
+[14:26:59.0533] <snek>
+sure
+
+[14:27:01.0744] <ljharb>
+which means that `{ __proto__: Iterator.prototype }` would fail that check, and not be a usable receiver with the Iterator Helper methods. which means Iterator.from musn't ever return it.
+
+[14:27:17.0449] <ljharb>
+which means that Iterator.from always returns a brand-checkable object, one that GeneratorValidate will accept.
+
+[14:27:26.0938] <snek>
+uhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh
+
+[14:27:27.0624] <snek>
+no
+
+[14:27:36.0444] <ljharb>
+what am i missing there?
+
+[14:28:00.0628] <snek>
+assuming this `let iterWithGeneratorSlots = [].values().map(x => x); `
+
+[14:28:22.0541] <snek>
+`Iterator.from(iterWithGeneratorSlots)` passes it through unchanged because it inherits from %Iterator.prototype%
+
+[14:28:24.0787] <snek>
+but
+
+[14:28:57.0242] <snek>
+if you do `Iterator.from({ next() {}, __proto__: Iterator.prototype })` it also passes it through unchanged
+
+[14:29:04.0970] <snek>
+that's not doing any generator stuff
+
+[14:29:29.0694] <snek>
+if you do `Iterator.from({ next() {} })` that creates a %WrapForValidIteratorPrototype% object and returns it
+
+[14:29:30.0204] <ljharb>
+ok but what happens with `Iterator.from({ next() {}, __proto__: Iterator.prototype }).map(x => x)`?
+
+[14:29:37.0331] <snek>
+but that still doesn't have any generator slots
+
+[14:29:40.0615] <snek>
+cuz its not a generator
+
+[14:29:44.0860] <snek>
+its just a stupid wrapper
+
+[14:29:51.0977] <snek>
+> <@ljharb:matrix.org> ok but what happens with `Iterator.from({ next() {}, __proto__: Iterator.prototype }).map(x => x)`?
+
+that has generator slots cuz you called map
+
