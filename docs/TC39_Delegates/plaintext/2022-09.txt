@@ -1000,3 +1000,23 @@ or bitwise it
 [19:19:51.0324] <rbuckton>
 and u64 is outside the range of allowable array indices
 
+[19:32:13.0927] <rbuckton>
+ok, I *think* I fixed my breaking changes. `@esfx/equatable` defines the following:
+- `Equatable` - A "protocol" involving two symbol-named methods (`[Equatable.equals](other)` and `[Equatable.hash]()`) indicating an object defines its own equality mechanism.
+- `Comparable` - A "protocol" involving one symbol-named method (`[Comparable.compareTo](other)`) indicating an object defines its own comparability mechanism.
+- `StructuralEquatable` - A "protocol" for `[StructuralEquatable.structuralEquals](other, equaler)` and `[StructuralEquatable.structuralHash](equaler)`
+- `StructuralComparable` - A "protocol" for `[StructuralComparable.structuralCompareTo(other, comparer)`.
+- `Equaler` - An "interface" describing an object with `{ equals(a, b), hash(x) }` methods, as well as a namespace object with default implementations (`defaultEqualer`, `structuralEqualer`, `tupleEqualer` (actually compares arrays), `tupleStructuralEqualer`), a `create` helper method to create an `Equaler` from callbacks, and a `combineHashes` function to help with complex hashCode construction (via bit shifting and XOR).
+- `Comparer` - An "interface" describing an object with `{ compare(a, b) }` methods, as well as a namespace object with default implementations (`defaultComparer`, `structuralComparer`, `tupleComparer`, and `tupleStructuralComparer`).
+
+There's also a `@esfx/equatable-shim` package that shims the `Equatable` and `Comparable` interfaces onto built-ins (and all of those methods are symbol-named, so no issues like with `.flatten`, etc.)
+
+[19:33:54.0166] <Kris Kowal>
+The CollectionsJS deep equality protocol carried an ibid map to break cycles and allowed an override for the contentEquals of the children.
+
+[19:33:55.0287] <rbuckton>
+I use the equality and comparison interfaces pretty heavily in the `@esfx/collections-*` packages as well as the `@esfx/iter-*` and `@esfx/async-iter-*` packages.
+
+[19:34:43.0658] <rbuckton>
+Mine doesn't do ad-hoc structural equality, but rather expects something that would be structurally equal to something else to explicitly implement that structural equality.
+
