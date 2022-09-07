@@ -219,3 +219,30 @@ I believe it's rare to have a full "escape back to normal expression syntax" swi
 [10:21:13.0254] <TabAtkins>
 Tho note that interpolation *mostly* exists to distinguish the ident space from irrefutable matchers. The ability to do arbitrary expressions is a nice benefit that we layered on *since* we have a well-defined boundary (and it's what the syntax does in template strings).
 
+[15:40:49.0450] <rbuckton>
+I've been discussing interpolation with some other members of the TypeScript team. One of the strong opinions I've heard is that interpolation shouldn't be necessary if we have clear semantics around how identifiers are resolved, especially if an explicit syntax is necessary to declare bindings:
+
+```
+when (Foo): ...; // look up `Foo` in scope, match the input to it (either a primitive value or a custom matcher)
+when ({ x }): ...; // either a syntax error, or merely tests for the presence of the property
+when ({ x: let x }): ...; // declare `x` and bind it. `let x` is an irrefutable matcher (always matches)
+when ({ x: x }): ...; // look up `x` in scope, match property `x` to it (either a primitive value or a custom matcher)
+when ({ x: Infinity }): ...; // look up `Infinity` in scope, match the input to it.
+when ({ x: -Infinity }): ...; // look up `Infinity` in scope, negate it, match the input to it.
+when ({ x: undefined }): ...; // look up `undefined` in scope, match the input to it.
+```
+There's no ambiguity here: Bindings are explicit (via `let`/`const` patterns), and shorthand property patterns are either illegal, or merely test for presence (i.e., property exists but value doesn't matter). The resolution rules for identifiers remain the same as anywhere else in JS.
+
+[15:43:17.0354] <rbuckton>
+Alternatively, there's also Rust's `@`-like syntax for bindings:
+```
+when ({ x@x }): ...; // bind `x` property to variable `x`
+```
+But I'd like to be able to control whether the binding is mutable or immutable, and I'd be concerned about `@` conflicting with some other future decorator target.
+
+[15:44:32.0129] <TabAtkins>
+Those last three are all primitive matchers, but otherwise yes, if we move irrefutable matchers to a separate syntax then we can resolve idents by as references instead.
+
+[15:45:02.0124] <TabAtkins>
+Tho that limits us to *just* idents (and possible dotted-ident sequences), meaning you might ahve to prepare some matcher values into temp variables beforehand.
+

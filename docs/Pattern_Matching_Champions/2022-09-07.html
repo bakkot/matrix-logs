@@ -28,6 +28,24 @@
 
   <tr class="msg" id="L0"><td class="ts-cell"><a class="ts" href="#L0" alt="Wed Sep 07 2022 10:19:53 GMT-0700 (Pacific Daylight Time)">17:19</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@tabatkins:matrix.org">TabAtkins</span>&gt;</div></td><td class="msg-cell">I believe it's rare to have a full "escape back to normal expression syntax" switch. It seems that most just allow for idents and possibly identifier descent (dotted/etc), referring to bindings visible from the outside.</td></tr>
   <tr class="msg" id="L1"><td class="ts-cell"><a class="ts" href="#L1" alt="Wed Sep 07 2022 10:21:13 GMT-0700 (Pacific Daylight Time)">17:21</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@tabatkins:matrix.org">TabAtkins</span>&gt;</div></td><td class="msg-cell">Tho note that interpolation <em>mostly</em> exists to distinguish the ident space from irrefutable matchers. The ability to do arbitrary expressions is a nice benefit that we layered on <em>since</em> we have a well-defined boundary (and it's what the syntax does in template strings).</td></tr>
+  <tr class="msg" id="L2"><td class="ts-cell"><a class="ts" href="#L2" alt="Wed Sep 07 2022 15:40:49 GMT-0700 (Pacific Daylight Time)">22:40</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell"><p>I've been discussing interpolation with some other members of the TypeScript team. One of the strong opinions I've heard is that interpolation shouldn't be necessary if we have clear semantics around how identifiers are resolved, especially if an explicit syntax is necessary to declare bindings:</p>
+<pre><code>when (Foo): ...; // look up `Foo` in scope, match the input to it (either a primitive value or a custom matcher)
+when ({ x }): ...; // either a syntax error, or merely tests for the presence of the property
+when ({ x: let x }): ...; // declare `x` and bind it. `let x` is an irrefutable matcher (always matches)
+when ({ x: x }): ...; // look up `x` in scope, match property `x` to it (either a primitive value or a custom matcher)
+when ({ x: Infinity }): ...; // look up `Infinity` in scope, match the input to it.
+when ({ x: -Infinity }): ...; // look up `Infinity` in scope, negate it, match the input to it.
+when ({ x: undefined }): ...; // look up `undefined` in scope, match the input to it.
+</code></pre>
+<p>There's no ambiguity here: Bindings are explicit (via <code>let</code>/<code>const</code> patterns), and shorthand property patterns are either illegal, or merely test for presence (i.e., property exists but value doesn't matter). The resolution rules for identifiers remain the same as anywhere else in JS.</p>
+</td></tr>
+  <tr class="msg" id="L3"><td class="ts-cell"><a class="ts" href="#L3" alt="Wed Sep 07 2022 15:43:17 GMT-0700 (Pacific Daylight Time)">22:43</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell"><p>Alternatively, there's also Rust's <code>@</code>-like syntax for bindings:</p>
+<pre><code>when ({ x@x }): ...; // bind `x` property to variable `x`
+</code></pre>
+<p>But I'd like to be able to control whether the binding is mutable or immutable, and I'd be concerned about <code>@</code> conflicting with some other future decorator target.</p>
+</td></tr>
+  <tr class="msg" id="L4"><td class="ts-cell"><a class="ts" href="#L4" alt="Wed Sep 07 2022 15:44:32 GMT-0700 (Pacific Daylight Time)">22:44</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@tabatkins:matrix.org">TabAtkins</span>&gt;</div></td><td class="msg-cell">Those last three are all primitive matchers, but otherwise yes, if we move irrefutable matchers to a separate syntax then we can resolve idents by as references instead.</td></tr>
+  <tr class="msg" id="L5"><td class="ts-cell"><a class="ts" href="#L5" alt="Wed Sep 07 2022 15:45:02 GMT-0700 (Pacific Daylight Time)">22:45</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@tabatkins:matrix.org">TabAtkins</span>&gt;</div></td><td class="msg-cell">Tho that limits us to <em>just</em> idents (and possible dotted-ident sequences), meaning you might ahve to prepare some matcher values into temp variables beforehand.</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>
