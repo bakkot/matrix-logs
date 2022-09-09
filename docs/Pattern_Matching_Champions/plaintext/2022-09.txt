@@ -383,3 +383,26 @@ While I generally favor the "keep it distinct" path, there are some interesting 
 [12:37:01.0709] <rbuckton>
 The downside of reusing destructuring is that such patterns would not have strict property or element checks by default (i.e., `const { x, y } = { x: 0, y: 1, z: 2 };` needs to continue to work), as well as that you need mechanisms for distinguishing from introducing a binding vs referencing an identifier (i.e., `const { x: Infinity } = { x: 0 }` is already legal). But the upside is that we could have a single unified pattern syntax that we could easily shoehorn into `catch` guards and `function` overloads if we so wished.
 
+[12:48:50.0139] <rbuckton>
+Some examples of the "reuse destructuring" approach:
+
+```js
+let { x: 0, y } = obj; // match obj.x to 0, bind y to obj.y, loose property matching
+let {| x: 0, y |} = obj; // match obj.x to 0, match obj.y to anything, no extra properties, bind y to obj.y
+let { x: x@0, y } = obj; // rust-style `@` binding. match obj.x to 0, bind x to obj.x, bind y to obj.y
+
+if (let Option.Some(value) = opt) ...; // `if-let` + extractors
+while (let Option.Some(message) = getNext()) ...; // `while-let` + extractors
+ 
+if (let x = foo(); x.bar) ...; // `if-let` plus C++ 17's `if-with-initializer` syntax
+while (let x = foo(); x.bar) ...; // `while-let` plus C++ 17's `if-with-initializer` syntax
+
+try { ... }
+catch (e@FileNotFoundError) { ... } // rust-style `@` and custom matcher
+catch (@TypeError) { ... } // `@` without binding and custom matcher. Needed to distinguish from id
+catch (HttpError{ statusCode: 404 }) { ... } // no need for `@` due to extractor syntax
+catch (Error{ cause: e@ReferenceError }) { ... } // `@` binding and extractors
+```
+
+It's very compelling, but requires workarounds like `@` to be backwards compatible, making it easy to make mistakes (like `{ x: NaN }`).
+
