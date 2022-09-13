@@ -2460,3 +2460,91 @@ You can but it may execute user code. I don't know if that's a requirement for o
 [22:24:51.0294] <rbuckton>
 Bradford Smith: `{ __proto__: null, toString() { return "#{" } }` would satisfy your example and not be a record wrapper.
 
+[22:25:21.0945] <ljharb>
+Mathieu Hofman: that's true. but `Promise.resolve(p) === p` ends up being "fine" in practice. i'd certainly prefer a robust approach, ofc.
+
+[22:25:44.0286] <ljharb>
+ * Mathieu Hofman: that's true. but `Promise.resolve(p) === p` ends up being "fine" in practice. i'd certainly prefer a robust approach, ofc.
+
+[22:25:45.0998] <snek>
+oh with Promise.resolve right
+
+[22:26:18.0035] <Robin Ricard>
+agree: fine to go ahead without brand check
+
+[22:26:31.0049] <Robin Ricard>
+unconvinced: something is needed to address brand check
+
+[22:26:31.0220] <bakkot>
+Richard Gibson: it is not clear to me why this intuition is valuable?
+
+[22:26:41.0670] <snek>
+ljharb this feels kind of like "your scientists were so preoccupied with whether they could they didn't stop to think if they should"
+
+[22:26:43.0098] <bakkot>
+like, who cares whether it is an actual wrapper or a copy? who is that important to?
+
+[22:27:03.0520] <leobalter>
+shu: also, our membrane framework at Salesforce deletes all the Web APIs from a ShadowRealm and we don't rely on the errors (we have userland mechanisms to capture details cross realms). We won't ship the membrane framework using ShadowRealms for at least 6 months, guaranteed.
+
+[22:27:03.0609] <ljharb>
+to users who want to realize they accidentally wrapped a primitive. it happens, albeit rarely.
+
+[22:27:15.0211] <rbuckton>
+Any reason not to have Records have a prototype that is frozen and has a `valueOf` method?
+
+[22:27:24.0832] <ljharb>
+then you couldn't have a record with a `valueOf` key
+
+[22:27:26.0538] <shu>
+leobalter: i am not concerned about SF, it is clear enough that y'all can push updates out if needed
+
+[22:27:56.0163] <Richard Gibson>
+> <@bakkot:matrix.org> like, who cares whether it is an actual wrapper or a copy? who is that important to?
+
+there's lots of code that uses `Object(…)` as an "is not primitive" predicate
+
+[22:27:58.0919] <rbuckton>
+ljharb: it could have an own `valueOf` key, just like an object.
+
+[22:28:04.0288] <bakkot>
+Richard Gibson: that would not be broken by my proposal
+
+[22:28:12.0812] <leobalter>
+shu: once again, I'm trying to mitigate the impact by usage of the feature. It's what I can do at this point. 
+
+[22:28:26.0788] <Jack Works>
+what is temp checking RN?
+
+[22:28:29.0307] <ljharb>
+rbuckton: so then you wouldn't be able to safely `.valueOf` on a record. there was a strong desire to avoid that kind of problem.
+
+[22:28:31.0531] <rbuckton>
+bakkot: that could be significantly more expensive than `Object(0)`
+
+[22:28:48.0731] <nicolo-ribaudo>
+> <@jackworks:matrix.org> what is temp checking RN?
+
+"Do we care strongly about brand checking for record wrappers?"
+
+[22:28:51.0243] <waldemar>
+We opened such a Pandora's box by letting folks customize Object.prototype.toString tags.
+
+[22:29:03.0029] <ljharb>
+yep, and we shouldn't have
+
+[22:29:23.0625] <ljharb>
+we could have pulled toStringTag from ES6 and left time to come up with a better solution, but we didn't do that (and i was too green to realize i could have insisted)
+
+[22:29:34.0150] <rbuckton>
+Having `Object(#{ arbitrarilyLargeRecord })` convert the record to an object seems expensive for such a test.
+
+[22:29:41.0010] <ljharb>
+ * we could have pulled toStringTag from ES6 and left time to come up with a better solution, but we didn't do that (and i was too green to realize i could have insisted)
+
+[22:29:43.0510] <littledan>
+yeah, like half of the symbols were a mistake
+
+[22:30:04.0234] <snek>
+most of javascript was a mistake tbh
+
