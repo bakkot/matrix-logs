@@ -5351,3 +5351,69 @@ err there's a typo there
 
 No, sorry. That example relates to general reuse of a disposable.
 
+[20:30:57.0068] <shu>
+i'd also like to better understand what the badness is with closing over a disposed thing
+
+[20:31:07.0842] <shu>
+like, what do you expect to happen, if it's not a runtime error, since that's what the TDZ gives you
+
+[20:31:23.0893] <shu>
+is it "it might do some other stuff before getting to the error point"?
+
+[20:31:37.0885] <shu>
+are your errors generally recoverable? is it bad that it did some other stuff?
+
+[20:32:43.0670] <bakkot>
+it is potentially bad that it did some other stuff, certainly
+
+[20:32:53.0666] <rbuckton>
+As far as binding reuse, the example is not much different than the example in your issue:
+```js
+{
+  using x = foo();
+  cache.set(x.url, data);
+  ...
+  setTimeout(() => cache.delete(x.url), 100);
+}
+```
+
+[20:32:55.0453] <bakkot>
+but more generally, the language should give you an error at the point at which it is obvious you have made a mistake
+
+[20:33:18.0794] <shu>
+my contention is that in practice, it does, because most objects would throw in some fashion at runtime after having its internal resources disposed
+
+[20:33:36.0768] <shu>
+if we had a static TDZ then i would not be of this opinion
+
+[20:33:51.0909] <bakkot>
+> <@rbuckton:matrix.org> As far as binding reuse, the example is not much different than the example in your issue:
+> ```js
+> {
+>   using x = foo();
+>   cache.set(x.url, data);
+>   ...
+>   setTimeout(() => cache.delete(x.url), 100);
+> }
+> ```
+
+that seems like it is a mistake - you're using `x` after it's been disposed. it seems like the language should prevent you from doing that.
+
+[20:34:10.0378] <shu>
+that's the philosophical difference
+
+[20:34:25.0222] <bakkot>
+if you explicitly want to use the object after it's been disposed, you should put it in a binding other than the one which is going to get disposed.
+
+[20:34:29.0669] <rbuckton>
+Yes, you can create another `const` to capture `x.url` to close over it, but that seems awkward just to enforce something via the binding that the disposable itself also needs to enforce internally.
+
+[20:34:30.0799] <shu>
+i do not think it is a mistake to reuse `x` after it's been "disposed", which i take to mean no more than "had some scope exit function ran"
+
+[20:34:51.0348] <bakkot>
+a scope exit function named `Symbol.dispose`, like from `DisposableStack`
+
+[20:34:59.0184] <bakkot>
+it's not like I am making up the word "dispose" here
+
