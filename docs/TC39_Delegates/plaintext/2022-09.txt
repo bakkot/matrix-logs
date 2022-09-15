@@ -5281,3 +5281,18 @@ I believe the README already give the solid motivations? For example, It's too h
 [20:09:53.0247] <rbuckton>
 `try..finally` also has the limitation of suppressing exceptions from the body, which are valuable for both logging and error recovery purposes.
 
+[20:10:10.0248] <shu>
+so here's a use case where i don't want tdz: recursive mutexes. to be sure, it's expressible even in the case of a TDZ via additional aliasing but that is not something i want to type.
+
+my intuition here is that the usual extreme badness about closing over stack-lifetimed variables is memory safety, which is not the footgun here. so my expectation is that most objects would throw at runtime in _some_ way after being disposed of anyways, instead, for example, accessing random memory. if TDZ throws a runtime error, i expect that to be net the same effect, except with extra implementation burden (at least the investigative portion, if not also the implementation complexity portion)
+
+[20:12:51.0055] <rbuckton>
+> <@shuyuguo:matrix.org> so here's a use case where i don't want tdz: recursive mutexes. to be sure, it's expressible even in the case of a TDZ via additional aliasing but that is not something i want to type.
+> 
+> my intuition here is that the usual extreme badness about closing over stack-lifetimed variables is memory safety, which is not the footgun here. so my expectation is that most objects would throw at runtime in _some_ way after being disposed of anyways, instead, for example, accessing random memory. if TDZ throws a runtime error, i expect that to be net the same effect, except with extra implementation burden (at least the investigative portion, if not also the implementation complexity portion)
+
+This matches my intuition as well. Disposable objects should guard against use that is inconsistent with their state regardless as to whether you used `using` or `let/const`. However, such a guard is not *mandatory* as there are valid use cases for disposables that can be reused, such as re-opening a connection.
+
+[20:13:49.0954] <rbuckton>
+Enforcing this both in the object itself and in the `using` binding (by introducing a new TDZ) seems excessive.
+
