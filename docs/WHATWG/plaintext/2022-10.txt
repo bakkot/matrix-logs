@@ -695,3 +695,45 @@ Okay good :-)
 [23:33:04.0098] <Domenic>
 annevk: while I have you, would love to get this merged. https://github.com/whatwg/fetch/pull/1469#issuecomment-1262513703 . I think I addressed your comment to look at things more closely.
 
+[23:40:18.0253] <annevk>
+Domenic: so what's weird is that we invoke "process response" but the data isn't final yet; and typically we wouldn't reveal the data until all redirects are followed; does that make sense?
+
+[23:40:57.0263] <Domenic>
+Hmm, I think I see... let me work through the flow
+
+[23:41:04.0307] <annevk>
+Domenic: I do see your point that it makes sense to hold on to the data given that's what we already do, but currently it wouldn't be exposed at this intermediate point
+
+[23:41:29.0556] <Domenic>
+Well right now the spec is broken ever since the move to callbacks
+
+[23:41:41.0484] <Domenic>
+You used to call fetch, get back an intermediate response, and then call HTTP-redirect fetch with that intermediate response
+
+[23:41:51.0234] <Domenic>
+Now fetch does not return a response, but HTTP-redirect fetch still expects one
+
+[23:42:30.0167] <Domenic>
+So you'd have to do something like having your processResponse (which gets the intermediate response!) call HTTP-redirect fetch
+
+[23:43:04.0491] <Domenic>
+sorry s/HTTP-redirect fetch/navigate-redirect fetch/
+
+[23:43:18.0106] <Domenic>
+Although I guess both expect the intermediate response
+
+[23:43:26.0679] <annevk>
+And with `fetch(, { ... "manual" })` they are exposed of course and presumably reveal the "intermediate" timing.
+
+[23:43:40.0040] <annevk>
+ * And with `fetch(, { ... "manual" })` they are exposed of course and presumably reveal the "intermediate" timing.
+
+[23:43:55.0133] <Domenic>
+But the point I'm taking from you is that it'd be nicer for consumers if processResponse had the same semantics for both manual and non-manual redirects... I want to trace through the flow to see if that fails to be the case.
+
+[23:44:44.0129] <Domenic>
+I think this PR actually accomplishes that?
+
+[23:44:53.0469] <Domenic>
+Because only main fetch, in the no-Location-header case, calls processResponse
+
