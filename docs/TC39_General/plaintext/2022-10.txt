@@ -547,3 +547,41 @@ stack.move(); // empties out stack
 [13:24:19.0900] <rbuckton>
 I prefer option 1 because its more GC friendly wrt/closures. If disposing the controller doesn't abort it, but instead makes it unusable and frees references to held "abort algorithms" or userland `abort` event handlers, then it doesn't matter if a closure holds a reference to the controller since everything it was holding can be GC'd. Option 2 doesn't have that benefit.
 
+[13:25:07.0987] <bakkot>
+hmmm, yeah; on the other hand it makes the simple case a lot uglier
+
+[13:25:09.0701] <rbuckton>
+Also, option 1 can be simplified by introducing a method on `AbortController.prototype` that lets you opt-in to "abort-on-dispose" semantics.
+
+[13:26:20.0805] <bakkot>
+yeah
+
+[13:27:09.0831] <rbuckton>
+> <@bakkot:matrix.org> hmmm, yeah; on the other hand it makes the simple case a lot uglier
+
+Not if you have some kind of "enter abort context" method like I mentioned above, i.e.:
+```js
+using controller = new AbortController();
+using ctx = controller.enterAbortOnDisposeContext(); // needs a better name.
+let pages = await ...;
+ctx.exit(); // exit the context without triggering dispose
+```
+
+[13:27:46.0220] <bakkot>
+right, I just mean it makes the simple case uglier unless you also add other stuff
+
+[13:28:11.0694] <rbuckton>
+Defining such lifetime contexts is well within the domain of resource management (see Python's `contextlib`)
+
+[13:28:34.0427] <bakkot>
+I could also imagine instead having a `AbortController.AutoCancel` constructor, so `using controller = new AbortController.AutoCancel()` would give you a controller with the auto-cancel behavior
+
+[13:28:48.0378] <rbuckton>
+You say simple case, but both the "i want to abort on dispose" and the "i don't want to abort on dispose" scenarios are equally as valid.
+
+[13:29:36.0565] <bakkot>
+mm... I agree they are both _valid_, but personally I anticipate wanting the "abort on dispose" semantics several orders of magnitude more often than I want the "don't want abort on dispose" semantics, and I expect this is true of almost all JS code
+
+[13:29:46.0900] <rbuckton>
+My examples illustrate how to do the same thing regardless of each behavior.
+
