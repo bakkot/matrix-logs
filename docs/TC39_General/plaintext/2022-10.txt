@@ -509,3 +509,41 @@ would be really nice
 [13:11:44.0752] <bakkot>
 (I don't yet have an opinion on this either way, just thinking through use cases)
 
+[13:21:49.0134] <rbuckton>
+either way, you need to be able to model both behaviors. 
+```js
+// option 1: cleanup but don't abort on dispose:
+using controller = new AbortController();
+
+// this could also be: `using _ = controller.enter();` or some better name
+using stack = new DisposableStack();
+stack.defer(() => controller.abort());
+
+let pages = await Promise.all(urls.map(url => fetch(url, { signal: controller.signal }));
+// automatically cancels outstanding requests if any request fails
+
+stack.move(); // empties out stack
+
+// no longer tries to abort for any errors that follow.
+
+// controller is disposed. since it is no longer usable, callbacks etc. can be GC'd
+```
+
+```js
+// option 2: abort on dispose
+using stack = new DisposableStack();
+const controller = stack.use(new AbortController());
+
+let pages = await Promise.all(urls.map(url => fetch(url, { signal: controller.signal }));
+// automatically cancels outstanding requests if any request fails
+
+stack.move(); // empties out stack
+
+// no longer tries to abort for any errors that follow.
+
+// controller isn't disposed, any closure that captures and holds a reference to `controller` will prevent GC of `abort` callbacks
+```
+
+[13:24:19.0900] <rbuckton>
+I prefer option 1 because its more GC friendly wrt/closures. If disposing the controller doesn't abort it, but instead makes it unusable and frees references to held "abort algorithms" or userland `abort` event handlers, then it doesn't matter if a closure holds a reference to the controller since everything it was holding can be GC'd. Option 2 doesn't have that benefit.
+

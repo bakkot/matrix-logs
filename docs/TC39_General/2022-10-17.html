@@ -100,6 +100,38 @@ let pages = await Promise.all(urls.map(url =&gt; fetch(url, { signal: controller
 <p>would be really nice</p>
 </td></tr>
   <tr class="msg" id="L50"><td class="ts-cell"><a class="ts" href="#L50" alt="Mon Oct 17 2022 13:11:44 GMT-0700 (Pacific Daylight Time)">20:11</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell">(I don't yet have an opinion on this either way, just thinking through use cases)</td></tr>
+  <tr class="msg" id="L51"><td class="ts-cell"><a class="ts" href="#L51" alt="Mon Oct 17 2022 13:21:49 GMT-0700 (Pacific Daylight Time)">20:21</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell"><p>either way, you need to be able to model both behaviors.</p>
+<pre><code class="language-js">// option 1: cleanup but don't abort on dispose:
+using controller = new AbortController();
+
+// this could also be: `using _ = controller.enter();` or some better name
+using stack = new DisposableStack();
+stack.defer(() =&gt; controller.abort());
+
+let pages = await Promise.all(urls.map(url =&gt; fetch(url, { signal: controller.signal }));
+// automatically cancels outstanding requests if any request fails
+
+stack.move(); // empties out stack
+
+// no longer tries to abort for any errors that follow.
+
+// controller is disposed. since it is no longer usable, callbacks etc. can be GC'd
+</code></pre>
+<pre><code class="language-js">// option 2: abort on dispose
+using stack = new DisposableStack();
+const controller = stack.use(new AbortController());
+
+let pages = await Promise.all(urls.map(url =&gt; fetch(url, { signal: controller.signal }));
+// automatically cancels outstanding requests if any request fails
+
+stack.move(); // empties out stack
+
+// no longer tries to abort for any errors that follow.
+
+// controller isn't disposed, any closure that captures and holds a reference to `controller` will prevent GC of `abort` callbacks
+</code></pre>
+</td></tr>
+  <tr class="msg" id="L52"><td class="ts-cell"><a class="ts" href="#L52" alt="Mon Oct 17 2022 13:24:19 GMT-0700 (Pacific Daylight Time)">20:24</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">I prefer option 1 because its more GC friendly wrt/closures. If disposing the controller doesn't abort it, but instead makes it unusable and frees references to held "abort algorithms" or userland <code>abort</code> event handlers, then it doesn't matter if a closure holds a reference to the controller since everything it was holding can be GC'd. Option 2 doesn't have that benefit.</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>
