@@ -787,3 +787,27 @@ or rather "an abort which happens after the thing is finished", which I would no
 [14:53:45.0883] <rbuckton>
 Its not difficult, its time consuming. You have to write scaffolding to handle that case for every single userland "abort" handler. Other implementations don't have this issue, because the ability to signal disinterest is baked in.
 
+[14:55:04.0090] <bakkot>
+You're almost certainly going to want do that anyway because someone calling `.abort` after your thing is finished is a totally normal thing to happen
+
+[14:55:18.0917] <rbuckton>
+Its far too easy to write code that doesn't handle "abort" well. That's not so much a concern if you can just drop the controller on the floor, but if `AbortController` aborts on dispose and every new StackOverflow example has `using controller = ...`, we've just made folks lives a lot harder.
+
+[14:57:40.0355] <bakkot>
+Assuming cancel-on-dispose semantics, the only reason you'd see `using controller = ...` is if it's _useful_ to call `.abort`, so we haven't made anyone's lives harder
+
+[14:58:02.0287] <bakkot>
+presumably if we had a `using _ = controller.cancelOnDipose` helper, instead of cancel-on-dispose semantics, then the stackoverflow example in question would have that line instead
+
+[14:58:27.0633] <rbuckton>
+Here's an example: Someone writes a website that asynchronously requests a page of data from the server. They use `signal.addEventListener("abort", () => { someElement.innerHTML = "Request aborted" })`, and all is well and good because they only call `.abort()` when they need to.
+
+[14:58:33.0137] <bakkot>
+ * presumably if we had a `using _ = controller.cancelOnDipose` helper, instead of cancel-on-dispose semantics, then the stackoverflow example in question would have that line instead
+
+[14:59:29.0059] <rbuckton>
+Now someone makes a change to this working code and switches `const` to `using`. Now, after the page of data is presented successfully, it is then replaced with a "Request aborted" message.
+
+[14:59:32.0060] <rbuckton>
+ * Now someone makes a change to this working code and switches `const` to `using`. Now, after the page of data is presented successfully, it is then replaced with a "Request aborted" message.
+
