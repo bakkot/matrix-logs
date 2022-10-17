@@ -630,3 +630,18 @@ While its expected that there will be cases that don't follow that behavior, in 
 
 the only thing AbortController right now does is cancellation, so it is natural to assume that `using x = new AbortController` is going to have the disposal semantics related to cancellation (i.e. abort-on-dispose). If you see that code but it doesn't do the thing it looks like (i.e. it just does GC), you're probably going to have a resource leak (e.g. requests will not be cancelled) which is very surprising to you, and you might well not even notice it (a fetch request not being cancelled is not an error you will likely notice).
 
+[13:36:01.0137] <bakkot>
+on the other hand, if `using x = new AbortController` _does_ do cancellation, and you're expecting it not to (... in which case, why did you write that code in the first place? were you looking for the GC semantics? JS developers probably are not looking for the GC semantics), what's the bug you get? probably an error in the happy path case? so you will almost certainly notice the error
+
+[13:36:22.0741] <rbuckton>
+One of the big things I wanted for the cancellation proposal was the ability to clean up complex cancellation graphs when _not_ canceled. That is something that has never made it to `AbortController`/`AbortSignal`.
+
+[13:38:37.0722] <bakkot>
+I agree that's a reasonable thing to want, I just expect JS devs will not want that nearly as often as they want "cancel outstanding fetch requests as soon as other simultaneous requests failed"
+
+[13:39:40.0217] <bakkot>
+I suppose in principle we could solve the "people having the wrong expectations" problem by not making `AbortController` disposable at all, and instead adding _two_ new properties (`.cleanupOnDispose` and `.abortOnDipsose`, say) each of which is disposable in different ways
+
+[13:40:01.0083] <rbuckton>
+Its perfectly reasonable to want an easy way to make that work, but I still believe it's the wrong default behavior. I'd honestly rather `AbortController` not be disposable at all.
+
