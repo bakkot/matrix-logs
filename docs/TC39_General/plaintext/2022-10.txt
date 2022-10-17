@@ -645,3 +645,60 @@ I suppose in principle we could solve the "people having the wrong expectations"
 [13:40:01.0083] <rbuckton>
 Its perfectly reasonable to want an easy way to make that work, but I still believe it's the wrong default behavior. I'd honestly rather `AbortController` not be disposable at all.
 
+[13:40:26.0646] <rbuckton>
+ * Its perfectly reasonable to want an easy way to make that work, but I still believe it's the wrong default behavior. I'd honestly rather `AbortController` not be disposable at all than to abort on dispose.
+
+[13:44:05.0244] <rbuckton>
+Something like this is fairly easy to write in user code, or to build into the DOM API:
+
+```js
+class AbortRegion {
+  #controller;
+  constructor(controller) {
+    this.#controller = controller;
+  }
+  preventAbort() {
+    this.#controller = null;
+  }
+  [Symbol.dispose]() {
+    const controller = this.#controller;
+    this.#controller = null;
+    controller?.abort();
+  }
+}
+
+...
+const controller = new AbortController();
+using region = new AbortRegion(controller);
+... // abort on error
+region.preventAbort();
+... // no longer abort on error
+```
+
+[13:44:21.0181] <rbuckton>
+ * Something like this is fairly easy to write in user code, or to build into the DOM API:
+
+```js
+class AbortRegion {
+  #controller;
+  constructor(controller) {
+    this.#controller = controller;
+  }
+  preventAbort() {
+    this.#controller = null;
+  }
+  [Symbol.dispose]() {
+    const controller = this.#controller;
+    this.#controller = null;
+    controller?.abort();
+  }
+}
+
+...
+const controller = new AbortController();
+using region = new AbortRegion(controller);
+... // abort on error
+region.preventAbort();
+... // no longer abort on error
+```
+

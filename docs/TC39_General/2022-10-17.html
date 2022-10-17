@@ -165,7 +165,31 @@ ctx.exit(); // exit the context without triggering dispose
   <tr class="msg" id="L75"><td class="ts-cell"><a class="ts" href="#L75" alt="Mon Oct 17 2022 13:36:22 GMT-0700 (Pacific Daylight Time)">20:36</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">One of the big things I wanted for the cancellation proposal was the ability to clean up complex cancellation graphs when <em>not</em> canceled. That is something that has never made it to <code>AbortController</code>/<code>AbortSignal</code>.</td></tr>
   <tr class="msg" id="L76"><td class="ts-cell"><a class="ts" href="#L76" alt="Mon Oct 17 2022 13:38:37 GMT-0700 (Pacific Daylight Time)">20:38</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell">I agree that's a reasonable thing to want, I just expect JS devs will not want that nearly as often as they want "cancel outstanding fetch requests as soon as other simultaneous requests failed"</td></tr>
   <tr class="msg" id="L77"><td class="ts-cell"><a class="ts" href="#L77" alt="Mon Oct 17 2022 13:39:40 GMT-0700 (Pacific Daylight Time)">20:39</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell">I suppose in principle we could solve the "people having the wrong expectations" problem by not making <code>AbortController</code> disposable at all, and instead adding <em>two</em> new properties (<code>.cleanupOnDispose</code> and <code>.abortOnDipsose</code>, say) each of which is disposable in different ways</td></tr>
-  <tr class="msg" id="L78"><td class="ts-cell"><a class="ts" href="#L78" alt="Mon Oct 17 2022 13:40:01 GMT-0700 (Pacific Daylight Time)">20:40</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">Its perfectly reasonable to want an easy way to make that work, but I still believe it's the wrong default behavior. I'd honestly rather <code>AbortController</code> not be disposable at all.</td></tr>
+  <tr class="msg" id="L78"><td class="ts-cell"><a class="ts" href="#L78" alt="Mon Oct 17 2022 13:40:01 GMT-0700 (Pacific Daylight Time)">20:40</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">Its perfectly reasonable to want an easy way to make that work, but I still believe it's the wrong default behavior. I'd honestly rather <code>AbortController</code> not be disposable at all than to abort on dispose.</td></tr>
+  <tr class="msg" id="L79"><td class="ts-cell"><a class="ts" href="#L79" alt="Mon Oct 17 2022 13:44:05 GMT-0700 (Pacific Daylight Time)">20:44</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell"><p>Something like this is fairly easy to write in user code, or to build into the DOM API:</p>
+<pre><code class="language-js">class AbortRegion {
+  #controller;
+  constructor(controller) {
+    this.#controller = controller;
+  }
+  preventAbort() {
+    this.#controller = null;
+  }
+  [Symbol.dispose]() {
+    const controller = this.#controller;
+    this.#controller = null;
+    controller?.abort();
+  }
+}
+
+...
+const controller = new AbortController();
+using region = new AbortRegion(controller);
+... // abort on error
+region.preventAbort();
+... // no longer abort on error
+</code></pre>
+</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>
