@@ -40,3 +40,62 @@ however, maybe it is still desirable to do one or the other; in which case we sh
 [10:45:06.0162] <Kris Kowal>
 Zalgo in short is a combinatoric explosion of behaviors that may be either synchronous or anachronous, such that it is not practical to test every combination that will be seen in production.
 
+[10:46:35.0793] <Kris Kowal>
+Vetting inputs is I believe debatable. It depends on whether the errant behavior can possibly vary at runtime.
+
+[10:47:05.0899] <Kris Kowal>
+Being JavaScript, it almost certainly can.
+
+[10:47:15.0497] <ljharb>
+the language has explicit decided with `async function` that sync exceptions should *never* be thrown from something that returns a promise. there's a few exceptions, i think, if you're calling something on the wrong receiver, but generally we should avoid that
+
+[10:47:26.0709] <bakkot>
+ptomato: I would say that Atomics.waitAsync is actually a sync function, despite the name
+
+[10:47:35.0970] <bakkot>
+it does not return a promise; it returns an object which is synchronously usable
+
+[10:47:37.0128] <ljharb>
+can it return a promise?
+
+[10:47:39.0233] <ljharb>
+ah ok
+
+[10:47:42.0632] <ljharb>
+then i would agree
+
+[10:47:49.0999] <bakkot>
+(one of the properties of that object can be a promise)
+
+[10:47:57.0568] <shu>
+Atomics.waitAsync is the way it is explicitly to avoid zalgo
+
+[10:47:58.0169] <ljharb>
+zalgo is basically "always, or never, return a promise"
+
+[10:48:13.0997] <ljharb>
+"an object containing a promise" is definitely not a promise :-)
+
+[10:48:53.0680] <shu>
+in particular, Atomics.waitAsync *needs* to fail fast because it's built to mutexes -- you can't wait until the next microtask tick to find out you couldn't acquire the lock and need to go into the slow path 
+
+[10:49:01.0138] <Kris Kowal>
+> <@ljharb:matrix.org> the language has explicit decided with `async function` that sync exceptions should *never* be thrown from something that returns a promise. there's a few exceptions, i think, if you're calling something on the wrong receiver, but generally we should avoid that
+
+And also the Promise constructor.
+
+[10:49:04.0650] <shu>
+so, instead of always returning a Promise it does this wrapping
+
+[10:49:34.0656] <ptomato>
+fair enough. I got misled by the first sentence of MDN on Atomics.waitAsync: "The static Atomics.waitAsync() method waits asynchronously on a shared memory location and returns a Promise."
+
+[10:49:48.0595] <shu>
+it waits asynchronously if it waits at all
+
+[10:49:52.0802] <ptomato>
+reading further down, you are right that it actually does not return a Promise
+
+[10:49:56.0835] <shu>
+if it doesn't wait, you can find out synchronously
+
