@@ -543,3 +543,35 @@ TabAtkins: I did that and bikeshed-data did pick it up; it's just api.csswg.org 
 [05:16:19.0500] <annevk>
  * TabAtkins: I did that and bikeshed-data did pick it up; it's just api.csswg.org that hasn't yet at this point
 
+
+2022-11-08
+[04:08:34.0441] <jgraham>
+So I'm trying to integrate WebDriver BiDi network events into fetch, and I'm struggling to work out where to call the various lifecycle update algorithms.
+
+The BiDi model is basically that you get the following events: `beforeRequest`, `responseStarted`, `responseCompleted`, `fetchError`. The invariants are that every request (including redirects etc.) gets a `beforeRequest` event and either `responseStarted`/`responseCompleted` or `fetchError` (and maybe `responseStarted` if the error happens after the response headers are received).
+
+I _think_ the end-of-lifecycle events can be handled in the "fetch response handover"? But what I'm less sure about is guaranteeing that there's always a matching `beforeRequest` event with the headers as-sent (or as seen by whatever prevents the request going over the wire e.g. serviceworker or cache). I think the headers requirement means that in the case where the request isn't blocked we need to emit it right before sending. But because the request may be blocked at various points before that, we can end up in "fetch response handover" without having emitted a `beforeRequest` event. But there can also be an error which occurs after it's sent, so we can end up there when we _have_ already emitted that event.
+
+Is there something simpler to do here than add extra state to the request, indicating whether we already emitted such an event? Obviously I'd prefer not to add more state if possible because state is complexity, but I'm not seeing an obvious alternative.
+
+[04:09:58.0281] <jgraham>
+ * So I'm trying to integrate WebDriver BiDi network events into fetch, and I'm struggling to work out where to call the various lifecycle update algorithms.
+
+The BiDi model is basically that you get the following events: `beforeRequest`, `responseStarted`, `responseCompleted`, `fetchError`. The invariants are that every request (including redirects etc.) gets a `beforeRequest` event and either `responseStarted`/`responseCompleted` or `fetchError` (and maybe `responseStarted` if the error happens after the response headers are received).
+
+I _think_ the end-of-lifecycle events can be handled in the "fetch response handover"? But what I'm less sure about is guaranteeing that there's always a matching `beforeRequest` event with the headers as-sent (or as seen by whatever prevents the request going over the wire e.g. serviceworker or cache). I think the headers requirement means that in the case where the request isn't blocked we need to emit it right before sending. But because the request may be blocked at various points before that, we can end up in "fetch response handover" without having emitted a `beforeRequest` event. But there can also be an error which occurs after it's sent, so we can end up there when we _have_ already emitted that event.
+
+Is there something simpler to do here than add extra state to the request, indicating whether we already emitted such an event? Obviously I'd prefer not to add more state if possible because state is complexity, but I'm not seeing an obvious alternative.
+
+[04:44:05.0351] <smaug>
+Domenic is so optimistic with https://github.com/whatwg/html/pull/6315#pullrequestreview-1158013824 🙂  no regressions with session history stuff?
+
+[04:44:38.0489] <smaug>
+Session history is the one component where regressions are pretty much guaranteed whenever anything changes.
+
+[04:47:15.0794] <smaug>
+/me just fixed yet another issue he caused 2 years ago. Some site did effectively: location.reload(); location.href = "newpage"; and that right after there were something like 5 http redirects 
+
+[04:47:48.0201] <smaug>
+/me  * just fixed yet another issue he caused 2 years ago. Some site did effectively: location.reload(); location.href = "newpage"; and that right after there were something like 5 http redirects 
+
