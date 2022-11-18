@@ -1103,3 +1103,50 @@ I guess we could change cssom-view to specify "If target is `Document` or `docum
 [07:06:19.0099] <dlrobertson>
 Actually I think we'd want `document.scrollingElement` not `document.body` there
 
+[07:20:12.0928] <Domenic>
+dlrobertson: I don't really understand the problem? If the "otherwise" case has the target being the body, then, `<body onscrollend="foo()">` should call `foo()`.
+
+[07:29:41.0645] <dlrobertson>
+yeah, but it sort of requires breaking the first case right? If we expect `scrollend` for `document.scrollingElement.scroll(...)` to fire to `document.scrollingElement`, then I think the first case is never hit
+
+[07:30:13.0796] <dlrobertson>
+and as a result, `window.onscrollend` is never used
+
+[07:30:33.0737] <dlrobertson>
+I could be thinking too much on the implementation side
+
+[07:31:51.0707] <Domenic>
+Doesn't it bubble to eventually hit window.onscrollend?
+
+[07:32:14.0181] <dlrobertson>
+currently only if the target is `Document`
+
+[07:32:25.0554] <Domenic>
+I thought events on body bubbled to window eventually...
+
+[07:33:33.0535] <dlrobertson>
+> <@domenicdenicola:matrix.org> I thought events on body bubbled to window eventually...
+
+do you happen to know the relevant spec where I can read about this?
+
+[07:33:35.0476] <Domenic>
+Yeah, all events that bubble go from document to window
+
+[07:33:44.0347] <Domenic>
+And body to document
+
+[07:33:57.0060] <Domenic>
+Look at each instance of https://dom.spec.whatwg.org/#get-the-parent
+
+[07:35:52.0208] <Domenic>
+So it looks like if the viewport is scrolled, then the Document itself goes into pending scroll event targets. So it bubbles Document -> Window. If scrollingElement (= html element, I think) gets scrolled, then it bubbles html element -> Document -> Window. But event.target === the html element. Similarly if the body element gets scrolled, then it bubbles body -> html -> Document -> Window, with event.target === the body element.
+
+[07:36:37.0508] <Domenic>
+Oh wait, second case doesn't bubble
+
+[07:36:57.0371] <Domenic>
+So I guess only the Document -> Window case bubbles. Kinda strange, but whatever...
+
+[07:39:01.0226] <dlrobertson>
+I think that's because we currently expect forwarding behavior, I'm starting to think the first case should be expanded to `Document` or `Document.scrollingElement`
+
