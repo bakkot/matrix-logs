@@ -308,3 +308,111 @@ And I think that yulia is correct that I meant evaluation, not link/init, but I�
 [09:44:26.0586] <Kris Kowal>
 nicolo-ribaudo I’m putting together a PR to add my module harmony graph presentation to the agenda, as well as Caridy’s Module and ModuleSource constructors for stage 2 presentation. https://github.com/tc39/agendas/pull/1259
 
+
+2022-11-21
+[18:13:25.0632] <Jack Works>
+write a webpack plugin to support `import(spec, { reflect: true })`, it returns a VirtualModuleSource (since there is no native ModuleSource available
+
+[18:14:31.0599] <Jack Works>
+but with slightly different semantics, it will call esbuild to bundle all transitive dependencies of `./danger.js`, which is different than our proposal proposed.
+
+[18:25:25.0916] <Jack Works>
+I think we need to consider this case in the module reflection proposal:
+
+[18:26:55.0082] <Jack Works>
+when using a library, it might contains many dependencies, but if we're reflecting them one-by-one and use importHook to provide all those files, it will be annoying to adopt, also with worse performance
+
+[18:28:40.0910] <Jack Works>
+e.g. lodash-es has 1000+ esm files, it is unrealistic to import them all as Reflected Module and provide them in `importHook`, because you need to enumerate all files under that package.
+
+[18:29:40.0072] <Jack Works>
+maybe we can change how import reflection works to make this case more convenient (and easier to be implemented in a bundler)
+
+[18:39:29.0179] <Jack Works>
+proposed change:
+
+the import reflection "bundles"/"includes" all transitive dependencies by default, but takes an exclude list for Virtualization.
+
+e.g. 
+
+> danger/index.js
+
+```js
+import * as fs from 'node:fs'
+import { get } from 'lodash-es'
+import { helper } from './utils.js'
+```
+
+When we reflect this module, `await import('danger/index.js', { reflect: true })`, and feed it to a `Module` constructor, it will call `importHook` to acquire `node:fs`, `lodash-es` and `./utils.js`
+
+This is not coinvent if we have many dependencies to virtualize
+
+[18:42:03.0989] <Jack Works>
+Proposed behavior:
+
+it will fetch `lodash-es` and `utils.js` in it's Module cache except `node:fs` (because it is a privilege/native module with no (?) source code)
+
+now it will only call `importHook` for `node:fs` to fetch I/O ability
+
+[18:47:08.0323] <Jack Works>
+with a new option to "exclude" some module from the module tree
+
+[18:48:29.0345] <Jack Works>
+e.g. `await import('./lib.js', { reflect: true, excludes: ["react"] })`. This allows something like "peer dependency"
+
+[18:48:57.0908] <Jack Works>
+The problem of this new proposed way is we need to introduce `referrer` back again
+
+
+2022-11-22
+[07:16:46.0178] <nicolo-ribaudo>
+Hey the agenda for today is empty, but if you want I can talk about Module declarations. I have an alternative version of the slides I'll present in plenary but more tailored to this group.
+
+[07:17:23.0549] <nicolo-ribaudo>
+However, I would only be able to present starting from ~30 mins after the beginning of the meeting
+
+[08:47:37.0301] <Kris Kowal>
+I will not be present. 
+
+[09:04:06.0338] <Luca Casonato>
+It seems that no-one is there?
+
+[09:05:30.0355] <guybedford>
+also waiting to join here
+
+[09:05:54.0084] <guybedford>
+do we need to setup a new link? or do we have someone with access?
+
+[09:05:54.0903] <nicolo-ribaudo>
+I can join in 5 minutes if there is a quorum 
+
+[09:10:07.0510] <guybedford>
+since I wasn't getting access, heres another link we can use if it helps - https://meet.google.com/mgj-pcun-rkx
+
+[09:15:19.0764] <nicolo-ribaudo>
+Nice firefox crashed
+
+[09:15:22.0265] <nicolo-ribaudo>
+ * Nice firefox crashed
+
+[10:36:57.0185] <nicolo-ribaudo>
+The slides I showed today: https://docs.google.com/presentation/d/1YBIdCxo9u2niMS5aPrCjYMFBoy\_El0qejij5kmwcoqY/edit
+
+They are the same as what I added to the agenda for the TC39 meeting, except for the "How do they interact with other proposals?" section which I will skip to save time (but it's probably the most interesting one for this group).
+
+[10:37:09.0533] <nicolo-ribaudo>
+ * The slides I showed today: https://docs.google.com/presentation/d/1YBIdCxo9u2niMS5aPrCjYMFBoy\_El0qejij5kmwcoqY/edit
+
+They are the same as what I added to the agenda for the TC39 meeting, except for the "How do they interact with other proposals?" section which I will skip to save time (but it's probably the most interesting one for this group).
+
+
+2022-11-23
+[07:38:11.0582] <yulia>
+I wasn't able to make it yesterday -- do you folks still want me to present on the layered proposal thing? i have something half way there and can finish it today
+
+[07:38:26.0747] <yulia>
+also will the notes be posted from yeterday?
+
+[09:55:24.0329] <guybedford>
+not many were present yesterday, so we just went through the slides and discussed various details of the declarations proposal
+
