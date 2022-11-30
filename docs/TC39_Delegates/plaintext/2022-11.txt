@@ -2828,3 +2828,65 @@ oh sure in this case i meant "via ModuleSource"
 [04:39:58.0281] <littledan>
 I share bakkot’s concern generically and was persuaded by the eval injection risk
 
+[04:40:09.0497] <Luca Casonato>
+bakkot: are you ok with:
+
+```
+import module foo from "./foo.js";
+const newMod = new Module(foo.source);
+await import(newMod);
+```
+
+[04:40:19.0085] <rbuckton>
+Though you will now also need to deny `ModuleSource`, since `await import(new Module(new ModuleSource(code)))` is just indirect eval.
+
+[04:40:31.0015] <bakkot>
+Luca Casonato: assuming `foo.source` is opaque, yes, I think so
+
+[04:40:35.0760] <rbuckton>
+> <@littledan:matrix.org> As Kris said, this is about making eval deniable
+
+ * Though you will now also need to deny `ModuleSource`, since `await import(new Module(new ModuleSource(code)))` is just indirect eval.
+
+[04:41:42.0614] <Luca Casonato>
+> <@bakkot:matrix.org> Luca Casonato: assuming `foo.source` is opaque, yes, I think so
+
+Yes, `foo.source` is a `ModuleSource` instance. There is no access to the module source text.
+
+[04:42:07.0914] <bakkot>
+though, I should say, I also don't understand the need for that
+
+[04:42:54.0949] <littledan>
+> <@bakkot:matrix.org> though, I should say, I also don't understand the need for that
+
+This lets you relink dependencies (eg for testing) which is interesting 
+
+[04:43:18.0203] <bakkot>
+yeah, the testing case is interesting, but not compelling to me on its own
+
+[04:43:37.0269] <bakkot>
+I am very reluctant to add features which are only motivated by testing
+
+[04:44:01.0068] <ljharb>
+what about feature-detection? like "is TLA supported"
+
+[04:44:16.0206] <yulia>
+im sort of swayed by hot reloading as a use case, in particular having no-reload updates
+
+[04:44:34.0317] <rbuckton>
+I find the testing case compelling, but there are potential issues there as well. If you can't remove modules from the module cache, re-importing the same module with different dependencies in a test runner will just continuously grow the module cache until you OOM.
+
+[04:44:37.0732] <yulia>
+so, similar to erlang behavior for swapping out running code is something i sometimes wistfully think about. 
+
+[04:44:38.0401] <Luca Casonato>
+> <@ljharb:matrix.org> what about feature-detection? like "is TLA supported"
+
+`new ModuleSource` would synchronously throw on syntax errors
+
+[04:44:40.0098] <eemeli>
+I get the sense that this first proposal is including ModuleSource in order to use it esp. for the introspection stuff that's coming in a later proposal. Could we not have a first proposal that has the source as a string and leaves out `module.source`, and then a follow-on proposal that modifies this proposal before it reaches stage-4 with the ModuleSource features that are in it now?
+
+[04:44:46.0231] <Mathieu Hofman>
+Right but engines can guarantee the stability of this, where delegating to the program, I don't see how it can
+
