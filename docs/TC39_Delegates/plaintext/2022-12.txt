@@ -1379,3 +1379,65 @@ const b = module { export function g() { return import(a); } };
 ```
 This seems like a perfectly reasonable case, but you can't eagerly serialize `b` because it's not defined. You'd have to defer such serialization until it is needed, so you would again have to capture all bindings.
 
+[06:36:44.0693] <danielrosenwasser>
+`a` and `b` aren't capturable in that example though, right?
+
+[06:37:07.0672] <rbuckton>
+> <@danielrosenwasser:matrix.org> `a` and `b` aren't capturable in that example though, right?
+
+My contention is that they should be.
+
+[06:38:08.0176] <Jack Works>
+> <@rbuckton:matrix.org> Accessing a serializable or replaceable binding in a module would be fine, but other bindings would not. There's a circularity issue there though:
+> ```js
+> const a = module { export function f() { return import(b); } };
+> const b = module { export function g() { return import(a); } };
+> ```
+> This seems like a perfectly reasonable case, but you can't eagerly serialize `b` because it's not defined. You'd have to defer such serialization until it is needed, so you would again have to capture all bindings.
+
+I agree this becomes messy... `b` and `a` will be looked up in the global object of it's evaluator instead of links to the module
+
+[06:38:18.0983] <rbuckton>
+It would be extremely inconsistent if you cannot model with module expressions the same thing you can model with module declarations. This seems like a major stumbling block for adopters.
+
+[06:38:26.0600] <danielrosenwasser>
+oh, because they *would* be valid if it was written as 
+
+```
+module a { export function f() { return import(b); } };
+module b { export function g() { return import(a); } };
+```
+
+[06:38:27.0495] <apaprocki>
+Justin Ridgewell: they don't want `if (runningInShadowRealm)`
+
+[06:38:45.0833] <danielrosenwasser>
+wait...is **_that_** true though?
+
+[06:38:53.0904] <danielrosenwasser>
+ * ...is **_that_** true though?
+
+[06:39:09.0212] <rbuckton>
+If it isn't then we don't have the same kind of decl/expr parity that function and class have.
+
+[06:39:09.0787] <danielrosenwasser>
+ * wait...is **_that_** true though?
+
+[06:39:13.0541] <nicolo-ribaudo>
+> <@danielrosenwasser:matrix.org> oh, because they *would* be valid if it was written as 
+> 
+> ```
+> module a { export function f() { return import(b); } };
+> module b { export function g() { return import(a); } };
+> ```
+
+Yes, this would be valid
+
+[06:39:50.0472] <rbuckton>
+I'd almost prefer just having module declarations over having both, if only to prevent potential confusion by adopters due to the inconsistency.
+
+[06:39:55.0603] <nicolo-ribaudo>
+> <@rbuckton:matrix.org> If it isn't then we don't have the same kind of decl/expr parity that function and class have.
+
+Functions already don't have parity - they have different scoping rules. Only classes can be transparently replaced with `let className = class { ...`
+
