@@ -1098,3 +1098,78 @@ I'm not huge on needing a separate namespace per module (or bit per value) to tr
 
 https://gbracha.blogspot.com/2014/09/a-domain-of-shadows.html
 
+[06:16:03.0438] <danielrosenwasser>
+ * I'm not huge on needing a separate namespace per module (or bit per value) to track which exports are _module_ exports that can be imported from vs. not
+
+This blog post comes to mind https://gbracha.blogspot.com/2014/09/a-domain-of-shadows.html
+
+[06:16:29.0215] <Kris Kowal>
+Module declarations/expressions won’t compose because a module graph that consists of declarations coming from different module files cannot be consolidated into a single module handler, for the purposes of resolving stringly named module specifiers on their various referrers.
+
+[06:16:42.0241] <rbuckton>
+Curious about static importability and portability of `import module foo from ...` and `module bar { import foo; }`. Is that valid?
+
+[06:17:20.0705] <Robert Pamely>
+If I'm reading this correctly, the concern was that CDN sources were manipulated to add tracking code in them that got loaded into every site that uses them?
+
+[06:17:35.0445] <Robert Pamely>
+> <@bakkot:matrix.org> there is no longer caching from CDNs https://github.com/whatwg/fetch/issues/904
+
+ * If I'm reading this correctly, the concern was that CDN sources were manipulated to add tracking code in them that got loaded into every site that uses them?
+
+[06:17:49.0435] <leobalter>
+aren't module declarations top level only?
+
+[06:17:59.0009] <caridy>
+Slides: https://docs.google.com/presentation/d/183cYPeUjhzVRuZ0O-gwXqp6KtFYxxhgYodbr7XNo_9o/edit
+
+[06:18:15.0909] <rbuckton>
+And what about:
+```js
+const x = module { }
+const y = module { import x; }
+```
+There is so much inconsistency with the "two worlds" approach that breaks the decl/expr equivalence of function and class
+
+[06:18:48.0941] <nicolo-ribaudo>
+> <@leobalter:matrix.org> aren't module declarations top level only?
+
+The proposal as it is now allows you to do something like this:
+```js
+{
+  module x {}
+  await import(module { import x });
+}
+```
+
+[06:19:14.0758] <leobalter>
+thanks for the info
+
+[06:19:19.0765] <rbuckton>
+That's specific to just that case, not a general solution.
+
+[06:19:22.0759] <Kris Kowal>
+My other concern is that differentiating lexical and stringy module specifiers will be used to distinguish which modules should be serialized from which should be resolved from a remote worker’s import hooks, and will have ramifications on whether instances are shared. That’ll herd the module ecosystem in a weird direction, where portable libraries will generally have to export a module expression/declaration in order to give the user the choice of whether to link lazily or eagerly.
+
+[06:19:28.0040] <nicolo-ribaudo>
+> <@rbuckton:matrix.org> And what about:
+> ```js
+> const x = module { }
+> const y = module { import x; }
+> ```
+> There is so much inconsistency with the "two worlds" approach that breaks the decl/expr equivalence of function and class
+
+What would you expect to happen here if instead of `const x` you had a `let x`, that is later reassigned?
+
+[06:19:50.0121] <rbuckton>
+You could be importing a `module` dynamically from another module that exports it, but can't reference it in another `module` expression.
+
+[06:19:52.0408] <bakkot>
+Robert Pamely: no, the concern is, my site can tell you've visited another site by timing whether loading a resource which is also loaded by that site is cache-hit or not
+
+[06:19:57.0843] <bakkot>
+https://github.com/shivanigithub/http-cache-partitioning has a better explainer I think
+
+[06:19:58.0855] <Luca Casonato>
+I think it may be a reasonable to investigate using a seperate identifier namespace to clarify the difference between "regular values" and "module values". For example `module $foo {}; import $foo;`
+
