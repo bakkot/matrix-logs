@@ -416,6 +416,65 @@ const y = module { import x; }
   <tr class="msg" id="L313"><td class="ts-cell"><a class="ts" href="#L313" alt="Thu Dec 01 2022 06:19:52 GMT-0800 (Pacific Standard Time)">14:19</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell"><span class="nick-6">Robert Pamely</span>: no, the concern is, my site can tell you've visited another site by timing whether loading a resource which is also loaded by that site is cache-hit or not</td></tr>
   <tr class="msg" id="L314"><td class="ts-cell"><a class="ts" href="#L314" alt="Thu Dec 01 2022 06:19:57 GMT-0800 (Pacific Standard Time)">14:19</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell"><a href="https://github.com/shivanigithub/http-cache-partitioning">https://github.com/shivanigithub/http-cache-partitioning</a> has a better explainer I think</td></tr>
   <tr class="msg" id="L315"><td class="ts-cell"><a class="ts" href="#L315" alt="Thu Dec 01 2022 06:19:58 GMT-0800 (Pacific Standard Time)">14:19</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-3" title="@lucacasonato:matrix.org">Luca Casonato</span>&gt;</div></td><td class="msg-cell">I think it may be a reasonable to investigate using a seperate identifier namespace to clarify the difference between "regular values" and "module values". For example <code>module $foo {}; import $foo;</code></td></tr>
+  <tr class="msg" id="L316"><td class="ts-cell"><a class="ts" href="#L316" alt="Thu Dec 01 2022 06:20:38 GMT-0800 (Pacific Standard Time)">14:20</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@jackworks:matrix.org">Jack Works</span>&gt;</div></td><td class="msg-cell"><mx-reply><blockquote> I think it may be a reasonable to investigate using a seperate identifier namespace to clarify the difference between "regular values" and "module values". For example <code>module $foo {}; import $foo;</code></blockquote></mx-reply>but module declarations should be able to <code>import($foo)</code></td></tr>
+  <tr class="msg" id="L317"><td class="ts-cell"><a class="ts" href="#L317" alt="Thu Dec 01 2022 06:20:48 GMT-0800 (Pacific Standard Time)">14:20</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@jackworks:matrix.org">Jack Works</span>&gt;</div></td><td class="msg-cell">so there is no need to separate a new namespace</td></tr>
+  <tr class="msg" id="L318"><td class="ts-cell"><a class="ts" href="#L318" alt="Thu Dec 01 2022 06:20:59 GMT-0800 (Pacific Standard Time)">14:20</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-9" title="@nicolo-ribaudo:matrix.org">nicolo-ribaudo</span>&gt;</div></td><td class="msg-cell"><mx-reply><blockquote> Curious about static importability and portability of <code>import module foo from ...</code> and <code>module bar { import foo; }</code>. Is that valid?</blockquote></mx-reply>There is no spec text for this yet, but if import reflection reifies to a <code>Module</code> object it can be easily made to work.</td></tr>
+  <tr class="msg" id="L319"><td class="ts-cell"><a class="ts" href="#L319" alt="Thu Dec 01 2022 06:21:15 GMT-0800 (Pacific Standard Time)">14:21</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@jackworks:matrix.org">Jack Works</span>&gt;</div></td><td class="msg-cell">we can think of, some values are just available eariler, before the execute</td></tr>
+  <tr class="msg" id="L320"><td class="ts-cell"><a class="ts" href="#L320" alt="Thu Dec 01 2022 06:21:26 GMT-0800 (Pacific Standard Time)">14:21</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell"><pre><code class="language-js">// foo.js
+export module A { }
+
+// bar.js
+export function maybeDoAThing() {
+  const A = await import("./foo.js").A;
+  const B = module { import A };
+  new Worker(B).postMessage(...);
+}
+</code></pre>
+</td></tr>
+  <tr class="msg" id="L321"><td class="ts-cell"><a class="ts" href="#L321" alt="Thu Dec 01 2022 06:21:36 GMT-0800 (Pacific Standard Time)">14:21</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-3" title="@lucacasonato:matrix.org">Luca Casonato</span>&gt;</div></td><td class="msg-cell"><mx-reply><blockquote> we can think of, some values are just available eariler, before the execute</blockquote></mx-reply>this is difficult to explain to users though. using a separate namespace would make this clear</td></tr>
+  <tr class="msg" id="L322"><td class="ts-cell"><a class="ts" href="#L322" alt="Thu Dec 01 2022 06:22:05 GMT-0800 (Pacific Standard Time)">14:22</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@jackworks:matrix.org">Jack Works</span>&gt;</div></td><td class="msg-cell"><mx-reply><blockquote> <pre><code class="language-js">// foo.js
+export module A { }
+
+// bar.js
+export function maybeDoAThing() {
+  const A = await import("./foo.js").A;
+  const B = module { import A };
+  new Worker(B).postMessage(...);
+}
+</code></pre>
+</blockquote></mx-reply>I believe this is a link error.</td></tr>
+  <tr class="msg" id="L323"><td class="ts-cell"><a class="ts" href="#L323" alt="Thu Dec 01 2022 06:22:29 GMT-0800 (Pacific Standard Time)">14:22</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-3" title="@lucacasonato:matrix.org">Luca Casonato</span>&gt;</div></td><td class="msg-cell"><p>it's difficult to explain why this is the case:</p>
+<pre><code class="language-js">const a = module {};
+module b {};
+import a; // link error
+import b; // fine
+</code></pre>
+</td></tr>
+  <tr class="msg" id="L324"><td class="ts-cell"><a class="ts" href="#L324" alt="Thu Dec 01 2022 06:22:31 GMT-0800 (Pacific Standard Time)">14:22</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">My point is that the "2nd world" approach makes module decls and module expressions inconsistent.</td></tr>
+  <tr class="msg" id="L325"><td class="ts-cell"><a class="ts" href="#L325" alt="Thu Dec 01 2022 06:22:41 GMT-0800 (Pacific Standard Time)">14:22</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">That's a refactoring hazard.</td></tr>
+  <tr class="msg" id="L326"><td class="ts-cell"><a class="ts" href="#L326" alt="Thu Dec 01 2022 06:23:04 GMT-0800 (Pacific Standard Time)">14:23</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-5" title="@leobalter:matrix.org">leobalter</span>&gt;</div></td><td class="msg-cell">Module expressions and declarations are among the most important changes coming to ECMAScript that positively affects web developers and code bundling in order to encourage a better usage of ES modules. I hope TC39 can dedicate more time for those topics in order to advance them without taking years.</td></tr>
+  <tr class="msg" id="L327"><td class="ts-cell"><a class="ts" href="#L327" alt="Thu Dec 01 2022 06:23:15 GMT-0800 (Pacific Standard Time)">14:23</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@jackworks:matrix.org">Jack Works</span>&gt;</div></td><td class="msg-cell"><mx-reply><blockquote> <p>it's difficult to explain why this is the case:</p>
+<pre><code class="language-js">const a = module {};
+module b {};
+import a; // link error
+import b; // fine
+</code></pre>
+</blockquote></mx-reply>so maybe we can also accept <code>const ident = module {}</code>. no more complex</td></tr>
+  <tr class="msg" id="L328"><td class="ts-cell"><a class="ts" href="#L328" alt="Thu Dec 01 2022 06:23:40 GMT-0800 (Pacific Standard Time)">14:23</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-9" title="@nicolo-ribaudo:matrix.org">nicolo-ribaudo</span>&gt;</div></td><td class="msg-cell"><p>Thanks for the example, the only way it could work with this proposal is something like this (!!! semantics are different, but the intention is the same):</p>
+<pre><code class="language-js">// foo.js
+export module A { }
+
+// bar.js
+export function maybeDoAThing() {
+  const B = module { import { A } from "./foo.js"; import A };
+  new Worker(B).postMessage(...);
+}
+
+</code></pre>
+<p>It's worth investigating when modules should "capture" available modules from the other scope, but it would still only allow capturing other modules and not generic values.</p>
+</td></tr>
+  <tr class="msg" id="L329"><td class="ts-cell"><a class="ts" href="#L329" alt="Thu Dec 01 2022 06:23:58 GMT-0800 (Pacific Standard Time)">14:23</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-3" title="@lucacasonato:matrix.org">Luca Casonato</span>&gt;</div></td><td class="msg-cell"><mx-reply><blockquote> so maybe we can also accept <code>const ident = module {}</code>. no more complex</blockquote></mx-reply>we can't hoist const bindings though. module declarations only work statically, because they are hoisted</td></tr>
+  <tr class="msg" id="L330"><td class="ts-cell"><a class="ts" href="#L330" alt="Thu Dec 01 2022 06:24:31 GMT-0800 (Pacific Standard Time)">14:24</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">I think if we have two things called <code>module</code> where there is a declaration and an expression version, then what they contain and how they handle scoping should be consistent.</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>

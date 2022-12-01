@@ -1173,3 +1173,155 @@ https://github.com/shivanigithub/http-cache-partitioning has a better explainer 
 [06:19:58.0855] <Luca Casonato>
 I think it may be a reasonable to investigate using a seperate identifier namespace to clarify the difference between "regular values" and "module values". For example `module $foo {}; import $foo;`
 
+[06:20:38.0013] <Jack Works>
+> <@lucacasonato:matrix.org> I think it may be a reasonable to investigate using a seperate identifier namespace to clarify the difference between "regular values" and "module values". For example `module $foo {}; import $foo;`
+
+but module declarations should be able to `import($foo)`
+
+[06:20:48.0376] <Jack Works>
+so there is no need to separate a new namespace
+
+[06:20:59.0628] <nicolo-ribaudo>
+> <@rbuckton:matrix.org> Curious about static importability and portability of `import module foo from ...` and `module bar { import foo; }`. Is that valid?
+
+There is no spec text for this yet, but if import reflection reifies to a `Module` object it can be easily made to work.
+
+[06:21:15.0791] <Jack Works>
+we can think of, some values are just available eariler, before the execute
+
+[06:21:26.0809] <rbuckton>
+```js
+// foo.js
+export module A { }
+
+// bar.js
+export function maybeDoAThing() {
+  const A = await import("./foo.js").A;
+  const B = module { import A };
+  new Worker(B).postMessage(...);
+}
+```
+
+[06:21:36.0062] <Luca Casonato>
+> <@jackworks:matrix.org> we can think of, some values are just available eariler, before the execute
+
+this is difficult to explain to users though. using a separate namespace would make this clear
+
+[06:22:05.0043] <Jack Works>
+> <@rbuckton:matrix.org> ```js
+> // foo.js
+> export module A { }
+> 
+> // bar.js
+> export function maybeDoAThing() {
+>   const A = await import("./foo.js").A;
+>   const B = module { import A };
+>   new Worker(B).postMessage(...);
+> }
+> ```
+
+I believe this is a link error.
+
+[06:22:29.0024] <Luca Casonato>
+it's difficult to explain why this is the case:
+
+```js
+const a = module {};
+module b {};
+import a; // link error
+import b; // fine
+```
+
+[06:22:31.0511] <rbuckton>
+My point is that the "2nd world" approach makes module decls and module expressions inconsistent.
+
+[06:22:34.0810] <Luca Casonato>
+ * it's difficult to explain why this is the case:
+
+```js
+const a = module {};
+module b {};
+import a; // link error
+import b; // fine
+```
+
+[06:22:41.0448] <rbuckton>
+That's a refactoring hazard.
+
+[06:23:04.0168] <leobalter>
+Module expressions and declarations are among the most important changes coming to ECMAScript that positively affects web developers and code bundling in order to encourage a better usage of ES modules. I hope TC39 can dedicate more time for those topics in order to advance them without taking years.
+
+[06:23:15.0403] <Jack Works>
+> <@lucacasonato:matrix.org> it's difficult to explain why this is the case:
+> 
+> ```js
+> const a = module {};
+> module b {};
+> import a; // link error
+> import b; // fine
+> ```
+
+so maybe we can also accept `const ident = module {}`. no more complex
+
+[06:23:22.0208] <leobalter>
+ * Module expressions and declarations are among the most important changes coming to ECMAScript that positively affects web developers and code bundling in order to encourage a better usage of ES modules. I hope TC39 can dedicate more time for those topics in order to advance them without taking years.
+
+[06:23:40.0880] <nicolo-ribaudo>
+Thanks for the example, the only way it could work with this proposal is something like this (!!! semantics are different, but the intention is the same):
+
+```js
+// foo.js
+export module A { }
+
+// bar.js
+export function maybeDoAThing() {
+  const B = module { import { A } from "./foo.js"; import A };
+  new Worker(B).postMessage(...);
+}
+
+```
+
+It's worth investigating when modules should "capture" available modules from the other scope, but it would still only allow capturing other modules and not generic values.
+
+[06:23:58.0833] <Luca Casonato>
+> <@jackworks:matrix.org> so maybe we can also accept `const ident = module {}`. no more complex
+
+we can't hoist const bindings though. module declarations only work statically, because they are hoisted
+
+[06:24:07.0123] <nicolo-ribaudo>
+ * Thanks for the example, the only way it could work with this proposal is something like this:
+
+```js
+// foo.js
+export module A { }
+
+// bar.js
+export function maybeDoAThing() {
+  const B = module { import { A } from "./foo.js"; import A };
+  new Worker(B).postMessage(...);
+}
+
+```
+
+It's worth investigating when modules should "capture" available modules from the other scope, but it would still only allow capturing other modules and not generic values.
+
+[06:24:31.0166] <nicolo-ribaudo>
+ * Thanks for the example, the only way it could work with this proposal is something like this (!!! semantics are different, but the intention is the same):
+
+```js
+// foo.js
+export module A { }
+
+// bar.js
+export function maybeDoAThing() {
+  const B = module { import { A } from "./foo.js"; import A };
+  new Worker(B).postMessage(...);
+}
+
+```
+
+It's worth investigating when modules should "capture" available modules from the other scope, but it would still only allow capturing other modules and not generic values.
+
+[06:24:31.0873] <rbuckton>
+I think if we have two things called `module` where there is a declaration and an expression version, then what they contain and how they handle scoping should be consistent.
+
