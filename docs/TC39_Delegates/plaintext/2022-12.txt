@@ -1599,3 +1599,47 @@ Is this the only way that script can determine it's running in a shadow realm?
 [06:53:49.0241] <Michael Ficarra>
 I mean it's non-standard, there could be non-standard "amIRunningInAShadowReam" function
 
+[06:57:06.0525] <nicolo-ribaudo>
+(thanks btw danielrosenwasser and rbuckton for explaining your concerns with clear code examples!)
+
+[06:59:29.0141] <danielrosenwasser>
+> <@nicolo-ribaudo:matrix.org> If you have this code:
+> 
+> ```js
+> module a { let b = getAModule(); await import(b); };
+> module b { await import(a); };
+> ```
+> 
+> the dynamic `import(b)` imports the result of `getAModule` and not the outer declaration. That looks expected.
+> 
+> In this case:
+> 
+> ```js
+> module a { globalThis.b = getAModule(); await import(b); };
+> module b { await import(a); };
+> ```
+> 
+> I see that it would be confusing, since `globalThis.b =` might be lexically somewhere else and not discoverable.
+> 
+> How would you feel if bindings of module declarations where not captured, but only statically importable?
+> 
+> ```js
+> module a {}
+> module b { import a; } // ok
+> ```
+> 
+> ```js
+> module a {}
+> module b { console.log(a); } // ReferenceError: as every other type of bindings, you cannot capture bindings from the outer scope. You can only use them in import specifiers, which is not a generic "binding usage" position
+> ```
+> 
+> Note: the current spec text throws the ReferenceError in this case, but just because it was easier to specify. We didn't have a reason to do one thing or the other, but this possible confusion seems to indicate what we should keep the error.
+
+
+I think if we had module declarations, I would prefer the "do not implicitly capture" behavior, but it feels like that defeats a lot of what would make them "special". I'm not sure if that's the right answer, but I found the current behavior confusing because my mental model was "modules capture _nothing_"
+
+[06:59:49.0302] <apaprocki>
+> <@michaelficarra:matrix.org> I mean it's non-standard, there could be non-standard "amIRunningInAShadowReam" function
+
+Shipping a standard "amIRunningInAShadowRealm" would be the most extreme form of telling people script can change its behavior based upon how it is run, as opposed to relying on them reading spec text, implementation recommendation, or whatever it is called.
+
