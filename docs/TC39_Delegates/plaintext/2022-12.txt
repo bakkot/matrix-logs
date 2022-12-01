@@ -1361,3 +1361,21 @@ Yes, because that could be a real use case. If you can dynamically import a modu
 [06:27:26.0407] <Michael Ficarra>
 uhhh censoring error stacks is already a proposal
 
+[06:30:18.0795] <ryzokuken>
+bakkot: `user land -> userland`
+
+[06:31:10.0977] <rbuckton>
+> <@jackworks:matrix.org> Some thought:
+> 
+> Link of module B in your example can be deferred to when `maybeDoAThing` is called. When the expression is evaluated, it checks if `A` is a Module and if it is a constant binding, if not, it failed to evaluate.
+
+Perhaps? This goes to my point about closures. You might, for example need to indicate if a given binding/value is either transparently serializable, replaceable (such as globals), or banned (i.e., non-serializable, non-global).
+
+[06:34:28.0499] <rbuckton>
+Accessing a serializable or replaceable binding in a module would be fine, but other bindings would not. There's a circularity issue there though:
+```js
+const a = module { export function f() { return import(b); } };
+const b = module { export function g() { return import(a); } };
+```
+This seems like a perfectly reasonable case, but you can't eagerly serialize `b` because it's not defined. You'd have to defer such serialization until it is needed, so you would again have to capture all bindings.
+
