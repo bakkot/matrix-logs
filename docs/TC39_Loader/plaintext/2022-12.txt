@@ -25,3 +25,52 @@ Always good to cross paths with Anne. Thank you for reminding me that this is an
 [13:43:56.0521] <littledan>
 Fundamentally, the problem is: The Web actually wants to make requests to the server in different ways depending on which kind of resource is anticipated. That changes the interpretation of the module and is not consistent with the "assertion" invariant.
 
+[13:45:10.0093] <littledan>
+I'd add: the fact that HTML folks have been discussing this idea for a year and didn't notice the mismatch is kinda a mark against the "assertion" mental model. (The initial discussion was about CSP checks on the response, but the HTML people should've been thinking about the effects on the request too, which isn't as obvious to us humble TC39 folks)
+
+[13:45:52.0024] <Kris Kowal>
+In my estimate, that will force our hand into incorporating the type in the module instance’s memo. At least we can be explicit about that in 262 now that we’ve borged the logic for loading.
+
+[13:46:11.0578] <littledan>
+well, it'd be as simple as deleting a line
+
+[13:46:18.0190] <Kris Kowal>
+And if we entertain this, I’m in favor of renaming `assert` to `with` as soon as possible.
+
+[13:46:27.0970] <littledan>
+but, we'd have to think about the implications...
+
+[13:47:05.0280] <littledan>
+yes, certainly the keyword `assert` doesn't make any sense at all if we made that simple change you're thinking of
+
+[13:47:19.0590] <littledan>
+we'll need to think about whether this is the change we want to make
+
+[13:47:25.0986] <Kris Kowal>
+It’d imply that `importHook` needs to accept the `type` as an optional argument. We would want to be very clear that this is the only additional term of the module memo keyspace we’re considering.
+
+[13:47:34.0271] <littledan>
+> <@kriskowal:matrix.org> And if we entertain this, I’m in favor of renaming `assert` to `with` as soon as possible.
+
+ * yes, certainly the keyword `assert` doesn't make any sense at all if we made that simple change you're thinking of
+
+[13:47:47.0707] <Kris Kowal>
+ * It’d imply that `importHook` needs to accept the `type` as an optional argument. We would want to be very clear that this is the only additional term of the module memo keyspace we’re considering.
+
+[13:48:22.0298] <Kris Kowal>
+As a safety, we’d probably also want the `Module` to have a `type` so the importing `Module` can make sure it gets what it asked for.
+
+[13:48:34.0753] <Kris Kowal>
+ * As a safety, we’d probably also want the `Module` to have a `type` so the importing `Module` can make sure it gets what it asked for.
+
+[13:48:58.0486] <Kris Kowal>
+Otherwise we have a maybe-ignore-the-requested-type footgun.
+
+[13:49:41.0119] <Kris Kowal>
+It’s a considerable complication, but if it’s table stakes, we can do it.
+
+[13:49:54.0210] <littledan>
+The two things which would be strongly dispreferrable to me are:
+- If HTML gets to have special rights around how to use the type (or other arguments) that  other environments/hooks don't see, assuming HTML uses them in a significant-enough way
+- If HTML does a willful violation (or violates a _should_ recommendation) around how assertions are used--we're designing this largely for HTML, so everything really should match up
+
