@@ -565,3 +565,38 @@ There are a lot of BufferSource-accepting APIs that cannot deal with mutations a
 [15:00:05.0112] <littledan>
 Oh yeah the Wasm JS API has some unfortunate cloning, for example. And I was always confused why it wasn’t transfer.
 
+[15:00:43.0496] <Kris Kowal>
+I for one am also on team zero-copy, by whatever means necessary.
+
+[15:00:50.0109] <Mathieu Hofman>
+So a more relevant example would be `WritableStreamDefaultWriter.write()`? It's not clear what would happen if you pass a chunk to that API and mutate the array buffer before the promise resolves.
+
+[15:01:04.0243] <Mathieu Hofman>
+* So a more relanvant example would be `WritableStreamDefaultWriter.write()`? It's not clear what would happen if you pass a chunk to that API and mutate the array buffer before the promise resolves.
+
+[15:01:24.0563] <Mathieu Hofman>
+* So a more relevant example would be `WritableStreamDefaultWriter.write()`? It's not clear what would happen if you pass a chunk to that API and mutate the array buffer before the promise resolves.
+
+[15:01:51.0460] <Domenic>
+Here is a strawperson with lots of objectionable properties, but hopefully it communicates the idea. There is a new argument-passing syntax, `f(take arg)`. This sets a bit on `arg` and also puts `arg` into a TDZ-like state, so the caller can't use it. API authors can then do something like `function f(arg) { if (!isBitSet(arg) { arg = arg.slice(); } ... }`.
+
+[15:02:29.0528] <Domenic>
+> <@mhofman:matrix.org> So a more relevant example would be `WritableStreamDefaultWriter.write()`? It's not clear what would happen if you pass a chunk to that API and mutate the array buffer before the promise resolves.
+
+WritableStream is not yet zero-copy friendly. ReadableStream is the relevant example here. https://streams.spec.whatwg.org/#byob-reader-prototype
+
+[15:02:42.0820] <Kris Kowal>
+This is also a description of linear types, fwiw.
+
+[15:03:27.0739] <Mathieu Hofman>
+Wouldn't that `take` only impact the binding? What if the array buffer had been assigned to another variable?
+
+[15:03:36.0111] <Domenic>
+Yes, that doesn't really work
+
+[15:04:26.0566] <Domenic>
+I guess you want `take` to do something more directly related to ArrayBuffer transferring
+
+[15:05:03.0770] <Mathieu Hofman>
+It seems what tou want is transferring the buffer temporarily and transferring it back. Or somehow put it in an "exclusive use" mode
+
