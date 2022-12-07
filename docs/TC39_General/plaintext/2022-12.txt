@@ -795,3 +795,17 @@ Anyway, it seems that CoW is not the way, but I really don't know how to solve a
 
 Yeah, I got lost with `slice()` for CoW because it doesn’t express detachment to the original.
 
+[16:20:44.0893] <Mathieu Hofman>
+Ok to summarize:
+
+For CoW, you'd do: `writer.write(ab);` with `async write (ab) { const copy = ab.slice(0); try { await doWrite(copy); } finally { copy.detach() } }`
+
+For explicit take you'd have to do something like: `write.write(ab.getTaker())` with `async write (taker) { const [ab, release] = taker(); try { await doWrite(ab); } finally { release(); } }`
+
+`taker()` could only be called once (throws after) and returns both the ab and a `release` function, which once called restore the state of the original array buffer instance. I guess we could imagine different modes for the taker. For example readonly would yield a readonly buffer and put the original buffer in read-only mode, which means they could be the same object. A write mode would yield a mutable buffer, putting the original buffer in read-only mode?
+
+There's always the risk that the receiver to which you provide the taker will never call release.
+
+[16:22:55.0100] <Mathieu Hofman>
+That's the only pattern I can imagine right now providing for the explicit/opt-in and guaranteed transfer of use, while still allowing the buffer to be reused.
+
