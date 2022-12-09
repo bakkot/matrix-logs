@@ -2133,3 +2133,78 @@ i'm asking in particular because in some methods, IteratorNext and IteratorValue
 [14:54:51.0147] <bakkot>
 ljharb: correct, iteratorstep and iteratorvalue throwing is considered misbehaving and so does not close the iterator
 
+[14:55:09.0535] <bakkot>
+if there are cases where those things throw and the iterator is still closed, that's a bug 
+
+[14:55:19.0865] <bakkot>
+(but you might be looking at flatMap, which is a special case because there are two iterators)
+
+[14:55:24.0006] <ljharb>
+yes - in take/drop
+
+[14:55:37.0948] <ljharb>
+the two throwing AOs are done in a oneliner, so the abrupt check isn't separated
+
+[14:55:39.0726] <ljharb>
+i can make a PR
+
+[14:55:50.0652] <bakkot>
+which step in take/drop?
+
+[14:56:03.0731] <ljharb>
+eg 6.c.iii in drop
+
+[14:56:08.0339] <ljharb>
+ * eg 6.c.iii in drop
+
+[14:56:18.0755] <bakkot>
+look closer
+
+[14:56:21.0407] <ljharb>
+in that case maybe it's just that the check should be removed?
+
+[14:56:31.0538] <ljharb>
+ohhhh i see
+
+[14:56:36.0966] <ljharb>
+it's just the Yield completion
+
+[14:56:40.0272] <bakkot>
+indeed
+
+[14:57:02.0857] <bakkot>
+i.e., when someone calls `.return()` or `.throw()` on the iterator produced by `.drop()`
+
+[14:57:05.0575] <ljharb>
+what kind of code would make Yield throw?
+
+[14:57:06.0636] <ljharb>
+ahhh
+
+[14:57:24.0750] <bakkot>
+(via GeneratorResumeAbrupt IIRC)
+
+[14:57:25.0185] <ljharb>
+so if they've *already* called those, then yield would throw then?
+
+[14:57:46.0189] <bakkot>
+what do you mean by "already called"?
+
+[14:58:48.0429] <ljharb>
+maybe i'm not understanding. to get to 6.c.iii in drop, you've received an object from the next call. the IteratorValue call means that the Get of `value` has succeeded. when would return/throw factor in?
+
+[14:59:12.0452] <ljharb>
+is it that `next` or a `value` getter could have called `.return` or `.throw`, setting the GeneratorState to completed, thus causing Yield to throw?
+
+[14:59:15.0331] <bakkot>
+the call to the `Yield` AO pauses the "generator"
+
+[14:59:45.0725] <bakkot>
+and while it is paused, someone calling `.throw()` on the iterator causes return value returned by the `Yield` AO to be a throw completion
+
+[14:59:53.0626] <bakkot>
+this is the same as for an actual generator
+
+[14:59:56.0461] <ljharb>
+ahhh ok, that's the part i'm missing, thanks
+
