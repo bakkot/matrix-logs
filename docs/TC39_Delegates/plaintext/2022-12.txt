@@ -2272,3 +2272,59 @@ right, but it is default, so it's not specified at all
 [23:24:58.0126] <bakkot>
 "Every other data property described in clauses 19 through 28 and in Annex B.2 has the attributes { [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: true } unless otherwise specified."
 
+[23:26:20.0924] <bakkot>
+> <@ljharb:matrix.org> so in this case, `taken.next()` will throw because `next` returns a non-Object, and the wrapper throws on that; if i modify next to return an empty object
+
+ah yeah sorry, `next` should return `{ done: false, value: null }` or something
+
+[23:26:32.0096] <bakkot>
+so should `return` for that matter
+
+[23:26:52.0554] <bakkot>
+ * simple test for this example:
+
+```
+let manualIter = {
+  next(){ console.log('next'); return { done: false, value: null } },
+  throw(){ console.log('not hit'); },
+  return() { console.log('closing'); return {}; },
+};
+
+let taken = Iterator.from(manualIter).take(10);
+taken.next(); // prints 'next'
+try { taken.throw('err'); } catch (e) { console.log('caught', e); } // prints 'closing' and then 'caught err'
+```
+
+[23:26:57.0918] <bakkot>
+updated my snippet
+
+[23:27:37.0478] <bakkot>
+> <@ljharb:matrix.org> but also, the iterator helper wrapper, nor Iterator.prototype, seems to specify a `throw` method, so `taken.throw` doesn't exist
+
+hm, ok, I guess it's just `.return` then
+
+[23:28:11.0986] <bakkot>
+which does not cause an exception, but does still cause an abrupt completion
+
+[23:29:03.0348] <bakkot>
+ * simple test for this example:
+
+```
+let manualIter = {
+  next(){ console.log('next'); return { done: false, value: null } },
+  throw(){ console.log('not hit'); },
+  return() { console.log('closing'); return {}; },
+};
+
+let taken = Iterator.from(manualIter).take(10);
+taken.next(); // prints 'next'
+taken.return(); // prints 'closing'
+taken.next(); // returns { done: true }
+```
+
+[23:29:24.0745] <bakkot>
+that makes it a little harder for a test to clearly demonstrate what's going on, but updated my snippet anyway
+
+[23:29:39.0347] <bakkot>
+writing tests without code to run them against is hard
+
