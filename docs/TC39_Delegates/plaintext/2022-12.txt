@@ -2475,3 +2475,66 @@ yes it is
 [16:10:02.0018] <bakkot>
 that is what it is for
 
+[16:10:08.0661] <bakkot>
+that is, very definitively, what it is for
+
+[16:10:13.0505] <ljharb>
+it's for "each callback *might* produce a sequence", which is why the one on arrays works that way
+
+[16:10:22.0265] <bakkot>
+we did not invent flatMap
+
+[16:10:56.0791] <ljharb>
+i realize that. but this makes the iterator flatMap different from the array one in a way that harms usability - it means i can't transparently refactor between map and flatMap without also changing the mapper - something i can already do on arrays, and very very often do.
+
+[16:11:02.0178] <bakkot>
+the only reason the one on arrays works that way is for symmetry with `.flat`, which does not exist on iterator helpers
+
+[16:11:34.0986] <ljharb>
+ok but flat and flatMap now exist on Arrays. the reason for array flatMap's behavior isn't really relevant - the two flatMaps are now inconsistent
+
+[16:11:56.0267] <bakkot>
+"primitives or iterables" would not restore the consistency with Array that you're looking for
+
+[16:12:08.0196] <ljharb>
+true. it would bring it closer tho.
+
+[16:12:23.0365] <bakkot>
+that's not always a good thing
+
+[16:12:33.0208] <littledan>
+sorry what was the change in how non-objects were handled?
+
+[16:12:35.0213] <ljharb>
+agreed. i fail to see why this wouldn't be a good thing tho
+
+[16:12:56.0906] <ljharb>
+littledan: in array flatMap, if the callback return is an array, it's flattened; if not, it's just used as-is
+
+[16:13:12.0802] <ljharb>
+in iterator flatMap, if the callback return is a non-iterable, it always throws - instead of just being used as-is
+
+[16:13:33.0351] <bakkot>
+littledan: right now, `flatMap` throws if you return anything other than an iterable object; ljharb proposes that instead it throw if you return anything other than an iterable object _or a primitive_, and that in the latter case it auto-box
+
+[16:13:34.0499] <ljharb>
+in particular this introduces a refactoring hazard for arrays
+
+[16:14:02.0533] <ljharb>
+`arr.map(x).filter(y).flatMap(z)` to `Iterator.from(arr).map(x).filter(y).flatMap(z)` won't work as intended
+
+[16:14:03.0317] <bakkot>
+the refactoring hazard is there either way, though; making the hazard more subtle (i.e. only relevant for non-primitives) is not an improvement IMO
+
+[16:14:40.0301] <bakkot>
+also Array.prototype.flatMap flattens _arrays_, and _not_ iterables
+
+[16:14:44.0262] <bakkot>
+they're just fundamentally different operations
+
+[16:14:45.0106] <ljharb>
+i suppose if you were returning a non-array iterable in the array case, the hazard is indeed always there
+
+[16:15:09.0831] <ljharb>
+but the only non-array iterable i would think is commonly returned from a mapper is strings
+
