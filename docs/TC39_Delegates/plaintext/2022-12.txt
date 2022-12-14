@@ -2969,3 +2969,46 @@ ah doh, it's just d8 being buggy and forgetting the set the same security token 
 [11:59:53.0334] <shu>
 sorry for all the confusion
 
+[13:41:31.0509] <Mathieu Hofman>
+shu: I'm not sure where the confusion stemmed from by as littledan said, just creating an error inside the shadow realm and observing its stack there is the issue. Here is a potential example:
+
+```
+const child = new ShadowRealm();
+child.evaluate(`
+const originalPrepare = Error.prepareStackTrace;
+Error.prepareStackTrace = function(error, structuredStackTrace) {
+  for (const callSite of structuredStackTrace) {
+    console.log(callSite.getFunctionName(), callSite.getFunction());
+  }
+  return originalPrepare(error, structuredStackTrace);
+});
+`);
+const getStack = child.evaluate(`function() {
+  try { null.error } catch (e) { return e.stack; }
+}`);
+console.log(getStack());
+```
+
+[13:42:37.0387] <Mathieu Hofman>
+ * shu: I'm not sure where the confusion stemmed from by as littledan said, just creating an error inside the shadow realm and observing its stack there is the issue. Here is a potential example:
+
+```
+const child = new ShadowRealm();
+child.evaluate(`
+const originalPrepare = Error.prepareStackTrace;
+Error.prepareStackTrace = function(error, structuredStackTrace) {
+  for (const callSite of structuredStackTrace) {
+    console.log(callSite.getFunctionName(), callSite.getFunction());
+  }
+  return originalPrepare(error, structuredStackTrace);
+});
+`);
+const getStack = child.evaluate(`function() {
+  try { null.error } catch (e) { return e.stack; }
+}`);
+console.log(getStack());
+```
+
+[13:44:00.0707] <shu>
+Mathieu Hofman: the confusion was my not observing any striped stacks in practice, which turned out to be an implementation issue with the `d8` testing shell
+
