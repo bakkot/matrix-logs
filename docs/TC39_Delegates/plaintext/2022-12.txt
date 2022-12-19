@@ -3052,3 +3052,23 @@ i guess that's something like, passing in a callback into a wrapped function tha
 [14:26:12.0338] <Mathieu Hofman>
 Yeah something like that
 
+[14:31:47.0375] <Mathieu Hofman>
+I think the following should do
+```
+const originalPrepare = Error.prepareStackTrace;
+Error.prepareStackTrace = function(error, structuredStackTrace) {
+  for (const callSite of structuredStackTrace) {
+    console.log(callSite.getFunctionName(), callSite.getFunction());
+  }
+  return originalPrepare(error, structuredStackTrace);
+});
+const child = new ShadowRealm();
+const wrap = child.evaluate(`function(callback) {
+  return function(...args) { return callback(...args); };
+}`);
+const wrapped = wrap(function() {
+  try { null.error } catch (e) { return e.stack; }
+});
+console.log(wrapped());
+```
+
