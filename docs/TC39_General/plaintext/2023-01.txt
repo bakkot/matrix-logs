@@ -845,3 +845,64 @@ the previous call settles in my example
 [16:05:09.0382] <Justin Ridgewell>
 The `reenter` won't log until the 1000ms is up
 
+[16:05:15.0751] <bakkot>
+yes but it doesn't need to
+
+[16:05:17.0245] <bakkot>
+my example still works
+
+[16:06:07.0096] <bakkot>
+```
+async function* foo(){ yield 0; await sleep(1000); yield 1; }
+let it = foo().map(x => fetch(x));
+it.next();
+// almost immediately after this point, the promise returned from the first call to the underlying foo()'s `.next` settles
+// then the first call to `fetch` starts
+it.next() // so this can almost immediately kick off another call to the underlying foo()'s `next`, and have that actually hit the `sleep`
+```
+
+[16:06:36.0282] <bakkot>
+ * ```
+async function* foo(){ yield 0; await sleep(1000); yield 1; }
+let it = foo().map(x => fetch(x));
+it.next();
+// almost immediately after this point, the promise returned from the first call to the underlying foo()'s `.next` settles
+// then the first call to `fetch` starts
+it.next() // so this can almost immediately kick off another call to the underlying foo()'s `next`, and have that actually hit the `sleep`
+```
+
+[16:08:57.0731] <Justin Ridgewell>
+```
+async function* foo(){
+    yield 0;
+    console.log('reenter');
+    await sleep(1000);
+    yield 1;
+}
+let it = foo();
+it.next();
+it.next();
+console.log('end');
+```
+Logs `end` then `reenter`, the first yield doesn't settle the iterator until after a tick
+
+[16:09:10.0644] <Justin Ridgewell>
+I think you're incorrect, and even if you're correct, you're example will start to fail again as soon as you chain your iterators with async functionality
+
+[16:09:50.0751] <Justin Ridgewell>
+```
+let it = foo()
+  .map(x => fetch(x))
+  .map(r => r.json());
+```
+
+[16:09:56.0548] <Justin Ridgewell>
+ * ```
+let it = foo()
+  .map(x => fetch(x))
+  .map(r => r.json());
+```
+
+[16:10:00.0077] <bakkot>
+not with the definition of `map` in the slides
+
