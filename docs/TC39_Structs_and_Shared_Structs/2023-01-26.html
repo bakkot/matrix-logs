@@ -48,6 +48,20 @@
   <tr class="msg" id="L7"><td class="ts-cell"><a class="ts" href="#L7" alt="Thu Jan 26 2023 09:05:07 GMT-0800 (Pacific Standard Time)">17:05</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@aclaymore:matrix.org">Ashley Claymore</span>&gt;</div></td><td class="msg-cell">omw</td></tr>
   <tr class="msg" id="L8"><td class="ts-cell"><a class="ts" href="#L8" alt="Thu Jan 26 2023 09:05:24 GMT-0800 (Pacific Standard Time)">17:05</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@aclaymore:matrix.org">Ashley Claymore</span>&gt;</div></td><td class="msg-cell">sorry, actually 1 min</td></tr>
   <tr class="msg" id="L9"><td class="ts-cell"><a class="ts" href="#L9" alt="Thu Jan 26 2023 09:05:29 GMT-0800 (Pacific Standard Time)">17:05</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-8" title="@shuyuguo:matrix.org">shu</span>&gt;</div></td><td class="msg-cell">np</td></tr>
+  <tr class="msg" id="L10"><td class="ts-cell"><a class="ts" href="#L10" alt="Thu Jan 26 2023 10:39:16 GMT-0800 (Pacific Standard Time)">18:39</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell"><p>Regarding the "shared modules" suggestion. I may have jumped a few steps ahead in my reasoning without explaining how I got there, so I'll take a few steps back.</p>
+<p>If we imagine an implementation of shared structs that contains some form of methods, what can those methods close over? Only globals? What about functions that are siblings to the shared struct? What about imports?</p>
+<p>If we do not close over these things, the methods of shared structs won't be able to reuse useful utilities such as common vector math operations you might use in a 3D graphics library, that aren't somehow patched into <code>globalThis</code>.</p>
+<p>If we do close over these things, how do we ensure the module graph has been instantiated on the worker thread? What about initialization logic that might be needed that wires together some of these modules, applies polyfills, etc.? What if these modules contain top-level <code>await</code> or must otherwise be loaded asynchronously?</p>
+<p>How and when do we instantiate the thread-local (or per-realm?) prototype for each struct, especially if doing so might kick off this kind of module loading in the worker?</p>
+<p>The leap in logic I took to the "shared module" approach was to address these concerns:</p>
+<ul>
+<li>"Shared modules" would have an identity in the module cache that could be used as part of the type identity.</li>
+<li>"Shared modules" would promote code reuse.</li>
+<li>"Shared modules" would be restricted to containing only those things that can safely be shared, i.e. references to globals (which would be re-bound per realm), local functions, variables, shared structs, and imports/exports from other "shared modules".</li>
+<li>Due to the nature of the above restrictions, "shared modules" avoid accidental references to non-shared code.</li>
+</ul>
+<p>It could be that the idea of isolating shared code to its own file is overkill, but many developers are already used to doing this with things like <code>protobuf</code> today (i.e., maintaining their <code>protobuf</code> schema in a separate file).</p>
+</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>
