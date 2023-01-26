@@ -1199,3 +1199,95 @@ I would phrase this as "`.next()` will call `.error()` if promise rejects"
 
 I would phrase this as "`.next()` will call `.error()` if promise rejects"
 
+[22:40:29.0586] <Justin Ridgewell>
+Eg, the slides say:
+
+```javascript
+// Given:
+AsyncIterator.prototype = {
+  async next(v) {
+    return { value: await resumeWithValue(v), done }
+  }
+
+  async error(e) {
+    return { value: await resumeWithError(e), done }
+  }
+}
+
+// Input
+async function* foo() {
+    try {
+        yield Promise.reject(1);
+    } finally {
+        console.log(2);
+    }
+}
+
+// Output
+async function* foo() {
+    try {
+        yield await Promise.reject(1);
+    } finally {
+        console.log(2);
+    }
+}
+```
+
+
+[22:41:07.0876] <Justin Ridgewell>
+I think we could unobservably change that to:
+
+[22:42:12.0572] <Justin Ridgewell>
+```javascript
+// Given:
+AsyncIterator.prototype = {
+  async next(v) {
+    try {
+      return { value: await resumeWithValue(v), done }
+    } catch (e) {
+      return { value: await resumeWithError(e), done }
+    }
+  }
+
+  async error(e) {
+    return { value: await resumeWithError(e), done }
+  }
+}
+
+// Input
+async function* foo() {
+    try {
+        yield Promise.reject(1);
+    } finally {
+        console.log(2);
+    }
+}
+
+// Output has no change
+```
+
+
+[22:43:57.0657] <Justin Ridgewell>
+And if we can do that, why can't we do:
+```javascript
+// Given:
+AsyncIterator.prototype = {
+  async next(v) {
+    try {
+      return { value: await this.nextRaw(v).value, done }
+    } catch (e) {
+      return { value: await resumeWithError(e), done }
+    }
+  }
+
+  async nextRaw(v) {
+    return { value: resumeWithValue(v), done }
+  }
+
+  async error(e) {
+    return { value: await resumeWithError(e), done }
+  }
+}
+```
+
+

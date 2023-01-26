@@ -190,6 +190,86 @@ it.next();
 </blockquote>
 <p>I would phrase this as "<code>.next()</code> will call <code>.error()</code> if promise rejects"</p>
 </td></tr>
+  <tr class="msg" id="L72"><td class="ts-cell"><a class="ts" href="#L72" alt="Wed Jan 25 2023 22:40:29 GMT-0800 (Pacific Standard Time)">06:40</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-1" title="@jridgewell:matrix.org">Justin Ridgewell</span>&gt;</div></td><td class="msg-cell"><p>Eg, the slides say:</p>
+<pre><code class="language-javascript">// Given:
+AsyncIterator.prototype = {
+  async next(v) {
+    return { value: await resumeWithValue(v), done }
+  }
+
+  async error(e) {
+    return { value: await resumeWithError(e), done }
+  }
+}
+
+// Input
+async function* foo() {
+    try {
+        yield Promise.reject(1);
+    } finally {
+        console.log(2);
+    }
+}
+
+// Output
+async function* foo() {
+    try {
+        yield await Promise.reject(1);
+    } finally {
+        console.log(2);
+    }
+}
+</code></pre>
+</td></tr>
+  <tr class="msg" id="L73"><td class="ts-cell"><a class="ts" href="#L73" alt="Wed Jan 25 2023 22:41:07 GMT-0800 (Pacific Standard Time)">06:41</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-1" title="@jridgewell:matrix.org">Justin Ridgewell</span>&gt;</div></td><td class="msg-cell">I think we could unobservably change that to:</td></tr>
+  <tr class="msg" id="L74"><td class="ts-cell"><a class="ts" href="#L74" alt="Wed Jan 25 2023 22:42:12 GMT-0800 (Pacific Standard Time)">06:42</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-1" title="@jridgewell:matrix.org">Justin Ridgewell</span>&gt;</div></td><td class="msg-cell"><pre><code class="language-javascript">// Given:
+AsyncIterator.prototype = {
+  async next(v) {
+    try {
+      return { value: await resumeWithValue(v), done }
+    } catch (e) {
+      return { value: await resumeWithError(e), done }
+    }
+  }
+
+  async error(e) {
+    return { value: await resumeWithError(e), done }
+  }
+}
+
+// Input
+async function* foo() {
+    try {
+        yield Promise.reject(1);
+    } finally {
+        console.log(2);
+    }
+}
+
+// Output has no change
+</code></pre>
+</td></tr>
+  <tr class="msg" id="L75"><td class="ts-cell"><a class="ts" href="#L75" alt="Wed Jan 25 2023 22:43:57 GMT-0800 (Pacific Standard Time)">06:43</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-1" title="@jridgewell:matrix.org">Justin Ridgewell</span>&gt;</div></td><td class="msg-cell"><p>And if we can do that, why can't we do:</p>
+<pre><code class="language-javascript">// Given:
+AsyncIterator.prototype = {
+  async next(v) {
+    try {
+      return { value: await this.nextRaw(v).value, done }
+    } catch (e) {
+      return { value: await resumeWithError(e), done }
+    }
+  }
+
+  async nextRaw(v) {
+    return { value: resumeWithValue(v), done }
+  }
+
+  async error(e) {
+    return { value: await resumeWithError(e), done }
+  }
+}
+</code></pre>
+</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>
