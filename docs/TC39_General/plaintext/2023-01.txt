@@ -957,3 +957,47 @@ Kris Kowal: what do you mean by interleaving?
 [19:10:04.0714] <bakkot>
 just that you can be executing the mapper function in parallel with itself?
 
+[19:10:20.0871] <bakkot>
+(assuming the resulting mapped thing is pumped multiple times)
+
+[19:10:48.0456] <Kris Kowal>
+That effect for one, yes.
+
+[19:11:45.0720] <Justin Ridgewell>
+> <@bakkot:matrix.org> and indeed the original generator can't be parallel with itself. I don't think there's anything we can do about that, though - the whole point of generators is that they're written as straight-line code, and you can't start executing the next line until the previous one finishes
+
+It's not just the running of the generators code, but the settlement of the `next()` promise external from the genrator that blocks
+
+[19:11:53.0181] <Kris Kowal>
+But also map(xf).map(yf) would interleave turns of xf and yf.
+
+[19:12:10.0343] <Justin Ridgewell>
+Eg, I want to be able to return a `yield fetch()` and reenter without that fetch having settled
+
+[19:12:18.0984] <bakkot>
+> <@jridgewell:matrix.org> It's not just the running of the generators code, but the settlement of the `next()` promise external from the genrator that blocks
+
+In the case that you specifically yield a promise, do you mean, or is there another case I'm not thinking of?
+
+[19:12:20.0040] <bakkot>
+ah yeah
+
+[19:12:42.0329] <bakkot>
+with this helper, you could do `yield { v: fetch() }` in your async generator and then `.map(box => box.v)` to get parallelism in the resulting thing (or rather the ability to be parallel assuming someone calls `.next` eagerly)
+
+[19:12:55.0076] <bakkot>
+a little silly but works fine
+
+[19:12:56.0665] <bakkot>
+... I think
+
+[19:13:55.0379] <bakkot>
+> <@kriskowal:matrix.org> But also map(xf).map(yf) would interleave turns of xf and yf.
+
+Right, yeah. You get that with my proposed tweak also (again assuming someone calls `.next()` eagerly)
+
+[19:14:09.0163] <Kris Kowal>
+> <@jridgewell:matrix.org> Eg, I want to be able to return a `yield fetch()` and reenter without that fetch having settled
+
+I don’t have spare attention to dig, but I would find it very surprising if `yield fetch()` were equivalent to `yield await fetch()`.
+
