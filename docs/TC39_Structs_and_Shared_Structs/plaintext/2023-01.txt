@@ -598,3 +598,119 @@ I fail to see how a user supplied value provided after shared struct creation wo
 [10:03:07.0028] <Mathieu Hofman>
 Btw, the prototype attaching I suggested can be made to have a shape more similar to your suggestion above
 
+[10:49:12.0002] <Mathieu Hofman>
+```js
+// vector2d.js
+// Each shared struct type, whether data only or "prepared" has its own unique type
+export const vector2Dtype = SharedStructType.prepare(["x", "y"]);
+
+const _Vector2D = SharedStructType.getConstructor(vector2Dtype);
+
+// custom construction behavior
+export function Vector2D(x = 0, y = 0) {
+  const _this = Reflect.construct(_Vector2D, [], new.target);
+  _this.x = x;
+  _this.y = y;
+  return _this;
+}
+
+// prototype methods
+Vector2D.prototype.distanceTo = function (v) {
+  const dx = this.x - v.x;
+  const dy = this.y - v.y;
+  return Math.sqrt(dx * dx + dy * dy);
+};
+
+SharedStructType.registerPrototype(vector2Dtype, Vector2D.prototype);
+
+// main.js
+import { Vector2D, vector2DType } from "./vector2d.js";
+const v1 = new Vector2D(1, 2);
+const worker = new Worker("worker.js");
+worker.postMessage([vector2DType, v1]);
+
+// worker.js
+// worker imports Vector2D, which causes registration as a side-effect.
+import { Vector2D, vector2DType } from "./vector2d.js";
+
+const v2 = new Vector2D(3, 4);
+
+parentPort.on("message", ([mainVector2DType, v1]) => {
+  SharedStructType.registerPrototype(mainVector2DType, Vector2D.prototype);
+  assert(mainVector2DType !== vector2DType);
+  assert(
+    SharedStructType.getConstructor(mainVector2DType) !==
+      SharedStructType.getConstructor(vector2Dtype)
+  );
+  assert(v1 instanceof Vector2D); // by virtue of sharing a prototype
+  v1.x; // 1
+  v1.distanceTo(v2); // ok
+  v1.toString(); // ok
+});
+
+```
+
+SharedStructType.getConstructor() is needed to allow the program to avoid duplicating type definitions in each agent/realm. I think the burden of such deduplication should be on the program, not on the engine.
+
+If the engine had to deduplicate itself, you'd either need a user provided type identifier at "prepare" time, and a global lock around such type definitions, or you'd need to somehow be able to collapse separate definitions into a single one. In either case you'd have to figure out what to do if the shape definition does not match, and in the case of definition collapse, how do you communicate the error to the program?
+
+By having the type definition generate the unique type identifier, you avoid all those complications in the engine, at the cost of putting more type hydration burden on the program.
+
+[10:49:27.0279] <Mathieu Hofman>
+ * ```js
+// vector2d.js
+// Each shared struct type, whether data only or "prepared" has its own unique type
+export const vector2Dtype = SharedStructType.prepare(["x", "y"]);
+
+const _Vector2D = SharedStructType.getConstructor(vector2Dtype);
+
+// custom construction behavior
+export function Vector2D(x = 0, y = 0) {
+  const _this = Reflect.construct(_Vector2D, [], new.target);
+  _this.x = x;
+  _this.y = y;
+  return _this;
+}
+
+// prototype methods
+Vector2D.prototype.distanceTo = function (v) {
+  const dx = this.x - v.x;
+  const dy = this.y - v.y;
+  return Math.sqrt(dx * dx + dy * dy);
+};
+
+SharedStructType.registerPrototype(vector2Dtype, Vector2D.prototype);
+
+// main.js
+import { Vector2D, vector2DType } from "./vector2d.js";
+const v1 = new Vector2D(1, 2);
+const worker = new Worker("worker.js");
+worker.postMessage([vector2DType, v1]);
+
+// worker.js
+// worker imports Vector2D, which causes registration as a side-effect.
+import { Vector2D, vector2DType } from "./vector2d.js";
+
+const v2 = new Vector2D(3, 4);
+
+parentPort.on("message", ([mainVector2DType, v1]) => {
+  SharedStructType.registerPrototype(mainVector2DType, Vector2D.prototype);
+  assert(mainVector2DType !== vector2DType);
+  assert(
+    SharedStructType.getConstructor(mainVector2DType) !==
+      SharedStructType.getConstructor(vector2Dtype)
+  );
+  assert(v1 instanceof Vector2D); // by virtue of sharing a prototype
+  v1.x; // 1
+  v1.distanceTo(v2); // ok
+  v1.toString(); // ok
+});
+
+```
+
+SharedStructType.getConstructor() is needed to allow the program to avoid duplicating type definitions in each agent/realm. I think the burden of such deduplication should be on the program, not on the engine.
+
+If the engine had to deduplicate itself, you'd either need a user provided type identifier at "prepare" time, and a global lock around such type definitions, or you'd need to somehow be able to collapse separate definitions into a single one. In either case you'd have to figure out what to do if the shape definition does not match, and in the case of definition collapse, how do you communicate the error to the program?
+
+By having the type definition generate the unique type identifier, you avoid all those complications in the engine, at the cost of putting more type hydration burden on the program.
+

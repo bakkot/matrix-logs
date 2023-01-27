@@ -207,6 +207,59 @@ export shared struct Vector2D {
 </td></tr>
   <tr class="msg" id="L39"><td class="ts-cell"><a class="ts" href="#L39" alt="Fri Jan 27 2023 10:02:40 GMT-0800 (Pacific Standard Time)">18:02</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@mhofman:matrix.org">Mathieu Hofman</span>&gt;</div></td><td class="msg-cell">I fail to see how a user supplied value provided after shared struct creation would work. Unless you'd somehow remap types you may have already seen. IMO you'd at least need to pass your unique ID as part of the <code>SharedStructType.prepare</code> call. But in general I don't like strings for unique IDs, and since we already have object that carry identity across agents, I thought it'd make sense to reuse them.</td></tr>
   <tr class="msg" id="L40"><td class="ts-cell"><a class="ts" href="#L40" alt="Fri Jan 27 2023 10:03:07 GMT-0800 (Pacific Standard Time)">18:03</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@mhofman:matrix.org">Mathieu Hofman</span>&gt;</div></td><td class="msg-cell">Btw, the prototype attaching I suggested can be made to have a shape more similar to your suggestion above</td></tr>
+  <tr class="msg" id="L41"><td class="ts-cell"><a class="ts" href="#L41" alt="Fri Jan 27 2023 10:49:12 GMT-0800 (Pacific Standard Time)">18:49</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@mhofman:matrix.org">Mathieu Hofman</span>&gt;</div></td><td class="msg-cell"><pre><code class="language-js">// vector2d.js
+// Each shared struct type, whether data only or "prepared" has its own unique type
+export const vector2Dtype = SharedStructType.prepare(["x", "y"]);
+
+const _Vector2D = SharedStructType.getConstructor(vector2Dtype);
+
+// custom construction behavior
+export function Vector2D(x = 0, y = 0) {
+  const _this = Reflect.construct(_Vector2D, [], new.target);
+  _this.x = x;
+  _this.y = y;
+  return _this;
+}
+
+// prototype methods
+Vector2D.prototype.distanceTo = function (v) {
+  const dx = this.x - v.x;
+  const dy = this.y - v.y;
+  return Math.sqrt(dx * dx + dy * dy);
+};
+
+SharedStructType.registerPrototype(vector2Dtype, Vector2D.prototype);
+
+// main.js
+import { Vector2D, vector2DType } from "./vector2d.js";
+const v1 = new Vector2D(1, 2);
+const worker = new Worker("worker.js");
+worker.postMessage([vector2DType, v1]);
+
+// worker.js
+// worker imports Vector2D, which causes registration as a side-effect.
+import { Vector2D, vector2DType } from "./vector2d.js";
+
+const v2 = new Vector2D(3, 4);
+
+parentPort.on("message", ([mainVector2DType, v1]) =&gt; {
+  SharedStructType.registerPrototype(mainVector2DType, Vector2D.prototype);
+  assert(mainVector2DType !== vector2DType);
+  assert(
+    SharedStructType.getConstructor(mainVector2DType) !==
+      SharedStructType.getConstructor(vector2Dtype)
+  );
+  assert(v1 instanceof Vector2D); // by virtue of sharing a prototype
+  v1.x; // 1
+  v1.distanceTo(v2); // ok
+  v1.toString(); // ok
+});
+
+</code></pre>
+<p>SharedStructType.getConstructor() is needed to allow the program to avoid duplicating type definitions in each agent/realm. I think the burden of such deduplication should be on the program, not on the engine.</p>
+<p>If the engine had to deduplicate itself, you'd either need a user provided type identifier at "prepare" time, and a global lock around such type definitions, or you'd need to somehow be able to collapse separate definitions into a single one. In either case you'd have to figure out what to do if the shape definition does not match, and in the case of definition collapse, how do you communicate the error to the program?</p>
+<p>By having the type definition generate the unique type identifier, you avoid all those complications in the engine, at the cost of putting more type hydration burden on the program.</p>
+</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>
