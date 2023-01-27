@@ -99,6 +99,112 @@ shared struct class SSC {
   <tr class="msg" id="L35"><td class="ts-cell"><a class="ts" href="#L35" alt="Fri Jan 27 2023 08:55:53 GMT-0800 (Pacific Standard Time)">16:55</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@mhofman:matrix.org">Mathieu Hofman</span>&gt;</div></td><td class="msg-cell">no need to mess with module logic</td></tr>
   <tr class="msg" id="L36"><td class="ts-cell"><a class="ts" href="#L36" alt="Fri Jan 27 2023 08:56:15 GMT-0800 (Pacific Standard Time)">16:56</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@aclaymore:matrix.org">Ashley Claymore</span>&gt;</div></td><td class="msg-cell">(I don't think) this would need module blocks, the part that is attached to the internal slot can be, as <span class="nick-10">littledan</span> said, a URL string</td></tr>
   <tr class="msg" id="L37"><td class="ts-cell"><a class="ts" href="#L37" alt="Fri Jan 27 2023 08:58:37 GMT-0800 (Pacific Standard Time)">16:58</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@mhofman:matrix.org">Mathieu Hofman</span>&gt;</div></td><td class="msg-cell">I'm personally not a fan of tying module specifier strings into the solution</td></tr>
+  <tr class="msg" id="L38"><td class="ts-cell"><a class="ts" href="#L38" alt="Fri Jan 27 2023 09:21:25 GMT-0800 (Pacific Standard Time)">17:21</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell"><p>Is there any reason the origin trial API couldn't be extended to provide a registration mechanism for the shared struct type with a user-provided unique ID (just a string, but could contain a URI, UUID, etc.) and the thread-local prototype to use?</p>
+<pre><code class="language-js">// + fairly flexible
+// - requires setup on receiver end, correlation of struct type identity.
+// - requires encapsulation for constructor logic
+
+// data.js
+// data only structs don't require registration and have no shared type identity.
+export const DataOnly = new SharedStructType(["foo"]);
+
+// vector2d.js
+// data+behavior structs require registration to define type identity
+const { type: _Vector2D, register } = SharedStructType.prepare(["x", "y"]);
+
+// custom construction behavior
+export function Vector2D(x = 0, y = 0) {
+    const _this = Reflect.construct(_Vector2D, [], new.target);
+    _this.x = x;
+    _this.y = y;
+    return _this;
+}
+
+// prototype methods
+Vector2D.prototype.distanceTo = function (v) {
+    const dx = this.x - v.x;
+    const dy = this.y - v.y;
+    return Math.sqrt(dx * dx + dy * dy);
+};
+
+// Register the type identity, constructor, and prototype to use for this struct type in this thread.
+// NOTE: register(id, constructor [, prototype])
+register("e3a9bd1f-0f64-4848-b255-3c629d0c44a3", Vector2D, Vector2D.prototype);
+
+export { Vector2D };
+
+// main.js
+import { DataOnly } from "./data.js";
+import { Vector2D } from "./vector2d.js";
+const data = new DataOnly();
+data.foo = "data only, no behavior";
+
+const v1 = new Vector2D(1, 2);
+const v2 = new Vector2D(3, 4);
+const worker1 = new Worker("worker1.js");
+worker1.postMessage([data, v1, v2]);
+
+const worker2 = new Worker("worker2.js");
+worker2.postMessage([data, v1, v2]);
+
+// worker1.js
+// worker1 does not import Vector2D, so can only access its data.
+parentPort.on("message", ([data, v1, v2]) =&gt; {
+    data.foo; // "data only, no behavior"
+    v1.x; // 1
+    v2.y; // 4
+    // NOTE: prototype not registered. This could mean an invalid prototype chain (thus every non-data
+    // member acces would throw), or a default prototype chain (where prototype methods throw by nature
+    // of them just being `undefined`).0
+    v1.distanceTo(v2); // error
+    v1.toString(); // error?
+});
+
+// worker2.js
+// worker2 imports Vector2D, which causes registration as a side-effect.
+import "./vector2d.js";
+parentPort.on("message", ([data, v1, v2]) =&gt; {
+    data.foo; // "data only, no behavior"
+    v1.x; // 1
+    v2.y; // 4
+    v1.distanceTo(v2); // ok
+    v1.toString(); // ok
+});
+</code></pre>
+<p>The user-supplied type identity would allow the user to define the same struct in different bundles, and the registry wouldn't be global, but would rather be thread-local, so there'd be no global mutable registry to worry about. It also doesn't really matter if the prototypes differ slightly between realms/threads, since they all access the same underlying data.</p>
+<p>We could eventually extend this to syntax, possibly even using decorators:</p>
+<pre><code class="language-js">// data.js
+export shared struct DataOnly {
+    foo;
+
+    // NOTE: constructors don't necessarily require registration
+    constructor(foo) {
+        this.foo = foo;
+    }
+}
+
+// vector2d.js
+// a syntactic declaration doesn't necessarily need to set a type identity, since
+// we could infer one for it based on path to the containing file and its offset within
+// the file. However, we could still allow the user to explicitly specify type identity
+// for use with bundlers, or other cases where the inferred type identity might not
+// be sufficient.
+
+@struct.id("e3a9bd1f-0f64-4848-b255-3c629d0c44a3")
+// or: @struct.id("https://babylonjs.com/5.0/Vector2D")
+export shared struct Vector2D {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+    }
+    distanceTo(v) {
+        const dx = this.x - v.x;
+        const dy = this.y - v.y;
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+}
+</code></pre>
+</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>
