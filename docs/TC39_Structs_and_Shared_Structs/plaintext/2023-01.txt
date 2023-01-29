@@ -726,3 +726,81 @@ The API I suggested would only be for the origin trial, not the final proposal. 
 
 "Objects that carry identity across agents" doesn't help with the model I was proposing. In my model, each agent must independently register the type associated with the struct.
 
+[14:20:16.0004] <Mathieu Hofman>
+> <@rbuckton:matrix.org> The API I suggested would only be for the origin trial, not the final proposal. The user supplied type identity and prototype isn't "provided after shared struct creation", but rather, the shared struct constructor isn't usable until after it is registered. This is why shared struct type creation that depends on a prototype is different from data-only shared structs. You would have to call `register` to make the struct type valid.
+
+That's doesn't answer my concern. What would happen if 2 types with different shapes are registered with the same user supplied identity?
+
+[14:20:17.0823] <rbuckton>
+> <@mhofman:matrix.org> ```js
+> // vector2d.js
+> // Each shared struct type, whether data only or "prepared" has its own unique type
+> export const vector2Dtype = SharedStructType.prepare(["x", "y"]);
+> 
+> const _Vector2D = SharedStructType.getConstructor(vector2Dtype);
+> 
+> // custom construction behavior
+> export function Vector2D(x = 0, y = 0) {
+>   const _this = Reflect.construct(_Vector2D, [], new.target);
+>   _this.x = x;
+>   _this.y = y;
+>   return _this;
+> }
+> 
+> // prototype methods
+> Vector2D.prototype.distanceTo = function (v) {
+>   const dx = this.x - v.x;
+>   const dy = this.y - v.y;
+>   return Math.sqrt(dx * dx + dy * dy);
+> };
+> 
+> SharedStructType.registerPrototype(vector2Dtype, Vector2D.prototype);
+> 
+> // main.js
+> import { Vector2D, vector2DType } from "./vector2d.js";
+> const v1 = new Vector2D(1, 2);
+> const worker = new Worker("worker.js");
+> worker.postMessage([vector2DType, v1]);
+> 
+> // worker.js
+> // worker imports Vector2D, which causes registration as a side-effect.
+> import { Vector2D, vector2DType } from "./vector2d.js";
+> 
+> const v2 = new Vector2D(3, 4);
+> 
+> parentPort.on("message", ([mainVector2DType, v1]) => {
+>   SharedStructType.registerPrototype(mainVector2DType, Vector2D.prototype);
+>   assert(mainVector2DType !== vector2DType);
+>   assert(
+>     SharedStructType.getConstructor(mainVector2DType) !==
+>       SharedStructType.getConstructor(vector2Dtype)
+>   );
+>   assert(v1 instanceof Vector2D); // by virtue of sharing a prototype
+>   v1.x; // 1
+>   v1.distanceTo(v2); // ok
+>   v1.toString(); // ok
+> });
+> 
+> ```
+> 
+> SharedStructType.getConstructor() is needed to allow the program to avoid duplicating type definitions in each agent/realm. I think the burden of such deduplication should be on the program, not on the engine.
+> 
+> If the engine had to deduplicate itself, you'd either need a user provided type identifier at "prepare" time, and a global lock around such type definitions, or you'd need to somehow be able to collapse separate definitions into a single one. In either case you'd have to figure out what to do if the shape definition does not match, and in the case of definition collapse, how do you communicate the error to the program?
+> 
+> By having the type definition generate the unique type identifier, you avoid all those complications in the engine, at the cost of putting more type hydration burden on the program.
+
+This assumes the worker can be sure the incoming message is actually for that prototype, which might not be the case if there are multiple possible values for the message. This design seems very hard to implement in user code, while my suggestion is more reliable for write-once and reuse.
+
+[14:20:52.0690] <rbuckton>
+> <@mhofman:matrix.org> That's doesn't answer my concern. What would happen if 2 types with different shapes are registered with the same user supplied identity?
+
+An error. If the user defined identity is already registered to a different shape, it should throw.
+
+[14:23:13.0461] <rbuckton>
+The bigger question is, what do we want the final, shipping version of this to look like? Do we want package authors to be able to define structs that package consumers can just use, or do we want package consumers to need to register shared structs themselves in any messaging scaffolding?
+
+[14:23:38.0071] <Mathieu Hofman>
+> <@rbuckton:matrix.org> This assumes the worker can be sure the incoming message is actually for that prototype, which might not be the case if there are multiple possible values for the message. This design seems very hard to implement in user code, while my suggestion is more reliable for write-once and reuse.
+
+Right it requires more setup dance from the program, and it's that setup dance that we should try to make easier. But I'm very doubtful we can overcome the issue with a user supplied identity.
+
