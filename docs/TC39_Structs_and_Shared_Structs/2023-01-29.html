@@ -92,6 +92,36 @@ parentPort.on("message", ([mainVector2DType, v1]) =&gt; {
   <tr class="msg" id="L11"><td class="ts-cell"><a class="ts" href="#L11" alt="Sun Jan 29 2023 14:36:02 GMT-0800 (Pacific Standard Time)">22:36</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@mhofman:matrix.org">Mathieu Hofman</span>&gt;</div></td><td class="msg-cell">I think the question raised by <span class="nick-4">Ashley Claymore</span>is relevant: how do you handle the fan in case where multiple agents setup a shared type before being introduced to each other. A forgeable type identifier in my opinion is not safe, and I'm pretty sure it'd never make it through committee. However I'm not convinced we need prototype/constructor continuity here.</td></tr>
   <tr class="msg" id="L12"><td class="ts-cell"><a class="ts" href="#L12" alt="Sun Jan 29 2023 14:36:05 GMT-0800 (Pacific Standard Time)">22:36</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">And that whatever that design is should be able to take into account bundling, be that with module declarations/module expressions, or traditional bundlers</td></tr>
   <tr class="msg" id="L13"><td class="ts-cell"><a class="ts" href="#L13" alt="Sun Jan 29 2023 14:38:56 GMT-0800 (Pacific Standard Time)">22:38</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell"><mx-reply><blockquote> I think the question raised by <span class="nick-4">Ashley Claymore</span>is relevant: how do you handle the fan in case where multiple agents setup a shared type before being introduced to each other. A forgeable type identifier in my opinion is not safe, and I'm pretty sure it'd never make it through committee. However I'm not convinced we need prototype/constructor continuity here.</blockquote></mx-reply>Since this wouldn't be a global registry, it wouldn't matter. Your code defines the relationship between an id and a constructor/prototype on your agent. If your code tries to register the same unique id twice, it should be an error so you can isolate the problem early. If the constructor/prototype on one agent doesn't match the constructor/prototype on another agent, that's fine. In fact, that may even be a value add, since bundlers could potentially tree-shake away prototype methods that aren't used.</td></tr>
+  <tr class="msg" id="L14"><td class="ts-cell"><a class="ts" href="#L14" alt="Sun Jan 29 2023 14:42:13 GMT-0800 (Pacific Standard Time)">22:42</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@mhofman:matrix.org">Mathieu Hofman</span>&gt;</div></td><td class="msg-cell">How is it not a global registry?</td></tr>
+  <tr class="msg" id="L15"><td class="ts-cell"><a class="ts" href="#L15" alt="Sun Jan 29 2023 14:42:57 GMT-0800 (Pacific Standard Time)">22:42</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@mhofman:matrix.org">Mathieu Hofman</span>&gt;</div></td><td class="msg-cell">You're assuming there is a single author to code running in an agent</td></tr>
+  <tr class="msg" id="L16"><td class="ts-cell"><a class="ts" href="#L16" alt="Sun Jan 29 2023 14:42:59 GMT-0800 (Pacific Standard Time)">22:42</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell"><p>All that matters is that a given struct type has the same type identity on multiple Agents, so that each Agent can bind a prototype to that type identity. Producing an instance of a struct type should be possible on any Agent, such that I could do:</p>
+<pre><code class="language-js">// main.js
+const v1 = new Vector2D(1, 2);
+worker.postMessage(v1);
+worker.on("message", e =&gt; console.log(e instanceof Vector2D));
+
+// worker.js
+const v2 = new Vector2D(3, 4);
+remotePort.postMessage(v1);
+remotePort.on("message", e =&gt; console.log(e instanceof Vector2D));
+</code></pre>
+</td></tr>
+  <tr class="msg" id="L17"><td class="ts-cell"><a class="ts" href="#L17" alt="Sun Jan 29 2023 14:43:13 GMT-0800 (Pacific Standard Time)">22:43</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@mhofman:matrix.org">Mathieu Hofman</span>&gt;</div></td><td class="msg-cell">And a single author to code running in communicating agents</td></tr>
+  <tr class="msg" id="L18"><td class="ts-cell"><a class="ts" href="#L18" alt="Sun Jan 29 2023 14:43:29 GMT-0800 (Pacific Standard Time)">22:43</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell"><mx-reply><blockquote> How is it not a global registry?</blockquote></mx-reply>I don't understand. Each Agent would have an independent registry mapping a type identity to a prototype.</td></tr>
+  <tr class="msg" id="L19"><td class="ts-cell"><a class="ts" href="#L19" alt="Sun Jan 29 2023 14:44:25 GMT-0800 (Pacific Standard Time)">22:44</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell"><mx-reply><blockquote> You're assuming there is a single author to code running in an agent</blockquote></mx-reply>I'm assuming that if you want to consistently use the same data in multiple agents, with the same underling behavior, then you should use a consistent definition.</td></tr>
+  <tr class="msg" id="L20"><td class="ts-cell"><a class="ts" href="#L20" alt="Sun Jan 29 2023 14:44:50 GMT-0800 (Pacific Standard Time)">22:44</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@mhofman:matrix.org">Mathieu Hofman</span>&gt;</div></td><td class="msg-cell"><mx-reply><blockquote> <p>All that matters is that a given struct type has the same type identity on multiple Agents, so that each Agent can bind a prototype to that type identity. Producing an instance of a struct type should be possible on any Agent, such that I could do:</p>
+<pre><code class="language-js">// main.js
+const v1 = new Vector2D(1, 2);
+worker.postMessage(v1);
+worker.on("message", e =&gt; console.log(e instanceof Vector2D));
+
+// worker.js
+const v2 = new Vector2D(3, 4);
+remotePort.postMessage(v1);
+remotePort.on("message", e =&gt; console.log(e instanceof Vector2D));
+</code></pre>
+</blockquote></mx-reply>Do you expect these console logs to print true or false?</td></tr>
+  <tr class="msg" id="L21"><td class="ts-cell"><a class="ts" href="#L21" alt="Sun Jan 29 2023 14:44:59 GMT-0800 (Pacific Standard Time)">22:44</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">I expect them to print <code>true</code>.</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>
