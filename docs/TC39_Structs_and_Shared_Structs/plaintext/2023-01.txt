@@ -1515,3 +1515,24 @@ All your examples seem to rely on prototype stability by require to pass `instan
 [09:46:09.0332] <Mathieu Hofman>
 This is the difficult part
 
+[09:57:21.0751] <rbuckton>
+`instanceof` is a function of the constructor, not the prototype. In my origin-trial derived example, I mistakenly included the constructor in the `register` API, though the runtime doesn't really need to know about the constructor. It would be better written as:
+
+```js
+const { type: _Vector2D, register } = SharedStructType.prepare(["x", "y"]);
+export function Vector2D(x = 0, y = 0) {
+    const _this = Reflect.construct(_Vector2D, [], new.target);
+    _this.x = x;
+    _this.y = y;
+    return _this;
+}
+Vector2D.prototype.distanceTo = function (v) {
+    const dx = this.x - v.x;
+    const dy = this.y - v.y;
+    return Math.sqrt(dx * dx + dy * dy);
+};
+register("e3a9bd1f-0f64-4848-b255-3c629d0c44a3", Vector2D.prototype);
+```
+
+You bind the type identity to the prototype to use for that struct type. `x instanceof Vector2D` then falls out of `Vector2D` checking whether `x` has `Vector2D.prototype` in its prototype chain.
+
