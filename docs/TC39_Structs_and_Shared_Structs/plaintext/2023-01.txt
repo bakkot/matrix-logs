@@ -1362,3 +1362,31 @@ That's still a poor DX as it would significantly overcomplicate `onmessage` hand
 [08:28:43.0142] <rbuckton>
 The `SharedStructTypeIdentityRegistry` suggestion above would handle the per-channel string identifier registry without requiring prior communication between each side of a channel.
 
+[08:38:05.0242] <rbuckton>
+Consider, for example:
+
+```js
+// node_modules/threejs/src/math/Vector2.js
+import { structRegistry } from "../registry.js"
+
+@structRegistry.register("http://threejs.com/structs/Vector2")
+shared struct Vector2 { ... }
+
+// main.js
+import { Vector2, structRegistry } from "threejs";
+
+const worker = new Worker("./worker.js", { structRegistry });
+worker.postMessage(new Vector2(0, 0));
+
+// worker.js
+import { structRegistry } from "threejs";
+import { parentPort } from "worker_threads";
+parentPort.addRegistry(structRegistry);
+parentPort.on("message", v => {
+  v.whatever();
+});
+```
+
+[08:39:19.0419] <rbuckton>
+Both the main and worker threads load the same struct type, though they could be in different bundles and tree shaking could remove some members. They independently associate type registries with their sides of the channel.
+
