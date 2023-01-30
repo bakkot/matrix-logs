@@ -1390,3 +1390,60 @@ parentPort.on("message", v => {
 [08:39:19.0419] <rbuckton>
 Both the main and worker threads load the same struct type, though they could be in different bundles and tree shaking could remove some members. They independently associate type registries with their sides of the channel.
 
+[08:40:07.0731] <rbuckton>
+ * Consider, for example:
+
+```js
+// node_modules/threejs/src/registry.js
+export const structRegistryWriter = new StructTypeRegistryWriter();
+export const structRegistry = structRegistryWriter.registry;
+
+// node_modules/threejs/src/math/Vector2.js
+import { structRegistryWriter } from "../registry.js"
+
+@structRegistry.register("http://threejs.com/structs/Vector2")
+shared struct Vector2 { ... }
+
+// main.js
+import { Vector2, structRegistry } from "threejs";
+
+const worker = new Worker("./worker.js", { structRegistry });
+worker.postMessage(new Vector2(0, 0));
+
+// worker.js
+import { structRegistry } from "threejs";
+import { parentPort } from "worker_threads";
+parentPort.addRegistry(structRegistry);
+parentPort.on("message", v => {
+  v.whatever();
+});
+```
+
+[08:40:54.0466] <rbuckton>
+While not automatic, the registration mechanism stays as out of the way as possible to simplify the developer experience.
+
+[08:41:42.0995] <Mathieu Hofman>
+Basically it'd look like 
+
+```js
+// Done by all workers independently
+import Vector2DPrototype from "vector2dBehavior.js" with { reflect: "module" };
+const { constructor: Vector2D, type: Vector2DType } = SharedStructType.prepare(["x", "y"]);
+SharedStructType.register(Vector2DType, Vector2DPrototype);
+const Vector2DUUID = '...';
+const structAwareChannel = new MessageChannel();
+structAwareChannel.register(Vector2DUUID, Vector2DType, Vector2DPrototype);
+
+// worker1.js
+const v1 = new Vector2D({x: 1, y: 2});
+structAwareChannel.postMessage({v1});
+
+// worker2.js
+channel.on("message", ({v1}) => {
+  console.log(v1 instanceof Vector2D); // true because prototype match even though type instance different
+});
+```
+
+[08:44:56.0334] <rbuckton>
+That's definitely not great for the actual proposal, that seems far to easy to get wrong. Maybe ok in the prototyping stage, but not long term.
+

@@ -138,8 +138,12 @@ And if that were easily solvable, we could also potentially solve that by bootst
   <tr class="msg" id="L89"><td class="ts-cell"><a class="ts" href="#L89" alt="Mon Jan 30 2023 08:27:18 GMT-0800 (Pacific Standard Time)">16:27</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell"><mx-reply><blockquote> Btw, you can use string identifier over <code>postMessage</code> for the application to know what the opaque type identifier is about, restoring your string based semantics. That would be scoped to whatever is holding the string identifier registry (possibly the channel itself).</blockquote></mx-reply>That's still a poor DX as it would significantly overcomplicate <code>onmessage</code> handlers by requiring custom scaffolding in every project to bootstrap.</td></tr>
   <tr class="msg" id="L90"><td class="ts-cell"><a class="ts" href="#L90" alt="Mon Jan 30 2023 08:28:43 GMT-0800 (Pacific Standard Time)">16:28</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">The <code>SharedStructTypeIdentityRegistry</code> suggestion above would handle the per-channel string identifier registry without requiring prior communication between each side of a channel.</td></tr>
   <tr class="msg" id="L91"><td class="ts-cell"><a class="ts" href="#L91" alt="Mon Jan 30 2023 08:38:05 GMT-0800 (Pacific Standard Time)">16:38</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell"><p>Consider, for example:</p>
-<pre><code class="language-js">// node_modules/threejs/src/math/Vector2.js
-import { structRegistry } from "../registry.js"
+<pre><code class="language-js">// node_modules/threejs/src/registry.js
+export const structRegistryWriter = new StructTypeRegistryWriter();
+export const structRegistry = structRegistryWriter.registry;
+
+// node_modules/threejs/src/math/Vector2.js
+import { structRegistryWriter } from "../registry.js"
 
 @structRegistry.register("http://threejs.com/structs/Vector2")
 shared struct Vector2 { ... }
@@ -160,6 +164,27 @@ parentPort.on("message", v =&gt; {
 </code></pre>
 </td></tr>
   <tr class="msg" id="L92"><td class="ts-cell"><a class="ts" href="#L92" alt="Mon Jan 30 2023 08:39:19 GMT-0800 (Pacific Standard Time)">16:39</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">Both the main and worker threads load the same struct type, though they could be in different bundles and tree shaking could remove some members. They independently associate type registries with their sides of the channel.</td></tr>
+  <tr class="msg" id="L93"><td class="ts-cell"><a class="ts" href="#L93" alt="Mon Jan 30 2023 08:40:54 GMT-0800 (Pacific Standard Time)">16:40</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">While not automatic, the registration mechanism stays as out of the way as possible to simplify the developer experience.</td></tr>
+  <tr class="msg" id="L94"><td class="ts-cell"><a class="ts" href="#L94" alt="Mon Jan 30 2023 08:41:42 GMT-0800 (Pacific Standard Time)">16:41</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@mhofman:matrix.org">Mathieu Hofman</span>&gt;</div></td><td class="msg-cell"><p>Basically it'd look like</p>
+<pre><code class="language-js">// Done by all workers independently
+import Vector2DPrototype from "vector2dBehavior.js" with { reflect: "module" };
+const { constructor: Vector2D, type: Vector2DType } = SharedStructType.prepare(["x", "y"]);
+SharedStructType.register(Vector2DType, Vector2DPrototype);
+const Vector2DUUID = '...';
+const structAwareChannel = new MessageChannel();
+structAwareChannel.register(Vector2DUUID, Vector2DType, Vector2DPrototype);
+
+// worker1.js
+const v1 = new Vector2D({x: 1, y: 2});
+structAwareChannel.postMessage({v1});
+
+// worker2.js
+channel.on("message", ({v1}) =&gt; {
+  console.log(v1 instanceof Vector2D); // true because prototype match even though type instance different
+});
+</code></pre>
+</td></tr>
+  <tr class="msg" id="L95"><td class="ts-cell"><a class="ts" href="#L95" alt="Mon Jan 30 2023 08:44:56 GMT-0800 (Pacific Standard Time)">16:44</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">That's definitely not great for the actual proposal, that seems far to easy to get wrong. Maybe ok in the prototyping stage, but not long term.</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>
