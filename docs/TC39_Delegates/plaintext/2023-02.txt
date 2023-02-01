@@ -453,3 +453,50 @@ It will also be difficult to explain why `await x; doSomethingWithContext()` wou
 
 that seems pretty straightforward to explain, for people using async contexts? "if you pass a callback, you need to wrap it" is not a hard rule to learn
 
+[07:55:31.0221] <bakkot>
+and if you're _not_ using an async context in your own function body you don't need to learn anything
+
+[07:55:50.0239] <Ashley Claymore>
+> <@littledan:matrix.org> Can someone link to the YouTube playlist?
+
+done
+
+[07:56:19.0742] <yulia>
+I appreciate the investigation into performance from v8 and the security review from SES. From our side, we see use cases for this but need to do a more thorough review. No outstanding concerns from us right now
+
+[07:56:26.0008] <shu>
+what is mark talking about?
+
+[07:56:33.0725] <yulia>
+ * I appreciate the investigation into performance from v8 and the security review from SES. From our side, we see use cases for this but need to do a more thorough review. No outstanding concerns from us right now
+
+[07:56:36.0841] <shu>
+is this the AsyncContext spec draft or 262?
+
+[07:58:06.0185] <bakkot>
+the other side of this, it will be difficult to explain why `x.then(doSomethingWithContext)` would work, but `setTimeout(doSomethingWithContext)` would not. so that implies `setTimeout` needs to automatically wrap as well. and then now you have the same problem but with `s/setTimeout/setEventListener/`, and so on
+
+[07:58:21.0707] <rbuckton>
+This becomes one more thing to consider when wrapping code in an `AsyncContext`, especially if that code calls into a third-party package that might use `.then`.
+
+[07:58:22.0120] <bakkot>
+> <@rbuckton:matrix.org> It will also be difficult to explain why `await x; doSomethingWithContext()` would work, but `x.then(() => doSomethingWithContext())` wouldn't. Especially when many editors have refactorings for that, which now become potentially unsafe operations.
+
+ * the other side of this, it will be difficult to explain why `x.then(doSomethingWithContext)` would work, but `setTimeout(doSomethingWithContext)` would not. so that implies `setTimeout` needs to automatically wrap as well. and then now you have the same problem but with `s/setTimeout/setEventListener/`, and so on
+
+[07:58:50.0229] <Michael Ficarra>
+since this is only stage 1, can we word the proposal (in its repo and the proposals list) in terms that don't lock us into any API decisions? something like "hooks for associating state with async call stack frames"?
+
+[07:59:16.0195] <rbuckton>
+> <@bakkot:matrix.org> the other side of this, it will be difficult to explain why `x.then(doSomethingWithContext)` would work, but `setTimeout(doSomethingWithContext)` would not. so that implies `setTimeout` needs to automatically wrap as well. and then now you have the same problem but with `s/setTimeout/setEventListener/`, and so on
+
+IIRC, `setTimeout`, `setImmediate`, `process.nextTick` were discussed in the slides as other potential places to automatically flow state.
+
+[07:59:40.0924] <bakkot>
+> <@rbuckton:matrix.org> This becomes one more thing to consider when wrapping code in an `AsyncContext`, especially if that code calls into a third-party package that might use `.then`.
+
+does it? if you pass a callback to the library you need to wrap it. but you need to _anyway_ because the third-party package might schedule the callback to get called in some way _other than_ `.then`, like event listener dispatch or something.
+
+[07:59:46.0277] <Michael Ficarra>
+Justin Ridgewell: ^
+
