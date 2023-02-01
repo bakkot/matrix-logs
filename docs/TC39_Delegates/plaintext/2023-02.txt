@@ -734,3 +734,94 @@ I think `transferAndFixLength is better than `transferToFixedLength`
 [08:24:58.0795] <Justin Ridgewell>
 I think it has to work for promises
 
+[08:25:08.0934] <Michael Ficarra>
+ * I think `transferAndFixLength` is better than `transferToFixedLength`
+
+[08:25:33.0523] <ljharb>
+> <@michaelficarra:matrix.org> I think `transferAndFixLength` is better than `transferToFixedLength`
+
+"fix" as a verb there is pretty overloaded
+
+[08:25:38.0143] <littledan>
+> <@bakkot:matrix.org> "calling into questionable code" meaning calling into... any code?
+
+I don't believe people should or do compose code in a perfectly defensive way all the time
+
+[08:25:57.0670] <Justin Ridgewell>
+Devs cannot escape our context on our platform, so any future point in which they would trigger an event listener would already have restored the request context
+
+[08:26:08.0102] <Michael Ficarra>
+the same overload as `Fixed`, no?
+
+[08:26:13.0068] <bakkot>
+littledan: while true, I also believe that a refactoring from scheduling with promises to scheduling with some other mechanism should be transparent to consumers of your code.
+
+[08:26:25.0086] <littledan>
+yeah, Bloomberg's use case also has requirements that we strictly not allow "escape".
+
+[08:26:28.0963] <bakkot>
+that is, we should not design the language such that such a refactoring is by-default not transparent.
+
+[08:26:50.0157] <littledan>
+In APMs OTOH, they would simply not work if everyone had to update all of their code... they are just based around implicit wrapping
+
+[08:27:03.0792] <littledan>
+like, this was proven out historically, leading to its development
+
+[08:27:39.0924] <ryzokuken>
+APMs have used decorators in the past to get around that though
+
+[08:28:07.0995] <Michael Ficarra>
+shu: please try to give a little more time between a name change and a stage 3 advancement next time; we may have been able to come up with a better name if we had more time
+
+[08:28:08.0511] <ryzokuken>
+well, although that'd still need changes
+
+[08:28:09.0495] <bakkot>
+> <@jridgewell:matrix.org> Devs cannot escape our context on our platform, so any future point in which they would trigger an event listener would already have restored the request context
+
+If you hand your callback to someone else, and there is literally no way they could schedule the callback to run with a different context than the one which existed when you handed the callback to them, I am also fine with that 
+
+[08:28:36.0456] <littledan>
+> <@michaelficarra:matrix.org> shu: please try to give a little more time between a name change and a stage 3 advancement next time; we may have been able to come up with a better name if we had more time
+
+Why didn't you put yourself on the queue?
+
+[08:28:40.0214] <bakkot>
+but that does lock us into, _every_ way of scheduling a task in the host must automatically wrap the callback passed to that context
+
+[08:28:40.0881] <shu>
+Michael Ficarra: technically there wasn't a name change
+
+[08:28:46.0499] <Michael Ficarra>
+littledan: because it didn't matter enough
+
+[08:28:52.0656] <bakkot>
+eventListener, unhandled promise handler, everything
+
+[08:29:12.0449] <Chengzhong Wu>
+you can AsyncContext.wrap the callback in such case
+
+[08:29:21.0779] <bakkot>
+Chengzhong Wu: well, that's my argument
+
+[08:29:23.0989] <Chengzhong Wu>
+> <@bakkot:matrix.org> If you hand your callback to someone else, and there is literally no way they could schedule the callback to run with a different context than the one which existed when you handed the callback to them, I am also fine with that
+
+ * you can AsyncContext.wrap the callback in such case
+
+[08:29:39.0749] <bakkot>
+if some ways of scheduling require you to wrap, they all should
+
+[08:29:49.0050] <bakkot>
+but if no ways of scheduling require you to wrap, that's fine too
+
+[08:30:02.0850] <Justin Ridgewell>
+Promises are a way for our users to later schedule a task, we do not control where they create promises or where the chain `.then()`
+
+[08:30:03.0468] <shu>
+Michael Ficarra: `transfer` was always named transfer, but because of the "preserve resizability" semantics change, to get the original "fixed length" behavior, i added a new method
+
+[08:30:04.0611] <bakkot>
+I am just not enthusiastic about _some_ callback-taking scheduling APIs wrapping
+
