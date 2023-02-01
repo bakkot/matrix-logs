@@ -357,3 +357,42 @@ always impressed by all JS engines' optimization ideas
 [07:44:32.0185] <Ashley Claymore>
 Someone might be able to get a published paper out of optimizing this :D
 
+[07:45:23.0634] <Ashley Claymore>
+"This one weird trick to get zero overhead async contexts" 
+
+[07:46:24.0578] <shu>
+v8 has zero overhead async contexts
+
+[07:46:27.0742] <bakkot>
+thinking about this even more, I am tempted to say that automatic wrapping happens _only_ when you can't do it yourself, i.e. only for syntactic `yield` and `await` (and friends, like `using await`, of course) - in every other case (including manual calls to `.then`) you can just wrap the continuation yourself, and not have to worry about whether the scheduler you're using happens to do wrapping for you
+
+[07:46:30.0137] <shu>
+the trick is that sometimes you can't get the stack!
+
+[07:46:49.0486] <bakkot>
+> <@bakkot:matrix.org> thinking about this more, I guess the fix is, if you are passing a context to someone else you manually `.wrap` the function first
+
+ * thinking about this even more, I am tempted to say that automatic wrapping happens _only_ when you can't do it yourself, i.e. only for syntactic `yield` and `await` - in every other case (including manual calls to `.then`) you can just wrap the continuation yourself, and not have to worry about whether the scheduler you're using happens to do wrapping for you
+
+[07:47:30.0249] <bakkot>
+ * thinking about this even more, I am tempted to say that automatic wrapping happens _only_ when you can't do it yourself, i.e. only for syntactic `yield` and `await` (and friends, like `using await`, of course) - in every other case (including manual calls to `.then`) you can just wrap the continuation yourself, and not have to worry about whether the scheduler you're using happens to do wrapping for you
+
+[07:47:41.0502] <Andreu Botella>
+https://github.com/wintercg/proposal-common-minimum-api/blob/main/asynclocalstorage.md
+
+[07:48:36.0527] <rbuckton>
+> <@bakkot:matrix.org> thinking about this even more, I am tempted to say that automatic wrapping happens _only_ when you can't do it yourself, i.e. only for syntactic `yield` and `await` (and friends, like `using await`, of course) - in every other case (including manual calls to `.then`) you can just wrap the continuation yourself, and not have to worry about whether the scheduler you're using happens to do wrapping for you
+
+I mostly agree, with the exception of `.then`. The biggest problem with context passing and Promises is that you would need to potentially wrap _every_ `.then` callback in the event one of them throws. This is far more arduous than wrapping the single entrypoint of an event handler.
+
+[07:48:57.0168] <rbuckton>
+If it works with `await`, it should work with `.then` on native `Promise` implementations.
+
+[07:49:29.0337] <bakkot>
+> <@rbuckton:matrix.org> I mostly agree, with the exception of `.then`. The biggest problem with context passing and Promises is that you would need to potentially wrap _every_ `.then` callback in the event one of them throws. This is far more arduous than wrapping the single entrypoint of an event handler.
+
+only if you have a bunch of `.then` calls, which isn't so common, and even then if you factor out a helper to do the wrapping it seems not so arduous?
+
+[07:49:42.0240] <bakkot>
+but I am maybe open to it; something to talk about more
+
