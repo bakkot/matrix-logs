@@ -157,3 +157,69 @@ I agree. The failure mode we have is very unfortunate, and this case highlights 
 [07:15:08.0650] <bakkot>
 though event listeners are kind of an odd case, because they run _sync_ if you dispatch an event manually, so I'm not totally clear what's supposed to happen there...
 
+[07:15:19.0066] <Ben Newman (Apollo, @benjamn on GH)>
+> <@bakkot:matrix.org> re: async contexts, I am assuming that the behavior is, whenever a function is scheduled to be run on a subsequent microtask tick or turn of the event loop, the host is required to snapshot the current async context bits and then restore them before running the function?
+
+yes, there will be a responsibility for the host environment to make sure the event-scheduling APIs it introduces (like `setTimeout`) use something similar to `AsyncContext.wrap` for their callbacks
+
+[07:15:23.0864] <shu>
+bakkot: that's been my understanding as well
+
+[07:15:38.0642] <shu>
+i'm kind of confused by justin's example saying the propagation point is at the await pause
+
+[07:15:43.0902] <ljharb>
+there is a decent list of proposals that were blocked by a lone objector, including some of the folks discussing changing the process here, fwiw. would we revist all of those if there were a process change?
+
+[07:15:49.0057] <shu>
+it can't work if it's _just_ promise reactions
+
+[07:16:04.0382] <Ben Newman (Apollo, @benjamn on GH)>
+right, but those are the hardest to polyfill
+
+[07:16:38.0221] <bakkot>
+> <@shuyuguo:matrix.org> i'm kind of confused by justin's example saying the propagation point is at the await pause
+
+the await pause is the point where you are scheduling a thing to be run on a subsequent tick, so that seems consistent?
+
+[07:16:55.0580] <shu>
+bakkot: that's the second one, i thought there was a handler scheduled earlier
+
+[07:16:59.0731] <shu>
+i might be mixing slides?
+
+[07:17:22.0709] <shu>
+anyway my point is just the host hooks i added for incumbent are only for JS callbacks
+
+[07:17:31.0650] <shu>
+this needs host event loop hook-ins as well
+
+[07:17:49.0103] <ljharb>
+ * there is a decent list of proposals that were blocked by a lone objector, including some of the folks discussing changing the process here, fwiw. would we revist all of those if there were a process change?
+
+[07:17:50.0239] <shu>
+ * anyway my point is just the host hooks i added for incumbent are only for JS callbacks
+
+[07:18:17.0761] <bakkot>
+indeed, as this slide is saying
+
+[07:19:02.0060] <bakkot>
+I will ask the question about event listener dispatch I guess
+
+[07:19:20.0285] <Ben Newman (Apollo, @benjamn on GH)>
+are folks here aware of the V8 methods `v8::Context::{Get,Set}ContinuationPreservedEmbedderData`?
+
+[07:19:40.0756] <shu>
+that's not quite enough
+
+[07:19:52.0807] <shu>
+we have that, yes, but you need more muxing
+
+[07:19:53.0084] <Ben Newman (Apollo, @benjamn on GH)>
+I know, but I'm trying to gauge context
+
+[07:20:00.0726] <Ashley Claymore>
+> <@bakkot:matrix.org> I will ask the question about event listener dispatch I guess
+
+good to ask. Though presumably all APIs could be wrapped in userland anyway. So technically nothing also stopping hosts doing that?
+
