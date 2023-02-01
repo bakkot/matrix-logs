@@ -530,3 +530,30 @@ so if you want to preserve the async context, you need to mark it as an async co
 [08:03:52.0125] <rbuckton>
 Simpler is knowing that `asyncIterable[Symbol.asyncIterator]().map(element => { /*has outer context*/ })` will work, but since there's no explicit `await`, how would I know? 
 
+[08:06:01.0357] <bakkot>
+Regardless of whether `.then` automatically wraps, I could write a `Symbol.asyncIterator` implementation that does not in fact wrap the callback using the top-of-stack callback; that's up to the implementation of `Symbol.asyncIterator`.
+
+[08:06:06.0294] <rbuckton>
+I also think not supporting this in `.then` would make it far less useful to quite a few of the use cases this is intended to support.
+
+[08:06:41.0481] <rbuckton>
+I'm pointing at the async iterator helpers proposal's built-in capabilities here.
+
+[08:07:34.0508] <bakkot>
+Right, but my point is that the async iterable is something someone hands you, and you can't trust that it's only going to use the scheduling APIs you expect it to on the way to its ultimate call to `Promise.prototype.then`.
+
+[08:08:26.0594] <bakkot>
+And the whole point of this API is that you shouldn't have to coordinate with other people's code about how they choose to schedule your callback. If you could coordinate, you could just have the other code thread the state through.
+
+[08:08:38.0418] <bakkot>
+ * And the whole point of this API is that you shouldn't have to coordinate with other people's code about how they choose to schedule your callback. If you could coordinate, you could just have the other code thread the state through.
+
+[08:09:29.0972] <littledan>
+There was some fascinating investigation into a sort of "borrowing" model for ArrayBuffers in https://gist.github.com/domenic/a9343fa787ba54b4ba3a60882c49cc32#file-readme-md
+
+[08:09:42.0720] <bakkot>
+Which is why I think we should not encourage you to write patterns which rely on other people's code using particular APIs to do scheduling.
+
+[08:10:08.0236] <bakkot>
+i.e., we should not make some APIs do wrapping of callbacks automatically.
+
