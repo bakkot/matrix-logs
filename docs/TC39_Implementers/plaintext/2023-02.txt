@@ -56,3 +56,29 @@ so how does iterator invalidation work? I guess chasing down all the iterators a
 [18:29:56.0875] <bakkot>
 or not invalidation _per se_ but if you delete an item that an iterator is pointing to
 
+[18:32:07.0766] <bakkot>
+hm. so this is fixable without redoing the entire implementation by e.g. adding uint64_t to each bucket to keep track of when items were added, but that does cost an extra word per item, which is a little unfortunate (and I guess requires you to re-scan the whole list once a total of 2^64 items have been added to a set over its lifetime)
+
+[18:32:14.0765] <bakkot>
+but the extra word per item is maybe not worth it
+
+[18:32:24.0424] <bakkot>
+I was really hoping this would be easy in all the engines, darn
+
+[18:32:57.0379] <bakkot>
+ * but the extra word per item is maybe not worth it
+
+[18:33:38.0635] <rkirsling>
+https://github.com/WebKit/WebKit/blob/main/Source/JavaScriptCore/runtime/HashMapImplInlines.h#L279-L304 is what happens upon delete(item)
+
+[18:34:09.0781] <bakkot>
+(that is: with each Set add a uint64_t, which is incremented whenever you add an item to the set, and never decremented; whenever you make a bucket put the value from that uint64_t in a field on the bucket. then you can sort buckets based on that field.)
+
+[18:34:10.0180] <rkirsling>
+yeah, sorry for the bubble bursting 😓
+
+[18:34:35.0169] <rkirsling>
+> <@bakkot:matrix.org> (that is: with each Set add a uint64_t, which is incremented whenever you add an item to the set, and never decremented; whenever you make a bucket put the value from that uint64_t in a field on the bucket. then you can sort buckets based on that field.)
+
+oh I see, yeah
+
