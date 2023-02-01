@@ -604,3 +604,86 @@ For `await` and `Promise.p.then`, I think we have to do them automatically
 [08:14:57.0310] <littledan>
 I think bakkot's arguments would need to be made to host environments, since we just don't own much of what would need to make these decisions
 
+[08:15:13.0085] <bakkot>
+> <@jridgewell:matrix.org> (And also if you force me to take away the fast path for `await promise` because I have to patch `.then`, I will riot)
+
+My point is that you don't have to patch `.then`
+
+[08:15:21.0158] <Justin Ridgewell>
+As the platform, I do
+
+[08:15:25.0356] <bakkot>
+... why?
+
+[08:15:35.0399] <bakkot>
+Assuming there's implicit wrapping in syntactic `await`s
+
+[08:15:41.0328] <Justin Ridgewell>
+The whole `console.log` use case in the slides
+
+[08:15:53.0521] <littledan>
+> <@bakkot:matrix.org> Assuming there's implicit wrapping in syntactic `await`s
+
+sure, I agree, in theory we could fork the semantics here
+
+[08:15:57.0209] <Justin Ridgewell>
+I have to preserve across any promise usage, because anything else will break an important API for us
+
+[08:16:00.0200] <littledan>
+what I don't understand is the motivation
+
+[08:16:11.0191] <littledan>
+> <@jridgewell:matrix.org> I have to preserve across any promise usage, because anything else will break an important API for us
+
+I think bakkot is saying, you could go patch that
+
+[08:16:21.0772] <bakkot>
+> <@jridgewell:matrix.org> I have to preserve across any promise usage, because anything else will break an important API for us
+
+Can you give an example?
+
+[08:16:22.0701] <Justin Ridgewell>
+I think he's saying I don't
+
+[08:16:50.0539] <littledan>
+by "you" I mean, either the program or the Vercel environment
+
+[08:17:02.0163] <Justin Ridgewell>
+Vercel's platform
+
+[08:17:05.0003] <Justin Ridgewell>
+https://docs.google.com/presentation/d/1yw4d0ca6v2Z2Vmrnac9E9XJFlC872LDQ4GFR17QdRzk/edit#slide=id.g18e6eaa50e1_0_164
+
+[08:17:16.0275] <Justin Ridgewell>
+I have to preserve this start time across any user code  per request
+
+[08:17:24.0840] <littledan>
+Let's slow down; I think you're talking past each other
+
+[08:17:34.0497] <Justin Ridgewell>
+It doesn't matter if they use `setTimeout`, `p.then()`, or `await`, it's all got to work
+
+[08:18:15.0123] <bakkot>
+Justin Ridgewell: right, and that would still work?
+
+[08:18:16.0522] <bakkot>
+I am confused
+
+[08:18:35.0447] <bakkot>
+You need to wrap your handlers before you hand them to other people
+
+[08:18:47.0504] <Justin Ridgewell>
+How? If I force my users to wrap their `p.then()` callbacks, then it's not seamlessly working
+
+[08:18:49.0410] <bakkot>
+and as long as you do that, the handlers run in your context, regardless of how other people are scheduling them to run
+
+[08:19:01.0501] <bakkot>
+ * and as long as you do that, the handlers run in your context, regardless of how other people are scheduling them to run
+
+[08:19:18.0570] <Justin Ridgewell>
+`console.log` isn't a callback I pass around, it exists in the global scope
+
+[08:19:57.0983] <Justin Ridgewell>
+I can't wrap it per requests, because the global value will change per request
+
