@@ -2621,3 +2621,103 @@ question: where is the link of current slide?
 [07:34:50.0766] <yulia>
 or you would be patching the globals
 
+[07:35:13.0910] <Michael Ficarra>
+yulia: both patching the globals and patching the `getIntrinsic` function
+
+[07:35:28.0214] <bakkot>
+We do also patch sometimes but that's both trickier and not always necessary
+
+[07:35:43.0343] <bakkot>
+there are a lot fewer things that we need to patch than there are things that we need to _work_
+
+[07:35:53.0327] <yulia>
+right so you want to control all access to for example Array.prototype.map
+
+[07:35:54.0996] <Michael Ficarra>
+yeah the things we patch is a much smaller set than the things we cache for protection
+
+[07:36:01.0965] <Justin Ridgewell>
+> <@michaelficarra:matrix.org> Justin Ridgewell: I don't know what that means
+
+`Class.prototype.bar = null`, then `getInrinsic('class.prototype.bar')` can't return the original bar value
+
+[07:36:04.0892] <Justin Ridgewell>
+That's what I mean
+
+[07:36:23.0002] <Justin Ridgewell>
+Well then what is the difference between just doing `Class.porototype.bar` when you need the value later?
+
+[07:36:28.0762] <Michael Ficarra>
+Justin Ridgewell: why?
+
+[07:36:39.0900] <yulia>
+> <@michaelficarra:matrix.org> yeah the things we patch is a much smaller set than the things we cache for protection
+
+would it be useful to have absolute access to a builtin
+
+[07:36:40.0298] <Michael Ficarra>
+Justin Ridgewell: it could have been written to by someone else
+
+[07:36:45.0093] <Justin Ridgewell>
+Because that's the semantics that Jordan outlined today?!
+
+[07:36:47.0760] <bakkot>
+yulia: like, for example, we had an annoying bug recently when some of our late-running code broke in a particular environment because the page had replaced the Response constructor with a version which was not spec-compliant
+
+[07:36:57.0211] <bakkot>
+we don't need to replace it
+
+[07:37:03.0379] <bakkot>
+but we do need to have the original one
+
+[07:37:11.0824] <yulia>
+right -- thats our use case, we always want the original
+
+[07:37:16.0335] <yulia>
+never the patched one
+
+[07:37:16.0640] <Michael Ficarra>
+> <@yulia:mozilla.org> would it be useful to have absolute access to a builtin
+
+if you mean undeniable access, no, in fact that would be very harmful
+
+[07:37:28.0329] <yulia>
+right, thats what i expected
+
+[07:37:30.0810] <Michael Ficarra>
+(because we do patch some things)
+
+[07:37:51.0562] <yulia>
+so if users start using an undeniable access to array then the things that you do patch would be at risk
+
+[07:37:51.0599] <bakkot>
+> <@yulia:mozilla.org> would it be useful to have absolute access to a builtin
+
+"absolute" meaning "undeniable for later code on the page"? no, that needs to be impossible
+
+[07:38:11.0727] <bakkot>
+right, undeniable access for later-running code is a non-starter
+
+[07:39:02.0636] <bakkot>
+> <@jridgewell:matrix.org> Well then what is the difference between just doing `Class.porototype.bar` when you need the value later?
+
+in our case, the early-running doesn't always know what values we'll need later
+
+[07:39:17.0994] <bakkot>
+also, the size of the early-running code is more sensitive
+
+[07:39:23.0468] <bakkot>
+(since it needs to be loaded sync, during page load)
+
+[07:39:23.0577] <Justin Ridgewell>
+I understand that, you call `getInrinsic('foo')` later on
+
+[07:39:27.0699] <yulia>
+and just thinking out loud: the cached access would be for your code internally, not for the code that is used outside
+
+[07:39:46.0204] <rbuckton>
+If the `Reflect` object was _actually_ about reflection, `Reflect.getIntrinsic()` would be a much better place than the global, IMO. I'd also prefer to see a `getIntrinsicNames()` function so as not to overload the return value of `getIntrinsic()`.
+
+[07:39:48.0015] <yulia>
+so we have two halves here: what you use internally, and what is used by other code externally that you want to patch (to make sure i have it right)
+
