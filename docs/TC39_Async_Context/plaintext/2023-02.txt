@@ -1,4 +1,488 @@
 2023-02-01
+[06:01:24.0107] <littledan>
+Good luck, Justin Ridgewell and Chengzhong Wu !
+
+[06:48:35.0220] <Ben Newman (Apollo, @benjamn on GH)>
+good luck! calm nerves!
+
+[07:59:50.0664] <Ben Newman (Apollo, @benjamn on GH)>
+congrats on stage 1!!
+
+[08:01:50.0201] <Justin Ridgewell>
+Thanks!
+
+[08:02:42.0159] <Chengzhong Wu>
+Justin Ridgewell awesome work!
+
+[08:04:32.0853] <James M Snell>
+nice
+
+[08:04:34.0548] <James M Snell>
+great job all
+
+[08:08:13.0780] <James M Snell>
+I likely missed the link somewhere so my apologies, but are the slides used for the discussion available?
+
+[08:08:56.0529] <Chengzhong Wu>
+yes, it's public: https://docs.google.com/presentation/d/1yw4d0ca6v2Z2Vmrnac9E9XJFlC872LDQ4GFR17QdRzk/edit#slide=id.p
+
+[08:48:48.0580] <Justin Ridgewell>
+PSA: V8 advises against shipping usages of ContinuationPreserveEmbedderData as it does *not* handle multiplexing multiple usages, and is likely to change in the future as we consider AsyncContext.
+
+[08:49:26.0141] <Justin Ridgewell>
+Meaning values that are stored there are overwritten by later calls
+
+[08:49:58.0891] <Justin Ridgewell>
+If node were to add `AsyncLocalStorage` data there, then nothing else in node could set data there
+
+[08:50:36.0251] <Justin Ridgewell>
+But I don't think this is a problem, just use the ALS APIs to set any other data
+
+[08:52:11.0082] <Justin Ridgewell>
+@room I'm taking this room public!
+
+[08:52:27.0814] <Ben Newman (Apollo, @benjamn on GH)>
+I very much agree that any way of exposing the continuation capability should not monopolize it for other usage
+
+[08:52:38.0697] <Ben Newman (Apollo, @benjamn on GH)>
+every `AsyncContext` should feel totally orthogonal/independent of any others
+
+[08:52:40.0987] <littledan>
+Let's make a nicer title for this room
+
+[08:53:02.0376] <littledan>
+Justin Ridgewell: You can do this in settings (or give me admin capabilities and I'd do it)
+
+[08:53:14.0630] <Justin Ridgewell>
+Are you not already?
+
+[08:53:38.0217] <Justin Ridgewell>
+Can we move it into the TC39 space, too?
+
+[08:54:06.0346] <James M Snell>
+> V8 advises against shipping usages of ContinuationPreserveEmbedderData as it does not handle multiplexing multiple usages
+
+Making sure I understand the "multiplexing multiple usages".. you mean like having multiple `AsyncContext`/`AsyncLocalStorage` instances?
+
+[08:54:14.0791] <Justin Ridgewell>
+No
+
+[08:54:55.0143] <Justin Ridgewell>
+Chrome is currently setting Task Attribution data their directly, meaning we can't directly set `AsyncContext` data there (because it would overwrite the TA data)
+
+[08:55:37.0380] <Justin Ridgewell>
+If we reserve the continuation data for `AsyncContext`, then Task Attribution would need to use our APIs to set data there
+
+[08:55:44.0115] <littledan>
+> <@jasnell:matrix.org> > V8 advises against shipping usages of ContinuationPreserveEmbedderData as it does not handle multiplexing multiple usages
+> 
+> Making sure I understand the "multiplexing multiple usages".. you mean like having multiple `AsyncContext`/`AsyncLocalStorage` instances?
+
+Yeah, I would say, logically "yes", that that conflict that Justin is taling about is a form of this at a high level
+
+[08:55:44.0119] <Justin Ridgewell>
+They can't directly set/get anymore
+
+[08:55:46.0700] <Ben Newman (Apollo, @benjamn on GH)>
+could Chrome use an `AsyncContext` for task attribution, theoretically?
+
+[08:56:00.0759] <littledan>
+The other thing is that Shu was saying the API may change over time
+
+[08:56:01.0681] <Justin Ridgewell>
+Yes
+
+[08:56:15.0306] <littledan>
+> <@benjamn:matrix.org> could Chrome use an `AsyncContext` for task attribution, theoretically?
+
+This is precisely our hope
+
+[08:56:27.0057] <littledan>
+BTW I wrote that conclusion in the notes, please feel free to edit it
+
+[08:56:32.0437] <James M Snell>
+ah right. so it's really currently an embedder specific limitation. In our case (workerd), we're not using it for anything else, but a chrome implementation of AsyncContext couldn't use it because it's already being used for other things
+
+[08:57:53.0682] <Justin Ridgewell>
+Correct
+
+[08:58:32.0098] <littledan>
+> <@jasnell:matrix.org> ah right. so it's really currently an embedder specific limitation. In our case (workerd), we're not using it for anything else, but a chrome implementation of AsyncContext couldn't use it because it's already being used for other things
+
+exactly. They also might remove the API.
+
+[08:58:40.0800] <James M Snell>
+hypothetically, chrome could adopt a model similar to what we're doing in workerd and store a context frame (map of keys to stored values) in the slot instead of the value directly
+
+[08:58:53.0503] <littledan>
+> <@jasnell:matrix.org> hypothetically, chrome could adopt a model similar to what we're doing in workerd and store a context frame (map of keys to stored values) in the slot instead of the value directly
+
+Right, this is what we hope to move into V8
+
+[08:58:58.0952] <Ben Newman (Apollo, @benjamn on GH)>
+is there value in discussing an even lower-level safe/restricted API around `v8::Context::{Get,Set}CPED`, or is `AsyncContext` the lowest level we want?
+
+[08:59:00.0894] <James M Snell>
+this is how we deal with multiplexing the field. each ALS/AC instance represents a key in that frame
+
+[08:59:17.0669] <James M Snell>
+perfect, ok
+
+[08:59:43.0542] <littledan>
+> <@benjamn:matrix.org> is there value in discussing an even lower-level safe/restricted API around `v8::Context::{Get,Set}CPED`, or is `AsyncContext` the lowest level we want?
+
+I think we should have a C++ API which maps to/from AsyncContext. I don't think it should leave out the try/finally nesting logic, though.
+
+[09:00:04.0867] <Ben Newman (Apollo, @benjamn on GH)>
+so I built something like this for my prototype
+
+[09:01:10.0472] <Ben Newman (Apollo, @benjamn on GH)>
+a C++-backed function you can call (with an optional default value), to get another function that can either return the current value if called without args (note: just your value, not the whole map) or run a function with a new value set in the map, when called with that new value and a callback
+
+[09:02:07.0031] <Ben Newman (Apollo, @benjamn on GH)>
+but I have to admit that feels awfully close to what `AsyncContext` is, just more functional and less OO
+
+[09:03:12.0829] <Ben Newman (Apollo, @benjamn on GH)>
+the key is that you can get as many independent context values from that API as you want, so nobody steps on anyone else's toes
+
+[09:04:12.0752] <bakkot>
+if you move this room to the TC39 space make history public then it should get picked up by https://matrixlogs.bakkot.com/ automatically
+
+[09:26:43.0688] <bakkot>
+https://github.com/legendecas/proposal-async-context/issues/22
+
+[09:28:47.0200] <Andreu Botella>
+is this moved already? I can't see the room in the https://matrixlogs.bakkot.com/ channel list
+
+[09:29:04.0813] <Justin Ridgewell>
+Not yet
+
+[09:29:18.0044] <Justin Ridgewell>
+Waiting on a TC39 admin do move it to this space
+
+[09:31:24.0856] <ljharb>
+it's moved now - sorry for the delay; ping me if you have any other matrix admin issues
+
+[09:31:26.0556] <rbuckton>
+I mentioned this in the delegates chat, but I'll leave it here as well. Assuming `AsyncContext` automatically flows through `.then`, we should ensure that `AsyncContext` will automatically flow through calls to `AsyncDisposableStack.prototype.disposeAsync` to registered `[Symbol.asyncDispose]()` methods and `adopt`/`defer` callbacks.
+
+[09:31:37.0349] <bakkot>
+rbuckton: Is your expectation that anyone doing any kind of control flow abstraction should be updating their code to flow async contexts?
+
+[09:31:56.0728] <bakkot>
+Or just the ones which are built in, and then users have to figure out which is which?
+
+[09:32:59.0834] <bakkot>
+Like, I've definitely built control flow abstractions on top of `addEventListener` in the past
+
+[09:33:21.0491] <bakkot>
+and would have been absolutely shocked to learn those weren't transparent because of this context thing
+
+[09:34:23.0838] <bakkot>
+It is not that unusual for me to make a custom `thenable` which schedules its callback via some mechanism other than `Promise.prototype.then`
+
+[09:34:30.0100] <littledan>
+What does “transparent” mean to you?
+
+[09:34:38.0604] <rbuckton>
+> <@bakkot:matrix.org> rbuckton: Is your expectation that anyone doing any kind of control flow abstraction should be updating their code to flow async contexts?
+
+What kind of abstraction? I have many async control flow and coordination classes in `@esfx/*`, and yes I would choose to support them in my library in places where they would not otherwise automatically flow, but on a case by case basis.
+
+[09:34:55.0928] <bakkot>
+littledan: it's not transparent if I as the library author who is not using async contexts have to be aware of async contexts because my users might use them
+
+[09:35:09.0587] <bakkot>
+it is transparent if I do not have to think about async contexts when I am not using async contexts
+
+[09:35:41.0555] <bakkot>
+If we're going to say that library authors all have to think about async contexts anyway, we can just say they should pass around contexts like any other state
+
+[09:35:49.0524] <rbuckton>
+I'll follow up more later, I need to eat and get ready for my presentation.
+
+[09:35:51.0061] <bakkot>
+i.e., explicitly, as values, on the stack
+
+[09:36:07.0254] <bakkot>
+async contexts are only a win if people who are not using them don't have to think about them
+
+[09:36:32.0755] <littledan>
+So, yes, it is implicit in this proposal that library authors, when they take callbacks, should probably think about AsyncContext if they want to meet their users’ expectations.
+
+[09:36:50.0399] <littledan>
+I don’t know what the bad part is, though 
+
+[09:36:53.0716] <bakkot>
+Hm. That's literally the opposite of what I heard in the presentation.
+
+[09:37:20.0171] <bakkot>
+The thing I heard was, we want to manage contexts for our code which is passing callbacks to other people's code _without_ the other people's code having to cooperate with that.
+
+[09:37:24.0180] <littledan>
+The presentation was about library users
+
+[09:37:38.0215] <rbuckton>
+> <@bakkot:matrix.org> If we're going to say that library authors all have to think about async contexts anyway, we can just say they should pass around contexts like any other state
+
+A library adding support is significantly better than every individual consumer of that library needing to add support themselves.
+
+[09:38:09.0969] <bakkot>
+Disagree; AsyncContexts are niche feature, libraries are not.
+
+[09:38:31.0955] <littledan>
+I used to think AsyncContext was niche; I no longer think so
+
+[09:39:08.0024] <littledan>
+It is already central in servers, and lots of frontend frameworks would use it if they had it
+
+[09:39:43.0662] <littledan>
+Plus browser features would use it if they had it, and libraries using wrap appropriately would make the browser work better
+
+[09:39:45.0243] <bakkot>
+> <@bakkot:matrix.org> The thing I heard was, we want to manage contexts for our code which is passing callbacks to other people's code _without_ the other people's code having to cooperate with that.
+
+Like, was that not an accurate understanding of the presentation?
+
+[09:39:57.0641] <bakkot>
+If this was not an accurate understanding of the presentation I am now extremely confused what the feature is even for.
+
+[09:40:13.0558] <littledan>
+Yeah users of the platform have this handled automatically 
+
+[09:40:26.0577] <Justin Ridgewell>
+> <@bakkot:matrix.org> Like, was that not an accurate understanding of the presentation?
+
+I'm a platform, not a library
+
+[09:40:40.0133] <littledan>
+> <@jridgewell:matrix.org> I'm a platform, not a library
+
+Same thing for this discussion 
+
+[09:40:48.0910] <bakkot>
+If the feature is only for "platforms" I am much less interested in it.
+
+[09:40:49.0363] <Justin Ridgewell>
+It's definitely not the same
+
+[09:40:59.0134] <littledan>
+It is not only for platforms
+
+[09:41:01.0713] <Justin Ridgewell>
+User code can't execute unless it is within my context, and it cannot be scheduled without my direct involvement
+
+[09:41:05.0769] <Justin Ridgewell>
+That's not true for libraries
+
+[09:41:19.0771] <rbuckton>
+> <@bakkot:matrix.org> Disagree; AsyncContexts are niche feature, libraries are not.
+
+There are significantly more end user applications that consume libraries than there are libraries. By moving the burden to the end user application developer, you are significantly increasing cost (both in time and in $, I imagine).
+
+[09:41:37.0084] <littledan>
+> <@jridgewell:matrix.org> That's not true for libraries
+
+Oh right yes platforms can reach this air tightness 
+
+[09:41:58.0688] <Andreu Botella>
+I don't think it makes much sense to treat a `click` event listener the same as an `await`
+
+[09:42:12.0499] <bakkot>
+> <@rbuckton:matrix.org> There are significantly more end user applications that consume libraries than there are libraries. By moving the burden to the end user application developer, you are significantly increasing cost (both in time and in $, I imagine).
+
+Only if end user applications are frequently using async contexts. I am a lot more OK with asking people who are _using a feature_ to pay the cost of the feature.
+
+[09:42:54.0988] <bakkot>
+Especially when the "cost" is "you are passing a callback out of your library; make sure to wrap it so it gets the context preserved"
+
+[09:42:57.0821] <bakkot>
+like, that's not a huge ask.
+
+[09:43:24.0180] <bakkot>
+> <@abotella:igalia.com> I don't think it makes much sense to treat a `click` event listener the same as an `await`
+
+What's the relevant difference here?
+
+[09:44:17.0140] <bakkot>
+> <@jridgewell:matrix.org> User code can't execute unless it is within my context, and it cannot be scheduled without my direct involvement
+
+If the feature is only motivated by platforms-in-this-sense, it is not IMO sufficiently motivated, so I think it would be helpful to figure out whether and how it's useful for people not in your quite unique situation
+
+[09:45:16.0266] <bakkot>
+> <@bakkot:matrix.org> What's the relevant difference here?
+
+or I guess to be more precise: I agree about `await`, but what's the relevant difference between a `click` listener and `Promise.prototype.then`?
+
+[09:45:35.0846] <littledan>
+> <@bakkot:matrix.org> like, that's not a huge ask.
+
+I think this is the kind of claim which we can analyze by looking at the many many analogous systems with experience here
+
+[09:46:08.0448] <littledan>
+I really wasn’t convinced of this feature until I saw the need and implementations over and over again
+
+[09:46:13.0456] <Andreu Botella>
+> <@bakkot:matrix.org> What's the relevant difference here?
+
+you can set `element.onclick` inside a callback called from a framework without treating the click handler as part of the framework's context
+
+[09:46:25.0017] <littledan>
+I agree with bakkot that if this were niche it would be questionable complexity 
+
+[09:46:31.0310] <bakkot>
+ljharb: can you make history for this room public?
+
+[09:46:44.0151] <bakkot>
+(I don't know how to do it but I don't think it currently is)
+
+[09:46:47.0698] <Andreu Botella>
+I'll try to think of a more concrete example for the `click` event though
+
+[09:47:01.0803] <littledan>
+I made history public 
+
+[09:47:09.0373] <ljharb>
+bakkot:  i can't see history prior to the room being public - it says "You can't see earlier messages. Encrypted messages before this point are unavailable."
+
+[09:47:35.0390] <bakkot>
+> <@abotella:igalia.com> you can set `element.onclick` inside a callback called from a framework without treating the click handler as part of the framework's context
+
+you can `Promise.prototype.then` inside a callback called from a framework without treating the thing passed to the handler as part of the framework's context also, though
+
+[09:47:45.0282] <bakkot>
+(I agree about `await`, but not P.p.then)
+
+[09:48:17.0582] <bakkot>
+> <@ljharb:matrix.org> bakkot:  i can't see history prior to the room being public - it says "You can't see earlier messages. Encrypted messages before this point are unavailable."
+
+yeah, the thing littledan did should be sufficient. (you can't make history retroactively public, which is IMO a good thing)
+
+[09:48:32.0146] <Justin Ridgewell>
+I think I really screwed up making this room originally
+
+[09:48:39.0848] <Justin Ridgewell>
+😬
+
+[09:50:06.0055] <Justin Ridgewell>
+Do we need to do anything else to get this picked up?
+
+[09:55:42.0425] <bakkot>
+that should have been sufficient but I think there might be a bug on my end
+
+[10:01:41.0070] <bakkot>
+hm. no there's just no history yet.
+
+[10:01:41.0825] <bakkot>
+somehow
+
+[10:01:43.0711] <bakkot>
+https://view.matrix.org/room/%21siOjSOrhCVYVzIoThy:matrix.org/
+
+[10:02:03.0231] <bakkot>
+testing, testing, trying to get this to show up in the history...
+
+[10:07:02.0697] <bakkot>
+if logs don't show up in https://view.matrix.org/room/%21siOjSOrhCVYVzIoThy:matrix.org/ they also won't show up on my logbot. I have no idea why logs don't show up at that link though.
+
+[10:07:50.0362] <ljharb>
+it's an "encrypted room" so that might be why
+
+[10:08:14.0058] <ljharb>
+which can't be disabled
+
+[10:08:28.0748] <ljharb>
+so if that's the problem, we might need to create a new room and scrap this one
+
+[10:08:34.0853] <bakkot>
+what does it mean to have globally visible history if it's encrypted...
+
+[10:08:40.0158] <Andreu Botella>
+oh, so the public API can't pick it up, only a bot that joined the room can
+
+[10:08:51.0233] <bakkot>
+I can make my bot join this room I guess
+
+[10:17:04.0015] <littledan>
+if that doesn't work, it'd be fine to switch rooms
+
+[10:17:58.0876] <bakkot>
+bot probably can't pick up history from before it joined
+
+[10:18:05.0263] <bakkot>
+but we'll see in a few minutes if it can pick this up
+
+[10:20:19.0925] <Justin Ridgewell>
+If it helps, we can export the early logs
+
+[10:20:37.0320] <littledan>
+I think future logs are the main thing
+
+[10:20:42.0725] <Justin Ridgewell>
+Yah
+
+[10:23:06.0250] <bakkot>
+it cannot, apparently, though I don't know why not
+
+[10:23:10.0553] <bakkot>
+probably need to make a new room
+
+[10:23:17.0289] <Andreu Botella>
+> <@bakkot:matrix.org> but we'll see in a few minutes if it can pick this up
+
+https://github.com/bakkot/matrix-logs/commit/7798d80d3c4c45af248733855824d15285cd879f <- there's a last seen event, but no actual logs
+
+[10:23:20.0564] <bakkot>
+best to have things viewable in `view.matrix.org` anyway
+
+[10:23:23.0392] <Andreu Botella>
+not sure if that tells you anything
+
+[10:23:40.0191] <bakkot>
+yeah, it means it can tell the room exists but not get the actual chat history from it, for whatever reason
+
+[10:45:02.0080] <Justin Ridgewell>
+Ok, let's make a new channel
+
+[10:45:29.0831] <Justin Ridgewell>
+bakkot: If we export the message logs for this channel, can we splice them into the new channel's logs for the bot?
+
+[10:46:05.0681] <littledan>
+the big reason why logging was 100% required is to deal with sanctioned entities; I don't think we had any such discussion in this channel before now
+
+[10:46:09.0444] <bakkot>
+I can do that manually sure
+
+[10:46:16.0356] <littledan>
+let's just set up the new channel
+
+[10:46:43.0455] <Justin Ridgewell>
+(Selfishly, I want to refer to some of these chat logs for my performance review)
+
+[10:47:40.0009] <littledan>
+lol, I might've heard of a company where you don't have to do all of this self-promotion...
+
+[10:49:09.0730] <shu>
+you still gotta deal with performance reviews?
+
+[10:49:21.0599] <shu>
+what if you just say to malte, bro, you know me, i do good work
+
+[10:50:37.0155] <Justin Ridgewell>
+I don't know the process yet, but I'm preparing as if it's still Google
+
+[10:52:05.0153] <shu>
+even google has a new process now
+
+[10:52:18.0360] <shu>
+supposedly less work for ICs but more work for managers
+
+[11:13:39.0722] <ljharb>
+I’ll set up the channel if that’s helpful
+
+[11:16:32.0292] <Justin Ridgewell>
+Go to new channel => https://matrix.to/#/#tc39-async-context:matrix.org
+
 [11:16:43.0397] <littledan>
 Hi, thanks for creating this ljharb
 
