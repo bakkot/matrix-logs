@@ -1,0 +1,507 @@
+2022-12-09
+[14:14:08.0619] <littledan>
+Yoav Weiss and I had a nice chat on this topic earlier today. Based on that, I'm hopeful that we'd be able to make AsyncContext layer in as the same thing that many of the built-in-to-the-browser timing cases that Yoav is working on, but I don't fully understand it all yet. In this way, we might work in parallel in TC39 vs web standards, with a pretty narrow point of overlap for the interaction/layering, and no need for one side to block on the other.
+
+[14:15:44.0313] <littledan>
+One thing which was especially interesting to me was that Yoav's current version is based on saving/restoring the context across tasks, as opposed to when callbacks are taken in by WebIDL. This was found to have better performance. The technique makes sense to me, and was just different from what I expected. In any case, this detail sits outside of what TC39 is responsible for.
+
+[15:01:35.0462] <Justin Ridgewell>
+That’s great to hear!
+
+[15:02:13.0131] <Justin Ridgewell>
+Shy said they were a bit worried about the extra memory per callback, but if there’s a better way then that’s amazing
+
+
+2022-12-10
+[16:08:59.0665] <littledan>
+Well it turns out Yoav found a word of memory that he could use in promise reactions that existed for other reasons. I haven’t learned details yet. It’s also possible that this doesn’t work for other engines though 
+
+[16:09:50.0187] <littledan>
+One piece of feedback: Yoav got the idea from the readme that this feature was mostly for APMs. We should encorporate the examples from the slide deck into the readme and talk them through.
+
+[16:10:34.0834] <littledan>
+Because, we have to work especially hard to explain to browsers why this is their problem. APMs are already sold on the importance of this space 
+
+[16:12:53.0062] <James M Snell>
+one key thing here (simply because it's fresh on my mind) is that whatever mechanism is used to implement this in engines like v8, embedders need the ability to define their own async resources (timers, other objects, etc). There has to be some API, for instance, that we can use internally in node.js and workers, etc to set the current async resource independently of promises.
+
+[16:13:22.0440] <Justin Ridgewell>
+> <@littledan:matrix.org> One piece of feedback: Yoav got the idea from the readme that this feature was mostly for APMs. We should encorporate the examples from the slide deck into the readme and talk them through.
+
+What is an APM?
+
+[16:13:46.0307] <James M Snell>
+APM = Application Performance Monitors (think datadog, new relic, etc)
+
+[16:14:36.0968] <littledan>
+> <@jasnell:matrix.org> one key thing here (simply because it's fresh on my mind) is that whatever mechanism is used to implement this in engines like v8, embedders need the ability to define their own async resources (timers, other objects, etc). There has to be some API, for instance, that we can use internally in node.js and workers, etc to set the current async resource independently of promises.
+
+Yeah, the web needs this as well—this is what attracted Yoav to the area. I hope this can be modeled as the embedded simply creating an AsyncContext and using the three core operations. We should look into the use cases so we can verify that this works.
+
+[16:15:04.0497] <littledan>
+> <@jasnell:matrix.org> APM = Application Performance Monitors (think datadog, new relic, etc)
+
+Things that hack into Node.JS to help you measure and optimize performance
+
+[16:15:26.0392] <Justin Ridgewell>
+> <@jasnell:matrix.org> one key thing here (simply because it's fresh on my mind) is that whatever mechanism is used to implement this in engines like v8, embedders need the ability to define their own async resources (timers, other objects, etc). There has to be some API, for instance, that we can use internally in node.js and workers, etc to set the current async resource independently of promises.
+
+I believe that is handled by the static `wrap` method?
+
+[16:15:28.0486] <littledan>
+Hack in the nicest sense of the word! Maybe!
+
+[16:15:34.0846] <James M Snell>
+If it helps from a use case perspective, I've started the implementation of AsyncLocalStorage in workerd (cloudflare workers) https://github.com/cloudflare/workerd/pull/208
+
+[16:16:20.0713] <littledan>
+> <@jasnell:matrix.org> If it helps from a use case perspective, I've started the implementation of AsyncLocalStorage in workerd (cloudflare workers) https://github.com/cloudflare/workerd/pull/208
+
+So… how fast would we need to deliver AsyncContext in TC39 to take the pressure off of you to ship AsyncLocalStorage in workerd?
+
+[16:16:25.0657] <James M Snell>
+provides a decent contrast to Node.js' implementation because (a) it's simpler (fewer async resources) and (b) there is no async_hooks api)
+
+[16:16:45.0401] <James M Snell>
+> how fast would we need to deliver AsyncContext in TC39
+
+Weeks?
+
+[16:16:56.0158] <James M Snell>
+We have customers who have been clamoring for this for a while now
+
+[16:17:02.0021] <littledan>
+Hehe Ok
+
+[16:17:30.0817] <littledan>
+Anyway AsyncContext will be a point of longer term compatibility 
+
+[16:17:56.0562] <James M Snell>
+we absolutely have to make sure, however, that whatever is produced by TC-39 here is compatible. Our intent would be to update `AsyncLocalStorage` to be a thin shim layer on top of whatever v8 gives us later
+
+[16:18:56.0524] <littledan>
+> <@jasnell:matrix.org> we absolutely have to make sure, however, that whatever is produced by TC-39 here is compatible. Our intent would be to update `AsyncLocalStorage` to be a thin shim layer on top of whatever v8 gives us later
+
+Whether this is the case depends on the exact subset you are using... will review 
+
+[16:19:18.0608] <James M Snell>
+For ALS -> run(), exit() and getStore()
+
+[16:19:26.0396] <James M Snell>
+we are not implementing enterWith() or disable()
+
+[16:19:46.0012] <Justin Ridgewell>
+Why do you need the exit method?
+
+[16:19:49.0024] <James M Snell>
+We are implementing `AsyncResource` also without the async_hooks api details
+
+[16:20:11.0526] <James M Snell>
+Our implementation of `exit()` is really `run()` and passing `undefined`
+
+[16:20:13.0765] <Justin Ridgewell>
+That’s the only thing that doesn’t have a direct parallel.
+
+[16:20:38.0722] <Justin Ridgewell>
+Ah, ok
+
+[16:20:49.0532] <littledan>
+So you don’t have a facility for queuing in libraries, just in the runtime?
+
+[16:21:12.0228] <James M Snell>
+not currently but that could change
+
+[16:21:18.0854] <James M Snell>
+we just don't need that at the moment
+
+[16:22:21.0858] <James M Snell>
+we will expose the `AsyncResource` object to allow user code to create their own contexts
+
+[16:22:30.0575] <James M Snell>
+but that's about it
+
+[16:23:52.0206] <littledan>
+OK, sounds like that is the equivalent of wrap
+
+[16:24:01.0182] <James M Snell>
+exactly
+
+[16:24:03.0616] <littledan>
+And the expressiveness is identical overall 
+
+[16:24:12.0341] <littledan>
+OK perfect
+
+[16:24:50.0830] <James M Snell>
+It's to support stuff like stuff like `addEventListener('foo', asyncResource.bind(()=> { /* executes in asyncResource's context */  });`
+
+[16:25:06.0123] <Justin Ridgewell>
+I think there are a couple of a APIs on asyncresource that might not be compatible, but if you do another minimal API, it should be fine
+
+[16:25:38.0091] <littledan>
+IMO this is an interesting story to motivate the project that warrants sharing with others sometimes—at least with other server JS environments so they don’t overstep in ALS compat! But also to justify the whole project.
+
+[16:26:03.0429] <James M Snell>
+For `AsyncResource` we are only implementing `bind()` (static and member), `runInAsyncScope()`, `asyncId()` and `triggerAsyncId()`
+
+[16:27:18.0397] <littledan>
+Is AsyncResource just about restoring a particular AsyncContext or does it do all of them?
+
+[16:27:20.0407] <Justin Ridgewell>
+I’m not familiar with the IDs, but the rest should be fine
+
+[16:28:24.0296] <littledan>
+I guess the id stuff is a small layer on top
+
+[16:30:06.0734] <James M Snell>
+It's really about providing a root for a context... for instance, if I did
+
+```
+const als = new AsyncLocalStorage();
+const fn = als.run(123, () => AsyncResource.bind(() => console.log(als.getStore()));
+eventTarget.addEventListener('foo', fn);
+eventTarget.addEventListener('foo', () => console.log(als.getStore());
+```
+
+The first listener prints 123, the second undefined
+
+[16:30:17.0134] <James M Snell>
+The id stuff is just part of Node.ks
+
+[16:30:38.0887] <James M Snell>
+it doesn't yet give us any other way of identifying the parent explicitly when creating a new AsyncResource
+
+
+2022-12-11
+[09:04:35.0075] <Chengzhong Wu>
+> <@littledan:matrix.org> Because, we have to work especially hard to explain to browsers why this is their problem. APMs are already sold on the importance of this space
+
+Sounds like a good idea to me. As an [OpenTelemetry](https://opentelemetry.io/) maintainer, zone.js is the only option on the web platform that we can rely on to propagate tracing contexts. And I've received constant complaining about the delicacy of zone.js and the lack of support of async functions.
+
+
+2022-12-12
+[17:11:58.0285] <littledan>
+> <@legendecas:matrix.org> Sounds like a good idea to me. As an [OpenTelemetry](https://opentelemetry.io/) maintainer, zone.js is the only option on the web platform that we can rely on to propagate tracing contexts. And I've received constant complaining about the delicacy of zone.js and the lack of support of async functions.
+
+Is there an issue you can point to with more details about how this came up?
+
+[18:06:45.0585] <Chengzhong Wu>
+> <@littledan:matrix.org> Is there an issue you can point to with more details about how this came up?
+
+Yeah, like https://github.com/open-telemetry/opentelemetry-js/issues/3171 and https://github.com/open-telemetry/opentelemetry-js/issues/2655.
+
+[18:41:59.0186] <littledan>
+Looks like these issues are on the server side?
+
+[18:45:51.0466] <littledan>
+Anyway great to see a reference to the original Angular issue at https://github.com/angular/angular/issues/31730
+
+[18:47:16.0414] <littledan>
+Yoav, there is a lot of context in the presentation at https://docs.google.com/presentation/d/1yw4d0ca6v2Z2Vmrnac9E9XJFlC872LDQ4GFR17QdRzk/edit?usp=sharing (but my mastodon client keeps crashing when I try to respond to the thread)
+
+[18:49:21.0472] <Chengzhong Wu>
+> <@littledan:matrix.org> Looks like these issues are on the server side?
+
+No, they are on the browsers.
+
+[18:52:37.0703] <Chengzhong Wu>
+OpenTelemetry can also be running on the browsers to trace user interactions and page navigation.
+
+[18:52:38.0743] <littledan>
+Oh I see, they are about https://github.com/open-telemetry/opentelemetry-js/blob/main/packages/opentelemetry-context-zone/README.md
+
+[18:54:37.0484] <Chengzhong Wu>
+yeah, opentelemetry context manager implementation builtin on top of zone.js
+
+[18:57:21.0001] <littledan>
+What does it use that for?
+
+[18:59:32.0046] <Chengzhong Wu>
+Well, that's the story of platform agnostic context propagation. We need an abstract interface so that we can inject platform provided async context implementation like AsyncLocalStorage, zone.js (and potentially CF Workerd's AsyncLocalStorage and Deno's).
+
+[19:00:58.0066] <Chengzhong Wu>
+This is the api definition of OpenTelemetry ContextManager https://github.com/open-telemetry/opentelemetry-js/blob/main/api/src/context/types.ts#L43. It defines the operations that required to trace the application
+
+[19:01:08.0823] <littledan>
+So I found these docs for Node, are there analogous docs for the client side? https://opentelemetry.io/docs/instrumentation/js/context/
+
+[19:02:16.0733] <Chengzhong Wu>
+> <@littledan:matrix.org> So I found these docs for Node, are there analogous docs for the client side? https://opentelemetry.io/docs/instrumentation/js/context/
+
+https://opentelemetry.io/docs/instrumentation/js/getting-started/browser/
+
+[19:08:25.0182] <littledan>
+The sample code there says that using the zone context provider is optional. What breaks if it is missing? What does “supports asynchronous operations” mean? It would be great to have this whole concrete case concisely described in our README.
+
+[19:11:36.0652] <Chengzhong Wu>
+Yeah, definitely. Without the zone.js on the browser, context propagation is based on manual propagation, or based on the sync call stacks -- identical to the example described in https://docs.google.com/presentation/d/1yw4d0ca6v2Z2Vmrnac9E9XJFlC872LDQ4GFR17QdRzk/edit#slide=id.g198251ee25f_2_6.
+
+[19:13:02.0094] <littledan>
+Sorry the part I am missing is how this comes up as important in OpenTelemetry as I am not so familiar with that library 
+
+[19:13:46.0175] <littledan>
+What sorts of traces do you end up wanting to take on the client side?
+
+[19:17:25.0308] <littledan>
+This is about building a causal chain that spans several server and client exchanges, explaining just part of what is going along in the page, passing along a context id in an AsyncContext variable?
+
+[19:20:36.0126] <littledan>
+I would say that the task priority use case, the timing case in the slide deck, and the context id propagation use case are all very interesting and different. (I honestly don’t understand the cache case yet)
+
+[19:24:04.0632] <littledan>
+The fact that we have 3-4 very different, real and meaningful use cases that are all on the client and solved by AsyncContext should be a strong argument 
+
+[19:28:03.0731] <Chengzhong Wu>
+> <@littledan:matrix.org> What sorts of traces do you end up wanting to take on the client side?
+
+Here https://github.com/open-telemetry/opentelemetry-js-contrib/tree/main/plugins/web, we provides several instrumentations that are available to the web browsers. Tracing the requests across server and client is the outstanding need. However, browser APIs like Long Task API ([instrumentation](https://github.com/open-telemetry/opentelemetry-js-contrib/tree/main/plugins/web/opentelemetry-instrumentation-long-task)) can be traced too to help understanding the behavior on the client side.
+
+[19:34:10.0783] <littledan>
+Can you walk me through a basic case where the context is used? It is great to have all these references but I want to understand if the context is only used in these contrib plugins or also in further even more simple cases.
+
+[19:36:41.0688] <littledan>
+Maybe the User interaction instrumentation is this basic case?
+
+[19:42:40.0233] <Chengzhong Wu>
+yeah
+
+[19:47:55.0528] <littledan>
+There are a lot of details here about how it hooks into events in the case that zone.js is missing!
+
+[19:48:33.0300] <littledan>
+Perhaps parallel to that, Yoav commented that it was a bit subtle which events make sense to propagate async context over
+
+[19:49:27.0164] <Chengzhong Wu>
+So taking the [screenshots in the readme](https://github.com/open-telemetry/opentelemetry-js-contrib/tree/main/plugins/web/opentelemetry-instrumentation-user-interaction#example-screenshots) as the example, when a button is clicked, a new trace span is created and saved to the async context as the current active span ([code](https://github.com/open-telemetry/opentelemetry-js-contrib/blob/main/plugins/web/opentelemetry-instrumentation-user-interaction/src/instrumentation.ts#L310)). When `fetch` is invoked as a result of the click event, the `fetch` instrumentation takes the current active span from the async context ([code](https://github.com/open-telemetry/opentelemetry-js/blob/main/packages/opentelemetry-sdk-trace-base/src/Tracer.ts#L68)) and create a child span of it, and injects necessary trace ids and span ids into the request to be send to the server.
+
+[19:50:58.0432] <Chengzhong Wu>
+Basically, every time we create a span, the span will be marked as a child span of the active span saved in the async context.
+
+[19:52:41.0758] <littledan>
+And it will start a new span when, e.g. there is a click or a long task detected?
+
+[19:52:59.0856] <Chengzhong Wu>
+yeah, exactly
+
+[19:54:58.0050] <littledan>
+Ah I see, thanks for explaining. This sounds extremely similar to what I think Yoav might be trying to accomplish—to the point where we should probably try to understand whether such a higher level construct might be sufficient for the OpenTelemetry case 
+
+[19:56:38.0396] <littledan>
+>    * Patches the constructor of fetch
+
+Didn’t we just cancel React over this? ;)
+
+[19:57:42.0644] <littledan>
+> <@legendecas:matrix.org> So taking the [screenshots in the readme](https://github.com/open-telemetry/opentelemetry-js-contrib/tree/main/plugins/web/opentelemetry-instrumentation-user-interaction#example-screenshots) as the example, when a button is clicked, a new trace span is created and saved to the async context as the current active span ([code](https://github.com/open-telemetry/opentelemetry-js-contrib/blob/main/plugins/web/opentelemetry-instrumentation-user-interaction/src/instrumentation.ts#L310)). When `fetch` is invoked as a result of the click event, [the `fetch` instrumentation](https://github.com/open-telemetry/opentelemetry-js/blob/main/experimental/packages/opentelemetry-instrumentation-fetch/src/fetch.ts#L307) takes the current active span from the async context ([code](https://github.com/open-telemetry/opentelemetry-js/blob/main/packages/opentelemetry-sdk-trace-base/src/Tracer.ts#L68)) and create a child span of it, and injects necessary trace ids and span ids into the request to be send to the server.
+
+Thanks so much for this
+
+[20:03:08.0950] <Chengzhong Wu>
+> <@littledan:matrix.org> Ah I see, thanks for explaining. This sounds extremely similar to what I think Yoav might be trying to accomplish—to the point where we should probably try to understand whether such a higher level construct might be sufficient for the OpenTelemetry case
+
+yeah, for OpenTelemetry's requirement, the context API interface defined at https://github.com/open-telemetry/opentelemetry-js/blob/main/api/src/context/types.ts#L43 is the basic block for tracing. I find it is sufficiently aligned with the minimum API in the proposal.
+
+[20:10:12.0985] <littledan>
+Yeah, when considering the aspect of generating these IDs and sending them to the server, the behavior and usage is sufficiently different from anything that could be built into the browser, so this motivates exposing the “lower level” AsyncContext API that OpenTelemetry can use, possibly alongside some higher level built-in purely client-side tracing/metrics
+
+[20:28:27.0650] <Chengzhong Wu>
+Sorry if I'm taking it wrong. The trace id in the OpenTelemetry is not the lower level async id James mentioned. The trace id is just sort of a random value.
+
+[20:36:36.0419] <littledan>
+Right, I got that, for this reason it would be sort of inappropriate for the built in browser api to generate it and pass it on to fetch
+
+[20:38:08.0353] <littledan>
+The question I am trying to answer is: for Yoav, do we actually need to expose AsyncContext to JS, or could we just have built in browser mechanisms to handle these cases? For example, main thread scheduling priority propagation could be something totally built-in, so it provides relatively weak motivation for exposing AsyncContext to JS.
+
+
+2022-12-13
+[07:47:04.0607] <littledan>
+There's some related discussion on Mastodon! https://hachyderm.io/@develwithoutacause@techhub.social/109488473692344107
+
+[07:47:42.0255] <littledan>
+Doug, who started the thread and works on Angular, might be thinking about their use of zone.js
+
+[07:48:00.0431] <littledan>
+Does anyone want to get in touch with Doug and Minko for a review of AsyncContext from Angular's perspective?
+
+[07:49:27.0771] <littledan>
+Misko Hevery (of Angular fame) did a quick review of the AsyncContext API. He told me it seemed good to focus on just one aspect, but that Angular would still miss the ability to run a callback "when the microtask queue becomes empty" (a concept which isn't very composition-friendly, but which Angular needs to decide when to render to the DOM)
+
+[08:08:06.0913] <Justin Ridgewell>
+That sounds like they need a scheduling API
+
+[08:10:16.0785] <littledan>
+I think they need an API analogous to requestAnimationFrame but that runs a little earlier
+
+[08:11:07.0821] <littledan>
+anyway they currently implement this by patching promises and also transpiling async/await such that it uses those promises. This lets them implement both AsyncContext and a mechanism to count how many outstanding microtask queue items there are
+
+[08:11:43.0332] <littledan>
+so AsyncContext alone will not solve the whole problem that they are patching promises for. Anyway, I agree with Misko that we shouldn't attempt to solve their whole problem
+
+[09:23:37.0487] <Kris Kowal>
+> <@littledan:matrix.org> Misko Hevery (of Angular fame) did a quick review of the AsyncContext API. He told me it seemed good to focus on just one aspect, but that Angular would still miss the ability to run a callback "when the microtask queue becomes empty" (a concept which isn't very composition-friendly, but which Angular needs to decide when to render to the DOM)
+
+At Agoric, we have historically drained the microtask queue in two different ways. You can approximate it with setImmediate, since it enqueues an event on the I/O queue. But, now we use a privileged API provided by XS that lets us dispatch an event and wait for the event loop to quiesce.
+
+[09:25:19.0360] <Kris Kowal>
+The latter we invoke from outside the execution context. Doing the same from inside an execution context is a bit of an ouroboros, or as littledan put it, doesn’t compose well.
+
+[09:25:32.0303] <littledan>
+> <@kriskowal:matrix.org> At Agoric, we have historically drained the microtask queue in two different ways. You can approximate it with setImmediate, since it enqueues an event on the I/O queue. But, now we use a privileged API provided by XS that lets us dispatch an event and wait for the event loop to quiesce.
+
+Yeah, this sort of solution sounds great to me; I hope Angular can find a similar solution for itself. (Or it might go "zoneless" but they have been talking about that since 2017...)
+
+
+2022-12-14
+[14:55:12.0593] <littledan>
+We should talk about how AsyncContext relates to unhandled promise rejections. For our usage in Bloomberg, we'd really want the context *where the promise was created* to be restored when running the unhandled rejection event. (This could sort of be modeled with wrap if used in the spec algorithm for creating a promise.) Do others have similar requirements?
+
+
+2022-12-15
+[16:21:37.0061] <James M Snell>
+honestly had not considered it previously but yes, that makes sense
+
+[16:27:28.0118] <Justin Ridgewell>
+Yah, we need a similar feature
+
+[18:17:35.0917] <Chengzhong Wu>
+I would avoid introducing any exception routing mechanism in the proposal, as documented as non-goals. But yes, I agree that we should clarify the " async context" when running the unhandled rejection event listeners, which would be necessary to associate the event with appropriate context values. This probably can be documented in a section dedicated for host integrations, in which we can also visit other host integration topics.
+
+[18:45:12.0556] <littledan>
+Yeah I think mechanically this would involve a host integration (since that is how uncaught rejections are reported) but maybe we want saving the context to just be part of the main spec algorithm, rather than done by a host hook, to clarify that it is expected to be in common. Anyway that is an editorial question—the important thing is establishing the shared utility and getting this into multiple environments 
+
+[18:45:55.0959] <littledan>
+I would love to hear from James and Justin how this affects use cases/environments that you have in mind 
+
+[18:49:05.0692] <littledan>
+Another thing which is important for Bloomberg and *definitely* not in the spec is V8’s API for dealing with all this. I imagine this is important for many server environments. Maybe we could collaborate on proposing such an API as part of this project
+
+[18:49:40.0572] <littledan>
+For example, wrap would have to look pretty different (maybe more like what jridgewell was proposing…) in the C++ API 
+
+[18:50:52.0072] <littledan>
+We would want to make sure there is a C++ API for creating AsyncContexts, and doing run and wrap and get
+
+[18:51:54.0584] <Justin Ridgewell>
+I don't know what's possible on the C++ side of JS engines, but I imagine they can create closures?
+
+[18:52:23.0450] <Justin Ridgewell>
+The `AsyncResource` and static `wrap` method are mostly equivalent in functionality, it's just whether we allocate an object or a closure
+
+[18:52:35.0813] <littledan>
+Yeah I am thinking we want an API that doesn’t use closures on the C++ side and instead reifies the stack 
+
+[18:52:55.0047] <littledan>
+So more like AsyncResource
+
+[18:52:59.0823] <Justin Ridgewell>
+For the `unhandledrejection`, I think this is part of the Host implementation, for the reason you mentioned (it's not spec'd in TC39)
+
+[18:54:23.0794] <Justin Ridgewell>
+I actually prefer my `Snapshot` (`AsyncResource`) API, because it's easier it's easier to use other callbacks without reverting into a HOF
+
+[18:54:28.0790] <Justin Ridgewell>
+(https://gist.github.com/jridgewell/3970a3078ebfb90e90cd9d0a36ab9c08#file-async-context-ts-L7-L20)
+
+[18:54:51.0367] <littledan>
+> <@jridgewell:matrix.org> For the `unhandledrejection`, I think this is part of the Host implementation, for the reason you mentioned (it's not spec'd in TC39)
+
+What I am proposing is that saving the current zone in the promise (the “hard part”) be in the JS spec. Or, if it’s not in the spec but rather in a host hook, we sort of let engines know it’s fine if that is all they let people use the host hook for.
+
+[18:55:17.0174] <Justin Ridgewell>
+Do we specify things that we don't actually use?
+
+[18:55:47.0305] <Justin Ridgewell>
+I know for JobRecord, we have a `[[HostDefined]]` slot: https://tc39.es/ecma262/multipage/executable-code-and-execution-contexts.html#sec-jobcallback-records
+
+[18:55:47.0669] <littledan>
+> <@jridgewell:matrix.org> I actually prefer my `Snapshot` (`AsyncResource`) API, because it's easier it's easier to use other callbacks without reverting into a HOF
+
+I think it is fine to make the JS and C++ API choices separately.
+
+[18:56:01.0885] <Justin Ridgewell>
+But we don't define what's actually inside it.
+
+[18:56:41.0905] <littledan>
+Yeah so this is an editorial decision, but if we don’t do it this way in the spec, we should at least communicate the intent some other way so engines can do the appropriate thing
+
+[18:57:12.0557] <Chengzhong Wu>
+> <@littledan:matrix.org> I think it is fine to make the JS and C++ API choices separately.
+
+Agreed. And not all JS apis are exposed in C++.
+
+[18:57:37.0532] <Chengzhong Wu>
+They doesn't necessarily align.
+
+[19:22:00.0295] <Justin Ridgewell>
+> <@littledan:matrix.org> I would love to hear from James and Justin how this affects use cases/environments that you have in mind
+
+Our use case is the same as the `console.log`, actually it is the `console.log`. We try to associate every log with the request that causes it, so that we can present a unified logging UI. But we don't have a good way to associate the `unhandledrejection` call with the request, and it's no fun to polyfill in userland (every user-created promise must create 2, and native-created promises aren't always possible to detect)
+
+[19:42:02.0963] <littledan>
+I don’t quite understand, how are unhandled observed in your system?
+
+[19:46:34.0874] <littledan>
+In Bloomberg’s environment, one thing we want to use AsyncContext for is running multiple logical applications in the same thread and Isolate. We need to understand who is the “current application”. In the case of unhandled rejections, we want to kill the application that created the unhandled promise rejection. I understand our use case is a bit idiosyncratic so I wanted to understand if the same comes up for others.
+
+[19:47:36.0592] <Justin Ridgewell>
+`PromiseRejectionEvent` gets the `promise`, so we need to map from Promise to Request, which isn't foolproof (`fetch` returns a native promise, and we can only detect if you chain a `.then()`, which isn't guaranteed, so we have to patch every native promise returning function). So we attempt to get the context from the promise instance, and if not, we fall back to whichever request was last triggered by this user
+
+[19:48:10.0720] <littledan>
+I am not asking what the mechanism is in spec terms but what the APIs are and how users observe any of this
+
+[19:48:35.0674] <Justin Ridgewell>
+It's not user observable
+
+[19:48:44.0009] <Justin Ridgewell>
+The user just `console.log`s
+
+[19:48:56.0549] <littledan>
+Or, system observable—what is it that shows up in the logs?
+
+[19:49:22.0660] <Justin Ridgewell>
+I don't understand
+
+[19:49:56.0608] <Justin Ridgewell>
+Logs are associated to a request, might as well be per-request file on a disk
+
+[19:50:29.0766] <littledan>
+Ah, Ok, it is used to decide which file to route the log message to, where you are logging the event that a promise was rejected and unhandled. Is that it?
+
+[19:51:02.0222] <littledan>
+Or, which logical log stream, might not be filed
+
+[19:51:04.0368] <Justin Ridgewell>
+So we need to restore the context in case the user calls `console.log` again
+
+[19:51:19.0243] <littledan>
+Where would they call it from?
+
+[19:51:28.0811] <Justin Ridgewell>
+`unhandledrejection`'s handler
+
+[19:51:44.0380] <littledan>
+Ah OK you expose that event
+
+[19:52:09.0089] <littledan>
+And when handling that event, you need to route log messages
+
+[19:52:15.0488] <littledan>
+Is this it?
+
+[19:52:20.0465] <Justin Ridgewell>
+I think so
+
+[19:55:13.0577] <littledan>
+Where can I find docs about how Vercel exposes this? Is it the web’s event, Node’s, or something else?
+
+[19:57:40.0321] <Justin Ridgewell>
+I don't know if that's explicitly documented
+
+[19:58:08.0273] <Justin Ridgewell>
+(And I actually don't now the difference between our many edge runtimes, /shrug)
+
+[20:01:42.0954] <littledan>
+Well, I think documenting what our systems do and what we want them to do will be useful in aligning the implementations to do it. (But it is a lot of work and not needed for Stage 1.) anyway I am happy to hear a lot in common between us here.
+

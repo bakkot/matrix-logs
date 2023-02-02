@@ -1,0 +1,2360 @@
+2023-01-05
+[13:14:20.0345] <Kris Kowal>
+MarkM started a talk-through of his investigation into whether to embrace AsyncContext at the SES Strategy Meeting yesterday. We didn’t get close to finishing the review, so this is Part 1, and we expect these to get gradually more refined https://youtu.be/vECr5IDJzpg
+
+[13:15:51.0706] <Justin Ridgewell>
+See also the PR at https://github.com/endojs/endo/pull/1424
+
+
+2023-01-12
+[08:00:05.0999] <littledan>
+> <@kriskowal:matrix.org> MarkM started a talk-through of his investigation into whether to embrace AsyncContext at the SES Strategy Meeting yesterday. We didn’t get close to finishing the review, so this is Part 1, and we expect these to get gradually more refined https://youtu.be/vECr5IDJzpg
+
+How has this discussion gone? Any more progress on the subsequent meeting? (Sorry for missing these.)
+
+[08:30:09.0379] <Justin Ridgewell>
+Second video is https://www.youtube.com/watch?v=28wfHOWCROo
+
+[08:31:29.0369] <Justin Ridgewell>
+We didn't get much feedback _during_ the meeting, but Mark came up with an interesting attack on membranes:
+- [Attack](https://github.com/endojs/endo/blob/markm-fluid-scopes/packages/eventual-send/test/async-contexts/test-attack.js)
+- [Fix](https://github.com/endojs/endo/pull/1424#discussion_r1067570517)
+
+[08:33:08.0684] <littledan>
+> <@jridgewell:matrix.org> We didn't get much feedback _during_ the meeting, but Mark came up with an interesting attack on membranes:
+> - [Attack](https://github.com/endojs/endo/blob/markm-fluid-scopes/packages/eventual-send/test/async-contexts/test-attack.js)
+> - [Fix](https://github.com/endojs/endo/pull/1424#discussion_r1067570517)
+
+huh, could you explain what this attack and fix mean for AsyncContext?
+
+[08:34:18.0164] <Justin Ridgewell>
+Briefly, it means all membranes will need to update to use an `AsyncContext` themselves if they care about preventing this type of communication. If not, it still doesn't allow direct access to to the other's graph, so it's not so terrible.
+
+[08:34:35.0144] <littledan>
+oh, which kind of communication?
+
+[08:35:12.0748] <Justin Ridgewell>
+You can communicate 1 bit of information per-call that is not directly seen by the membrane
+
+[08:35:27.0162] <Justin Ridgewell>
+See my first few paragraphs of the fix
+
+[08:35:48.0700] <Justin Ridgewell>
+> The crux of this attack is that Alice has received 2 callbacks from Bob (they're actually the same === callback, but run in different fluid var contexts), which she stores. After receiving these callbacks, she can then invoke either. Carol cannot tell from the callback's identity which is invoked. Once invoked, Bob can tell from the fluid var state whether the first callback or second callback is invoked.
+
+[08:36:09.0503] <Justin Ridgewell>
+(Carol is the membrane)
+
+[15:08:17.0500] <littledan>
+Justin Ridgewell: Can we talk more about whether `wrap` is Realm-specific?
+
+[15:08:23.0469] <littledan>
+I think this would significantly complicate any implementation
+
+[15:08:49.0818] <littledan>
+the use cases for membranes and the types of mitigations don't depend on Realms at all, so I'm not convinced we should do it this way
+
+[15:11:02.0786] <littledan>
+On second thought, maybe implementation wouldn't be so complex, but this depends a lot on what semantics we adopt when different realms call each other (I honestly don't know what you have in mind)
+
+[15:27:23.0316] <Justin Ridgewell>
+Having it be per-realm or per-agent isn't important to me, I chose realm because it's easiest to implement in JS, I figured it be easy in C++, and it seems the least objectionable (per the dedent caching semantics)
+
+[15:38:52.0472] <Justin Ridgewell>
+Given that membranes will need to update to use `AsyncContext` in same-realm anyways, I don't think it matters if we choose to do per-agent (and they'll need to update for both same-realm and cross-realm)
+
+
+2023-01-13
+[07:33:28.0139] <littledan>
+Justin Ridgewell: Could you describe the semantics you're thinking of in the cross-realm case?
+
+[07:33:39.0903] <littledan>
+(or if there's some JS implementation, point me to it)
+
+[08:03:48.0893] <Justin Ridgewell>
+It would require the polyfill to have access to the other realm
+
+[08:09:12.0630] <littledan>
+Sure, this is a general thing about polyfills that makes them tend to not be spec-complaint
+
+[08:09:32.0103] <littledan>
+What are the semantics that you want Realm-separated `wrap` to have at runtime? I just don't know what you're proposing.
+
+[08:10:28.0767] <littledan>
+like, would Promise.prototype.then do a Realm-separated `wrap` or a cross-Realm one?
+
+[08:12:01.0090] <littledan>
+without Realm separation, each microtask queue item can have a single word added to it, which is "what is the whole group of AsyncContexts to restore during this microtask queue item". If we're being Realm-specific... I don't actually know what this should contain.
+
+[08:13:34.0503] <Justin Ridgewell>
+I don’t understand how they would be different. It would still be a single pointer to a map.
+
+[08:13:50.0658] <littledan>
+OK, but the map would contain only the async contexts that are in the Realm that called `then`?
+
+[08:14:43.0611] <littledan>
+so, synchronously, you could call `otherRealmContext.get()` and get that value, but it'd be lost when you restore the microtask queue item
+
+[08:14:49.0783] <littledan>
+that's the observable difference of being realm-separated
+
+[08:14:51.0490] <littledan>
+right?
+
+[08:15:05.0603] <Justin Ridgewell>
+Isn’t that intrinsic to then? Like which globals and environment is it going to resume with?
+
+[08:16:05.0955] <littledan>
+sure but I imagined this being different from that (since synchronously you can `get` multiple Realms' AsyncContext things)
+
+[08:16:16.0176] <littledan>
+> <@littledan:matrix.org> so, synchronously, you could call `otherRealmContext.get()` and get that value, but it'd be lost when you restore the microtask queue item
+
+Is this what you are picturing?
+
+[08:17:13.0982] <Justin Ridgewell>
+Yes, if we choose per realm.
+
+[08:18:42.0503] <littledan>
+OK, now I understand. And so what is the advantage of these semantics, of partitioning the AsyncContexts in this way?
+
+[08:20:18.0269] <Justin Ridgewell>
+> Having it be per-realm or per-agent isn't important to me, I chose realm because it's easiest to implement in JS, I figured it be easy in C++, and it seems the least objectionable (per the dedent caching semantics)
+
+[08:20:35.0907] <Justin Ridgewell>
+There’s no real benefit to it this way, it’s just easy
+
+[08:24:53.0569] <littledan>
+One thing it consider is that, in some implementations, this data structure gets a bit complex since you might want to scale up to a large number of `.run` calls nested in each other without that being quadratic (so you don't want to have to clone the whole map for each `.run` call). But I'm not sure whether this argues for Realm-partitioned or global (maybe it's the same?)
+
+[08:26:15.0146] <littledan>
+oh, also, how should we handle AsyncContexts that aren't in any Realm at all because they're implicitly set by other built-in libraries (e.g., web standards)?
+
+[08:26:29.0890] <Justin Ridgewell>
+I think it’s much more likely that you’ll have many snapshots happening than many nested runs happening, so I prioritized zero-copy snapshots
+
+[08:27:02.0760] <littledan>
+yes, snapshots must be extremely cheap, that's for sure
+
+[08:27:55.0157] <littledan>
+I don't think one thing excludes another. A classic purely functional map (like Clojure has) would work for what I described.
+
+[08:28:03.0855] <littledan>
+(snapshots are also free there)
+
+[08:28:10.0733] <Justin Ridgewell>
+Maybe we could add a multi-run behavior where many contexts are set, to avoid N clones of the map?
+
+[08:28:29.0865] <littledan>
+what do you mean?
+
+[08:29:04.0969] <littledan>
+oh, a JS-visible API for that?
+
+[08:29:14.0925] <Justin Ridgewell>
+`AsyncContext.runMultiple([a, val, b, otherVal])`
+
+[08:29:46.0345] <Justin Ridgewell>
+So `a` and `b` are set without 2 clones
+
+[08:29:48.0432] <littledan>
+I don't think this would remove the potential demand for multiple calls of run being more efficient. Also I'm speculating here; I can't think of when it'd make sense to do that very deeply
+
+[08:30:09.0811] <littledan>
+Generally it should be separate pieces of code which ask for different variables (otherwise they should consolidate into one)
+
+[08:31:01.0513] <Justin Ridgewell>
+> <@littledan:matrix.org> I don't think one thing excludes another. A classic purely functional map (like Clojure has) would work for what I described.
+
+The issue with pure linked list approaches that a snapshot prevents GC of prior values on the chain
+
+[08:31:31.0666] <Justin Ridgewell>
+You’ve had to flatten the chain, but maybe that can happen in a GC step
+
+[08:31:32.0122] <littledan>
+Yeah, this is why you wouldn't use a linked list but instead a functional map. Will find a link...
+
+[08:33:23.0329] <littledan>
+https://clojure.org/reference/data_structures#Maps
+
+[08:34:15.0361] <littledan>
+anyway probably just a JS Map is good enough in practice; I just wouldn't want to rule out using this theoretically more efficient mechanism in case things come up. But I think this would be possible and doesn't relate to the use of Realms.
+
+[08:35:03.0174] <littledan>
+see Chris Okazaki's classic thesis for an overview of this topic, summary at https://en.wikipedia.org/wiki/Purely_functional_data_structure
+
+[08:38:23.0411] <littledan>
+> <@littledan:matrix.org> oh, also, how should we handle AsyncContexts that aren't in any Realm at all because they're implicitly set by other built-in libraries (e.g., web standards)?
+
+OK, so I want to dig into this part. This is core to my agenda of linking AsyncContext with Yoav Weiss 's work, which is around built-in variables (which I believe should be propagated in the identical way to AsyncContext)
+
+[08:53:05.0614] <littledan>
+> <@littledan:matrix.org> OK, so I want to dig into this part. This is core to my agenda of linking AsyncContext with Yoav Weiss 's work, which is around built-in variables (which I believe should be propagated in the identical way to AsyncContext)
+
+Justin Ridgewell: What do you think?
+
+[09:11:09.0229] <Justin Ridgewell>
+🤷‍♂️. Is we specify the storage as per-agent, do we need to do any further work to integrate the browser context?
+
+[09:37:15.0776] <littledan>
+yeah I'd prefer per-agent; if we do per-Realm, I'm not sure how it should work
+
+[09:38:11.0291] <littledan>
+I guess you convinced me that it wouldn't be harder to implement per-Realm and that the semantics can be defined; now this is potentially the thing to rest the decision on
+
+[12:33:23.0388] <Justin Ridgewell>
+Just got out of a meeting with the SES folks, and they're supportive of the proposal now
+
+[12:34:03.0943] <Justin Ridgewell>
+Well, MM in particular, but of the 2 meetings I've had with SES and OCAP folks, there aren't any objections raised
+
+[12:35:45.0547] <littledan>
+> <@jridgewell:matrix.org> Just got out of a meeting with the SES folks, and they're supportive of the proposal now
+
+Wow, that's great!
+
+[12:36:00.0689] <littledan>
+Could you elaborate a little more on their thoughts?
+
+[12:36:14.0824] <littledan>
+Did it rest on the per-Realm vs cross-Realm aspect we were discussing above?
+
+[12:37:04.0042] <Justin Ridgewell>
+No, not at all, they're looking at it from the OCAP language model
+
+[12:37:11.0649] <littledan>
+cool
+
+[12:37:33.0022] <Justin Ridgewell>
+While this does give new powers (and there's an implicit message passing), they're ok with it.
+
+[12:38:01.0920] <Justin Ridgewell>
+I think we'll need to discuss with the browser folks to decide on realm-ness
+
+[12:42:43.0898] <Justin Ridgewell>
+🌶️ Also Crockford wants us to stop adding new features to the language
+
+[12:43:03.0252] <Kris Kowal>
+Crockford wants us to take features away, really.
+
+[12:43:30.0951] <Kris Kowal>
+Oh, he was at friam! Of course he was.
+
+[12:44:06.0880] <Justin Ridgewell>
+Yup
+
+[12:44:21.0831] <Justin Ridgewell>
+We'll have a video of it uploaded eventually
+
+[13:10:52.0602] <littledan>
+> <@kriskowal:matrix.org> Crockford wants us to take features away, really.
+
+this is in general, not with respect to AsyncContext?
+
+[13:11:10.0409] <Kris Kowal>
+Yes.
+
+[13:11:22.0616] <littledan>
+> <@jridgewell:matrix.org> I think we'll need to discuss with the browser folks to decide on realm-ness
+
+OK, I think we should start this conversation with Yoav Weiss , let's try to organize a call
+
+[13:11:24.0554] <Kris Kowal>
+Crockford has gone from specifically grumpy to generally grumpy.
+
+[13:12:44.0249] <littledan>
+> <@kriskowal:matrix.org> Crockford has gone from specifically grumpy to generally grumpy.
+
+I am not sure whether/why I should care what Crockford thinks at this point
+
+[13:14:10.0121] <Kris Kowal>
+Same as anyone else and in the same way. :-)
+
+[13:16:47.0494] <littledan>
+> <@kriskowal:matrix.org> Oh, he was at friam! Of course he was.
+
+what is this?
+
+[13:18:57.0311] <Kris Kowal>
+There was an ocap research group meeting at a company called Agorics in the 90s. The company was acquired by Microsoft and the team scattered, but has continued to meet every Friday morning ever since. Folks as noteworthy as the late Carl Hewitt were regulars at Friam.
+
+[13:19:46.0519] <Kris Kowal>
+Might have started at Xeorx PARC. I’m not sure.
+
+[13:20:21.0702] <littledan>
+oh, this was the audience that Justin brought this proposal to?
+
+[13:21:03.0658] <Kris Kowal>
+Yeah, MarkM wanted to share the same material from the SES meeting with this group for more eyes.
+
+[13:21:48.0985] <littledan>
+SGTM, are there further eyes in the ocap world we should be seeking here, or is this considered the highest body?
+
+[13:25:09.0176] <Kris Kowal>
+Idk about highest, but it’s certainly the centermost.
+
+[13:55:25.0802] <Justin Ridgewell>
+Yah, Mark wanted to discuss with OCAP folks because JS is a subset of the OCAP language model
+
+[13:56:03.0896] <Justin Ridgewell>
+We didn't dive deeply into the JS semantics, it was pretty general discussion on programming
+
+
+2023-01-14
+[19:09:24.0860] <Justin Ridgewell>
+> <@littledan:matrix.org> anyway probably just a JS Map is good enough in practice; I just wouldn't want to rule out using this theoretically more efficient mechanism in case things come up. But I think this would be possible and doesn't relate to the use of Realms.
+
+After looking at this a bunch, I believe the current `Map` based approach is ideal:
+- O(1) `wrap()`
+- O(1) `get()`
+- O(n) `run()`
+- Automatic GC
+
+[19:10:29.0155] <Justin Ridgewell>
+I can't come up with another solution that don't have O(n) `run` without sacrificing `wrap` or `get`
+
+[19:11:13.0430] <Justin Ridgewell>
+I did come up with a slightly optimized solution which has O(1) `run` **if** the current state has not been `wrap`ped.
+
+[19:58:16.0988] <Justin Ridgewell>
+https://github.com/legendecas/proposal-async-context/pull/15
+
+
+2023-01-15
+[06:39:22.0439] <littledan>
+I agree that Map is a good approach for the polyfill and initial implementations, but a good quality of the current proposal is that it'd also be friendly to an implementation which is O(log n) for all three of those operations, using a persistent map instead of a mutable one.
+
+[08:48:41.0814] <Chengzhong Wu>
+> <@jridgewell:matrix.org> Well, MM in particular, but of the 2 meetings I've had with SES and OCAP folks, there aren't any objections raised
+
+This is great! Thank you Justin for pushing this forward!
+
+[08:49:31.0931] <Chengzhong Wu>
+Unfortunately, I've always had hard time to join the SES meeting as the meeting time is not comfortable for me at UTC+8. 
+
+[08:52:27.0123] <Chengzhong Wu>
+> <@littledan:matrix.org> OK, I think we should start this conversation with Yoav Weiss , let's try to organize a call
+
+Is Yoav active on matrix? Seems like Yoav didn't send messages in the room.
+
+
+2023-01-17
+[23:56:00.0990] <Rob Palmer>
+FYI:  https://twitter.com/jarredsumner/status/1614646182269313025
+
+[12:58:52.0969] <littledan>
+native AsyncContext should be more efficient than AsyncLocalStorage because it hooks into the microtask queue in a less flexible way (just storing a pointer, rather than calling a callback
+
+[12:59:31.0842] <littledan>
+> <@legendecas:matrix.org> Is Yoav active on matrix? Seems like Yoav didn't send messages in the room.
+
+It might work better to send a small group message (since this room has too much traffic), or otherwise we could shift to email. I've talked to him on Matrix before.
+
+[14:37:25.0500] <James M Snell>
+The implementation of ALS that we have in workers now is quite a bit more efficient than Node.js' but still has a fairly sizable cost due to the way promise hooks are implement
+
+[14:39:07.0312] <James M Snell>
+Specifically, not only do we have to handle the promise hook for init, pre and post callback, and resolve, for every promise we have to allocate an object to store as a private field since v8 does not give us any mechanism for storing additional context on the `Promise` object (i.e. we can't dedicate an aligned internal fields to use)
+
+[14:43:52.0594] <James M Snell>
+For each Promise, the object we allocate is a opaque wrapper around a ref to the ref-counted "async context frame" that is storing the relevant context
+
+[14:44:24.0492] <James M Snell>
+So we do need more than storing a simple pointer but there is tons of room for improvement still
+
+[14:54:02.0711] <littledan>
+yeah a naive built-in implementation would address these issues
+
+[14:55:53.0825] <James M Snell>
+absolutely doesn't need to be much
+
+
+2023-01-18
+[17:05:29.0529] <Justin Ridgewell>
+I'm surprised you need to do so much work to integrate it
+
+[17:06:06.0522] <Justin Ridgewell>
+The spec has a hook designed for this usecase, and it seems to exist in V8: https://source.chromium.org/chromium/chromium/src/+/main:v8/src/api/api.cc;l=6837-6853;drc=dd38db94df728f36d61d5d6c943156dbe37144a4
+
+[17:07:27.0216] <James M Snell>
+I spotted that previously but couldn't find any detail whatsoever on what/how it's used
+
+[17:09:13.0400] <James M Snell>
+specifically, on the promise hook callback, for the init event, we create an opaque JS object that wraps the reference to the current async context frame. We then set that as a private field on the Promise object. What's not clear in any way (I couldn't find any documentation or examples) if Set/GetContinuationPreservedEmbedderData could be used for that
+
+[17:10:08.0459] <James M Snell>
+specifically, it's not clear *when* we would call `SetContinuationPreservedEmbedderData` and what effect that would have
+
+[17:14:47.0001] <Justin Ridgewell>
+If I'm reading this right, I would call it in `Set…` inside `AsyncContext.run()`, and call `Get…` inside `AsyncContext.get()`
+
+[17:15:19.0904] <Justin Ridgewell>
+- https://source.chromium.org/search?q=continuation_preserved_embedder_data%20-filepath:%5Eout%2F&ss=chromium%2Fchromium%2Fsrc
+- Preserved on jobs: https://source.chromium.org/chromium/chromium/src/+/main:v8/src/builtins/promise-misc.tq;l=75-90;drc=39c3a97e848a7ecd1fa95e738771cc61d6d72552
+- Restored on run: https://source.chromium.org/chromium/chromium/src/+/main:v8/src/builtins/builtins-microtask-queue-gen.cc;l=238-245?q=continuation_preserved_embedder_data%20-filepath:%5Eout%2F&ss=chromium%2Fchromium%2Fsrc
+
+[17:16:14.0535] <Justin Ridgewell>
+Looks like Yoav might be using it in the new Chrome TaskAttribution work: https://source.chromium.org/chromium/chromium/src/+/main:third_party/blink/renderer/modules/scheduler/task_attribution_tracker_impl.cc;l=233-289;drc=71630a0e336a703e21de9ebeb98a5abf84e8c96c
+
+[17:18:24.0463] <James M Snell>
+Still not super clear but it's worth exploring to see if it does make it easier
+
+[17:19:06.0578] <James M Snell>
+one key issue is that we need the context tracking to also work with things like timers
+
+[17:19:46.0175] <Justin Ridgewell>
+What other times do you provide?
+
+[17:20:03.0317] <James M Snell>
+so long as we can preserve the context with non-v8 things and it all just works, then hopefully this could make things easier. I'll play with it
+
+[17:20:40.0429] <James M Snell>
+Just setTimeout and setInterval but v8's only involvement there is that we call the function when the timer expires
+
+[17:20:49.0237] <Justin Ridgewell>
+I think if you port https://docs.google.com/presentation/d/1yw4d0ca6v2Z2Vmrnac9E9XJFlC872LDQ4GFR17QdRzk/edit#slide=id.g18e6eaa50e1_0_192 into C++, and everywhere you access `__storage__` you call `Get…`, and everywhere you set you call `Set…`, then it'd work correctly
+
+[17:20:59.0171] <James M Snell>
+we capture a reference to the current frame and enter it when we invoke the callback
+
+[17:22:23.0503] <James M Snell>
+ok, I'll play with this a bit. If we can eliminate the promise hook I'll be really quite happy
+
+[17:25:32.0952] <Justin Ridgewell>
+It doesn't look like anything else uses the embedder continuation data, so I'm not sure if `setTimeout` would propagate correctly.
+
+[17:25:42.0536] <Justin Ridgewell>
+It might be easy to do manually, though
+
+[05:52:39.0030] <littledan>
+> <@jridgewell:matrix.org> The spec has a hook designed for this usecase, and it seems to exist in V8: https://source.chromium.org/chromium/chromium/src/+/main:v8/src/api/api.cc;l=6837-6853;drc=dd38db94df728f36d61d5d6c943156dbe37144a4
+
+Oh wow I didn’t know about this API
+
+[05:57:20.0170] <littledan>
+Would be cool to see if someone can build AsyncContext as a Node native module just based on that, or if there are limitations 
+
+[12:30:54.0553] <Andreu Botella>
+`SCOPING.md` has the following:
+
+[12:31:02.0246] <Andreu Botella>
+> Only code with direct access to `AsyncContext` instances can modify the value, and only for code execution nested inside a new `context.run()`.
+
+[12:32:46.0777] <Andreu Botella>
+Doesn't `AsyncContext.wrap` allow any code to modify the value of all `AsyncContext` instances in the callback's context?
+
+[12:33:41.0514] <Justin Ridgewell>
+Yes and no
+
+[12:34:15.0880] <Justin Ridgewell>
+The `AsyncContext` instance can't contain a value unless that value is placed there by someone with access to the instance
+
+[12:34:47.0672] <Justin Ridgewell>
+`undefined` (the default state of an `AsyncContext`) is just a "value placed there by someone with access"
+
+[12:35:24.0126] <Justin Ridgewell>
+So restoring the state to a prior one just places a value into the `AsyncContext` that was already placed there by someone with access
+
+[12:36:04.0664] <Justin Ridgewell>
+Mark Miller's equates this more to a closed over variable
+
+[12:37:14.0325] <Justin Ridgewell>
+If I have a opaque `Map` (that I can't directly acccess, but which can be access by `AsyncContext` instances) which holds the data, then all I've done is propagate my closed-over map for you to read from.
+
+[12:37:59.0766] <Justin Ridgewell>
+- https://github.com/endojs/endo/blob/markm-fluid-scopes/packages/eventual-send/src/async-contexts/7-fluid-passing-style-transform.md
+- https://github.com/endojs/endo/blob/markm-fluid-scopes/packages/eventual-send/src/async-contexts/7-fluid-passing-style.js
+
+[12:40:36.0900] <littledan>
+I guess to connect these things, the modification is well-behaved
+
+[12:40:49.0937] <littledan>
+yes, you definitely can restore things via `wrap`, that's the whole point, that is a well-behaved modification
+
+[12:41:03.0996] <littledan>
+so maybe this could be clarified in the wording of SCOPING.md
+
+[12:41:50.0736] <Andreu Botella>
+yeah, in that sense `wrap` doesn't introduce any dynamic scoping, so it's just a matter of wording that
+
+[12:41:56.0033] <James M Snell>
+Just a quick update here. I've implemented use of this api to store context for workers (https://github.com/cloudflare/workerd/pull/282).... it works well for promises in general but does have a limitation.
+
+[12:42:25.0124] <James M Snell>
+Specifically, I'm currently not able to completely eliminate the use of the promise hook because the v8 api does not make the context propagation available for the unhandledrejection event handlers
+
+[12:42:50.0948] <Andreu Botella>
+I'm not familiar with programming language theory, and there's a lot of stuff I'm missing here
+
+[12:42:57.0857] <James M Snell>
+I end up having to still associate the current context frame with the promise in the promise hook and entering the frame manually when emitting those events
+
+[12:43:32.0509] <littledan>
+> <@jasnell:matrix.org> Specifically, I'm currently not able to completely eliminate the use of the promise hook because the v8 api does not make the context propagation available for the unhandledrejection event handlers
+
+yep, that doesn't surprise me... this is what you need the init hook for, right?
+
+[12:43:51.0517] <littledan>
+but it's great to hear if everything but the init hook works!!!
+
+[12:44:09.0461] <James M Snell>
+Second, I am capturing the async context when `queueMicrotask()` is called so that the context at the time queueMicrotask is called to schedule the callback is entered. v8 does not appear to propagate the stored context when invoking those scheduled tasks
+
+[12:44:36.0365] <littledan>
+> <@abotella:igalia.com> I'm not familiar with programming language theory, and there's a lot of stuff I'm missing here
+
+Andreu, I recommend you make PRs to SCOPING.md to make things clearer for you, and we can iterate on it in code review. You shouldn't have to be an expert in PL theory to read our docs.
+
+[12:44:39.0206] <James M Snell>
+but otherwise, the v8 api is quite helpful. Thank you for pointing it out Justin Ridgewell 
+
+[12:45:03.0366] <littledan>
+> <@jasnell:matrix.org> Second, I am capturing the async context when `queueMicrotask()` is called so that the context at the time queueMicrotask is called to schedule the callback is entered. v8 does not appear to propagate the stored context when invoking those scheduled tasks
+
+Sorry, could you explain this a little more?
+
+[12:45:09.0394] <Andreu Botella>
+well, that was a bit more about Justin Ridgewell's response
+
+[12:45:46.0917] <James M Snell>
+```
+als.run(123, () => queueMicrotask(() => console.log(als.getStore())));
+```
+
+[12:45:53.0257] <littledan>
+the thing is, Mark Miller's school of PL theory is really not widely understood... it is just his small community
+
+[12:46:26.0922] <James M Snell>
+I've implemented it such that when the scheduled microtask is run, `als.getStore()` returns the appropriate value
+
+[12:46:32.0493] <littledan>
+> <@jasnell:matrix.org> ```
+> als.run(123, () => queueMicrotask(() => console.log(als.getStore())));
+> ```
+
+huh, I thought that would be the whole point of V8's API, to propagate over exactly that pattern... if it doesn't handle this, what does it do?
+
+[12:47:32.0579] <James M Snell>
+I don't know. I could be doing something wrong here but in local testing it wasn't picking up the value
+
+[12:47:41.0583] <James M Snell>
+I can play with it more
+
+[12:48:40.0397] <littledan>
+did you get it to work at all, in any case? for example, maybe it works for promises but not calls to queueMicrotask?
+
+[12:49:26.0130] <Justin Ridgewell>
+> <@littledan:matrix.org> the thing is, Mark Miller's school of PL theory is really not widely understood... it is just his small community
+
+Mark asked to update the proposal docs to reference his explanations, which I'm a little worried about. 😬
+
+[12:50:08.0816] <littledan>
+> <@jridgewell:matrix.org> Mark asked to update the proposal docs to reference his explanations, which I'm a little worried about. 😬
+
+reference like link to, or put everything in his terms?
+
+[12:50:24.0880] <Justin Ridgewell>
+They may not be integrating with the job queue correctly
+
+[12:50:45.0000] <Justin Ridgewell>
+The intention of the hooks is for that to work without modifications, but they're only calling it for promises currently
+
+[12:50:59.0641] <Justin Ridgewell>
+I'm not sure how Web APIs implement their calls
+
+[12:51:11.0977] <Justin Ridgewell>
+Redo the explanation in his terms
+
+[12:53:30.0773] <James M Snell>
+yeah, definitely doesn't appear to be working
+
+[12:53:38.0052] <littledan>
+> <@jridgewell:matrix.org> Redo the explanation in his terms
+
+Ah, yeah, I think we should decline this request. The main explanation should be intuitive; we could have a doc off to the side in their terms
+
+[12:53:49.0671] <Justin Ridgewell>
+> <@jasnell:matrix.org> Specifically, I'm currently not able to completely eliminate the use of the promise hook because the v8 api does not make the context propagation available for the unhandledrejection event handlers
+
+Looks like that's actually possible with `SetPromiseRejectCallback`:
+- https://source.chromium.org/chromium/chromium/src/+/main:v8/src/api/api.cc;l=9491-9495;drc=c53c026e6ee5083d71e1cd63607ecbae0c641678
+- called by https://source.chromium.org/chromium/chromium/src/+/main:v8/src/runtime/runtime-promise.cc
+
+[12:54:27.0763] <littledan>
+> <@jridgewell:matrix.org> Looks like that's actually possible with `SetPromiseRejectCallback`:
+> - https://source.chromium.org/chromium/chromium/src/+/main:v8/src/api/api.cc;l=9491-9495;drc=c53c026e6ee5083d71e1cd63607ecbae0c641678
+> - called by https://source.chromium.org/chromium/chromium/src/+/main:v8/src/runtime/runtime-promise.cc
+
+Justin, that's one side (where you read the relevant asynccontext) but there's the other side separately (in the promise init hook, when you have to stash exactly that information)
+
+[12:55:35.0099] <littledan>
+> <@jasnell:matrix.org> yeah, definitely doesn't appear to be working
+
+Yoav told me that, for web APIs, he added extra logic to save and restore the right thing when queueing [macro]tasks
+
+[12:55:57.0146] <littledan>
+so this is why I'm wondering if, in your testing, the save and restore at least happened for promises (it'd be really surprisng to me if it didn't work)
+
+[12:56:48.0576] <James M Snell>
+Will the promise reject callback be invoked while the appropriate stored continuation value is current?
+
+[12:57:06.0481] <James M Snell>
+if so, I can absolutely capture it then
+
+[12:57:40.0243] <Andreu Botella>
+littledan: You're sometimes replying to a thread on the main channel. Are you using an outdated Matrix client?
+
+[12:57:54.0990] <littledan>
+I'm using app.element.io... I don't see threads
+
+[12:58:13.0684] <littledan>
+how do I enable them?
+
+[12:58:50.0901] <Andreu Botella>
+oh, they're not actually enabled by default in recent Element versions, I just had manually enabled them
+
+[12:58:58.0271] <Andreu Botella>
+All Settings / Labs
+
+[12:59:23.0383] <Justin Ridgewell>
+Yes, it should be
+
+[12:59:28.0438] <James M Snell>
+oh! yes, quick test appears that it does work! woo!
+
+[13:00:20.0135] <Justin Ridgewell>
+> <@littledan:matrix.org> Ah, yeah, I think we should decline this request. The main explanation should be intuitive; we could have a doc off to the side in their terms
+
+That's exactly what I said. Lol.
+
+[13:01:13.0363] <littledan>
+Oh hi now I can see the thread
+
+[13:01:33.0272] <James M Snell>
+> Yoav told me that, for web APIs, he added extra logic to save and restore the right thing when queueing [macro]tasks
+
+Justin Ridgewell in v8 or somewhere else?
+
+[13:02:01.0800] <James M Snell>
+if in v8, it might be in a newer version than we're using maybe?
+
+[13:02:17.0716] <Justin Ridgewell>
+Hm?
+
+[13:02:22.0365] <littledan>
+> <@jasnell:matrix.org> Justin Ridgewell in v8 or somewhere else?
+
+This is in Chrome, not V8
+
+[13:02:32.0817] <littledan>
+so you won't just pick it up
+
+[13:02:37.0617] <James M Snell>
+ok yeah
+
+[13:03:09.0484] <littledan>
+> <@jasnell:matrix.org> Will the promise reject callback be invoked while the appropriate stored continuation value is current?
+
+I don't expect this to work at all... I think we'd have to add something specifically to promises code to store exactly this thing
+
+[13:03:33.0996] <James M Snell>
+Well, it does appear to be working in local testing
+
+[13:03:35.0979] <littledan>
+this is why it's important that we document that unhandled rejection asynccontext is important!
+
+[13:03:40.0340] <littledan>
+huh really? how so?
+
+[13:03:47.0602] <littledan>
+Could you share your tests?
+
+[13:04:38.0562] <James M Snell>
+```
+          jsg::AsyncContextFrame::Scope scope(js, jsg::AsyncContextFrame::current(js));
+          auto ev = jsg::alloc<PromiseRejectionEvent>(event, kj::mv(promise), kj::mv(value));
+          dispatchEventImpl(js, kj::mv(ev));
+```
+
+It's a bit obscure here but...
+
+`jsg::AsyncContextFrame::current()` is a wrapper around code that grabs the current stored continuation data from v8::Context
+
+[13:06:14.0180] <James M Snell>
+In JavaScript...
+
+```
+const { AsyncLocalStorage } = async_hooks;
+
+const als = new AsyncLocalStorage();
+
+addEventListener('unhandledrejection', (event) => {
+  // Here we are making sure that the async context properly travels along with
+  // unhandled rejections.
+  if (event.reason === 'boom' && als.getStore() !== 123) {
+    throw new Error("Incorrect async store value");
+  }
+  if (event.reason === 'boom2' && als.getStore() !== 'ABC') {
+    throw new Error("Incorrect async store value");
+  }
+});
+
+addEventListener('rejectionhandled', (event) => {
+  if (als.getStore() !== 'ABC') {
+    throw new Error("Incorrect async store value");
+  }
+});
+
+export default {
+  async fetch(request) {
+    // The async context is captured when on(...) is called to register
+    // handlers.
+    als.run(123, () => {
+      Promise.reject("boom");
+    });
+
+    const p = als.run('ABC', () => {
+      return Promise.reject("boom2");
+    });
+
+    await scheduler.wait(1);
+
+    p.catch(() => {});
+
+    return new Response("ok");
+  }
+}
+```
+
+[13:06:50.0856] <Justin Ridgewell>
+Try one that adopts the state of a rejected promise
+
+[13:06:56.0442] <Justin Ridgewell>
+That'll be the tricky case
+
+[13:07:20.0161] <Justin Ridgewell>
+`Promise.reject` is a sync rejection signal, so it's very easy to capture the current run state
+
+[13:07:21.0379] <James M Snell>
+oh.. no, yeah, shoot
+
+[13:08:04.0550] <James M Snell>
+spoke too soon. That case was failing
+
+[13:10:07.0592] <James M Snell>
+boo ok
+
+[13:16:50.0047] <Justin Ridgewell>
+Curious of your test case
+
+[13:17:00.0136] <Justin Ridgewell>
+The spec flows work, maybe it's just a V8 impl bug
+
+[13:17:38.0598] <Justin Ridgewell>
+The reject is either called sync (in which case, the context is still there), or it's queued in a job callback, in which case it would have been restored before calling reject
+
+[13:18:07.0543] <James M Snell>
+I'll see if I can dig in a bit deeper soon
+
+[13:20:19.0134] <Justin Ridgewell>
+```js
+new Promise((_, rej) => rej(1));
+new Promise(res => res(Promise.reject(1)));
+// technically equivalent to the previous one
+Promise.resolve().then(() => Promise.reject(1));
+```
+
+[14:20:19.0381] <littledan>
+FYI I asked about this API in the #jsc room of WebKit Slack, and Jared Sumner responded explaining that he's implementing AsyncLocalStorage in Bun. Hopefully he takes my offer to come and hang out over here :)
+
+[14:23:21.0356] <littledan>
+fun fact: Promise.reject is in fact the hard case, since you actually want to wait for the microtask queue to be exhausted before considering it truly an unhandled rejection
+
+[14:23:38.0257] <littledan>
+the async case where the rejection happens after the responses have already been chained on--that's the easy case
+
+[14:24:16.0505] <littledan>
+(this was quite tricky for people inside of Bloomberg to rediscover, at least)
+
+[14:29:00.0441] <James M Snell>
+For the following case, what would you expect the `als.getStore()` value to be printed..
+
+```
+addEventListener('unhandledrejection', () =>{
+  console.log(als.getStore());
+})
+
+let reject;
+const p2 = als.run(123, () => new Promise((a,b) => reject = b));
+als.run(321, () => reject());
+```
+
+[14:30:29.0403] <Justin Ridgewell>
+Ahh, I hadn't considered that `reject()` would be called in a different context
+
+[14:32:46.0685] <Justin Ridgewell>
+I don't have an answer for this, it's not a usecase that we expose
+
+[14:33:06.0378] <Justin Ridgewell>
+All user code is guaranteed to run inside the only context we care about
+
+[14:34:37.0627] <James M Snell>
+not sure I grok that... in Node.js, `als.getStore()` in the unhandledrejection handler prints `123`
+
+[14:34:56.0801] <James M Snell>
+because it grabs the async context reference on promise init and not promise reject
+
+[14:36:00.0617] <Justin Ridgewell>
+I think that's reasonable, but the other way actually allows more expressiveness
+
+[14:36:31.0363] <Justin Ridgewell>
+If you wanted to preserve the context for the `reject()`, you would export `return wrap(reject)`
+
+[14:37:05.0998] <James M Snell>
+yeah, I'm a bit torn because honestly I do think it should return `321` in this case
+
+[14:37:12.0043] <Justin Ridgewell>
+I wonder if node had a use case to choose init-time
+
+[14:37:40.0985] <James M Snell>
+I'm not entirely convinced this case was considered
+
+[14:38:10.0371] <James M Snell>
+I'm going to open an issue in Node.js to discuss
+
+[14:38:21.0252] <Justin Ridgewell>
+👍️, please link
+
+[14:42:04.0220] <littledan>
+> <@jasnell:matrix.org> For the following case, what would you expect the `als.getStore()` value to be printed..
+> 
+> ```
+> addEventListener('unhandledrejection', () =>{
+>   console.log(als.getStore());
+> })
+> 
+> let reject;
+> const p2 = als.run(123, () => new Promise((a,b) => reject = b));
+> als.run(321, () => reject());
+> ```
+
+I would say, 123. I guess I'd predict that the V8 API that Justin linked to would log undefined.
+
+[14:42:24.0840] <littledan>
+This is actually important for Bloomberg's (admittedly weird) use case
+
+[14:42:38.0744] <James M Snell>
+https://github.com/nodejs/node/issues/46262
+
+[14:43:28.0628] <Justin Ridgewell>
+I think it'd log `321`, no?
+
+[14:44:36.0846] <Justin Ridgewell>
+`reject` there is https://tc39.es/ecma262/multipage/control-abstraction-objects.html#sec-promise-reject-functions, which immediately invokes https://tc39.es/ecma262/multipage/control-abstraction-objects.html#sec-rejectpromise, which triggers the hook API
+
+[14:45:09.0471] <James M Snell>
+Yeah, it logs `321`
+
+[14:46:34.0072] <Justin Ridgewell>
+You would need to store the current context until the actual `unhandledrejection` event is fired, but you can do that as part of the hook
+
+[14:47:17.0344] <Justin Ridgewell>
+> https://github.com/nodejs/node/issues/46262
+
+Nit: "promise is resolved" should say "promise is settled"
+
+[14:47:58.0046] <littledan>
+yeah, this is exactly the thing that I raised a week or two ago; I'm glad we're coming back to it since apparently we were talking past each other then
+
+[14:48:45.0205] <littledan>
+I was arguing, we should include something about the kInit storage in the spec (even though it's not visible without the unhandled rejection tracking)
+
+[14:48:46.0175] <James M Snell>
+My intuition is that what you really want is the context at the point either `resolve()` or `reject()` is called
+
+[14:49:02.0804] <Justin Ridgewell>
+I remember. I think we should specify this as part of the proposal, I'm just interested in how we can implement this for workerd given what we already have
+
+[14:49:26.0449] <James M Snell>
+it's trivial for me to make it work either way now. 
+
+[14:49:41.0305] <James M Snell>
+currently I have the Promise hook in place to set the context on kInit
+
+[14:50:00.0325] <James M Snell>
+but I have a pending set of changes that eliminates the promise hook and captures it on the rejection handler, which is working great
+
+[14:52:39.0912] <littledan>
+> <@jridgewell:matrix.org> I remember. I think we should specify this as part of the proposal, I'm just interested in how we can implement this for workerd given what we already have
+
+what do the spec sections that you cited have to do with workerd?
+
+[14:52:52.0914] <littledan>
+> <@jasnell:matrix.org> but I have a pending set of changes that eliminates the promise hook and captures it on the rejection handler, which is working great
+
+wait, does this work to implement either set of semantics, or just the 321 one?
+
+[14:53:47.0375] <James M Snell>
+it's either or, not both
+
+[14:54:02.0754] <James M Snell>
+my pending changes removes the promise hook
+
+[14:54:25.0788] <Justin Ridgewell>
+workerd uses v8, and v8 exposes these hooks for implementers.
+
+[14:55:01.0925] <Justin Ridgewell>
+I think we should specify a behavior instead of allowing implementers to implement on their own
+
+[14:55:16.0354] <James M Snell>
+For this case, I think we have to
+
+[14:55:38.0249] <littledan>
+will this be a publicly visible PR?
+
+[14:55:45.0980] <James M Snell>
+yes
+
+[14:56:14.0272] <Justin Ridgewell>
+https://github.com/cloudflare/workerd/pull/282
+
+[14:58:16.0430] <James M Snell>
+Specifically, I think by default, we should capture the context on settle not kInit. So the answer by default should be `321`. If you want `123`, then use `wrap` around `reject` as suggested by Justin. Or, if we are using a mechanism like Node.js' `AsyncResource`, we can do something like:
+
+```
+class Foo extends AsyncResource {
+  constructor() {
+    this.deferredPromise = createDeferredPromise();
+  }
+
+  resolve() { this.runInAsyncScope(() => this.deferredPromise.resolve()) }
+  reject() { this.runInAsyncScope(() => this.deferredPromise.reject()) }
+}
+```
+
+[14:59:04.0192] <James M Snell>
+This gives us the most flexibility because it allows us either option
+
+[15:00:45.0119] <littledan>
+Can we have a parallel thread about the same question in legendecas's repo? I'd feel more comfortable sharing my thoughts there (since they're more related to Bloomberg's use case than Node stuff)
+
+[15:09:34.0078] <Justin Ridgewell>
+https://github.com/legendecas/proposal-async-context/issues/16
+
+[15:42:57.0674] <Justin Ridgewell>
+This is also an interesting case because `unhandledrejection` will be the only event API that does not preserve the context at the time of registration...
+
+[15:44:20.0474] <littledan>
+It would indeed be special, but Yoav found that, in DOM, some events naturally wanted to restore the context when they were registered, whereas others should *not* do so and leave in place the context that triggered them
+
+[15:44:34.0746] <littledan>
+(I don't know details, but when we get back in touch with him, I'm really excited to hear his thoughts.)
+
+[15:44:49.0139] <littledan>
+this is sort of a third case, to be sure
+
+[15:45:15.0840] <littledan>
+but I think we agree it's disagreeing somehow, whether we go with 321 or 123
+
+[15:47:40.0824] <James M Snell>
+Going through this, I'm more and more convinced the answer should be `321`
+
+[15:48:35.0236] <James M Snell>
+if we're saying that the context is rightfully captured when the `then()` is called, or when `await` is called.. invoking an unhandledrejection handler falls into the equivalent category of "continuation handler"... it's just a different kind of continuation
+
+[15:53:14.0744] <littledan>
+I need to pull in an expert in how Bloomberg's system currently works before we make a call for the proposal in general; this whole thing might be unusable to us if the answer is 321
+
+
+2023-01-19
+[16:00:39.0735] <James M Snell>
+I'd be curious as to why. Even if the answer is `321` by default, you should still be able to get `123` as the result by wrapping `resolve`
+
+```
+// should print 123
+addEventListener('unhandledrejection', () => console.log(als.getStore()));
+
+let reject;
+als.run(123, () => new Promise((a,b) => reject = AsyncResource.bind(b)));
+als.run(321, () => reject());
+```
+
+[16:01:56.0810] <littledan>
+yeah, I guess so, I'd just rather this be based on analyzing how our codebase works today to double-check, rather than just hand-waving
+
+[16:02:20.0054] <James M Snell>
+yep, understood
+
+[16:02:23.0423] <littledan>
+(and I feel like we need an analogous analysis for the Node ecosystem)
+
+[16:21:37.0355] <Justin Ridgewell>
+> <@littledan:matrix.org> It would indeed be special, but Yoav found that, in DOM, some events naturally wanted to restore the context when they were registered, whereas others should *not* do so and leave in place the context that triggered them
+
+Interesting, I think we definitely need to meet with them to figure out what cases these are
+
+[16:22:05.0780] <Justin Ridgewell>
+Chengzhong Wu I think is setting up a meeting with Yoav already?
+
+[16:22:29.0138] <James M Snell>
+Node.js specifically introduced `EventEmitterAsyncResource` for those kinds of use cases
+
+[16:26:02.0915] <James M Snell>
+by default, `emitter.emit('...')` will propagate the context where `emit()` is called. With an `EventEmitterAsyncResource`, however, the context is captured when the emitter is created and that's what is propagated when `emit()` is called
+
+[16:27:42.0719] <littledan>
+but, unhandledRejection is a third behavior, right?
+
+[16:28:14.0029] <James M Snell>
+yep, because it's a singular event on an emitter that otherwise acts like the default
+
+[16:29:06.0423] <James M Snell>
+```
+process.on('foo', () => console.log(als.getStore()); // context at emit
+process.on('unhandledRejection' () => console.log(als.getStore()); // context at promise create
+```
+
+[16:29:18.0972] <James M Snell>
+same object, two very different behaviors
+
+[16:31:38.0280] <littledan>
+makes sense. Ultimately, whether we go with `123` or `321`, `unhandledRejection` is still special, right?
+
+[16:31:45.0020] <James M Snell>
+yep
+
+[19:05:20.0932] <Kris Kowal>
+This is a bit of a mischaracterization. Mark asked what Justin thought of the idea of using his work as the explainer. Justin (in my opinion rightly) responded that Mark’s reexplanation is better suited for a different audience. I believe Mark found that argument compelling.
+
+[19:13:48.0823] <Kris Kowal>
+Posted https://youtu.be/KKOn5SepxYI
+
+[19:24:39.0329] <Justin Ridgewell>
+Oh, Mark also said we should probably use per-Agent storage for the contexts
+
+[19:24:59.0914] <Justin Ridgewell>
+https://youtu.be/KKOn5SepxYI?t=1950
+
+[23:01:15.0384] <Justin Ridgewell>
+> <@littledan:matrix.org> Would be cool to see if someone can build AsyncContext as a Node native module just based on that, or if there are limitations
+
+Here's a simple package implementing the proposal: https://github.com/jridgewell/async-context-native
+
+[00:30:14.0052] <Andreu Botella>
+Is it special because the mere fact of rejecting causes a macrotask, as opposed to other macrotasks which have to be triggered from a call to a runtime API?
+
+[05:21:58.0514] <littledan>
+> <@jridgewell:matrix.org> Here's a simple package implementing the proposal: https://github.com/jridgewell/async-context-native
+
+What, is that all??? I refuse to believe it!
+
+[05:22:59.0204] <littledan>
+So the magic V8 API does literally all of the work?
+
+[05:23:20.0759] <littledan>
+> <@jridgewell:matrix.org> Oh, Mark also said we should probably use per-Agent storage for the contexts
+
+Yay also!
+
+[05:26:20.0589] <littledan>
+I think the specialness here is unrelated to it being a macro task vs micro or sync, and more that we turn out to want this somewhat weird state restored for unique reasons
+
+[05:27:55.0858] <littledan>
+Anyway, as Daryl from my team wrote on the local issue, it turns out our use case works fine whether the answer is 123 or 321 (though Daryl shares my intuition that 123 feels nicer, maybe related to the fact that he has spent much more time than me on the current 123 implementation)
+
+[08:31:32.0335] <James M Snell>
+I think in the overwhelming majority of cases the promise is going to reject in the appropriate context. The only case where I've seen this issue so far is the deferred reject where the reject is called in a different context. If the model were set up to handle returning `321` in that case, the more usual cases would still resolve correctly.
+
+[08:31:57.0833] <James M Snell>
+and it would still be possible to implement it so that `123` was returned if that's really what you wanted
+
+[10:06:57.0362] <Justin Ridgewell>
+> <@littledan:matrix.org> So the magic V8 API does literally all of the work?
+
+Yup. The magic V8 API is the parallel for the hooks the spec already implements (though they don't faithfully implement it everywhere it's needed, hence the `queueMicrotask` not working)
+
+[10:07:49.0137] <Justin Ridgewell>
+It's also not possible to hook into Node's `unhandledRejection` without completely reimplementing the event queue, but that's a Node issue and not a spec issue.
+
+[10:08:38.0188] <littledan>
+> <@jridgewell:matrix.org> Yup. The magic V8 API is the parallel for the hooks the spec already implements (though they don't faithfully implement it everywhere it's needed, hence the `queueMicrotask` not working)
+
+Would be really cool to describe the extent to which this does and doesn't work in its readme
+
+[10:09:06.0102] <Justin Ridgewell>
+👍️, I'll add more details later tonight
+
+[10:27:22.0063] <littledan>
+So the `321` semantics significantly simplify the implementation?
+
+[10:27:32.0985] <littledan>
+and this is part of the motivation?
+
+[10:28:07.0934] <littledan>
+it's hard for me to see the part of it which is more intuitive with 321, but if it's easier to implement (avoiding the kInit hook?) then I'm sold
+
+[10:28:33.0899] <littledan>
+do we need anything more than the small V8 API? e.g., the resolve hook
+
+[10:28:44.0098] <littledan>
+err, reject hook
+
+[10:29:04.0991] <littledan>
+or this is handled by the relevant V8 API being synchronous?
+
+[10:29:11.0335] <Justin Ridgewell>
+V8 could implement efficiently (all promises will require another slot to hold the context pointer). It's inefficient for embedders to do this
+
+[10:29:38.0867] <littledan>
+yeah, I'm convinced that either option could be implemented efficiently; this is more about curiousity
+
+[10:29:48.0689] <littledan>
+what is it that V8 would have to implement, if all we want is 321?
+
+[10:31:54.0645] <Justin Ridgewell>
+V8 wouldn't need to implement anything, it already has the necessary hooks for us. Embedders will need to capture the context when V8 triggers the ProjectReject hook.
+
+[10:32:54.0216] <Justin Ridgewell>
+If we want 123 behavior, then V8 needs to store the context on each promise allocation, and provide a method for embedders to access that when they V8 triggers the PromiseReject hook.
+
+[10:36:28.0326] <littledan>
+right, OK
+
+[10:40:28.0692] <littledan>
+so this works because the V8 API's SetPromiseRejectCallback is invoked synchronously (giving us all the context we need)
+
+[10:46:49.0796] <Justin Ridgewell>
+Correct
+
+[10:53:16.0072] <James M Snell>
+Yeah, the promise kinit hook is unnecessary if v8 will capture the context for us on promise creation and give an API to retrieve it
+
+[10:53:54.0941] <littledan>
+right but we're thinking that we don't even need that, if we build consensus around 321
+
+[10:53:57.0469] <littledan>
+right?
+
+[10:54:42.0543] <James M Snell>
+Correct
+
+[10:55:06.0695] <James M Snell>
+There is one additional bit of complexity to support multiple AsyncContext instances. That is, for ALS, the context stored is actually a map of ALS instances to the current values associated with each. 
+
+[10:55:52.0362] <Justin Ridgewell>
+Why's that a problem?
+
+[10:55:59.0310] <James M Snell>
+That's minor tho. But it would be convenient if the v8 API allowed me to store an embedder value directly rather than a v8::Value
+
+[10:56:05.0592] <James M Snell>
+Not a problem, just a detail
+
+[10:56:54.0852] <littledan>
+yeah, that's exactly what Justin's code does, I think
+
+[10:57:00.0953] <littledan>
+definitely necessary!
+
+[11:44:11.0724] <littledan>
+oh yeah I guess basically V8 should remove the existing API and just provide a higher AsyncContext API (or make it an assertion failure to use them both at once)
+
+[11:44:51.0556] <littledan>
+for Bloomberg's use case, we really want a C++-accessible API for all of this. I think that would be necessary for the browser-internal cases as well.
+
+[11:59:44.0213] <littledan>
+> <@littledan:matrix.org> yeah, that's exactly what Justin's code does, I think
+
+oh sorry I misunderstood this comment; ignore me
+
+[15:17:13.0097] <littledan>
+Justin Ridgewell Chengzhong Wu : For the TC39 slides, I want to suggest that we talk about OpenTelemetry rather than React Cache. It is a very real client-side use case, and it's also easy to understand based on the context from the previous example (it's just a more sophisticated version). I honestly still don't understand the React Cache case, and I don't think getting into a self-contained explanation of React would play well with theorists in the audience if we had to go down that rabbit hole. OpenTelemetry will sound very convincing to serious people, on the other hand :) and there are intuitive reasons for why you want to split a span on the client side, which Chengzhong Wu 's library shows.
+
+[15:18:22.0017] <Justin Ridgewell>
+Sure
+
+[15:20:23.0531] <littledan>
+could also be fun to explain the relationship to Justin's awesome library above and/or James's ongoing work, but this can also just be in the air without slides
+
+[15:48:56.0890] <Kris Kowal>
+OpenTel would speak to me. I used to work with Yuri Shkuro.
+
+[15:58:53.0411] <Justin Ridgewell>
+Oh god, thenables are broken!
+
+[15:59:35.0632] <Justin Ridgewell>
+```js
+const ctx = new AsyncContext()
+
+const queue = [];
+
+const thenable = {
+  then(onRes, _onRej) {
+    queue.push("thenable: " + ctx.get());
+    onRes();
+  },
+};
+
+const out = ctx.run(1, () => {
+  queue.push("new Promise");
+  const p = new Promise(res => res(thenable));
+
+  queue.push("p.then");
+  const p2 = p.then(() => thenable);
+
+  queue.push("p2.then");
+  return p2.then(() => {
+    queue.push("promise: " + ctx.get());
+  });
+});
+
+queue.push("out.then");
+out.then(() => {
+  queue.push("done");
+  //hook.disable();
+  console.log(queue);
+});
+```
+
+[15:59:56.0759] <Justin Ridgewell>
+```
+[
+  'new Promise',
+  'p.then',
+  'p2.then',
+  'out.then',
+  'thenable: undefined',
+  'thenable: undefined',
+  'promise: 1',
+  'done'
+]
+```
+
+
+2023-01-20
+[16:01:55.0865] <Justin Ridgewell>
+Because it uses `EnqueueMicrotask`, which doesn't preserve the context: https://source.chromium.org/chromium/chromium/src/+/main:v8/src/builtins/promise-resolve.tq;l=189;drc=4c61bb3131b7951ed2ed896b4df6110b1e5c072f
+
+[17:36:39.0731] <littledan>
+Let me know if I should write this; I am happy to do so but don’t have Edit access
+
+[18:13:52.0209] <Justin Ridgewell>
+Send me your email, and I’ll give you edit access
+
+[18:14:43.0684] <Justin Ridgewell>
+Or send me notes, and I’ll add them to the deck
+
+[18:14:50.0144] <Justin Ridgewell>
+I don’t really know anything about open telemetry
+
+[18:18:17.0877] <Chengzhong Wu>
+Sorry I was out yesterday and now I'm back on work. Catching up with the long discussions.
+
+[18:29:56.0535] <littledan>
+My email for slides is littledan@chromium.org
+
+[18:30:09.0463] <littledan>
+Will post outline of presentation edits here in the coming hours
+
+[18:31:55.0589] <littledan>
+So the question then is, is this fixable with V8 changes?
+
+[18:35:50.0365] <littledan>
+My notes since legendecas was gone:
+- SES says we are all good!!!!! And the AsyncContext is per agent, not per Realm.
+- V8 has an API that does most of the work for us, and it is cheaper than PromiseHooks. It is called SetContinuationPreservedEmbedderData. However this only handles some things and not others, where we will need plumbing.
+- It actually turns out it makes sense to run the promise unhandled rejections callback in the AsyncContext where the promise was rejected, rather than created. This means we don’t need to instrument the init hook.
+
+[18:55:30.0902] <James M Snell>
+I'd add that v8's API will definitely need to be expanded to EnqueueMicrotask in order for thenables to be supported
+
+[18:55:43.0875] <James M Snell>
+(And for queueMicrotask)
+
+[19:02:03.0537] <Justin Ridgewell>
+Yes, this is due to V8 not fully implementing the host hooks
+
+[19:02:47.0255] <Justin Ridgewell>
+All jobs should carry the `[[HostDefined]]` slot (what they're calling `continuation_preserved_embedder_data`), but currently only Promise jobs do it
+
+[19:46:47.0018] <littledan>
+queueMicrotask is in the same logical bucket as setTimeout though, isn’t it? Like, everything needs plumbing
+
+[19:47:02.0936] <littledan>
+But thenables would need built in support otoh 
+
+[19:48:01.0756] <Justin Ridgewell>
+Kinda, and no
+
+[19:48:24.0502] <littledan>
+Note that the job system in the JS spec has historically contained certain… standing disagreements between layers
+
+[19:48:42.0313] <littledan>
+The V8 API can do whatever it wants; there is no obligation to match the JS spec
+
+[19:49:02.0629] <littledan>
+Anyway this is to say that I don’t know what “all jobs” means
+
+[19:49:11.0088] <Justin Ridgewell>
+`queueMicrotask` seems to be the equivalent of a quick job, and they're not properly implementing the hooks for jobs
+
+[19:49:30.0021] <Justin Ridgewell>
+`setTimeout` might be a job, but I have no idea how it's implemented
+
+[19:49:32.0008] <littledan>
+Do you mean literally the function queueMicrotask, or the V8 API used to implement it?
+
+[19:49:48.0529] <Justin Ridgewell>
+Sorry, I meant `queueMicrotask`
+
+[19:49:59.0378] <Justin Ridgewell>
+No, `EnqueueMicrotask`
+
+[19:50:00.0789] <Justin Ridgewell>
+Ugh
+
+[19:50:10.0642] <littledan>
+Oh! ok, the V8 API 
+
+[19:50:15.0200] <littledan>
+Now I understand better
+
+[19:50:26.0822] <littledan>
+Yeah I can imagine that we need something there
+
+[19:51:30.0848] <Justin Ridgewell>
+Specifically, steps 13-15 of https://tc39.es/ecma262/multipage/control-abstraction-objects.html#sec-promise-resolve-functions are all jobs code, but they're implemented in V8 as a single `EnqueueMicrotask`
+
+[19:52:07.0273] <Chengzhong Wu>
+Node.js tracks `queueMicrotask` with the async resource API: https://github.com/nodejs/node/blob/main/lib/internal/process/task_queues.js#L152
+
+[19:52:15.0461] <Chengzhong Wu>
+similar to `setTimeout`
+
+[19:52:21.0824] <Justin Ridgewell>
+Thenables shouldn't need specific support, the spec for them would work if V8 had fully implemented the job hooks
+
+[19:54:32.0989] <littledan>
+Please, let’s make our arguments on the basis of what is useful, not on what someone is expected to do based on how the spec is written. The latter is a weaker argument and less relevant.
+
+[19:55:31.0156] <littledan>
+> <@legendecas:matrix.org> Node.js tracks `queueMicrotask` with the async resource API: https://github.com/nodejs/node/blob/main/lib/internal/process/task_queues.js#L152
+
+This makes sense to me. Though if the V8 API did something fancier, it might be more efficient.
+
+[19:56:20.0782] <littledan>
+This is a place where we should learn from Yoav’s implementation experience 
+
+[19:57:49.0775] <Justin Ridgewell>
+> Please, let’s make our arguments on the basis of what is useful, not on what someone is expected to do based on how the spec is written
+
+Because it prevents an embedder from implementing a feature specifically designed in the spec, I do think it's a problem.
+
+[20:03:40.0343] <littledan>
+I think if you make an argument on this basis, you will get a flat no. It just isn’t the contract that engines sign up for.
+
+[20:04:02.0673] <littledan>
+If we make an argument based on case by case utility, it will be more effective 
+
+[20:05:09.0342] <littledan>
+Part of this is, there are some things about the interface Ecma-262 provides which are very wacky and bad; engines don’t actually want to sign up for implementing all of that
+
+[20:06:01.0581] <littledan>
+So you are asking for more than you need if you say that they should do everything corresponding to that interface 
+
+[20:07:47.0508] <littledan>
+Eg it is fine that there is no actual imperative V8 API to get the time zone and that it does things via libc or ICU
+
+[20:08:50.0988] <Justin Ridgewell>
+I think we're getting off on a tangent.
+
+[20:09:07.0986] <Justin Ridgewell>
+The spec will have explicit requirements for `AsyncContext`, and when that exists, the hooks won't really matter
+
+[20:09:19.0674] <Justin Ridgewell>
+They only matter now because we're trying to shoehorn in `AsyncContext`
+
+[20:09:27.0201] <Justin Ridgewell>
+It's unfortunate it doesn't work properly
+
+[20:09:33.0091] <Justin Ridgewell>
+But that'll go away with the real impl
+
+[20:09:41.0948] <littledan>
+Yes, the spec will have requirements, and we will also design a V8 API
+
+
+2023-01-23
+[09:30:03.0767] <littledan>
+> <@littledan:matrix.org> Will post outline of presentation edits here in the coming hours
+
+OK, coming in at a bit under 100 hours from when I promised this, here's the edits I'd make to the slides:
+- Don't you want to use the run() function in your wrap() implementation? (Aside: rename run())
+- I think mixing in the part about monkey-patching console.log is a distraction which would be better removed.
+- I would replace the React Cache example with OpenTelemetry (legendecas can do this as he knows that area much better than me). Really, the OpenTelemetry case of holding a span ID instead of an initial timestamp has exactly the same needs--we should say this explicitly.
+- Slide 18 is really key (maybe reference the main thread scheduling proposal? maybe not?) but the code doesn't then correspond to anything about prioritization, so it's a little confusing
+- In general, let's say "async context" intead of "async stack" to reinforce the intuition around the terms. Also "stack" implies linear memory usage for the number of async items, which is definitely not the case here, but definitely is the case with general async stack traces (which is a specific non-goal here, and which we should probably avoid comparing this with in slide 19, as it will probably make browsers uncomfortable)
+- All the stuff about "the dynamic scoping elephant" should be probably rephrased as "Bonus slides (if time allows): ocap analysis" and then just defer to Mark to say he thought about it and decided it's OK. I expect the committee to continue disagreeing internally on whether this deserves to be called "dynamic scoping", and really, that's all irrelevant
+
+[09:30:34.0670] <littledan>
+Let me know if you want me to make these edits; by default I would leave this to you two champions, since you'll actually deliver this. But I can help if you don't have time.
+
+
+2023-01-24
+[14:46:26.0126] <littledan>
+Shu added a schedule constraint for AsyncContext since he's getting the background on that magical API that Justin found. It's pretty weird, it was implemented in https://chromium-review.googlesource.com/c/v8/v8/+/2005849 but I can't find any usages.
+
+[14:47:16.0357] <littledan>
+It'd be nice to identify where this implementation falls over for thenables, and whether that's something to fix at the V8 level, or whether it's something for each custom thenable to do something-or-other (I don't know exactly what)
+
+[14:48:37.0044] <James M Snell>
+It's also worth pointing out that it should be possible to workaround with thenables by using something like Node.js' `AsyncResource`. Not elegant but it gets the job done.
+
+[14:53:37.0187] <littledan>
+right, or as it's called in this proposal, `wrap`
+
+[14:54:13.0116] <littledan>
+so, the question in my mind is: is Justin's example something that V8 should fix, or should it just be fixed by saying, Working As Intended, use `wrap` if you want it to have the other behavior
+
+[14:54:26.0698] <littledan>
+(this is concretely something we should get back to V8 on)
+
+[15:14:58.0796] <Justin Ridgewell>
+Yoav’s work is also using this API, and I can’t imagine that Task Attribution is happy with the way micro tasks aren’t properly tracked
+
+
+2023-01-25
+[16:54:46.0893] <littledan>
+Justin Ridgewell: Do you have a link to the reference site? I couldn't find it
+
+[16:55:02.0199] <littledan>
+I definitely expected that Yoav's work would use this
+
+[16:55:23.0797] <Justin Ridgewell>
+Reference site?
+
+[16:57:31.0018] <littledan>
+err, callsite
+
+[16:58:05.0152] <littledan>
+just trying to find Yoav's patches or design docs or anything like that
+
+[16:59:16.0429] <Justin Ridgewell>
+[third_party/blink/renderer/modules/scheduler/task_attribution_tracker_impl.cc](https://source.chromium.org/chromium/chromium/src/+/main:third_party/blink/renderer/modules/scheduler/task_attribution_tracker_impl.cc)
+
+[16:59:48.0943] <littledan>
+ah I see thanks!!
+
+[17:00:05.0789] <Justin Ridgewell>
+They're using continuation API, and there's no special handling for `enqueueMicrotask` that I can find
+
+[17:00:12.0988] <Justin Ridgewell>
+So they're falling into the same thenable bug
+
+[17:01:02.0075] <littledan>
+how is setTimeout handled here?
+
+[17:01:03.0841] <littledan>
+does it work?
+
+[17:01:36.0535] <littledan>
+Shu is skeptical of putting too much work into thenables. I don't understand the issue in enough detail to know how it would be solved, or whether it should be solved.
+
+[17:11:02.0624] <Justin Ridgewell>
+Looks like `setTimeout` is handled on the Blink side
+
+[17:11:16.0520] <Justin Ridgewell>
+TaskAttribution users: https://source.chromium.org/search?q=%22GetTaskAttributionTracker()%22&ss=chromium%2Fchromium%2Fsrc
+
+[17:13:40.0892] <littledan>
+OK, good, this is all useful context
+
+[17:13:50.0421] <littledan>
+thank you
+
+[17:14:02.0326] <littledan>
+Shu will look into this and be in some level of contact with Yoav
+
+[17:14:30.0096] <littledan>
+Chengzhong Wu: How is it going with proposing a meeting between us and Yoav?
+
+[17:18:50.0679] <littledan>
+> <@littledan:matrix.org> OK, coming in at a bit under 100 hours from when I promised this, here's the edits I'd make to the slides:
+> - Don't you want to use the run() function in your wrap() implementation? (Aside: rename run())
+> - I think mixing in the part about monkey-patching console.log is a distraction which would be better removed.
+> - I would replace the React Cache example with OpenTelemetry (legendecas can do this as he knows that area much better than me). Really, the OpenTelemetry case of holding a span ID instead of an initial timestamp has exactly the same needs--we should say this explicitly.
+> - Slide 18 is really key (maybe reference the main thread scheduling proposal? maybe not?) but the code doesn't then correspond to anything about prioritization, so it's a little confusing
+> - In general, let's say "async context" intead of "async stack" to reinforce the intuition around the terms. Also "stack" implies linear memory usage for the number of async items, which is definitely not the case here, but definitely is the case with general async stack traces (which is a specific non-goal here, and which we should probably avoid comparing this with in slide 19, as it will probably make browsers uncomfortable)
+> - All the stuff about "the dynamic scoping elephant" should be probably rephrased as "Bonus slides (if time allows): ocap analysis" and then just defer to Mark to say he thought about it and decided it's OK. I expect the committee to continue disagreeing internally on whether this deserves to be called "dynamic scoping", and really, that's all irrelevant
+
+(and, please let me know if you won't do these edits and I should make them)
+
+[17:19:01.0223] <Justin Ridgewell>
+I still need to take a look at them
+
+[17:19:30.0177] <Justin Ridgewell>
+I think this is how setTimeout works:
+- https://source.chromium.org/chromium/chromium/src/+/main:third_party/blink/renderer/modules/scheduler/dom_scheduler.cc
+- https://source.chromium.org/chromium/chromium/src/+/main:third_party/blink/renderer/modules/scheduler/dom_task.h
+
+[17:33:25.0031] <littledan>
+Cool, though I am having trouble tracing it 
+
+[17:33:25.0585] <littledan>
+Would be awesome if it is possible to hack up a PR to Chrome to make a pair of functions to get and set this context variable somehow 
+
+[17:34:49.0921] <Justin Ridgewell>
+Different than the `Get`/`SetContinuationPreservedEmbedderData`?
+
+[17:35:00.0191] <Justin Ridgewell>
+Or do you mean specific to timers?
+
+[18:17:49.0013] <littledan>
+I mean that plus this plumbing through all the web APIs (not specific to timers)
+
+[18:17:54.0552] <littledan>
+So like the node extension you made but it restores across web APIs including timers in exactly the way yoav’s work does
+
+[18:44:40.0146] <James M Snell>
+Currently we (workerd) has to capture the context manually for timers and queueMicrotask web apis. These are still fundamentally based on the v8 API tho. Basically when a timer is set we call GetContinuationPreservedEmbedderData to get the current storage context and enter that manually when the callback function is called. Pretty simple
+
+[18:45:20.0697] <James M Snell>
+queueMicrotask will be handled for us once v8 fixes the current limitations
+
+[18:45:45.0188] <Justin Ridgewell>
+Do you maintain patches onto V8 for workerd?
+
+[18:45:46.0308] <James M Snell>
+Oh, we also capture manually for wrapped functions and AsyncResource
+
+[18:45:51.0991] <littledan>
+> <@jasnell:matrix.org> queueMicrotask will be handled for us once v8 fixes the current limitations
+
+Which limitation?
+
+[18:46:08.0450] <James M Snell>
+We do but none for this yet
+
+[18:46:48.0064] <James M Snell>
+The limitation that v8 is not attaching the context to EnqueueMicrotask 
+
+[18:51:27.0917] <James M Snell>
+We certainly could float a patch that covers the queueMicrotask issue but we'd rather that just be addressed upstream. For now we're fine with it not working for thenables but would like that not to be permanent 
+
+[18:55:07.0822] <Justin Ridgewell>
+The thenable bug is solved by copying https://source.chromium.org/chromium/chromium/src/+/main:v8/src/builtins/builtins-microtask-queue-gen.cc;l=238-247;drc=bf9ffddf05af0586dc82cd2a320508cd5dcfbc3c into https://source.chromium.org/chromium/chromium/src/+/main:v8/src/builtins/builtins-microtask-queue-gen.cc;l=191-221;drc=bf9ffddf05af0586dc82cd2a320508cd5dcfbc3c
+
+[18:57:10.0571] <Justin Ridgewell>
+The generic microtask bug is in that same function, but it's more complicated
+
+[18:59:37.0796] <James M Snell>
+Oh nice. Since we have a workaround for queueMicrotask we might be able to just float the change for thenables then wait for the rest 
+
+[19:00:15.0696] <Justin Ridgewell>
+I'm assuming you're not using any Blink code for your timers?
+
+[19:00:34.0749] <James M Snell>
+Correct
+
+[19:03:02.0579] <Justin Ridgewell>
+Perfect
+
+[19:14:21.0351] <Justin Ridgewell>
+Sorry, we'll also need these to store the data in the first place
+- https://source.chromium.org/chromium/chromium/src/+/main:v8/src/builtins/promise-misc.tq;l=283-285;drc=39c3a97e848a7ecd1fa95e738771cc61d6d72552 into https://source.chromium.org/chromium/chromium/src/+/main:v8/src/builtins/promise-misc.tq;l=310-316;drc=39c3a97e848a7ecd1fa95e738771cc61d6d72552
+- https://source.chromium.org/chromium/chromium/src/+/main:v8/src/objects/promise.tq;l=44-47;drc=f30f4815254b8eed9b23026ea0d984d18bb89c28 into https://source.chromium.org/chromium/chromium/src/+/main:v8/src/objects/promise.tq;l=64-69;drc=f30f4815254b8eed9b23026ea0d984d18bb89c28
+- https://source.chromium.org/chromium/chromium/src/+/main:v8/src/objects/promise.tq;l=57;drc=f30f4815254b8eed9b23026ea0d984d18bb89c28 into https://source.chromium.org/chromium/chromium/src/+/main:v8/src/objects/promise.tq;l=64-69;drc=f30f4815254b8eed9b23026ea0d984d18bb89c28
+
+
+[19:15:26.0026] <Justin Ridgewell>
+So it's the same amount of work to fix generic microtask (I thought those last 3 already existed in thenable tasks, but they didn't)
+
+[19:17:01.0762] <Justin Ridgewell>
+Those same 4 changes are all that's necessary to add continuation data to [CallbackTask](https://source.chromium.org/chromium/chromium/src/+/main:v8/src/objects/microtask.tq;l=9-12;drc=f30f4815254b8eed9b23026ea0d984d18bb89c28) and [CallableTask](https://source.chromium.org/chromium/chromium/src/+/main:v8/src/objects/microtask.tq;l=14-17;drc=f30f4815254b8eed9b23026ea0d984d18bb89c28) (I don't really know the difference between them…)
+
+[19:18:21.0104] <Justin Ridgewell>
+As far as I can tell, though, nothing in V8 uses the generic microtask queue except promises, it's only if you call into it via the public API
+
+[19:32:19.0356] <Andreu Botella>
+The web specs do enqueue microtasks for various things, and in Blink they do seem to use `EnqueueMicrotask`
+
+[19:33:14.0388] <Andreu Botella>
+I'm not yet confident that if those microtasks run any user code, or queue tasks that do, that they would want wrap-like behavior
+
+[19:33:29.0330] <Andreu Botella>
+I'll look through them though
+
+[07:32:30.0517] <Chengzhong Wu>
+> <@littledan:matrix.org> Chengzhong Wu: How is it going with proposing a meeting between us and Yoav?
+
+Sadly, yoav hasn't responded to my email with the meeting doodle.
+
+[07:33:49.0357] <littledan>
+> <@legendecas:matrix.org> Sadly, yoav hasn't responded to my email with the meeting doodle.
+
+ah OK I'll ping him today
+
+[07:44:26.0337] <Chengzhong Wu>
+thanks!
+
+[09:01:31.0784] <Justin Ridgewell>
+@benjamn just did the patches for thenables into his deno impl: https://github.com/benjamn/deno-v8/commit/d72a3dd59139242385203b3aa0167451220d0bdf
+
+[09:42:46.0721] <Ben Newman (Apollo, @benjamn on GH)>
+👋
+
+[09:43:21.0241] <Ben Newman (Apollo, @benjamn on GH)>
+nice to see some new/familiar faces
+
+[09:46:54.0697] <Ben Newman (Apollo, @benjamn on GH)>
+I recently scraped together this Docker image with a custom build of Deno that supports the `AsyncContext` proposal in native async/await code: https://github.com/benjamn/deno/pull/2
+
+[09:47:57.0402] <Ben Newman (Apollo, @benjamn on GH)>
+```
+docker run -it --rm benjamn/deno:async-thenables repl
+```
+should give you a Deno REPL where you can play with `AsyncContext`, provided you have Docker installed
+
+[09:52:28.0644] <Ben Newman (Apollo, @benjamn on GH)>
+I don't plan to support this Deno fork in the long run, but I thought it might be useful to share, so others can check their intuitions, suggest test cases, identify context loss pitfalls, etc
+
+[10:02:54.0444] <Ben Newman (Apollo, @benjamn on GH)>
+(that Docker image is "only" 162MB, thanks mostly to Deno being a single standalone 90MB binary)
+
+[10:15:27.0573] <littledan>
+Was the SES meeting cancelled today?
+
+[10:15:36.0579] <Justin Ridgewell>
+Nothing on the agenda
+
+[11:17:37.0740] <James M Snell>
+Justin Ridgewell: ... what's your sense on how stable the current definition of the `AsyncContext` interface is? Like if we were to do something silly and implement a polyfill in workerd now would we likely be shooting ourselves in the foot
+
+[11:18:24.0249] <Justin Ridgewell>
+I don't think the names are stable
+
+[11:19:10.0390] <Justin Ridgewell>
+If you're not against it, I would just implement `AsyncLocalStorage` and provide maybe a JS wrapper around it to conform to the current `AsyncContext` API
+
+[11:19:50.0358] <Justin Ridgewell>
+Like a `import AsyncContext from "workerd:async-context/v0"` would give you the current interface
+
+[11:20:02.0215] <James M Snell>
+Yeah we're just trying to decide whether we really want to encourage too much dependency on ALS while AsyncContext is coming. 
+
+[11:20:33.0204] <James M Snell>
+I know it's really difficult to estimate standards logistics machinery, but what's your expectation on when AsyncContext could find its way to stage 3?
+
+[11:20:38.0758] <James M Snell>
+(if any)
+
+[11:20:51.0783] <Justin Ridgewell>
+You could choose not to expose the ALS API at all, but implement a public AC interface on top of your private ALS interface
+
+[11:21:30.0794] <James M Snell>
+we've got customers currently asking specifically for node.js compat with ALS so we're pretty much committed to supporting both apis
+
+[11:21:44.0036] <Justin Ridgewell>
+I think the most likely thing to change is `wrap` into an object like `AsyncResource`
+
+[11:21:53.0283] <Justin Ridgewell>
+`get`/`run` seem stable
+
+[11:37:11.0042] <littledan>
+> <@jasnell:matrix.org> Justin Ridgewell: ... what's your sense on how stable the current definition of the `AsyncContext` interface is? Like if we were to do something silly and implement a polyfill in workerd now would we likely be shooting ourselves in the foot
+
+Please don't do that!
+
+[11:37:28.0754] <littledan>
+I'd instead encourage us all to define a subset of AsyncLocalStorage that should be supported across environments
+
+[11:37:54.0451] <littledan>
+Once AsyncContext is stable, we can polyfill exactly that subset on top of AsyncContext
+
+[11:37:55.0410] <James M Snell>
+heh, I'm not wanting to. We had a question come up about whether we could and I wanted it to not just be me saying "No!"
+
+[11:38:18.0508] <littledan>
+great, well, you can cite me as well if it's useful (I can give a more quotable explanation if needed)
+
+[11:38:32.0989] <littledan>
+let's actually write down what this subset is though
+
+[11:42:15.0036] <James M Snell>
+> let's actually write down what this subset is though
+
+we can do that on tonight's wintercg call probably
+
+[11:46:29.0489] <Ben Newman (Apollo, @benjamn on GH)>
+apologies for the vague question (I'm new)… is there a good term for an API like `AsyncContext`… loosely immutable (`get` only), but overridable/censorable (with `run`) if you're calling new code?
+
+[11:47:29.0924] <Ben Newman (Apollo, @benjamn on GH)>
+something like a "call stack-hugging environment variable"
+
+[11:47:37.0517] <Justin Ridgewell>
+Mark Miller (TC39 delegate) has been calling this a Fluid Variable
+
+[11:49:30.0689] <Ben Newman (Apollo, @benjamn on GH)>
+are we collecting use cases somewhere? maybe the proposal repo?
+
+[11:50:30.0833] <Justin Ridgewell>
+https://github.com/legendecas/proposal-async-context/issues/5
+
+[11:54:03.0447] <Justin Ridgewell>
+I tried looking for references for this, and it's all esoteric computer science papers and MIT's Scheme
+
+[11:59:47.0308] <Ben Newman (Apollo, @benjamn on GH)>
+I vaguely remember there used to be a `set` method along with `get`, but that's been removed… is `set` gone for good? (My bias: I hope so, for predictability and efficiency)
+
+[12:00:31.0499] <Ben Newman (Apollo, @benjamn on GH)>
+(of course if you want mutability you can store an object of your own design in the `AsyncContext` and provide an API around that)
+
+[12:01:16.0615] <Justin Ridgewell>
+I like that it's gone, because it prevents a memory leak
+
+[12:01:36.0431] <Justin Ridgewell>
+The Node folks mentioned that it's helpful for APM usage, though, so you don't need to redo the app
+
+[12:02:04.0370] <Justin Ridgewell>
+Even my company makes use of it, but I know how to update it once we get a real API
+
+[12:03:01.0700] <Ben Newman (Apollo, @benjamn on GH)>
+with no `set` method, I believe you're guaranteed the result of calling `ctx.get()` will always return the same value anywhere you call it in a given function body, which is a very useful invariant
+
+[12:03:44.0359] <Ben Newman (Apollo, @benjamn on GH)>
+so you don't have to guess arbitrarily about how often you should poll the context for a new value within a given function
+
+[12:09:55.0634] <James M Snell>
+there's some work ongoing to eliminate the need for `set` in the APM cases
+
+[12:12:21.0501] <littledan>
+> <@benjamn:matrix.org> I vaguely remember there used to be a `set` method along with `get`, but that's been removed… is `set` gone for good? (My bias: I hope so, for predictability and efficiency)
+
+I prefer omitting `set`, but rbuckton has argued in favor of including it
+
+[12:13:29.0765] <littledan>
+`set` usages can sometimes be replaced by using a single mutable object in the AsyncContext variable, and setting a property in that. Other times, that doesn't work, though.
+
+[12:13:52.0272] <littledan>
+It'd be great to do a deeper analysis of use cases of `set`
+
+[12:16:32.0179] <James M Snell>
+we *could* implement `set`, I'd prefer not to in general. just really dislike that model
+
+[12:17:16.0304] <Ben Newman (Apollo, @benjamn on GH)>
+agreed
+
+[12:17:30.0773] <Ben Newman (Apollo, @benjamn on GH)>
+I'd at least like to be able to disable `set`, so `AsyncContext.prototype.set.call(<arbitrary context obj>, <new value>)` does not work
+
+[12:20:23.0844] <littledan>
+the thing I don't understand about set is how far it applies. Ron seemed to expect it to only take affect in the current function and "inwards", whereas another, simpler model would be for it to take effect across the whole innermost `run` where that particular variable was set. The latter can be implemented in terms of AsyncContext; the former requires some fancier core behavior
+
+[12:21:45.0070] <Ben Newman (Apollo, @benjamn on GH)>
+since Ron is also working on the resource management proposal, I wonder if he's interested in the region of time from when the resource is created to when it goes out of scope
+
+[12:22:24.0813] <littledan>
+well, yes, Ron has talked about how it's unfortunate that `run` forces you to put everything in a callback (which `using` avoids)
+
+[12:23:17.0897] <littledan>
+but... I'm not personally convinced that this is so bad. I think people shouldn't be using `run` anywhere near the same order of magnitude of frequency as `using`.
+
+[12:24:00.0851] <littledan>
+if we had `set`, it'd be (potentially) a solution to this problem of forcing everything to be inside the callback (especially if it had the behavior Ron is arguing for, that it shouldn't leak out of the current function)
+
+[12:24:36.0498] <littledan>
+(it may be that I misunderstood/misrepresented this suggestion; corrections welcome rbuckton )
+
+[12:25:29.0277] <littledan>
+I think of `run` as something you call "once per thread" (conceptually)
+
+[12:25:40.0311] <littledan>
+(if you conceptualize async/await being a weird kind of threading with tons of forks)
+
+[12:27:34.0512] <Ben Newman (Apollo, @benjamn on GH)>
+if the only way to change the value of the `AsyncContext` is to run new code, then there's an especially convenient representation for the underlying collection of all contexts
+
+[12:29:10.0080] <Ben Newman (Apollo, @benjamn on GH)>
+roughly: an immutable map, where you can "add" elements in constant time by creating a new map in terms of old ones, and lookups are amortized O(1)
+
+[12:29:47.0058] <Ben Newman (Apollo, @benjamn on GH)>
+I know Justin Ridgewell was working on a similar/better(?) optimization in https://github.com/legendecas/proposal-async-context/pull/15
+
+[12:29:56.0375] <Justin Ridgewell>
+Yup
+
+[12:30:14.0799] <Justin Ridgewell>
+We can optimize it further if we know whether the current map was "frozen" by a `wrap`
+
+[12:30:30.0100] <Justin Ridgewell>
+If it is, we need to reallocate to modify. If not, we can directly mutate
+
+[12:31:38.0813] <Ben Newman (Apollo, @benjamn on GH)>
+I believe there's even a way to use `WeakMap` here, so all values for a given `AsyncContext` go away if you discard that object
+
+[12:32:17.0275] <Ben Newman (Apollo, @benjamn on GH)>
+I know this may sound like premature optimization, but it's going to be hot code (in terms of CPU and memory) if we're not careful
+
+[12:32:31.0972] <Justin Ridgewell>
+From the JS side, unfortunately not, but as an actual implementation, the values should be weakly held by the keys
+
+[12:32:51.0356] <Ben Newman (Apollo, @benjamn on GH)>
+keys being `AsyncContext` instances?
+
+[12:32:55.0456] <Justin Ridgewell>
+Yah
+
+[12:33:34.0394] <Justin Ridgewell>
+In pure spec terms, there's no reason we can clone a `WeakMap`
+
+[12:33:43.0010] <Justin Ridgewell>
+It's just not an API currently offered
+
+[12:37:37.0475] <Ben Newman (Apollo, @benjamn on GH)>
+true! funny how useless the data structure `ImmutableWeakMap` sounds, but something like that would be useful for this
+
+[12:38:11.0140] <littledan>
+it really doesn't need to be weak
+
+[12:38:20.0553] <littledan>
+but yes an immutable map structure would be useful here
+
+[12:38:30.0326] <Ben Newman (Apollo, @benjamn on GH)>
+private would be good enough, yes
+
+[12:38:40.0570] <littledan>
+yes, this is definitely private
+
+[12:39:29.0786] <littledan>
+but WeakMap doesn't make sense because there's no practical way that the AsyncContext variable can be garbage-collected while in the middle of a `run` with it.
+
+[12:39:39.0000] <littledan>
+Map is the better one
+
+[12:39:56.0934] <littledan>
+ImmutableMap could avoid the linear cloning cost, while preserving the fast lookup, but ultimately this is an optimization available to implementations
+
+[12:40:10.0733] <littledan>
+nothing visible in the API about whether it's implemented with Map or WeakMap or ImmutableMap
+
+[12:40:21.0267] <Ben Newman (Apollo, @benjamn on GH)>
+right
+
+[12:40:46.0616] <Ben Newman (Apollo, @benjamn on GH)>
+my point is, it's one of those optimizations that works best (for the implementations that choose to take advantage) if there are some restrictions in the API
+
+[12:41:15.0580] <littledan>
+Yeah I think we should just avoid using terms like "dynamic scoping" or "fluid variable" in the presentations and docs, since they just get us into debates about wording, and lose most of the audience
+
+[12:41:40.0807] <rbuckton>
+> <@littledan:matrix.org> (it may be that I misunderstood/misrepresented this suggestion; corrections welcome rbuckton )
+
+I think that is a valid summary. It would be unfortunate to not have it, but not a deal breaker.
+
+[12:41:53.0987] <littledan>
+> <@benjamn:matrix.org> my point is, it's one of those optimizations that works best (for the implementations that choose to take advantage) if there are some restrictions in the API
+
+yes, `set` would definitely add complexity to the potential use of ImmutableMap (but not invalidate it I think)
+
+[12:42:27.0676] <littledan>
+it would definitely be something to think through before concluding that we should have `set`
+
+[12:43:11.0692] <Ben Newman (Apollo, @benjamn on GH)>
+rbuckton: can you speak to what `set` can provide that mutable top-level context values (as an implementation detail) are not adequate for?
+
+[12:43:20.0490] <rbuckton>
+Is `AsyncContext` threaded through generators as well, or just async operations? If it isn't threaded through generators, then you could potentially write a generator function that `yield`s execution and upon returning control to the generator, evaluates *inside* of that context. 
+
+[12:44:14.0461] <rbuckton>
+Can you clarify what you mean by "mutable top-level context values"? I haven't caught up on the conversation 
+
+[12:45:00.0248] <Justin Ridgewell>
+It’s not captured by gens, but it’d be easy to implement in userland
+
+[12:45:57.0152] <Ben Newman (Apollo, @benjamn on GH)>
+(edited my text above a bit) if you `ctx.run([/*mutable array*/], () => { ... })` and code within that block has access to `ctx`, then they can do `ctx.get().push(...)` as if the context value was mutable
+
+[12:45:59.0389] <Justin Ridgewell>
+Once the gen.next call starts, inner code would not effect the outer context
+
+[12:46:34.0045] <Ben Newman (Apollo, @benjamn on GH)>
+`AsyncContext` is decidedly not just async operations (I sort of think the name undersells the sync side of the coin, where it also helps greatly)
+
+[12:46:58.0510] <littledan>
+Should it be captured by generators? It would be coherent to do so
+
+[12:47:20.0435] <Ben Newman (Apollo, @benjamn on GH)>
+there are two possible flows: the creation of the generator, when the whole thing could be bound to the current context, or each .next() call
+
+[12:48:08.0853] <littledan>
+oh, yeah, I guess I was imagining that, when the generator is created, it'd capture the current async context, and on each .next() call, it would restore that
+
+[12:48:15.0069] <Ben Newman (Apollo, @benjamn on GH)>
+I think it's important to decide what happens in generators, because async generators are also a thing
+
+[12:48:28.0316] <rbuckton>
+So `ctx.run(foo, () => gen.next())` wouldn't resume the generator inside of the context?
+
+[12:48:56.0467] <Justin Ridgewell>
+The case I’m thinking of is koa, where an APM would be a middleware with a yield
+
+[12:49:00.0947] <littledan>
+right, since basically the thing that next() calls out to would be "wrapped" internally
+
+[12:50:01.0540] <Justin Ridgewell>
+We should move this into a GH issue, though
+
+[12:52:38.0702] <Ben Newman (Apollo, @benjamn on GH)>
+> <@benjamn:matrix.org> (edited my text above a bit) if you `ctx.run([/*mutable array*/], () => { ... })` and code within that block has access to `ctx`, then they can do `ctx.get().push(...)` as if the context value was mutable
+
+so I'm wondering if that kind of object mutability is adequate for your use cases, or you really need the top-level context value to be changeable within the scope of a single function body
+
+[12:55:03.0744] <Ben Newman (Apollo, @benjamn on GH)>
+no rush to answer btw; I'm just trying to get my thoughts sorted out before the meeting next week
+
+[13:03:43.0390] <Ben Newman (Apollo, @benjamn on GH)>
+> <@littledan:matrix.org> I think of `run` as something you call "once per thread" (conceptually)
+
+one use case I like to imagine is an async task runner system, where `run` gets called behind the scenes once per subtask, setting the current subtask object for that execution subtree, say
+
+[13:05:35.0060] <Ben Newman (Apollo, @benjamn on GH)>
+(which is mostly to say `run` could happen fairly often in normal code)
+
+[13:07:43.0966] <Andreu Botella>
+would `wrap` affect V8's async stack tracing?
+
+[13:07:49.0756] <littledan>
+Subtask is a better word than thread, yes
+
+[13:08:29.0742] <littledan>
+Do you mean the one that exists if you check the box in devtools?
+
+[13:09:11.0177] <littledan>
+I think not too often that, for example, it's a problem that `run` requires some allocation, and using a mutable object would mean even more allocation
+
+[13:12:37.0491] <Ben Newman (Apollo, @benjamn on GH)>
+right now I guess you'll see the immediately calling callstack when the wrapped function runs, not the one from wherever it was first wrapped (which could also be useful)
+
+[13:13:45.0613] <Ben Newman (Apollo, @benjamn on GH)>
+if the immediate caller is the event loop, maybe there's room to restore the previous async stack instead of showing nothing there
+
+[13:14:03.0779] <Ben Newman (Apollo, @benjamn on GH)>
+(not sure if this even remotely answers the question)
+
+[13:14:23.0088] <littledan>
+> <@littledan:matrix.org> Do you mean the one that exists if you check the box in devtools?
+
+If you mean this one--that's a good point, probably it should be based on AsyncContext, if that can be done efficiently enough.
+
+[13:14:38.0807] <Andreu Botella>
+I had to check whether there was a checkbox
+
+[13:14:46.0564] <littledan>
+the problem is that it'd be a lot of implied `run` calls
+
+[13:15:00.0549] <Andreu Botella>
+it's enabled by default, at least in M111
+
+[13:15:11.0069] <Andreu Botella>
+or rather, the checkbox says "disable"
+
+[13:15:21.0770] <littledan>
+huh, really?
+
+[13:15:50.0289] <littledan>
+well, it may be default-on when you open up the devtools panel, for example
+
+[13:15:58.0386] <Andreu Botella>
+it's also been shipping in Deno and Node for a while
+
+[13:16:17.0326] <littledan>
+always-on async stack traces have been a long-time feature request; I hadn't heard that that was granted, but if so, great
+
+[13:16:42.0555] <littledan>
+they ultimately run into the sort of buffer overrun issue that was raised in response to Yoav's talk at BlinkOn
+
+[13:16:55.0008] <littledan>
+but also, before then, there's a whole lot of bookkeeping
+
+[13:16:59.0550] <littledan>
+that's why, originally, it wasn't default-on
+
+[13:17:13.0326] <littledan>
+anyway if they made this cheaper: that's great!
+
+[13:17:52.0773] <Andreu Botella>
+https://docs.google.com/document/d/13Sy_kBIJGP0XT34V1CV3nkWya4TwYx9L3Yv45LdGB6Q/edit
+
+[13:18:25.0027] <littledan>
+Ah yes that's a different thing
+
+[13:18:30.0155] <littledan>
+that's why I started by asking "which one"
+
+[13:18:40.0514] <Andreu Botella>
+I didn't realize there were more than one
+
+[13:18:42.0348] <littledan>
+that is more limited to just async/await and sometimes doesn't work
+
+[13:19:30.0522] <littledan>
+I think that always-on mechanism will not interact with `wrap` or anything like that
+
+[13:23:37.0422] <littledan>
+Oh, I guess they got rid of the previous version and there has only been one for a while
+
+[13:24:58.0520] <littledan>
+the previous mechanism also worked for, e.g., setTimeout
+
+[13:27:36.0015] <littledan>
+Here's a description of the old version, clearly working without promises: https://developer.chrome.com/blog/async-call-stack/
+
+[13:28:04.0187] <littledan>
+and here's the release notes for the change: https://developer.chrome.com/blog/new-in-devtools-60/#async-stacks
+
+[13:28:27.0360] <littledan>
+I think, with the previous version, you'd expect `wrap` to continue the async stack trace. With the new version, you would not--it is specific to Promises.
+
+[14:39:34.0115] <Justin Ridgewell>
+I think they want you to manually tag your stacks now: https://developer.chrome.com/blog/devtools-modern-web-debugging/#:~:text=The%20Async%20Stack%20Tagging%20API%20introduces%20a%20new%20console%20method%20named%20console.createTask().%20The%20API%20signature%20is%20as%20follows%3A
+
+
+2023-01-26
+[16:16:59.0214] <James M Snell>
+Except that doesn't work with error stack properties yet :-/ (as we discussed earlier)
+
+[16:17:39.0278] <Justin Ridgewell>
+Yah, only dev tools
+
+[23:16:24.0525] <Chengzhong Wu>
+Agreed. I tried to find an exact definition of "fluid variable" but no luck for me.
+
+[23:22:17.0081] <Chengzhong Wu>
+We have an issue on generator use case in OpenTelemetry too: https://github.com/open-telemetry/opentelemetry-js/issues/2951
+
+[23:23:49.0866] <Chengzhong Wu>
+I'll create the issue then.
+
+[23:38:37.0251] <Chengzhong Wu>
+https://github.com/legendecas/proposal-async-context/issues/18
+
+[09:38:30.0294] <Chengzhong Wu>
+Would you mind expanding on "rename run()"?
+
+[09:51:39.0900] <James M Snell>
+Just for visibiity... WinterCG discussed defining an interoperable subset of AsyncLocalStorage ... draft is here https://github.com/wintercg/proposal-common-minimum-api/pull/38
+
+[09:52:00.0424] <James M Snell>
+the idea is to define a minimal subset of the API that runtimes can implement now while waiting for AsyncContext to be finished
+
+[09:52:28.0617] <James M Snell>
+the subset is intended to be minimally compatible with the model being defined here in order to prevent incompatibilties down the road
+
+[10:26:45.0633] <Justin Ridgewell>
+I think he's referencing the module-level run helper function, not the `AC.p.run` method
+
+[10:27:04.0733] <Justin Ridgewell>
+We could call it `doRun` or something short
+
+[10:28:32.0675] <Justin Ridgewell>
+> the subset is intended to be minimally compatible with the model being defined here in order to prevent incompatibilties down the road
+
+I think we're going to have an issue with `EventEmitter`/`EventTarget`
+
+[10:29:14.0409] <Justin Ridgewell>
+My expectation on the web side is that `addEventListener` will act as an async resource and capture the current frame to be used when the event is emitted
+
+[10:36:36.0887] <James M Snell>
+I've had this pop up in other conversations also. I'm fine if we do that but it does introduce an incompatibility with Node.js, which does not currently propagate the context for either of these
+
+[10:37:25.0388] <James M Snell>
+We have greater flexibility/authority to define the behavior for `EventTarget` here than `EventEmitter`, which is a node.js defined API
+
+[10:38:05.0549] <James M Snell>
+but we can definitely raise this. one concern I know will come up with `EventEmitter` is that with the current async_hooks based design, there's going to be a performance hit
+
+[10:38:14.0206] <James M Snell>
+but that's an implementation specific concern
+
+[10:38:35.0470] <James M Snell>
+can I ask you to comment in the PR on this?
+
+[10:39:08.0996] <littledan>
+> <@jridgewell:matrix.org> My expectation on the web side is that `addEventListener` will act as an async resource and capture the current frame to be used when the event is emitted
+
+This doesn't match my expectation. I think Andreu Botella is investigating this sort of issue.
+
+[10:39:26.0964] <littledan>
+I think addEventListener will *sometimes* act like this, and sometimes not
+
+[10:39:53.0919] <Andreu Botella>
+investigating that is on my TODO list
+
+[10:41:12.0331] <littledan>
+anyway I don't think solving this problem should block Deno and Cloudflare from shipping their AsyncLocalStorage subset
+
+[10:41:21.0095] <James M Snell>
+Sadly this one is pretty complicated. there are three distinct modes:
+
+1. Capture the context on EventTarget/EventEmitter creation (extends AsyncResource style, ala Node.js `EventEmitterAsyncResource`)
+2. Capture the context on addEventListener/on (e.g. AsyncResource.bind() / wrap())
+3. Use the current context when dispatchEvent/emit is called.
+
+[10:42:32.0971] <James M Snell>
+The subset as currently described allows all three, with 3 being the default. Making either of the other two the default makes 3 more difficult (or even impossible?)
+
+[10:42:40.0202] <littledan>
+Mostly I think this because I think they, like everyone who has shipped this feature, will have a long stream of bug reports about expectations being subtly broken and they will iterate a bit over time
+
+[15:25:13.0977] <Justin Ridgewell>
+Ben Newman (Apollo, @benjamn on GH): do you want to submit your thenable patch to V8?
+
+
+2023-01-27
+[10:33:25.0012] <Justin Ridgewell>
+Pinged him at https://github.com/legendecas/proposal-async-context/pull/17#issuecomment-1406907267, maybe he doesn't keep Matrix open
+
+[10:33:53.0927] <Justin Ridgewell>
+Anyone know how to read Chrome's Pinpoint performance metrics? https://chromium-review.googlesource.com/c/v8/v8/+/4173598
+
+[10:44:40.0186] <James M Snell>
+We could make this configurable as an option passed in to `addEventListener` in order to prevent backwards compatibility issues.
+
+For instance,
+
+```
+eventTarget.addEventListener('foo', () => {}, {
+  captureAsyncContext: true,
+});
+```
+
+which would essentially be syntactic sugar for manually calling wrap on the handler function
+
+[10:45:50.0077] <James M Snell>
+Alternatively, I do wonder if there's a syntax solution here? Similar to what is done with generator functions, or async functions, some way where we can declare that a function should always capture the async context when it is called
+
+[10:46:05.0651] <James M Snell>
+I fully understand that syntax additions are less than desirable a lot of the time
+
+[10:46:52.0091] <Justin Ridgewell>
+Not a syntax, but we could add a property to the function instance to do it
+
+[10:47:12.0939] <James M Snell>
+yeah that's better
+
+[10:47:17.0172] <Justin Ridgewell>
+It would be a WebIDL thing that it can check
+
+[10:47:55.0221] <Justin Ridgewell>
+I think either behavior is fine, though, so I'm not sure if we need to push it
+
+[10:48:04.0587] <James M Snell>
+so the impl of `addEventListener` would look for that property and if set, capture the async context and restore it when that function is called
+
+[10:48:07.0081] <Justin Ridgewell>
+Yoav may have some thoughts on it, though
+
+[10:48:53.0946] <Chengzhong Wu>
+Should we create a tracking issue for host integration?
+
+[10:49:11.0588] <Justin Ridgewell>
+Yes
+
+[10:50:50.0252] <Chengzhong Wu>
+I really need to go to bed now so if any of you would like to do it, it would be great. Or I'll create one when I get up tomorrow morning.
+
+[13:46:10.0861] <James M Snell>
+Looking at that I don't see any significant difference in the performance metrics between the two. Is this the patch to handle EnqueueMicrotask?
+
+[13:48:00.0343] <James M Snell>
+What's the current plan for dealing with the `extends AsyncResource` case that we have in Node.js? For instance `class Foo extends AsyncResource { doIt() { this.runInAsyncScope(() => {}) } }` ... it admittedly is not a great pattern and is difficult to optimize around. 
+
+[13:48:31.0230] <Justin Ridgewell>
+No, it removes promise handling entirely
+
+[13:48:57.0493] <Justin Ridgewell>
+They're trying to see if the continuation stuff causes any perf impact, and it doesn't look like it
+
+[13:49:08.0708] <Justin Ridgewell>
+(But I don't really know how to read it, so maybe I missed something)
+
+[13:49:42.0285] <James M Snell>
+What we *almost* need is a way of capturing the reference to the async context frame ... something like a...
+
+```
+class AsyncContextFrame {
+  static readonly attribute AsyncContextFrame current;
+  run(fn, ...args);
+}
+```
+
+[13:50:30.0603] <James M Snell>
+such that in an object I could do...
+
+```
+class Foo {
+  #frame = AsyncContextFrame.current;
+  doSomething() {
+    return this.#frame.run(() => {});
+  }
+}
+```
+
+[13:51:10.0483] <James M Snell>
+ah, ok. Yeah from what I can see there it's no perceptible difference in performance
+
+[13:51:20.0535] <Justin Ridgewell>
+The initial design for `AsyncContext` had a mutable static property, and it was shot down
+
+[13:52:30.0991] <Justin Ridgewell>
+Is there a reason they can do `#run = AsyncContext.wrap((cb) => cb())`?
+
+[13:52:44.0596] <Justin Ridgewell>
+(This is the higher-order pattern that I kinda dislike)
+
+[13:53:03.0324] <James M Snell>
+other than it's really ugly? lol
+
+[13:53:44.0744] <James M Snell>
+not a fan of the boilerplate but it does work
+
+[13:54:10.0516] <Justin Ridgewell>
+My original design had a [`Snapshot` class](https://gist.github.com/jridgewell/3970a3078ebfb90e90cd9d0a36ab9c08#file-async-context-ts-L7-L20) that acts like `AsyncResource`
+
+[13:56:45.0867] <James M Snell>
+I would expect the pattern to be common enough to justify making a utility... perhaps something simple like
+
+```
+#run = AsyncContext.snapshot(); 
+```
+
+That is simply defined as being equivalent to `AsyncContext.wrap((cb, ...args) => cb(..args))`
+
+[14:04:19.0196] <Justin Ridgewell>
+That seems fine
+
+[14:17:05.0863] <James M Snell>
+I guess alternatively we could have the variation `AsyncContext.wrap()` (with no arguments passed) be the equivalent to `AsyncContext.snapshot()` but that seems a bit weird
+
+[14:17:13.0157] <James M Snell>
+it would save on API surface tho
+
+[15:46:42.0698] <littledan>
+When I suggested switching to wrap, it’s because I thought it looked simpler. I would like to understand more about the use cases for AsyncResource to explain its surface area. Could someone compile a few usage examples?
+
+[15:48:50.0418] <littledan>
+(I like to think nothing has been shot down yet, we are just iterating through alternatives and can still come back to things. Anyway, I apologize for being too pushy about some of these details.)
+
+[15:50:58.0919] <littledan>
+I think adding punned overloads still counts as surface area. But if something is important, we can go back and add it.
+
+[15:57:53.0612] <James M Snell>
+So `AsyncResource` originally was just an `async_hooks` thing and didn't have anything to do with AsyncLocalStorage. However, as an artifact of the way Node.js implemented ALS, every `AsyncResource` captures the async context when it is created and allows functions to enter the context using `runInAsyncScope(...)`. Simply put: it's a way of capturing the async context on object creation.
+
+[15:58:39.0790] <James M Snell>
+For resource tracking purposes (`async_hooks`), `AsyncResource` is still a thing that will be needed there, but for async context tracking, it's not really needed and it's a bit wasteful
+
+
+2023-01-28
+[16:00:11.0352] <James M Snell>
+As Justin suggests, we can easily replace `class Foo extends AsyncContext { bar() { this.runInAsyncScope(() => {}) }}` with...
+
+```
+class Foo {
+  #runInAsyncScope = AsyncContext.wrap((cb, ...args) => cb(...args));
+  bar() { this.#runInAsyncScope(() => {});
+}
+```
+
+To achieve the use case
+
+[16:00:42.0640] <James M Snell>
+The idea with `AsyncContext.snapshot()` is to just eliminate the extra boilerplate of that wrap tho
+
+[16:15:43.0387] <James M Snell>
+While `AsyncResource` has other use cases relating to async_hooks, the only one that is relevant here is capturing the context on object creation and being able to call into that multiple times
+
+[03:01:40.0267] <Chengzhong Wu>
+https://github.com/legendecas/proposal-async-context/issues/19
+
+[07:15:24.0914] <littledan>
+Sure, so since this is not expressiveness but rather ergonomics, it would help if someone could point at actual use cases so I could understand why this is worth it
+
+[08:05:57.0881] <James M Snell>
+Take a look at the piscina library. That was the origin of Node.js' EventEmitterAsyncResource. It shows a practical use case. Another useful case, look at HTMLRewriter change here https://github.com/cloudflare/workerd/pull/282/commits/0ffd4efd1914b428639499517e0177bd843a6583
+
+[08:07:43.0890] <James M Snell>
+That's not using AsyncResource but the effect is the same. We capture the context frame once and enter it each time the registered callbacks are called
+
+[08:08:33.0829] <James M Snell>
+Or, we can use AsyncResource to run in the context where the handlers are registered. 
+
+[08:08:45.0608] <James M Snell>
+It gives a good amount of flexibility
+
+[10:02:36.0904] <Justin Ridgewell>
+- https://github.com/piscinajs/piscina/blob/bcae345594fa5a6c306bff207fc95c14b021293a/src/index.ts#L209-L211
+- https://github.com/piscinajs/piscina/blob/bcae345594fa5a6c306bff207fc95c14b021293a/src/index.ts#L267
+
+[10:04:33.0850] <Justin Ridgewell>
+I think in this particular case, using `this.callback = AsynContext.wrap(callback)` would have been appropriate
+
+[10:04:56.0884] <Justin Ridgewell>
+But `snapshot()` would be helpful for capturing the context used for multiple callbacks, instead of wrapping each individually
+
+[10:05:29.0164] <James M Snell>
+Yep absolutely. We had no other choices at the time.
+
+[10:06:14.0871] <James M Snell>
+That's why I also point at the HTMLRewriter example. It has the multiple callbacks so provides a good contrast
+
+[10:15:09.0313] <James M Snell>
+Wrapping each individual callback is also very expensive in node.js' current model since each is a separate AsyncResource that copies the context
+
+[10:16:22.0591] <James M Snell>
+That won't the case in the revised model, of course, but currently it's pretty expensive to wrap each individual callback so using AsyncResource is less costly but isn't really quite right in most cases
+
+[10:19:03.0481] <Chengzhong Wu>
+I've been poking the current implementation to adopt the revised model, based on the current async_hooks.
+
+[10:20:03.0014] <Chengzhong Wu>
+The performance improvements can be significant
+
+[10:22:23.0786] <Chengzhong Wu>
+it is still worthwhile to update the current implementation, since we won't get the new v8 apis on older LTS lines
+
+[10:24:56.0684] <James M Snell>
+Yeah I think once we get a few tweaks in place we should be able to transition fairly easily while keeping the old releases on the asynchooks model
+
+[10:27:31.0777] <Chengzhong Wu>
+yeah, maybe I can submit my micro-benchmarks first -- I still need more time to cleanup my improvements.
+
+[10:34:35.0641] <Chengzhong Wu>
+but, right, with the revised model, wrap and snapshot should have no performance differences.
+
+
+2023-01-30
+[12:35:04.0076] <Ben Newman (Apollo, @benjamn on GH)>
+Justin Ridgewell: thanks for the ping over on GH
+
+[12:35:35.0103] <Ben Newman (Apollo, @benjamn on GH)>
+do you think this is something V8 would realistically take?
+
+[12:35:41.0594] <Justin Ridgewell>
+Yes
+
+[12:35:59.0401] <Ben Newman (Apollo, @benjamn on GH)>
+essentially this commit, in case anyone is curious: https://github.com/benjamn/deno-v8/commit/d72a3dd59139242385203b3aa0167451220d0bdf
+
+[12:36:28.0535] <Justin Ridgewell>
+Chrome is currently working on Task Attribution, which uses the same `continuation_preserved_embedder_data`
+
+[12:36:35.0898] <Justin Ridgewell>
+And it's broken for thenables for the same reason we are
+
+[12:38:47.0814] <Ben Newman (Apollo, @benjamn on GH)>
+ok cool, I've done one (gnarly) V8 patch before, so hopefully this time will be easier 😅
+
+[12:44:12.0029] <littledan>
+I think V8 will take it if it doesn’t add too much complexity
+

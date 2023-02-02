@@ -1,0 +1,1628 @@
+2022-11-17
+[07:34:20.0856] <littledan>
+hello!
+
+[07:35:10.0652] <Chengzhong Wu>
+Hey, dan!
+
+[07:35:37.0675] <littledan>
+Hey, good to be in touch with you again
+
+[07:35:47.0843] <littledan>
+I'm very excited about seeing this proposal move forward
+
+[07:36:12.0974] <littledan>
+Maybe Justin communicated this to you, my main feedback at this point is we should have a method enabling userspace queuing
+
+[07:36:46.0952] <Chengzhong Wu>
+Just for people who are not able to join the SES meeting yesterday like me, this is the recording of the discussion about the async context on the meeting: https://youtu.be/Y6hQLM08Ig8?t=891 The discussion is very helpful for people to catch up with the latest status of the proposal
+
+[07:41:16.0108] <Chengzhong Wu>
+yeah. It can be useful and I am willing to know more about the requirement of this method. We recently stripped the proposed API aiming to reduce the surface of the proposal and pushing it forward with the essential part.
+
+[07:41:59.0541] <littledan>
+yeah I am really happy about the direction of making the API as minimal as possible, and I like how this is currently done
+
+[07:42:45.0401] <littledan>
+I'd add one static method, AsyncContext.wrap (or, name tbd), which takes a callback, and eagerly stores a snapshot of all the async contexts, and returns a new callback which restores that snapshot through the duration of its execution
+
+[07:43:44.0454] <littledan>
+if we don't have this, then the platform has superpowers (to wrap its callbacks, not just promise reactions) which user code does not have
+
+[07:44:29.0479] <littledan>
+Kris gave the example of the Q promise library that he maintains. Maybe that's an edge case. But I imagine that this would come up for some larger RPC client libraries for example.
+
+[07:45:26.0784] <littledan>
+> <@littledan:matrix.org> I'd add one static method, AsyncContext.wrap (or, name tbd), which takes a callback, and eagerly stores a snapshot of all the async contexts, and returns a new callback which restores that snapshot through the duration of its execution
+
+this design might be a little heavy in that it requires allocating a new closure. But, on the positive, it avoids the need to reify the snapshot in a more complicated way
+
+[07:53:04.0664] <Chengzhong Wu>
+> <@littledan:matrix.org> Kris gave the example of the Q promise library that he maintains. Maybe that's an edge case. But I imagine that this would come up for some larger RPC client libraries for example.
+
+True, the snapshotting API is very helpful to those larger libraries. I had an example shows how it can be achieved with built-in Promise: https://github.com/legendecas/proposal-async-context/pull/8#issuecomment-1246309357 (limited to asynchronous flows, yes :( ).
+
+[07:54:28.0866] <Chengzhong Wu>
+A well defined method can definitely alleviates the burden for those libraries with complex use cases, and avoid restricting them to snapshot with asynchronous flows.
+
+[07:55:22.0493] <littledan>
+I'm suggesting that we do this as a single method rather than another class
+
+[07:55:29.0301] <littledan>
+so this could remain minimal-feeling
+
+[07:56:15.0780] <littledan>
+the thing is, Kris identified this gap in our SES call, so I think it's a bit difficult to delay for later; we may have others asking about this
+
+[07:56:51.0414] <littledan>
+also I think it makes it easier to explain what's going on, to have a concrete name for this wrapping, with a pseudo-js implementation on the slides
+
+[07:57:06.0758] <littledan>
+and then say, yeah this is what we apply to promise reactions as well as all built-in callbacks
+
+[07:59:12.0369] <littledan>
+I don't think taking advantage of promises is a working way through, as you might want a synchronous callback to restore the context (think addEventListener)
+
+[07:59:24.0412] <littledan>
+anyway it's fine to make this change after Stage 1
+
+[09:05:20.0178] <Kris Kowal>
+Beyond Q, some other promise libraries also use my ASAP queueMicrotask shim, which is a more isolated example of a library that is obliged to wrap async context in a “user mode queue”. You can see the treatment we were obliged to integrate for Node.js domains https://github.com/kriskowal/asap/blob/master/asap.js#L44
+
+[09:06:43.0832] <Kris Kowal>
+Dan’s right about RPC libraries. It’s common to have work shedding or prioritization middleware that are also user mode queues.
+
+[09:09:35.0744] <Kris Kowal>
+User mode queueing problems are both a reason for and against AsyncLocal. On the one hand, I don’t like being obliged to accommodate this kind of action-at-a-distance, where a library must account how it will compose with another library. But on the other hand, I would rather there be just one such thing to accommodate, and for it to be design well enough to address problems analogous to hygienic dynamic scope, as AsyncLocal does and domains did not.
+
+[09:55:07.0462] <Andreu Botella>
+As I mentioned on the WinterCG room, in a talk at BlinkOn yesterday, Yoav Weiss was talking about task attribution, which sounded somewhat similar to `AsyncContext` to me
+
+[09:55:17.0665] <Andreu Botella>
+The video for the talk is up at https://www.youtube.com/watch?v=NOWC6M0MS2o
+
+[10:42:08.0459] <Justin Ridgewell>
+Yeah, it does seem like task attribution is a subset of a AsyncContext
+
+[10:42:34.0282] <Justin Ridgewell>
+Yoav mentions in the last question in the video that task attribution did not have a performance penalty after they trimmed it down
+
+[10:42:51.0759] <Justin Ridgewell>
+That might be a good sign for us
+
+[10:44:15.0177] <littledan>
+so I guess it's not too soon to trace through the implementation and see if it could be extended...
+
+[13:14:13.0571] <littledan>
+just got off the phone with Mark Miller. He supports continuing the discussion here at Stage 1!
+
+[13:14:51.0189] <Justin Ridgewell>
+Whoot!
+
+[13:14:54.0936] <littledan>
+He agreed on a sort of stretch goal of having his analysis complete in 2 months, or in the worst case in 4 months, but this is the kind of analysis that would be more of a Stage 2 precondition
+
+[13:15:13.0282] <littledan>
+I don't think we should push him to go faster than that; that is a very reasonable pace IMO
+
+[13:15:21.0632] <Justin Ridgewell>
+I'll add it to the agenda as as advancement item
+
+[13:15:48.0780] <littledan>
+also I wanted to suggest that we get someone from MS in this discussion, like Ron Buckton was expressing support for this last time, right?
+
+[13:15:58.0709] <littledan>
+saying that there was a similar feature in C# that was very important
+
+[13:16:21.0610] <Justin Ridgewell>
+I don't remember, but I'll check the minutes later today
+
+[13:41:14.0193] <littledan>
+yeah, watching that BlinkOn video, I think citing exactly what Yoav is talking about would be a great way to explain the relevance to frontend
+
+[13:41:33.0319] <littledan>
+he's talking about both prioritization and recording timing
+
+[13:52:02.0683] <littledan>
+Stefan is actually suggesting that Yoav's work move in a direction which is *more* similar to this proposal, where there's no big tree of all the ancestors always tracked, but rather only certain pieces of code explicitly start a task with tracking
+
+[13:52:12.0667] <Kris Kowal>
+For RPC, this stuff is usually used for distributed tracing and measuring latency. Trace headers and TTL from inbound requests get captured as a deadline and inbound span on the context, which in turn gets written back as an updated TTL and span for dependent outbound requests. In Go, this is done explicitly with a context.Context, which is a slow but small KV store.
+
+[13:53:08.0863] <Kris Kowal>
+An _immutable_ KV store, to be clear.
+
+[13:54:10.0960] <littledan>
+note that the talk links to this document: https://docs.google.com/document/d/1_m-h9_KgDMddTS2OFP0CShr4zjU-C-up64DwCrCfBo4/edit#
+
+[13:54:33.0210] <littledan>
+does someone want to take the action item to have a more detailed conversation about this relationship with Yoav? Andreu Botella ?
+
+[13:55:37.0870] <Kris Kowal>
+Tracing: https://opentelemetry.io/docs/concepts/observability-primer/#distributed-traces
+
+[14:07:38.0560] <Justin Ridgewell>
+I took his question to mean that a flat mapping should be used instead of a tree?
+
+[14:08:02.0817] <Justin Ridgewell>
+Which is exactly how AsyncLocal does it
+
+[14:08:33.0753] <Justin Ridgewell>
+(Though, you could store an array to track the ancestry if you wanted)
+
+[14:09:22.0303] <littledan>
+It sounded like Yoav's thing tracked the ancestry for all promise/callback reactions, so it could be traced backwards, not just forwards
+
+[14:09:39.0749] <littledan>
+could you talk through the relationship between AsyncLocal and AsyncContext?
+
+[14:13:02.0090] <Justin Ridgewell>
+The current proposal doesn't have an `AsyncContext` (though my personal one does). `AsyncLocal` is the same as an `AsyncLocalStorage` (allows propagating a value through an async call stack). `AsyncTask` is the snapshotting API (allows you to snapshot all `AsyncLocal`s at the time of the snapshot and run later a function with that snapshot). Together, those make up the "Async Context" APIs
+
+[14:13:46.0835] <Justin Ridgewell>
+My personal design has a `AsyncContext` namespace which holds a `Value` class (`AsyncLocal`) and a `Snapshot` class (`AsyncTask`)
+
+[14:14:29.0824] <littledan>
+why do we need all three of those classes?
+
+[14:15:03.0893] <littledan>
+Maybe we should debate the APIs here at https://github.com/legendecas/proposal-async-context/issues/9
+
+[14:15:16.0826] <Justin Ridgewell>
+The current design just has 2, but my personal has a namespace class purely for organization
+
+[14:15:45.0852] <littledan>
+AsyncLocal and AsyncContext seem very similar
+
+[14:15:54.0318] <littledan>
+the differences are really superficial, right?
+
+[14:16:49.0341] <Justin Ridgewell>
+`AsyncLocal` and `AsyncContext.Value` are the same
+
+[14:18:07.0801] <Justin Ridgewell>
+If we offer a wrapping/snapshotting API, I think we need a distinction between `AsyncLocal` (or `Value`) and the the namespace
+
+[14:18:38.0210] <Justin Ridgewell>
+Eg, we would need `AsyncContext.Local` class if we wanted to have a `AsyncContext.wrap` static function
+
+[14:19:30.0257] <littledan>
+yeah I'm proposing that we have no explicit snapshot, just `wrap` with the current stuff
+
+[14:20:16.0777] <littledan>
+also, yeah, I think `run` is a lot better than flat get/set
+
+[14:20:28.0678] <littledan>
+it's more structured
+
+[14:20:47.0529] <littledan>
+I'm not sure why we need the observer thing--you can just build that yourself
+
+[14:21:34.0113] <littledan>
+I think the API should be `class AsyncContext { run(value, callback); get(); static wrap(callback); }
+
+[14:21:57.0491] <littledan>
+you can express everything with just that
+
+[14:21:59.0040] <littledan>
+right?
+
+[14:22:57.0093] <Justin Ridgewell>
+I worry about the confusion of wrapping a particular local vs the all the locals, which is why I suggest that the class and wrap be on a common namespace
+
+[14:23:24.0927] <Justin Ridgewell>
+Though I guess it could work that way
+
+[14:23:41.0860] <Justin Ridgewell>
+Using the static vs instance distinction (and not offering the instance wrap)
+
+[14:23:49.0533] <littledan>
+well, I don't care about naming, but I think we should minimize the number of classes and things we reify
+
+[14:23:58.0422] <littledan>
+(I mean, I totally care about naming, but...)
+
+[14:24:17.0084] <littledan>
+the idea is you are always wrapping for all of the locals/contexts
+
+[14:24:39.0734] <littledan>
+we're just going for Stage 1, so we really don't need to be settled on any of this
+
+[14:39:48.0620] <littledan>
+If anyone wants to try to prototype AsyncContext in V8/Chrome, I'd start by looking at https://source.chromium.org/chromium/chromium/src/+/main:third_party/blink/renderer/platform/scheduler/public/task_attribution_tracker.h;l=24
+
+
+2022-11-18
+[18:14:25.0684] <Justin Ridgewell>
+Yes, rbuckton was excited about the proposal in June 2020: https://github.com/tc39/notes/blob/3937a973f1903550e33ccebd9bf18f90dd7d5b7c/meetings/2020-06/june-3.md#async-context
+
+[21:04:12.0280] <Justin Ridgewell>
+littledan: I don't have a full grasp of React's concurrent priorities. How are you imagining this will help?
+
+[21:47:53.0759] <Justin Ridgewell>
+Slides are updated besides that.
+
+[04:48:19.0249] <rbuckton>
+How does this compare to `AsyncLocalStorage` in NodeJS? I've used that to good effect so far: https://nodejs.org/dist/latest-v19.x/docs/api/async_context.html#class-asynclocalstorage
+
+[05:28:05.0574] <littledan>
+> <@jridgewell:matrix.org> littledan: I don't have a full grasp of React's concurrent priorities. How are you imagining this will help?
+
+I don’t have a full grasp of it either, but Yoav mentioned it in his talk too. Maybe ask Seb?
+
+[05:29:26.0460] <littledan>
+> <@rbuckton:matrix.org> How does this compare to `AsyncLocalStorage` in NodeJS? I've used that to good effect so far: https://nodejs.org/dist/latest-v19.x/docs/api/async_context.html#class-asynclocalstorage
+
+It is hoped to be roughly equivalent in expressiveness for normal usage, just omitting some weird misfeatures and simplifying the API surface.
+
+[06:00:34.0386] <rbuckton>
+Misfeatures?
+
+[06:06:42.0238] <rbuckton>
+I'm curious what you're categorizing as misfeatures? `exit` is a convenience method that is shorthand for `run(undefined, ...)`,  `enterWith` is a convenient way to set the context value without introducing a closure (and thus avoiding TCP issues), and `disable` is a convenience wrapper for `enterWith(undefined)`.
+
+[06:23:02.0662] <Chengzhong Wu>
+The current proposal is seeking for a minimum API that can provide the necessary infrastructure in the language for async context propagation. Compared to the Node.js AsyncLocalStorage, they are motivated by the same requirement so they should be very similar.
+
+[06:26:33.0429] <rbuckton>
+For comparison, .NET has two ways of doing something similar:
+
+`AsyncLocal<T>` (https://learn.microsoft.com/en-us/dotnet/api/system.threading.asynclocal-1?view=net-7.0) has a `.Value` property (analogous to Node's `AsyncLocalStorage.getStore()` and `.enterWith(store)` 
+
+`ExecutionContext` (https://learn.microsoft.com/en-us/dotnet/api/system.threading.executioncontext.run?view=netframework-4.8) has `.Run()` (analogous to Node's `AsyncLocalStorage.run()`) and can be used with `LogicalCallContext` (https://learn.microsoft.com/en-us/dotnet/api/system.runtime.remoting.messaging.logicalcallcontext.getdata?view=netframework-4.8) to get and set values associated with the logical call flow. It also has a `Dispose`, which is analogous to Node's `.disable()`.
+
+In addition, `ExecutionContext` allows you to capture the current context, copy it into a new context, and suppress and restore the context across async invocations (using `AsyncFlowControl`).
+
+[06:27:35.0680] <rbuckton>
+And `AsyncLocal<T>` is really just a convenient wrapper over `ExecutionContext`
+
+[06:28:21.0897] <rbuckton>
+If anything, I find Node's `AsyncLocalStorage` to be somewhat limited.
+
+[06:30:29.0684] <rbuckton>
+I'm also curious what the motivation is for `.wrap`? It seems like another convenience method, so I'm interested to know why that is prioritized over others.
+
+[06:31:52.0206] <rbuckton>
+I can see not having `.exit()` and `.disable()`, but `.enterWith()` isn't a convenience method, it's a core capability.
+
+[06:33:39.0133] <Chengzhong Wu>
+> <@rbuckton:matrix.org> I'm also curious what the motivation is for `.wrap`? It seems like another convenience method, so I'm interested to know why that is prioritized over others.
+
+It snapshots the current context into the wrapped function, and restores it when the wrapped function is been invoked. It is part of the basic block to be able to defining userland queues with async context.
+
+[06:34:33.0883] <rbuckton>
+Actually, I'll retract that last statement somewhat. My concern is about async context mutability without violating TCP, but that can be achieved via indirection, i.e. `context.run({ value: 1 }, () => { context.get().value++ })`
+
+[06:36:35.0982] <rbuckton>
+I don't disagree with its utility, but It's still a convenience method. You could achieve the same in userland with only `.run()` and `.get()`:
+
+```js
+function wrap(ctx, cb) {
+  const store = ctx.get();
+  return () => ctx.run(store, cb);
+}
+```
+
+[06:38:06.0838] <Chengzhong Wu>
+> <@rbuckton:matrix.org> I don't disagree with its utility, but It's still a convenience method. You could achieve the same in userland with only `.run()` and `.get()`:
+> 
+> ```js
+> function wrap(ctx, cb) {
+>   const store = ctx.get();
+>   return () => ctx.run(store, cb);
+> }
+> ```
+
+I don't think the `.wrap` in the proposal behaves the same in this example.
+
+[06:38:33.0264] <rbuckton>
+Or, as a one-liner: `((store) => ctx.run(store, cb))(ctx.get())`
+
+[06:39:41.0903] <rbuckton>
+Ah, I see. `.wrap` captures *all* async contexts.
+
+[06:39:48.0269] <Chengzhong Wu>
+The static wrap in the proposal snapshots the current global async context storage, in which all async context values are saved.
+
+[06:39:59.0151] <rbuckton>
+So its more like .NET's `ExecutionContext.Capture()`
+
+[06:40:18.0940] <Chengzhong Wu>
+Yes, with your pointers I think so.
+
+[06:40:48.0618] <Chengzhong Wu>
+Namings in the proposal are not the final decisions at this point.
+
+[06:40:59.0743] <rbuckton>
+In that case I'm finding the granularity of `.run()` at odds with the coarseness of `.wrap()`.
+
+[06:42:44.0052] <rbuckton>
+In .NET, you have an `ExecutionContext` and a `LogicalCallContext`. When you call `ExecutionContext.Run`, you pass in what amounts to _the entire global async context storage_. You then manipulate that storage with `LogicalCallContext.GetData(key)` and `LogicalCallContext.SetData(key, value)`.
+
+[06:50:33.0307] <rbuckton>
+If you have multiple `AsyncContext` objects, you might end up with:
+```js
+const ctx1 = new AsyncContext();
+const ctx2 = new AsyncContext();
+
+function foo() {
+  ctx1.run({ id: 1 }, bar);
+}
+
+function bar() {
+  ctx1.run({ id: 2 }, baz);
+}
+
+function baz() {
+  ctx1.get(); // { id: 1 }
+  ctx2.get(); // { id: 2 } 
+}
+```
+
+While in .NET you might do:
+
+```cs
+var local1 = new AsyncLocal<number>();
+var local2 = new AsyncLocal<number>();
+
+void Foo() {
+  var context = ExecutionContext.CreateCopy();
+  ExecutionContext.Run(context, () => {
+    local1.Value = 1;
+    Bar();
+  });
+}
+
+void Bar() {
+  local2.Value = 2;
+  Baz();
+}
+
+void Baz() { ... }
+```
+
+[06:51:58.0337] <rbuckton>
+I'm not opposed to the design of `AsyncContext` being a per-context `.run()`, I just find `.wrap` to be strange.
+
+[06:53:28.0491] <rbuckton>
+From what I surmise, the purpose of `.wrap` is to address two specific needs:
+1. To capture the current logical call context (i.e., all global async context values)
+2. To, at some point in the future, use that captured context to execute a callback.
+
+[06:57:20.0224] <rbuckton>
+`.wrap()` does that by combining those two operations into a single operation. This is fine if you want to wrap a single callback, but is less convenient if you want to capture all contexts and pass it to different callbacks:
+```js
+const callWithContext = AsyncContext.wrap((cb, ...args) => cb(...args));
+callWithContext(f);
+callWithContext(g);
+```
+
+[07:05:30.0566] <rbuckton>
+vs. something like:
+```js
+const context = AsyncContext.capture();
+
+// with a `.run` method on the captured context...
+context.run(f);
+context.run(g);
+
+// or with a static method
+AsyncContext.runWithContext(context, f);
+AsyncContext.runWithContext(context, g);
+```
+
+And if `AsyncContext` ever does become mutable (i.e., via `.enterWith`), you might want to be able to clone the global context so that async context mutations are local to the logical call:
+
+```js
+const ctx = new AsyncContext();
+ctx.run(1, main);
+
+function main() {
+  const captured = AsyncContext.capture();
+  const copied = AsyncContext.copyContext();
+
+  AsyncContext.runWithContext(captured, foo);
+  AsyncContext.runWithContext(copied, bar);
+
+  console.log(ctx.get()); // 2 (bar's mutation acted on a copy)
+}
+
+function foo() {
+  console.log(ctx.get()); // 1
+  ctx.set(2);
+}
+
+function bar() {
+  console.log(ctx.get()); // 1 (due to copy)
+  ctx.set(3);
+}
+```
+
+[07:14:57.0139] <rbuckton>
+Also, without `.enterWith`, you could not easily emulate something like `AsyncLocal` in user code:
+
+```js
+// with AsyncLocalStorage
+class AsyncLocal {
+  #context = new AsyncLocalStorage();
+  get value() { return this.#context.getStore(); }
+  set value(v) { this.#context.enterWith(v); }
+}
+
+const loc = new AsyncLocal();
+loc.value = 1;
+loc.value; // 1
+
+// with AsyncContext
+class AsyncLocal {
+  #context = new AsyncContext();
+  get value() { return this.#context.value; }
+  set value(v) { this.#context.value = v; }
+  enable(cb) {
+    return this.#context.run({ value: undefined }, cb);
+  }
+}
+
+const loc = new AsyncLocal();
+loc.value = 1; // ReferenceError
+
+// need to establish context first
+loc.enable(() => {
+  loc.value = 1;
+  loc.value; // 1
+});
+```
+
+[07:35:01.0372] <Chengzhong Wu>
+The user stories of these ideas are important to shape the API in the proposal. I believe it is worthwhile to visit those requirements in stage 1.
+
+[07:40:23.0115] <Chengzhong Wu>
+> <@rbuckton:matrix.org> Actually, I'll retract that last statement somewhat. My concern is about async context mutability without violating TCP, but that can be achieved via indirection, i.e. `context.run({ value: 1 }, () => { context.get().value++ })`
+
+I might get it wrong. Would you mind expanding on the TCP issue?
+
+[07:51:19.0097] <rbuckton>
+Tennent's Correspondence Principle (aka. "Tennent's Principle of Correspondence"): http://techscursion.com/2012/02/tennent-correspondence-principle.html
+
+In plenary its often used to describe anything that changes the context of an expression such that the expression can no longer be evaluated in the same way, which is a bit of an more expanded definition than the actual principle.  The issue I'm concerned with is as follows: 
+
+Lets say you start with an async generator:
+```js
+class C {
+async function* foo() {
+  await a();
+  yield b();
+  await c();
+}
+```
+
+Now I need to
+
+[07:53:12.0825] <rbuckton>
+Now I need to introduce an async context for b() and c():
+```js
+const ctx = new AsyncContext();
+class C {
+  async * foo() {
+    await a();
+    ctx.run(value, () => {
+      yield b(); // syntax error, arrow function is not a generator
+      await this.c(); // syntax error, arrow function is not async
+    });
+  }
+}
+```
+
+[07:54:02.0624] <rbuckton>
+I can make that an async arrow:
+```js
+const ctx = new AsyncContext();
+class C {
+  async * foo() {
+    await a();
+    await ctx.run(value, async () => {
+      yield b(); // syntax error, arrow function is not a generator
+      await this.c(); // ok
+    });
+  }
+}
+```
+But that won't work with `yield`.
+
+[07:54:52.0135] <rbuckton>
+I can make it an async generator:
+```js
+const ctx = new AsyncContext();
+class C {
+  async * foo() {
+    await a();
+    ctx.run(value, async function *() {
+      yield b(); // ok
+      await this.c(); // reference error, this is undefined
+    });
+  }
+}
+```
+But that won't work with the `this` binding.
+
+[07:55:13.0943] <rbuckton>
+any solution requires significant refactoring.
+
+[07:56:15.0514] <rbuckton>
+vs. an `enterWith`:
+```js
+const ctx = new AsyncContext();
+class C {
+  async * foo() {
+    await a();
+    ctx.enterWith(value);
+    try {
+      yield b();
+      await this.c();
+    }
+    finally {
+      ctx.disable();
+    }
+  }
+}
+```
+
+[07:57:50.0712] <rbuckton>
+And that could be potentially even more convenient with `using` declarations:
+```js
+const ctx = new AsyncContext();
+class C {
+  async * foo() {
+    await a();
+    using _ = ctx.enterWith(value); // assumes disposable return value...
+    yield b();
+    await this.c();
+  }
+}
+```
+
+[08:05:07.0455] <rbuckton>
+TCP violations aren't necessarily bad, but are indicative of inconsistencies in the language. For example, using `ctx.run` would be fine if there was an async generator equivalent for arrow functions so that we could more easily preserve `await`, `this`, and `yield`
+
+[08:09:38.0497] <Chengzhong Wu>
+Thanks for sharing! This is a very interesting point on `.setValue` versus a structured `.run` method as the basic block.
+
+[09:20:38.0395] <Justin Ridgewell>
+> <@rbuckton:matrix.org> I can see not having `.exit()` and `.disable()`, but `.enterWith()` isn't a convenience method, it's a core capability.
+
+Still reading, all the messages, but this is the first I disagree with. The way I'm explaining the proposal during the meeting will be to equate it with putting data onto the call stack, and `.enterWith()` doesn't create a new callstack entry.
+
+[09:21:08.0808] <Justin Ridgewell>
+The behavior here of leaking data beyond the current callstack, and mutating the containing callstack's data for other execution that follows the current, is only a source of bugs.
+
+[09:30:36.0703] <Justin Ridgewell>
+> <@rbuckton:matrix.org> vs. something like:
+> ```js
+> const context = AsyncContext.capture();
+> 
+> // with a `.run` method on the captured context...
+> context.run(f);
+> context.run(g);
+> 
+> // or with a static method
+> AsyncContext.runWithContext(context, f);
+> AsyncContext.runWithContext(context, g);
+> ```
+> 
+> And if `AsyncContext` ever does become mutable (i.e., via `.enterWith`), you might want to be able to clone the global context so that async context mutations are local to the logical call:
+> 
+> ```js
+> const ctx = new AsyncContext();
+> ctx.run(1, main);
+> 
+> function main() {
+>   const captured = AsyncContext.capture();
+>   const copied = AsyncContext.copyContext();
+> 
+>   AsyncContext.runWithContext(captured, foo);
+>   AsyncContext.runWithContext(copied, bar);
+> 
+>   console.log(ctx.get()); // 2 (bar's mutation acted on a copy)
+> }
+> 
+> function foo() {
+>   console.log(ctx.get()); // 1
+>   ctx.set(2);
+> }
+> 
+> function bar() {
+>   console.log(ctx.get()); // 1 (due to copy)
+>   ctx.set(3);
+> }
+> ```
+
+Dan suggested we not reify the snapshot into a class structure. Your suggestion matches pretty closely with what I have in [my gist](https://gist.github.com/jridgewell/3970a3078ebfb90e90cd9d0a36ab9c08#file-async-context-ts-L7-L20)
+
+[09:56:06.0754] <littledan>
+I still am having trouble understanding the motivation for this reified design
+
+[10:11:43.0417] <rbuckton>
+> <@littledan:matrix.org> I still am having trouble understanding the motivation for this reified design
+
+A `.wrap()` method makes it easy to wrap a _single_ callback in a captured execution context, but harder to reuse that context for multiple callbacks without incurring the overhead of an additional function wrapper for each callback.
+
+A `.capture()` method, and an associated `.run(globalContext, cb)` method make it easy to reuse a context with multiple functions without incurring the overhead of a function wrapper.
+
+Either can be composed with the other, however:
+
+```js
+// emulate `capture` if you only have `wrap()`:
+
+function capture() {
+    return AsyncContext.wrap((cb, ...args) => cb(...args));
+}
+
+// wrap a single callback
+const wrapped = AsyncContext.wrap(cb);
+setImmediate(() => {
+    wrapped();
+});
+
+// capture context and use with multiple functions
+const context = capture();
+setImmediate(() => {
+    context(foo);
+    context(bar);
+});
+
+// emulate `wrap` if you only have `capture()`:
+
+// assumes `AsyncContext.capture()` produces `(cb, ...args) => any`
+function wrap(cb) {
+    const context = AsyncContext.capture();
+    return (...args) => context(cb, ...args);
+}
+
+// wrap a single callback
+const wrapped = wrap(cb);
+setImmediate(() => {
+    wrapped();
+});
+
+// capture context and use with multiple functions
+const context = AsyncContext.capture();
+setImmediate(() => {
+    context(foo);
+    context(bar);
+});
+```
+
+
+[10:14:06.0040] <rbuckton>
+I'd argue its a bit more obvious to a developer that they can do the following to wrap:
+```js
+const context = AsyncContext.capture();
+return () => context(f);
+```
+
+vs. the more opaque syntax needed to emulate `context()`:
+```js
+const context = AsyncContext.wrap((cb, ...args) => cb(...args));
+context(f);
+```
+
+[10:14:32.0792] <rbuckton>
+But I would argue to have both rather than just one or the other.
+
+[10:16:52.0358] <Justin Ridgewell>
+I agree, I think that makes is simpler for restoring before multiple callbacks
+
+[10:17:28.0335] <rbuckton>
+I also wonder if the MVP should include a mechanism for async context control flow so its easier to escape a global context.
+
+[10:17:57.0248] <rbuckton>
+My examples above use `setImmediate`, but what if `setImmediate` *also* passes along the current execution context?
+
+[10:19:26.0087] <rbuckton>
+.NET has `ExecutionContext.SuppressFlow()` and `ExecutionContext.RestoreFlow()` for this purpose, and the result of `SuppressFlow()` is disposable (if disposed, it will call `RestoreFlow()` for you).
+
+[10:19:59.0228] <Justin Ridgewell>
+(It's intended to keep the execution context, but `setImmediate` and friends don't live in 262)
+
+[10:20:31.0113] <rbuckton>
+then we *definitely* need a way to escape an execution context.
+
+[10:20:59.0620] <Justin Ridgewell>
+It's already possible with `.wrap()` in the top level scope
+
+[10:22:03.0629] <Justin Ridgewell>
+```js
+const suppressed = AsyncContext.wrap((cb, …args) => cb(…args));
+
+context.run(1, () => {
+  suppressed(() => {
+    context.get() === undefined;
+  });
+});
+```
+
+[10:23:23.0785] <rbuckton>
+Yes, but that wouldn't work well if async contexts were mutable like Node's `AsyncLocalStorage.enterWith`, since that can set up a context at the top level before your module body runs.
+
+[10:23:52.0212] <rbuckton>
+then again, `capture` and `copy` would have the same problem I suppose.
+
+[10:24:00.0438] <Justin Ridgewell>
+As I said above, I think mutable context is a bug (and very likely to hit challenges with the SES folks)
+
+[10:24:21.0292] <rbuckton>
+But a `suppressFlow()` would avoid that as well.
+
+[10:24:22.0022] <Justin Ridgewell>
+I really don't wanna support it.
+
+[10:24:42.0458] <James M Snell>
+Definite +1 on not supporting mutable context. Not a fan of enterWith
+
+[10:25:11.0132] <rbuckton>
+Something like `SuppressFlow()` would also work well with `using` declarations, i.e.:
+```js
+const ctx = new AsyncContext();
+ctx.run(1, foo);
+
+async function foo() {
+  console.log(ctx.get()); // 1
+  {
+    using flow = AsyncContext.suppressFlow();
+    console.log(ctx.get()); // undefined
+  }
+  console.log(ctx.get()); // 1
+}
+```
+
+[10:27:47.0551] <rbuckton>
+I'd really like to be able to have a simple `AsyncLocal` primitive, or even an `@AsyncLocal` decorator (not unlike a potential `@ThreadLocal` decorator that could someday exist for shared structs):
+
+```js
+class HttpServer {
+  @AsyncLocal
+  accessor currentRequest;
+  ...
+}
+```
+But that wouldn't work without the ability attach an async context to the _current_ execution context without needing to go through a `.run` call.
+
+[10:29:54.0544] <rbuckton>
+> <@jasnell:matrix.org> Definite +1 on not supporting mutable context. Not a fan of enterWith
+
+Yet `context.run({ value: 1 }, () => context.get().value++)` is still mutable. Not having `enterWith` just makes other related primitives harder to implement.
+
+[10:35:03.0574] <James M Snell>
+Yeah, and we have plenty of use cases where folks add to or change values in the context... mutable context is likely the wrong phrase. I'm not a big fan of the enterWith(...) model at all, and I shouldn't be able to completely replace the context value.
+
+[10:37:29.0340] <James M Snell>
+unfortunately I'm on my way out the door for an appointment. Will be back and will try to weigh in more
+
+[10:37:31.0651] <rbuckton>
+Its not the wrong phrase. I was just illustrating that an _immutable context_ can still hold _mutable values_. And in most other languages I'm familiar with, the context is also mutable.
+
+[10:37:45.0336] <James M Snell>
+tl;dr is just I really dislike enterWith
+
+[10:37:55.0615] <James M Snell>
+will be back later
+
+[10:40:06.0734] <Justin Ridgewell>
+(I'm looking for Marks' comments on mutability during our call)
+
+[10:40:45.0306] <Justin Ridgewell>
+The model that I'm building the slides is simple to explain only because we don't need deep integration with the runtime
+
+[10:42:57.0947] <Justin Ridgewell>
+If we were to support mutable contexts, it would either
+- allow one function to replace the context for sibling calls (which I think is what Mark is objecting to)
+- push a context onto the stack (but then it's not obvious where we would pop with deep integration with the host's actual call stack)
+
+[10:43:47.0195] <Justin Ridgewell>
+It's _possible_ we could work this with Disposable proposal, but I don't want to the two proposals together
+
+[10:45:14.0359] <Justin Ridgewell>
+The current `.run()`'s try-finally push-call-pop can be understood extremely easily and it's directly teachable with what's possible in userland today with sync execution
+
+[10:45:20.0756] <Justin Ridgewell>
+I _really_ like that it's simple
+
+[11:41:26.0222] <rbuckton>
+> - allow one function to replace the context for sibling calls (which I think is what Mark is objecting to)
+
+
+In a mutable context world, you would use `.copyContext()` to clone the global context to avoid mutations in siblings.
+
+[11:41:31.0844] <Justin Ridgewell>
+Here's the part where Mark starts talking about mutability: https://youtu.be/Y6hQLM08Ig8?t=4513
+
+[11:44:01.0053] <Justin Ridgewell>
+And a bit more at https://youtu.be/Y6hQLM08Ig8?t=5106
+
+[13:38:42.0108] <littledan>
+> <@rbuckton:matrix.org> But I would argue to have both rather than just one or the other.
+
+Yeah, my interpretation has been that each can express the other; that's why my intuition was that we should go with the smaller API surface
+
+[13:39:25.0458] <littledan>
+(smaller API surface was a guiding principle of Chengzhong Wu 's recent edits and I like it, even if I have other preferences for the exact form)
+
+[13:54:40.0006] <rbuckton>
+I don't mind a small API surface, my concerns stem from ensuring the appropriate building blocks are surfaced. Most of what I've mentioned is inconsequential, you can implement some of the missing functionality in terms of other functionality. The `@AsyncLocal` or `new AsyncLocal()` approach can't be solved with the current API, which makes it infeasible to do in userland. Suspending and resuming global async context flow is only barely feasible given that it requires you do `const emptyContext = AsyncContext.wrap((cb, ...args) => cb(...args))` at the top level before any context is created, which certainly isn't a great developer experience.
+
+[13:58:29.0529] <Justin Ridgewell>
+Could this be solve by using a mutable object in the context, and allowing a default value when constructing?
+
+[13:58:39.0602] <Justin Ridgewell>
+I don't understand the decorator usecase yet.
+
+[13:59:12.0606] <Justin Ridgewell>
+But a default value would allow the your `AsyncLocal` example to work at the top-level
+
+[13:59:20.0938] <Justin Ridgewell>
+(React also allows a default value for its contexts)
+
+[14:00:36.0505] <rbuckton>
+Except there's no way to switch contexts with just `@AsyncLocal`, it depends on the ability to copy a context or suppress async flow to actually get a different value each time.
+
+[14:01:15.0509] <Justin Ridgewell>
+Can you explain more? What would code using this look like?
+
+[14:01:43.0372] <Justin Ridgewell>
+I don't understand what a context would do unless there is execution that happens further down the callstack
+
+[14:04:47.0953] <rbuckton>
+One moment, I'm refreshing my knowledge of how `AsyncLocal` works in .NET to make sure I'm not misspeaking
+
+[14:05:59.0301] <littledan>
+yeah I agree you shouldn't have to run top-level code (this always creates problems with composition/packaging), but I'd like to understand the use case for escaping all the contexts
+
+[14:07:07.0468] <littledan>
+we should expect the platform itself to make some context variables too, so I'm not even sure what it means to escape all of them
+
+[14:07:31.0584] <rbuckton>
+It looks like how .NET's `AsyncLocal` works, is that each "mutation" of the local results in the local values in the execution context being copied, such that when an `await` occurs, the current snapshot of the locals in the execution context is copied to the context bound to that `await`.
+
+[14:11:26.0981] <rbuckton>
+So based on that, here's a rough example:
+```js
+const local = new AsyncLocal();
+local.value = 1;
+await foo(); 
+
+// mutation of local doesn't change the snapshot seen by the `await` in foo
+local.value = 2; 
+
+await bar();
+
+function foo() {
+  console.log(local.value); // 1
+
+  // takes snapshot of current async execution context
+  // restores snapshot when `await` resumes
+  await Promise.resolve(); 
+
+  console.log(local.value); // 1
+}
+
+function bar() {
+  console.log(local.value); // 2
+
+  // takes snapshot of current async execution context
+  // restores snapshot when `await` resumes
+  await Promise.resolve(); 
+
+  console.log(local.value); // 2
+}
+```
+
+[14:13:36.0650] <littledan>
+yeah, I can see how this snapshotting approach is convenient; I guess I prefer the `run`-based API which makes it a bit more explicit when the copying occurs
+
+[14:14:22.0197] <littledan>
+I sort of assumed that, with what's in the main branch of AsyncContext, the get/set functions didn't have any copying semantics, that you're responsible for saving and restoring things when appropriate
+
+[14:15:33.0961] <littledan>
+maybe I understood wrong?
+
+[14:17:06.0233] <littledan>
+anyway if you only have `run` and not a setter, then it is sort of clearer why `run` doesn't hold in the reaction (because you've already exited it by then)
+
+[14:17:38.0868] <rbuckton>
+I think earlier I said .NET has two approaches: `AsyncLocal` which stores a local associated with async control flow, and `ExecutionContext`, which has a logical call context that can have data stored within it.
+
+[14:18:14.0834] <rbuckton>
+`ExecutionContext.Run()` is kind of like `AsyncContext.prototype.run()`, except it covers the entire execution context, not just a single value.
+
+[14:19:08.0517] <rbuckton>
+`AsyncLocal` state is _stored_ in an `ExecutionContext`, but that context is captured and restored whenever you create a `Task` or a task continuation is invoked.
+
+[14:19:40.0262] <rbuckton>
+So `AsyncLocal` (which snapshots) is built on an `ExecutionContext` (which is mutable).
+
+[14:21:33.0008] <littledan>
+I see
+
+[14:22:07.0976] <littledan>
+Do you have an example of something you can do in this system which wouldn't work with the kinds of approaches we've been discussing?
+
+[14:22:17.0516] <littledan>
+(apologies if that's above)
+
+[14:23:30.0987] <rbuckton>
+So in .NET, you can do:
+```cs
+LogicalCallContext.SetData("foo", 1);
+var context = ExecutionContext.Capture();
+
+ExecutionContext.Run(context, () => {
+  Console.WriteLine(LogicalCallContext.GetData("foo")); // 1
+  LogicalCallContext.SetData("foo", 2);
+});
+
+Console.WriteLine(LogicalCallContext.GetData("foo")); // 2
+```
+Since the context is mutable.
+
+[14:26:57.0242] <rbuckton>
+> <@littledan:matrix.org> Do you have an example of something you can do in this system which wouldn't work with the kinds of approaches we've been discussing?
+
+Since AsyncLocal does snapshotting, its very useful for fork/join operations like this:
+```js
+const local = new AsyncLocal();
+local.value = 1;
+await Promise.all(operations.map(async (op) => {
+  await op.execute(); // where op.execute reads or writes local.value
+}));
+```
+Where each `op.execute()` gets a copy of the state, such that any state mutations don't affect other parallel tasks.
+
+[14:28:32.0605] <rbuckton>
+In reality, this probably can't be implemented in userland regardless. The kind of snapshotting that is necessary would require the same hooks that `AsyncContext` needs to restore the context after `await`.
+
+[14:29:41.0610] <rbuckton>
+the upside of `AsyncLocal` is that you don't really need to worry about closures and TCP
+
+[14:29:45.0692] <littledan>
+I guess all of the alternatives here have the property (which I agree is essential) that you can write to the variable without affecting parallel tasks. The `run` method certainly does, at least.
+
+[14:30:50.0512] <littledan>
+> <@rbuckton:matrix.org> the upside of `AsyncLocal` is that you don't really need to worry about closures and TCP
+
+I see, I guess this is the part I need to understand better (probably you already explained this and I need to reread the logs)
+
+[14:31:28.0289] <littledan>
+> <@littledan:matrix.org> I guess all of the alternatives here have the property (which I agree is essential) that you can write to the variable without affecting parallel tasks. The `run` method certainly does, at least.
+
+I guess the get/set functions in the main branch would not handle this properly
+
+[14:31:40.0736] <rbuckton>
+No, I've been a bit randomized today so I feel I've been jumping around between topics too frequently and may not be making a coherent argument.
+
+[14:37:08.0966] <rbuckton>
+I'll simplify my thoughts:
+- `new AsyncContext()` is great.
+- `AsyncContext.prototype.run()` is great.
+- `AsyncContext.prototype.get()` is great.
+- The capability introduced by `AsyncContext.wrap()` is necessary, but has some ergonomics issues I have concerns about.
+- The minimal API for `AsyncContext` means some other useful primitives like an `AsyncLocal` can't be modeled in userland. However, its likely it would need to be introduced as a built-in anyways if we wanted anything like snapshotting capabilities such that the value is associated with control flow.
+- A way to suppress and restore the global context is necessary, and I'm not convinced the approach of a "call to `AsyncContext.wrap()` at the top level" is sufficiently ergonomic.
+
+[14:40:51.0843] <rbuckton>
+If the value associated with an `AsyncContext` is immutable, then a `.copyContext()` isn't necessary because *every* `await` (or other async mechanism) would already snapshot the current global execution context.
+
+[14:44:56.0278] <littledan>
+I guess I could see how freely getting/setting and expecting the snapshotting to be automatic can't be built in terms of `run`, and what I don't understand yet is why we'd want that.
+
+[14:45:09.0529] <littledan>
+I also don't understand in what sorts of cases you'd want to restore the global context
+
+[14:45:27.0228] <Justin Ridgewell>
+I think we can support both, but I would want to see use cases that can't be solved by the immutable context
+
+[14:45:30.0695] <littledan>
+I guess I assumed that it'd be an anti-goal to have any sort of notion of the global context
+
+[14:45:41.0428] <littledan>
+(since it's sort of anti-compositional)
+
+[14:48:20.0001] <Justin Ridgewell>
+> <@littledan:matrix.org> I don’t have a full grasp of it either, but Yoav mentioned it in his talk too. Maybe ask Seb?
+
+Seb pushed me back to talking about `cache`, but dropping `use` discussion (it's not necessary, client will support async/await without it)
+
+[14:48:37.0183] <Justin Ridgewell>
+Not that I don't need to discuss `use`, I can dive deeper into the real use for this for client side
+
+[14:48:43.0107] <littledan>
+> <@jridgewell:matrix.org> Seb pushed me back to talking about `cache`, but dropping `use` discussion (it's not necessary, client will support async/await without it)
+
+Did he not like the idea of discussing priorities?
+
+[14:49:12.0833] <littledan>
+I mean, more importantly: would this feature be useful for priorities?
+
+[14:49:20.0173] <Justin Ridgewell>
+Yah, he said that priorities really needs brower APIs that this won't solve (the priority scheduler work would be the API)
+
+[14:49:47.0750] <Justin Ridgewell>
+Possibly, in that they could store the priority on an `AsyncContext`
+
+[14:49:52.0712] <littledan>
+ah, but as discussed in Yoav's talk, browsers are unable to make this capability due to *the need for the same platform feature*
+
+[14:50:12.0083] <Justin Ridgewell>
+But it needs platform support to not be able to create a high priority task from a low priority one, and that's not solved by us
+
+[14:50:24.0790] <rbuckton>
+> <@littledan:matrix.org> I guess I could see how freely getting/setting and expecting the snapshotting to be automatic can't be built in terms of `run`, and what I don't understand yet is why we'd want that.
+
+I think that's actually how the proposal probably works right now.
+
+[14:51:00.0042] <littledan>
+> <@rbuckton:matrix.org> I think that's actually how the proposal probably works right now.
+
+by "right now" you mean the flat get/set variable API in the main branch?
+
+[14:51:04.0246] <rbuckton>
+No
+
+[14:51:35.0760] <rbuckton>
+Sorry, no. Snapshotting is likely how we would achieve the semantics that Justin Ridgewell seems to prefer.
+
+[14:51:44.0161] <littledan>
+> <@jridgewell:matrix.org> But it needs platform support to not be able to create a high priority task from a low priority one, and that's not solved by us
+
+hmm, I would like to dig into this more (but maybe another day/with Seb and/or Yoav)
+
+[14:54:01.0146] <littledan>
+> <@rbuckton:matrix.org> Sorry, no. Snapshotting is likely how we would achieve the semantics that Justin Ridgewell seems to prefer.
+
+What do you mean by this?
+
+[14:54:02.0831] <rbuckton>
+Imagine the current execution context as an ImmutableMap. Adding or replacing entries in the map copies the map.
+So:
+```js
+const ctx1 = new AsyncContext();
+const ctx2 = new AsyncContext();
+const ctx3 = new AsyncContext();
+
+// execution context: {}
+ctx1.run("a", () => {
+  // execution context: { [ctx1]: "a" }
+  ctx2.run("b", () => {
+    // execution context: { [ctx1]: "a", [ctx2]: "b" }
+  });
+  ctx3.run("c", () => {
+    // execution context: { [ctx1]: "a", [ctx3]: "c" }
+  });
+});
+
+[14:54:51.0889] <littledan>
+Yes, well, if that is snapshotting, then I agree it's how we'd achieve the semantics
+
+[14:54:57.0141] <rbuckton>
+You don't mutate the execution context, you copy it when you call `contxt.run`, adding or replacing the value for `context` in the copy of the execution context seen by the callback.
+
+[14:55:05.0086] <Justin Ridgewell>
+```js
+let __storage__ = new Map();
+class AsyncContext {
+  // Pushes a new state, and pops it when done
+  run(val, cb) {
+    let prev = __storage__;
+    try {
+      this.set(val);
+      return cb();
+    } finally {
+      __storage__ = prev;
+    }
+  }
+
+  // Mutates the current state
+  set(val) {
+    const next = new Map(__storage__);
+    next.set(this, val);
+    __storage__ = next;
+  }
+}
+```
+
+[14:55:11.0716] <littledan>
+I like to think of it as, a singly-linked list, which you don't need to copy, just push associations onto
+
+[14:55:31.0207] <littledan>
+this differentiates `run` from an AsyncLocal that you can literally mutate (which woudln't have that property)
+
+[14:55:52.0732] <rbuckton>
+Justin Ridgewell: Yes, while you can't mutate the execution context itself (since its immutable), you can mutate the values stored in it.
+
+[14:56:24.0310] <littledan>
+> <@littledan:matrix.org> I like to think of it as, a singly-linked list, which you don't need to copy, just push associations onto
+
+and this singly linked list is immutable; the only thing that changes is the pointer to its root
+
+[14:56:55.0811] <littledan>
+so if that's our data model, the usage of AsyncContext is somehow "structured" (debatable how useful that is, I'm just describing how I'm conceptualizing this)
+
+[14:57:03.0166] <rbuckton>
+> <@littledan:matrix.org> and this singly linked list is immutable; the only thing that changes is the pointer to its root
+
+Yes, and that's how an `ImmutableDictionary` would be implemented. Not precisely a "copy" but essentially a snapshot since it can't be changed.
+
+[14:57:59.0103] <littledan>
+right so since the snapshot operation is the identity function, we don't have to worry about "when" the snapshot occurs, just when/how the mutation occurs (with `run`)
+
+[14:58:09.0029] <rbuckton>
+The difference between `AsyncContext` and something like `AsyncLocal`, is that `AsyncContext` is _explicit_ (you must call `.run()`, while `AsyncLocal` is implicit.
+
+[14:58:33.0376] <littledan>
+Makes sense
+
+[14:58:53.0768] <littledan>
+I can see how the two things have this difference; I haven't yet understood the downside of explicitness
+
+[15:00:25.0746] <rbuckton>
+Explicitness is fine for imperative code, not so much for declarative code (such as using with decorators). Also the TCP issue (managing `yield`, `await`, and `this` when you shift to a callback).
+
+[15:22:40.0787] <rbuckton>
+Imagine there was an internal `ExecutionContext` object that had an immutable dictionary of `AsyncContext->value` entries. What an `AsyncLocal` would need is a second immutable dictionary on that object:
+
+```ts
+// internal implementation details...
+class ExecutionContext {
+  #asyncContextValues;
+  #asyncLocalValues;
+  constructor(asyncContextValues, asyncLocalValues) {
+    this.#asyncContextValues = asyncContextValues;
+    this.#asyncLocalValues = asyncLocalValues;
+  }
+
+  static get current() {
+    return %GetCurrentExecutionContext();
+  }
+
+  static set current(value) {
+    %SetCurrentExecutionContext(value);
+  }
+
+  static create() {
+    return new ExecutionContext(new ImmutableMap(), new ImmutableMap());
+  }
+
+  copy() {
+    return new ExecutionContext(this.#asyncContextValues, this.#asyncLocalValues);
+  }
+
+  getContext(key) {
+    return this.#asyncContextValues.get(key);
+  }
+
+  getLocal(key) {
+    return this.#asyncLocalValues.get(key);
+  }
+
+  setLocal(key, value) {
+    this.#asyncLocalValues = this.#asyncLocalValues.set(key, value);
+  }
+
+  runWithContext(asyncContext, value, callback, args) {
+    const context = new ExecutionContext(this.#asyncContextValues.set(asyncContext, value), this.#asyncLocalValues);
+    return %RunWithContext(context, callback, args);
+  }
+}
+
+// global scope would have a root context
+ExecutionContext.current = ExecutionContext.create();
+
+// public
+class AsyncContext {
+  run(value, callback, ...args) {
+    return ExecutionContext.current.runWithContext(this, value, callback, args);
+  }
+
+  get() {
+    return ExecutionContext.current.getContext(this);
+  }
+
+  static wrap(cb) {
+    const captured = ExecutionContext.current;
+    return (...args) => {
+      const current = ExecutionContext.current;
+      try {
+        ExecutionContext.captured = captured;
+        return cb(...args);
+      }
+      finally {
+        ExecutionContext.current = current;
+      }
+    }
+  }
+}
+
+// public
+class AsyncLocal {
+  get value() { return ExecutionContext.current.getLocal(this); }
+  set value(v) { ExecutionContext.current.setLocal(this, v); }
+}
+
+// and `await f()` is translated to something like:
+
+const result = Promise.resolve(f());
+result.[[ExecutionContext]] = ExecutionContext.current.copy(); // used for continuations
+await result;
+
+```
+
+An `await` would just preserve the pointer to the `AsyncContext` entries, but get an independent reference to the `AsyncLocal` entries. Mutating the `asyncLocalValues` reference wouldn't affect snapshots taken during `await`.
+
+[15:23:26.0523] <littledan>
+> <@rbuckton:matrix.org> Explicitness is fine for imperative code, not so much for declarative code (such as using with decorators). Also the TCP issue (managing `yield`, `await`, and `this` when you shift to a callback).
+
+Ah, I see (abstractly, still trying to conceptualize how this relates to likely concrete code)
+
+[15:24:06.0903] <rbuckton>
+Most of the real world examples I can think of are related to things like HttpContext in ASP.NET, which I'm a few years out from using regularly.
+
+[15:24:24.0393] <littledan>
+my intuition is that it's generally a "big deal" when you use `run`. There are many wrapped callbacks/promise reactions for every big `run` setting up a context
+
+[15:24:26.0029] <rbuckton>
+I've used this feature in .NET a fair bit though.
+
+[15:25:57.0540] <rbuckton>
+So really, neither `AsyncContext` nor `AsyncLocal` are the actual building block, but rather `ExecutionContext` is. However, I think `ExecutionContext` provides too much access to internals.
+
+[15:27:19.0493] <rbuckton>
+> <@littledan:matrix.org> my intuition is that it's generally a "big deal" when you use `run`. There are many wrapped callbacks/promise reactions for every big `run` setting up a context
+
+Yes, and that's generally true for an `ExecutionContext` which is a bit more coarse grained. You will see `asyncContext.run` more often since its so granular (i.e., a single value). `AsyncLocal` is designed to be more lightweight.
+
+[15:27:45.0998] <littledan>
+so, we're talking about https://learn.microsoft.com/en-us/dotnet/api/system.web.httpcontext?view=netframework-4.8 ?
+
+[15:28:02.0240] <rbuckton>
+When I'm talking about HttpContext, yes.
+
+[15:28:04.0343] <littledan>
+that looks like an example of something coarse-grained, which library user code doesn't manually set
+
+[15:28:15.0222] <rbuckton>
+HttpContext.Items uses LogicalCallContext.GetValue under the hood.
+
+[15:28:57.0428] <rbuckton>
+And multiple HttpRequests are handled by calls to ExecutionContext.Run, which provides isolated execution contexts containing sensitive things like the current security principal, in addition to HttpRequests and responses.
+
+[15:30:54.0513] <rbuckton>
+this is also how a lightweight version of MEF (Managed Extensibility Framework) interacted with HttpContext to provide dependency injection for web applications. When a new HttpRequest is created, a new DI composition scope would be created and associated with the request context, allowing you to pull in request-specific services.
+
+[15:31:52.0517] <rbuckton>
+Again, I'm a few years out from using that actively so some things may have changed.
+
+[15:32:40.0579] <littledan>
+well, it's interesting to hear about this; it's not so relevant if this is current
+
+[15:33:07.0543] <rbuckton>
+The underlying logic is still actively in use, even if some parts have changed.
+
+[15:33:08.0353] <littledan>
+Does the security aspect mean that it should be top-level, or just that the framework needs to be careful about what information it nests where?
+
+[15:33:39.0671] <littledan>
+Are there any use cases here for mutating the value of an AsyncLocal, or is this all through Run?
+
+[15:34:29.0707] <rbuckton>
+It needs to be careful about information nesting. The LogicalCallContext exists to do this work for you, though awaitable things in .NET let you configure how to capture and restore execution contexts via `.ConfigureAwait()`.
+
+[15:34:45.0285] <rbuckton>
+https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task.configureawait?view=netframework-4.8#system-threading-tasks-task-configureawait(system-boolean)
+
+[15:35:04.0199] <littledan>
+Do you think we need .ConfigureAwait?
+
+[15:35:09.0988] <rbuckton>
+Hopefully not.
+
+[15:35:52.0647] <rbuckton>
+Mostly .ConfigureAwait is used to determine whether to resume on the context captured at `await` or to continue with the context that's part of the continuation.
+
+[15:36:10.0662] <rbuckton>
+One moment and I'll put together an example.
+
+[15:45:54.0001] <rbuckton>
+Actually, it shouldn't matter. `.ContinueAwait(false)` is used to resume on the same _SynchronizationContext_, which affects which thread pool is used. A UI thread in a Windows app uses a Windows message queue based thread pool, while background threads might handle the work that is being awaited. Since you have to be on the UI thread to do UI updates, you need to go back to the original synchronization context to be on the correct thread pool/thread.
+
+[15:51:32.0444] <rbuckton>
+However, context switching is still useful. Without async context flow suppression, you can still do `asyncContext.run(undefined, cb)`, but that's on an individual `AsyncContext` bases. Something like .NET's `ExecutionContext.SuppressFlow()` would suppress copying the current context for *every* `AsyncContext`. Again, that's achieveable with `wrap` but not very ergonomic.
+
+[15:52:10.0421] <littledan>
+sorry what is the purpose of context flow suppression?
+
+[15:54:18.0157] <rbuckton>
+My earlier example was an HTTP Server. you may have context information for the server itself (such as the server's security principal) that you don't want to propagate to each request handler. In that case you would suppress execution context flow so that the current context isn't copied when you spin up a request handler (which will need to set its own context).
+
+[15:54:47.0980] <Justin Ridgewell>
+I’m also not understanding that usecase
+
+[15:55:08.0646] <rbuckton>
+Its also useful if you are using an async context that is reachable both from your code and potentially untrusted/sandboxed code. You may want to suppress async flow when invoking the untrusted code so as not to leak information.
+
+[15:55:12.0286] <Justin Ridgewell>
+Is this because execution context allows you to change all contexts?
+
+[15:56:02.0756] <rbuckton>
+The untrusted code use case is very important when building an plugin/extensibility ecosystem, such as the one used in VS Code.
+
+[15:56:57.0279] <rbuckton>
+Its because there's no easy way to reset all the context information for the purpose of an invocation into untrusted code, aside from a top-level `AsyncContext.wrap((cb, ...args) => cb(...args))`.
+
+[15:57:38.0531] <littledan>
+> <@rbuckton:matrix.org> My earlier example was an HTTP Server. you may have context information for the server itself (such as the server's security principal) that you don't want to propagate to each request handler. In that case you would suppress execution context flow so that the current context isn't copied when you spin up a request handler (which will need to set its own context).
+
+OK, so in this case, the sensitive information is in an outer context, and then inner nested contexts need to not be able to see it?
+
+[15:58:09.0084] <rbuckton>
+Plus I may just want a way to kick off an async operation in a base state without whatever extra context baggage the current function is holding on to.
+
+[15:58:16.0489] <rbuckton>
+Yes.
+
+[15:58:23.0401] <littledan>
+> <@rbuckton:matrix.org> Its because there's no easy way to reset all the context information for the purpose of an invocation into untrusted code, aside from a top-level `AsyncContext.wrap((cb, ...args) => cb(...args))`.
+
+I guess, for both of these examples, a "true" top-level usage is not needed--we just need to capture this before the sensitive information is added by the server/vscode, right?
+
+[15:58:40.0312] <rbuckton>
+Again, you can do that on a case by case basis with `asyncContext.run(undefined, cb)`, but not for *all* async contexts
+
+[15:59:46.0805] <rbuckton>
+Yes, but making this specifically a case-by-case basis is very fiddly. that can be fine for an and user application, but it makes it hard for intermediate libraries to work around.
+
+[15:59:47.0882] <littledan>
+So, this is important if you have a profusion of sensitive things, where the inner modules can find the AsyncContext objects, but otoh it would be impractical to construct a list of all of them to censor them?
+
+
+2022-11-19
+[16:00:49.0888] <rbuckton>
+Sensitive or not. I may just want the code I'm executing to start fresh, such as ignoring a memoization cache stored in an async context to produce a fresh result.
+
+[16:01:19.0491] <rbuckton>
+You may not even have access to the async context you need to reset, because its defined in code you don't control. 
+
+[16:02:52.0717] <rbuckton>
+And you don't want to give users the ability to enumerate all async contexts, or change them to arbitrary values. However, most of that code will already have to defensively check whether the context value is `undefined`, so resetting to a base state isn't a terrible inconvenience.
+
+[16:03:03.0419] <littledan>
+So we're talking about the scenario where, if you're in the middle you might not have the asynccontext, but the inner code can access the asynccontext of the outer code, right?
+
+[16:03:15.0073] <littledan>
+> <@rbuckton:matrix.org> And you don't want to give users the ability to enumerate all async contexts, or change them to arbitrary values. However, most of that code will already have to defensively check whether the context value is `undefined`, so resetting to a base state isn't a terrible inconvenience.
+
+Yes, I think we all agree that we don't want to expose that capability
+
+[16:03:16.0397] <rbuckton>
+Yes, exactly.
+
+[16:05:43.0612] <rbuckton>
+> <@littledan:matrix.org> So we're talking about the scenario where, if you're in the middle you might not have the asynccontext, but the inner code can access the asynccontext of the outer code, right?
+
+This was the same concern I had about Yehuda's request for some kind of implicit propagation of cancellation tokens several years back.
+
+[16:05:48.0081] <littledan>
+OK, so you provided an API above with `ExecutionContext` to achieve this, but if we were to not care about TCP and such, I take it that this could be something like a static method `AsyncContext.fresh(cb)`
+
+[16:06:15.0415] <littledan>
+> <@rbuckton:matrix.org> This was the same concern I had about Yehuda's request for some kind of implicit propagation of cancellation tokens several years back.
+
+I have definitely been thinking about how this would apply to cancel tokens and finally fulfill the prophesy!
+
+[16:06:23.0450] <rbuckton>
+Essentially, yes. I think the TCP issues are still worth discussing in terms of ergonomics for refactoring.
+
+[16:06:39.0035] <littledan>
+yeah I'm not dismissing them just checking my understanding
+
+[16:06:56.0581] <rbuckton>
+> <@littledan:matrix.org> I have definitely been thinking about how this would apply to cancel tokens and finally fulfill the prophesy!
+
+I hope not. This is the opposite of what cancellation tokens should be. Implicit propagation is bad, explicit handoff is good.
+
+[16:07:59.0436] <littledan>
+what is the concern you had in this context?
+
+[16:08:19.0079] <rbuckton>
+Or at least, if you want implicit propagation you have to roll it yourself with your own `AsyncContext.
+
+[16:10:53.0661] <rbuckton>
+The "I'm in the middle" concern. Lets say the `fetch` API had some kind of implicit cancellation. You are a library author whose library has an async function that *must* execute a `fetch` to completion (barring network I/O or power interruption issues). If your function is called by an application that just so happens to set this implicit cancellation token for `fetch`, you have no way to preserve your *must execute* requirement.
+
+[16:11:26.0508] <rbuckton>
+This is why cancellation tokens are passed as an argument. If you are sitting in the middle, you can chose whether to forward that argument on to an API based on your function's needs.
+
+[16:11:59.0552] <rbuckton>
+If that token is in an `AsyncContext` you don't control, you have no way to preserve your invariant.
+
+[16:12:35.0306] <littledan>
+right, makes sense
+
+[16:12:53.0406] <rbuckton>
+If you're only recourse is a blunt object (i.e., `AsyncContext.fresh`), you might lose other important context information that the things *you* are calling still need.
+
+[16:14:58.0926] <rbuckton>
+So its better just to advise against it. A developer can still do it if they want to, but don't make it any easier than it has to be.
+
+[16:20:27.0373] <Justin Ridgewell>
+Are we sure we want to allow resetting all contexts, even the ones you don’t have direct access to?
+
+[16:23:04.0400] <littledan>
+I guess I'm convinced that people should be cautious about when/how to use AsyncContext, but this broader question is unclear to me
+
+[16:42:13.0259] <littledan>
+for both the vscode and server case, I kinda feel like those systems won't really run into the "in the middle" case, and like they should probably use 1-2 AsyncContexts in the first place
+
+[16:43:55.0521] <littledan>
+Within a single piece of code, you should only really use multiple AsyncContexts if they are going to differ in extent/nesting from other things, right? You would use a compound data structure within that. (It looks like this is how HTTPContext works, right?) So when you have any kind of restricted-privilege plugin system, you only have a certain set of things to censor
+
+[16:44:24.0171] <littledan>
+the "in the middle" concern seems like a good reason to not do implicit propagation of cancel tokens, but I don't see how it relates to this case of clearing all contexts
+
+[16:46:55.0154] <littledan>
+> <@rbuckton:matrix.org> If your only recourse is a blunt object (i.e., `AsyncContext.fresh`), you might lose other important context information that the things _you_ are calling still need.
+
+Sorry where you suggesting a more subtle instrument? I guess I missed that, though I guess the ExecutionContext API put the way to create and set a fresh one less "in your face", which could reduce the risk of accidental usage.
+
+[16:50:49.0749] <littledan>
+anyway thanks so much for explaining all of this, rbuckton . We don't need to come to a conclusion today, and I'm just happy that I can understand your points on this now.
+
+[16:51:54.0375] <littledan>
+Overall I'd categorize these things as, even post-Stage 2 things, to resolve before Stage 3. There aren't really any fundamental disagreements about the core semantics of this API, I think.
+
+[17:17:39.0903] <rbuckton>
+> <@littledan:matrix.org> for both the vscode and server case, I kinda feel like those systems won't really run into the "in the middle" case, and like they should probably use 1-2 AsyncContexts in the first place
+
+In one of my own projects I have at least 3 AsyncLocalStorage instances, and its a small app. Because `AsyncContext` represents a single value, as opposed to a larger mutable store like .NET's `ExecutionContext`, I would expect you will see far more of them than 1-2 in many applications.
+
+[17:18:21.0926] <rbuckton>
+> <@jridgewell:matrix.org> Are we sure we want to allow resetting all contexts, even the ones you don’t have direct access to?
+
+That's already feasible in the proposed design, just not convenient. 
+
+[17:19:02.0763] <rbuckton>
+> <@littledan:matrix.org> Sorry where you suggesting a more subtle instrument? I guess I missed that, though I guess the ExecutionContext API put the way to create and set a fresh one less "in your face", which could reduce the risk of accidental usage.
+
+I'm speaking specifically as to why transparent propagation of cancellation tokens are bad, not the async context API in general.
+
+[17:20:31.0161] <Kris Kowal>
+That’s funny because propagating cancellation tokens is almost certainly the first and most obvious thing this will be used for.
+
+[17:29:55.0616] <rbuckton>
+I expect the most obvious thing it will be used for is passing along request state in a server. That's what I'm using `AsyncLocalStorage` for (though in that case, its a Discord bot).
+
+
+2022-11-20
+[09:45:44.0647] <littledan>
+> <@rbuckton:matrix.org> That's already feasible in the proposed design, just not convenient. 
+
+I don’t think it is, because you can’t really reliably get ahold of something with no context variables defined, if the engine may define some of them (as proposed by Yoav in his talk)
+
+[09:46:34.0532] <littledan>
+> <@rbuckton:matrix.org> I expect the most obvious thing it will be used for is passing along request state in a server. That's what I'm using `AsyncLocalStorage` for (though in that case, its a Discord bot).
+
+I think priority of different threads of control is also likely to be a very immediate and important application 
+
+[11:39:21.0088] <rbuckton>
+I'm not opposed to *any* storage of a cancellation token in an async context. Its fine to do so in an application, its just that its a bad practice for library authors to depend on it if there's a chance an intermediate/middleware might need to use the API with its own level of control. For example, if `fetch` were to have a transparent cancellation mechanism, it would be bad if it didn't also introduce a way to easily suppress an implicit cancellation flow. You wouldn't want `setTimeout` to have implicit cancellation because its just used too often for too many things to have a user try to cancel one timer and accidentally cancel *every* timer that may have been created in the same flow.
+
+
+2022-11-23
+[10:57:01.0642] <Justin Ridgewell>
+I have updated the slides to include discussion on dynamic scoping: https://docs.google.com/presentation/d/1yw4d0ca6v2Z2Vmrnac9E9XJFlC872LDQ4GFR17QdRzk/edit#slide=id.g197cac9e141_3_8
+
+
+2022-11-24
+[18:07:55.0581] <Chengzhong Wu>
+Thanks, it looks good to me!
+
+[18:10:28.0092] <littledan>
+the slides give a good explanation. Presumably this is as a bonus, if people ask about it, right?
+
+[18:10:52.0903] <Justin Ridgewell>
+Yah
+
+[18:11:12.0086] <Justin Ridgewell>
+Supplemental slides if it's brought up
+
+[18:11:32.0762] <littledan>
+I think, when you're presenting this, you should give a nod to people like Chris and me, who would agree with you on substance but still say, "yeah this is dynamic scoping, and it's OK for the reasons you explain". It's OK for us to disagree about what words mean and would be silly to have an argument about that.
+
+[18:17:24.0814] <Justin Ridgewell>
+I'll be remote, but would appreciate you two chiming in when if we discuss
+
+[18:17:55.0807] <littledan>
+yeah if someone brings up "dynamic scoping" I'm happy to give my view
+
+[18:18:22.0253] <Chengzhong Wu>
+Absolutely!
+
+[18:50:55.0907] <Kris Kowal>
+My view is that dynamic scope is bad, but dynamic scope that can only be addressed lexically is not so bad. Like DeMorgan’s various laws, the pattern is more important than the specific application. An instance of that pattern is hygienic macros from Racket, which (in my meager understanding) address the bad kind of dynamic scope present in Lisp by making the gensyms on the stack addressable only lexically. But, I’ve gotten in trouble in these very halls for interpreting dynamic scope loosely! That said, I don’t mind going on the record for the first sentence of this message.
+
+[18:52:34.0316] <littledan>
+well I'd give the addendum that dynamic scope which is addressed only lexically can still be bad, if it's unstructured in the sense of letting you set the local value of a variable when it's ambiguous how "deep" in the scope stack you want to set it. (This was our experience in Factor!) This proposal avoids that pitfall as well.
+
+[18:53:00.0558] <littledan>
+anyway I would agree with the headline, "Dynamic scope is bad, but dynamic scope with [various properties] is not bad"
+
+[18:53:08.0807] <Kris Kowal>
+Right, as long as it’s superficial.
+
+[18:53:12.0734] <littledan>
+like you, I could babble unintelligibly for a while :)
+
+[18:53:53.0597] <littledan>
+we thought it was so elegant how the "name stack" was sort of parallel to the operand stack (for a RPN language)
+
+[18:54:16.0370] <littledan>
+it was propagated across coroutine resumption because call-cc simply copied all of the stacks!
+
+[18:54:28.0560] <littledan>
+much elegant, very orthogonal
+
+[18:54:47.0998] <Kris Kowal>
+and small enough to bootstrap a boot loader, i’m sure!
+
+[18:55:14.0135] <littledan>
+well, Factor isn't as well-suited to bootloaders as Forth... it needs a GC and such
+
+[18:55:43.0769] <littledan>
+though I hear people are running JVMs in their TrustZone or something so who knows
+
+[18:55:49.0011] <Kris Kowal>
+my positive experience with hybrid dynamic/lexical scope was with “Guten Tags”, but I don’t think I could ramble my way out of that bag…
+
+[18:56:17.0168] <littledan>
+> <@kriskowal:matrix.org> my positive experience with hybrid dynamic/lexical scope was with “Guten Tags”, but I don’t think I could ramble my way out of that bag…
+
+this is not very Googleable
+
+[18:56:31.0133] <Kris Kowal>
+such failed project
+
+[18:56:34.0078] <littledan>
+the thing is, the factor experience isn't actually hybrid, since the operand stack subsumes the need for lexical scope!
+
+[18:56:45.0814] <Kris Kowal>
+https://github.com/gutentags/gutentag
+
+[18:56:56.0610] <littledan>
+(though over time we made more and more use of a lexical scoping extension...)
+
+[18:58:46.0490] <Kris Kowal>
+> <@kriskowal:matrix.org> https://github.com/gutentags/gutentag
+
+In the `list` example, `items:iteration`, `items` is lexical and `iteration` is dynamic and shallow.
+
+[18:59:14.0309] <littledan>
+dynamic and shallow! this smells like partial continuations
+
+[18:59:55.0763] <littledan>
+that doc looks interesting
+
+[19:00:46.0230] <littledan>
+I think you can see the interplay of lexical and dynamic scoping in most modern web frameworks. everyone has a "context" API these days. However that needs to be cached and re-run against re-evaluating just part of the DOM tree, so AsyncContext doesn't model it so well (or does it??)
+
+[19:02:49.0973] <Kris Kowal>
+> <@littledan:matrix.org> dynamic and shallow! this smells like partial continuations
+
+partial continuations isn’t in my vocab but yes, probably an accurate description.
+
+[19:03:30.0975] <littledan>
+Sorry delimited continuations
+
+[19:04:30.0264] <littledan>
+Sorry it is an extremely high level analogy 
+
+[19:04:38.0963] <Kris Kowal>
+Oh, I know that one. I don’t think I could make that leap on my own.
+
