@@ -53,6 +53,20 @@
   <tr class="msg" id="L15"><td class="ts-cell"><a class="ts" href="#L15" alt="Fri Mar 10 2023 08:37:32 GMT-0800 (Pacific Standard Time)">16:37</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-1" title="@jridgewell:matrix.org">Justin Ridgewell</span>&gt;</div></td><td class="msg-cell">So just modifying the get method’s last step</td></tr>
   <tr class="msg" id="L16"><td class="ts-cell"><a class="ts" href="#L16" alt="Fri Mar 10 2023 08:38:49 GMT-0800 (Pacific Standard Time)">16:38</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-3" title="@jasnell:matrix.org">James M Snell</span>&gt;</div></td><td class="msg-cell">So I guess the key question then is what happens in the <code>AsyncLocalStorage.exit(...)</code> case, which Node.js defines as exiting the context scope but we've implemented as being equivalent to <code><a href="http://als.run">als.run</a>(undefined, () =&gt; {})</code></td></tr>
   <tr class="msg" id="L17"><td class="ts-cell"><a class="ts" href="#L17" alt="Fri Mar 10 2023 08:39:42 GMT-0800 (Pacific Standard Time)">16:39</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-1" title="@jridgewell:matrix.org">Justin Ridgewell</span>&gt;</div></td><td class="msg-cell">Setting to an explicit undefined isn’t the same as no found mapping, so you’d get undefined</td></tr>
+  <tr class="msg" id="L18"><td class="ts-cell"><a class="ts" href="#L18" alt="Fri Mar 10 2023 08:40:07 GMT-0800 (Pacific Standard Time)">16:40</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-3" title="@jasnell:matrix.org">James M Snell</span>&gt;</div></td><td class="msg-cell"><p>e.g. what would you expect in the following:</p>
+<pre><code>const als = new AsyncLocalStorage({ defaultValue: 'foo' });
+als.run(123, () =&gt; {
+  als.exit(() =&gt; {
+    console.log(als.getStore()); // undefined or foo?
+  }
+})
+</code></pre>
+</td></tr>
+  <tr class="msg" id="L19"><td class="ts-cell"><a class="ts" href="#L19" alt="Fri Mar 10 2023 08:41:42 GMT-0800 (Pacific Standard Time)">16:41</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-1" title="@jridgewell:matrix.org">Justin Ridgewell</span>&gt;</div></td><td class="msg-cell">Undefined, but it could really be either. AsyncContext doesn’t have an exit method, so this is really just Node</td></tr>
+  <tr class="msg" id="L20"><td class="ts-cell"><a class="ts" href="#L20" alt="Fri Mar 10 2023 08:42:24 GMT-0800 (Pacific Standard Time)">16:42</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@abotella:igalia.com">Andreu Botella</span>&gt;</div></td><td class="msg-cell">if this is only something that is a concern when implementing <code>AsyncLocalStorage</code> in terms of <code>AsyncContext</code>, I'm not sure that's enough to block this addition</td></tr>
+  <tr class="msg" id="L21"><td class="ts-cell"><a class="ts" href="#L21" alt="Fri Mar 10 2023 08:42:40 GMT-0800 (Pacific Standard Time)">16:42</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@abotella:igalia.com">Andreu Botella</span>&gt;</div></td><td class="msg-cell">it can surely be implemented anyway with an additional layer of indirection, right?</td></tr>
+  <tr class="msg" id="L22"><td class="ts-cell"><a class="ts" href="#L22" alt="Fri Mar 10 2023 08:43:10 GMT-0800 (Pacific Standard Time)">16:43</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-3" title="@jasnell:matrix.org">James M Snell</span>&gt;</div></td><td class="msg-cell">yeah, I think I just wanted to make sure that adding the default value does not actually modify the current storage context</td></tr>
+  <tr class="msg" id="L23"><td class="ts-cell"><a class="ts" href="#L23" alt="Fri Mar 10 2023 08:43:23 GMT-0800 (Pacific Standard Time)">16:43</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-3" title="@jasnell:matrix.org">James M Snell</span>&gt;</div></td><td class="msg-cell">if it's local to the <code>AsyncContext</code> instance itself, then +1</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>
