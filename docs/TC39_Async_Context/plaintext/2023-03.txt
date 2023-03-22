@@ -712,3 +712,27 @@ Of course, this `AsyncContext.wrap` binding means any other `AsyncContext` value
 [10:52:43.0903] <Ben Newman (Apollo, @benjamn on GH)>
 Is that helpful?
 
+[10:55:27.0151] <James M Snell>
+Unfortunately it doesn't exactly help. If I call c.error() within the pull, and there's a queued read, that queued read is likely not necessarily going to be rejected immediately when the `c.error` is called. It might end up getting processed from a different async scope, which means if it results in an unhandledrejection event, it will propagate the wrong context
+
+[10:56:22.0432] <James M Snell>
+going to have to play with this case a bit more to really tease out all the various cases
+
+[10:57:10.0760] <James M Snell>
+There are a variety of situations that make this complicated.
+
+[10:57:49.0983] <Ben Newman (Apollo, @benjamn on GH)>
+whatever code is scheduling/queueing those read jobs needs to be using something like `AsyncContext.wrap` to preserve the context from one job to the next, I think?
+
+[10:58:04.0171] <Ben Newman (Apollo, @benjamn on GH)>
+are you trying to get this to work without modifying library code that does this kind of scheduling? (seems hard)
+
+[10:58:06.0394] <James M Snell>
+for instance, I may have multiple reads queued, all called from separate async contexts, but a mismatched number of pulls, where one pull triggered by one context fulfills multiple reads
+
+[10:58:22.0268] <James M Snell>
+yeah, we're not in control of the ReadableStream implementations
+
+[10:58:47.0300] <Ben Newman (Apollo, @benjamn on GH)>
+ok I think I see the rub you were pointing out
+
