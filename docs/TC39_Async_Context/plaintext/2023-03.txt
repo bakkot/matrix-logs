@@ -930,3 +930,26 @@ we can break this down to a few specific questions:
 [11:29:37.0205] <James M Snell>
 2. If a read promise rejects and is unhandled, should the unhandledrejection error be called in the async context in which the read promise was rejected (which is likely different than the context that scheduled the read), or the async context that was current when the read was scheduled
 
+[11:30:08.0182] <James M Snell>
+ * 2. If a read promise rejects and is unhandled, should the unhandledrejection event be called in the async context in which the read promise was rejected (which is likely different than the context that scheduled the read), or the async context that was current when the read was scheduled
+
+[11:30:36.0177] <James M Snell>
+ * we can break this down to a few specific questions:
+
+1. Because the various "algorithms" associated with a stream are considered part of its internal implementation (e.g. start, pull, close), should those always be executed in the async context frame in which the stream itself was created or should they propagate the context that triggered the algorithm to be called
+
+[11:34:11.0291] <Ben Newman (Apollo, @benjamn on GH)>
+Mark Miller brought up a point a while back (when `AsyncContext` was last proposed), about what to do with an `AsyncContext.wrap`-bound function that gets called in a context where some `AsyncContext` instance that was previously bound with one value happens to have a different value in the new calling context
+
+[11:34:33.0070] <James M Snell>
+Keeping in mind also that people can do silly things like..
+
+```
+let controller;
+const readable = als.run(123, () => new ReadableStream({
+  start(c) { controller = c; }
+}));
+const read = als.run('abc', () => readable.getReader().read());
+als.run(321, () => controller.error('boom'));
+```
+

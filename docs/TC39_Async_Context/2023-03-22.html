@@ -120,12 +120,22 @@ await Promise.all([
   <tr class="msg" id="L49"><td class="ts-cell"><a class="ts" href="#L49" alt="Wed Mar 22 2023 11:26:23 GMT-0700 (Pacific Daylight Time)">18:26</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-3" title="@jasnell:matrix.org">James M Snell</span>&gt;</div></td><td class="msg-cell">it doesn't. Currently pull would be called within the async context of whatever read triggered it. It could also be called following the completion of the start algorithm microtask (the async context where the stream is constructed).</td></tr>
   <tr class="msg" id="L50"><td class="ts-cell"><a class="ts" href="#L50" alt="Wed Mar 22 2023 11:28:13 GMT-0700 (Pacific Daylight Time)">18:28</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-3" title="@jasnell:matrix.org">James M Snell</span>&gt;</div></td><td class="msg-cell"><p>we can break this down to a few specific questions:</p>
 <ol>
-<li>Because the various "algorithms" associated with a stream are considered part of its internal implementation (e.g. start, pull, close), should those always be executed in the async context frame in which the stream itself was created</li>
+<li>Because the various "algorithms" associated with a stream are considered part of its internal implementation (e.g. start, pull, close), should those always be executed in the async context frame in which the stream itself was created or should they propagate the context that triggered the algorithm to be called</li>
 </ol>
 </td></tr>
   <tr class="msg" id="L51"><td class="ts-cell"><a class="ts" href="#L51" alt="Wed Mar 22 2023 11:29:37 GMT-0700 (Pacific Daylight Time)">18:29</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-3" title="@jasnell:matrix.org">James M Snell</span>&gt;</div></td><td class="msg-cell"><ol start="2">
-<li>If a read promise rejects and is unhandled, should the unhandledrejection error be called in the async context in which the read promise was rejected (which is likely different than the context that scheduled the read), or the async context that was current when the read was scheduled</li>
+<li>If a read promise rejects and is unhandled, should the unhandledrejection event be called in the async context in which the read promise was rejected (which is likely different than the context that scheduled the read), or the async context that was current when the read was scheduled</li>
 </ol>
+</td></tr>
+  <tr class="msg" id="L52"><td class="ts-cell"><a class="ts" href="#L52" alt="Wed Mar 22 2023 11:34:11 GMT-0700 (Pacific Daylight Time)">18:34</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@benjamn:matrix.org">Ben Newman (Apollo, @benjamn on GH)</span>&gt;</div></td><td class="msg-cell">Mark Miller brought up a point a while back (when <code>AsyncContext</code> was last proposed), about what to do with an <code>AsyncContext.wrap</code>-bound function that gets called in a context where some <code>AsyncContext</code> instance that was previously bound with one value happens to have a different value in the new calling context</td></tr>
+  <tr class="msg" id="L53"><td class="ts-cell"><a class="ts" href="#L53" alt="Wed Mar 22 2023 11:34:33 GMT-0700 (Pacific Daylight Time)">18:34</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-3" title="@jasnell:matrix.org">James M Snell</span>&gt;</div></td><td class="msg-cell"><p>Keeping in mind also that people can do silly things like..</p>
+<pre><code>let controller;
+const readable = als.run(123, () =&gt; new ReadableStream({
+  start(c) { controller = c; }
+}));
+const read = als.run('abc', () =&gt; readable.getReader().read());
+als.run(321, () =&gt; controller.error('boom'));
+</code></pre>
 </td></tr>
 
 </tbody></table></div></div></div>
