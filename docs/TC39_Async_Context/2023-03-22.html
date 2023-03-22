@@ -29,6 +29,23 @@
   <tr class="msg" id="L0"><td class="ts-cell"><a class="ts" href="#L0" alt="Tue Mar 21 2023 17:30:53 GMT-0700 (Pacific Daylight Time)">00:30</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@littledan:matrix.org">littledan</span>&gt;</div></td><td class="msg-cell">I had some quick chats today at TC39 with dminor and bakkot, everyone seemed cautiously positive though a little uncertain about use cases. I am optimistic about the presentation but we might consider adding bonus slides that go in more depth there (eg just taking what was in legendecas’s webperf wg slides)</td></tr>
   <tr class="msg" id="L1"><td class="ts-cell"><a class="ts" href="#L1" alt="Tue Mar 21 2023 17:31:50 GMT-0700 (Pacific Daylight Time)">00:31</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@littledan:matrix.org">littledan</span>&gt;</div></td><td class="msg-cell">I didn’t get the feeling that the complexity around what things are wrapped was considered a very bad issue for either (just something to work out) but maybe I misunderstood them</td></tr>
   <tr class="msg" id="L2"><td class="ts-cell"><a class="ts" href="#L2" alt="Tue Mar 21 2023 17:32:02 GMT-0700 (Pacific Daylight Time)">00:32</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@littledan:matrix.org">littledan</span>&gt;</div></td><td class="msg-cell">Good luck this week on proposing for Stage 2!</td></tr>
+  <tr class="msg" id="L3"><td class="ts-cell"><a class="ts" href="#L3" alt="Wed Mar 22 2023 08:16:26 GMT-0700 (Pacific Daylight Time)">15:16</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-3" title="@jasnell:matrix.org">James M Snell</span>&gt;</div></td><td class="msg-cell"><p>So, here's a question. fetch has the <code>Response</code> object. This can be created using a <code>ReadableStream</code> object, which uses a number of internal promises to manage state. In workerd, we have a method that handles received requests and can return a <code>Response</code> object specifying the response to an http request. So, imagine a case like:</p>
+<pre><code>const als = new AsyncLocalStorage(); // or AsyncContext
+export default {
+  async fetch(req) {
+    const readable = als.run('abc', () =&gt; new ReadableStream({
+      pull(c) {
+        c.error(new Error(`boom ${als.getStore()}`));
+      }
+    }));
+    return als.run(123, () =&gt; new Response(readable));
+  }
+}
+</code></pre>
+<p>The actual pipe from the readable happens by the code that calls the <code>fetch</code> function handler here, which is running in the root async context where <code>als</code> store will be <code>undefined</code>.</p>
+<p>What value would you expect <code>als.getStore()</code> to return when the error is constructed?</p>
+</td></tr>
+  <tr class="msg" id="L4"><td class="ts-cell"><a class="ts" href="#L4" alt="Wed Mar 22 2023 08:17:37 GMT-0700 (Pacific Daylight Time)">15:17</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-3" title="@jasnell:matrix.org">James M Snell</span>&gt;</div></td><td class="msg-cell">Keep in mind that the pull function can be called at different times depending on the value of the <code>highWaterMark</code> configured for the readablestream</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>

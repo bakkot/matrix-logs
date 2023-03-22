@@ -642,3 +642,27 @@ I didn’t get the feeling that the complexity around what things are wrapped wa
 [17:32:02.0818] <littledan>
 Good luck this week on proposing for Stage 2!
 
+[08:16:26.0038] <James M Snell>
+So, here's a question. fetch has the `Response` object. This can be created using a `ReadableStream` object, which uses a number of internal promises to manage state. In workerd, we have a method that handles received requests and can return a `Response` object specifying the response to an http request. So, imagine a case like:
+
+```
+const als = new AsyncLocalStorage(); // or AsyncContext
+export default {
+  async fetch(req) {
+    const readable = als.run('abc', () => new ReadableStream({
+      pull(c) {
+        c.error(new Error(`boom ${als.getStore()}`));
+      }
+    }));
+    return als.run(123, () => new Response(readable));
+  }
+}
+```
+
+The actual pipe from the readable happens by the code that calls the `fetch` function handler here, which is running in the root async context where `als` store will be `undefined`.
+
+What value would you expect `als.getStore()` to return when the error is constructed?
+
+[08:17:37.0762] <James M Snell>
+Keep in mind that the pull function can be called at different times depending on the value of the `highWaterMark` configured for the readablestream
+
