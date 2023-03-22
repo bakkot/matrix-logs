@@ -681,3 +681,34 @@ That's fair. What I suspect is that for web apis, once AsyncContext is integrate
 [08:56:38.0210] <James M Snell>
 It's going to be needed regardless of where AsyncContext ultimately gets defined (tc39 or whatwg, etc)
 
+[10:51:00.0200] <Ben Newman (Apollo, @benjamn on GH)>
+Here’s my take: if/once `AsyncContext` becomes an official part of the language, utilities like `ReadableStream` could (backwards compatibly!) begin to support a contract whereby the context in effect at `ReadableStream` construction time is automatically restored each time `pull` and other callbacks are called
+
+[10:51:20.0626] <Ben Newman (Apollo, @benjamn on GH)>
+In the meantime (potentially for a long time), you might need to take matters into your own hands using `AsyncContext.wrap`:
+
+[10:51:26.0955] <Ben Newman (Apollo, @benjamn on GH)>
+``` export default {
+  async fetch(req) {
+    const readable = als.run('abc', () => new ReadableStream({
+      pull: AsyncContext.wrap((c) => {
+        c.error(new Error(`boom ${als.getStore()}`));
+      }),
+    }));
+    return als.run(123, () => new Response(readable));
+  }
+}
+```
+
+[10:51:51.0207] <Ben Newman (Apollo, @benjamn on GH)>
+With this code, the `als` with `abc` is bound to the `pull` callback function so `als.getStore()` can return `abc` instead of undefined for the Error
+
+[10:52:21.0500] <Ben Newman (Apollo, @benjamn on GH)>
+Of course, this `AsyncContext.wrap` binding means any other `AsyncContext` values coming from the caller of the `pull` callback (some code in the `ReadableStream` implementation) will now be ignored, but that’s probably safe as long as you don’t expect/care `ReadableStream` to be manipulating `AsyncContext`
+
+[10:52:25.0332] <Ben Newman (Apollo, @benjamn on GH)>
+ * Of course, this `AsyncContext.wrap` binding means any other `AsyncContext` values coming from the caller of the `pull` callback (some code in the `ReadableStream` implementation) will now be ignored, but that’s probably safe as long as you don’t expect `ReadableStream` to be manipulating `AsyncContext`
+
+[10:52:43.0903] <Ben Newman (Apollo, @benjamn on GH)>
+Is that helpful?
+
