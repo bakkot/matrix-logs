@@ -89,6 +89,28 @@ export default {
   <tr class="msg" id="L35"><td class="ts-cell"><a class="ts" href="#L35" alt="Wed Mar 22 2023 11:13:28 GMT-0700 (Pacific Daylight Time)">18:13</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-3" title="@jasnell:matrix.org">James M Snell</span>&gt;</div></td><td class="msg-cell">no</td></tr>
   <tr class="msg" id="L36"><td class="ts-cell"><a class="ts" href="#L36" alt="Wed Mar 22 2023 11:14:07 GMT-0700 (Pacific Daylight Time)">18:14</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-3" title="@jasnell:matrix.org">James M Snell</span>&gt;</div></td><td class="msg-cell">whether it throws or calls <code>controller.error(...)</code> the effect is the same, the stream is put into an errored state such that all pending and future reads are rejected with that reason</td></tr>
   <tr class="msg" id="L37"><td class="ts-cell"><a class="ts" href="#L37" alt="Wed Mar 22 2023 11:14:47 GMT-0700 (Pacific Daylight Time)">18:14</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-3" title="@jasnell:matrix.org">James M Snell</span>&gt;</div></td><td class="msg-cell">all pending reads would be rejected within the same async context and not the frame that was current when the read was scheduled</td></tr>
+  <tr class="msg" id="L38"><td class="ts-cell"><a class="ts" href="#L38" alt="Wed Mar 22 2023 11:15:17 GMT-0700 (Pacific Daylight Time)">18:15</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-3" title="@jasnell:matrix.org">James M Snell</span>&gt;</div></td><td class="msg-cell">so the unhandledrejection handler would see that context and the context that scheduled the read in the first place would be lost</td></tr>
+  <tr class="msg" id="L39"><td class="ts-cell"><a class="ts" href="#L39" alt="Wed Mar 22 2023 11:17:17 GMT-0700 (Pacific Daylight Time)">18:17</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-3" title="@jasnell:matrix.org">James M Snell</span>&gt;</div></td><td class="msg-cell"><p>Here's another example:</p>
+<pre><code>const als = new AsyncLocalStorage();
+
+const readable = als.run(123, () =&gt; new ReadableStream({
+  pull(c) {
+    c.error(`boom ${als.getStore()}`);
+  }
+}, { highWaterMark: 0 }));
+const response = als.run('abc', () =&gt; new Response(readable));
+const reader = als.run('xyz', () =&gt; response.body);
+const read1 = als.run(321, () =&gt; reader.read());
+const read2 = als.run(567, () =&gt; reader.read());
+await Promise.all([
+  als.run('???', async () =&gt; await read1),
+  als.run('!!!', async () =&gt; await read2)
+]);
+</code></pre>
+</td></tr>
+  <tr class="msg" id="L40"><td class="ts-cell"><a class="ts" href="#L40" alt="Wed Mar 22 2023 11:18:25 GMT-0700 (Pacific Daylight Time)">18:18</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-3" title="@jasnell:matrix.org">James M Snell</span>&gt;</div></td><td class="msg-cell">sorry that's a bit off... one sec</td></tr>
+  <tr class="msg" id="L41"><td class="ts-cell"><a class="ts" href="#L41" alt="Wed Mar 22 2023 11:18:26 GMT-0700 (Pacific Daylight Time)">18:18</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@benjamn:matrix.org">Ben Newman (Apollo, @benjamn on GH)</span>&gt;</div></td><td class="msg-cell">I'm not sure this works as you'd hope: <code>const reader = <a href="http://als.run">als.run</a>('xyz', () =&gt; response.body)</code>, since <code><a href="http://reader.read">reader.read</a></code> won't automatically restore the <code>xyz</code> context value when called</td></tr>
+  <tr class="msg" id="L42"><td class="ts-cell"><a class="ts" href="#L42" alt="Wed Mar 22 2023 11:19:23 GMT-0700 (Pacific Daylight Time)">18:19</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-3" title="@jasnell:matrix.org">James M Snell</span>&gt;</div></td><td class="msg-cell">that's thrown in just to make it more complex. I know it wouldn't do anything :-)</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>

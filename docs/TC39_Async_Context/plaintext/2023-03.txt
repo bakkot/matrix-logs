@@ -783,3 +783,121 @@ whether it throws or calls `controller.error(...)` the effect is the same, the s
 [11:14:47.0568] <James M Snell>
 all pending reads would be rejected within the same async context and not the frame that was current when the read was scheduled
 
+[11:15:17.0233] <James M Snell>
+so the unhandledrejection handler would see that context and the context that scheduled the read in the first place would be lost
+
+[11:17:17.0474] <James M Snell>
+Here's another example:
+
+```
+const als = new AsyncLocalStorage();
+
+const readable = als.run(123, () => new ReadableStream({
+  pull(c) {
+    c.error(`boom ${als.getStore()}`);
+  }
+}, { highWaterMark: 0 }));
+const response = als.run('abc', () => new Response(readable);
+const reader = als.run('xyz', () => response.body;
+const read = als.run(321, () => reader.read();
+await Promise.all([
+  als.run('???', async () => await read),
+  als.run('???', async () => await read)
+]);
+```
+
+[11:17:43.0396] <James M Snell>
+ * Here's another example:
+
+```
+const als = new AsyncLocalStorage();
+
+const readable = als.run(123, () => new ReadableStream({
+  pull(c) {
+    c.error(`boom ${als.getStore()}`);
+  }
+}, { highWaterMark: 0 }));
+const response = als.run('abc', () => new Response(readable);
+const reader = als.run('xyz', () => response.body;
+const read = als.run(321, () => reader.read();
+await Promise.all([
+  als.run('???', async () => await read),
+  als.run('!!!', async () => await read)
+]);
+```
+
+[11:18:25.0537] <James M Snell>
+sorry that's a bit off... one sec
+
+[11:18:26.0671] <Ben Newman (Apollo, @benjamn on GH)>
+I'm not sure this works as you'd hope: `const reader = als.run('xyz', () => response.body)`
+
+[11:18:57.0248] <James M Snell>
+ * Here's another example:
+
+```
+const als = new AsyncLocalStorage();
+
+const readable = als.run(123, () => new ReadableStream({
+  pull(c) {
+    c.error(`boom ${als.getStore()}`);
+  }
+}, { highWaterMark: 0 }));
+const response = als.run('abc', () => new Response(readable);
+const reader = als.run('xyz', () => response.body;
+const read1 = als.run(321, () => reader.read();
+const read2 = als.run(567, () => reader.read();
+await Promise.all([
+  als.run('???', async () => await read1),
+  als.run('!!!', async () => await read2)
+]);
+```
+
+[11:19:23.0332] <James M Snell>
+that's thrown in just to make it more complex. I know it wouldn't do anything :-)
+
+[11:19:26.0871] <Ben Newman (Apollo, @benjamn on GH)>
+ * I'm not sure this works as you'd hope: `const reader = als.run('xyz', () => response.body)`, since `reader.read` won't automatically restore the `xyz` context value when called
+
+[11:19:41.0583] <James M Snell>
+ * Here's another example:
+
+```
+const als = new AsyncLocalStorage();
+
+const readable = als.run(123, () => new ReadableStream({
+  pull(c) {
+    c.error(`boom ${als.getStore()}`);
+  }
+}, { highWaterMark: 0 }));
+const response = als.run('abc', () => new Response(readable);
+const reader = als.run('xyz', () => response.body);
+const read1 = als.run(321, () => reader.read());
+const read2 = als.run(567, () => reader.read());
+await Promise.all([
+  als.run('???', async () => await read1),
+  als.run('!!!', async () => await read2)
+]);
+```
+
+[11:19:52.0217] <James M Snell>
+ * Here's another example:
+
+```
+const als = new AsyncLocalStorage();
+
+const readable = als.run(123, () => new ReadableStream({
+  pull(c) {
+    c.error(`boom ${als.getStore()}`);
+  }
+}, { highWaterMark: 0 }));
+const response = als.run('abc', () => new Response(readable));
+const reader = als.run('xyz', () => response.body);
+const read1 = als.run(321, () => reader.read());
+const read2 = als.run(567, () => reader.read());
+await Promise.all([
+  als.run('???', async () => await read1),
+  als.run('!!!', async () => await read2)
+]);
+```
+
