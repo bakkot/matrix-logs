@@ -3789,3 +3789,67 @@ i'm just wondering how you plan to verify anything
 [12:14:31.0416] <Chengzhong Wu>
 In Node.js we have several micro-benchmarks that we can port to AsyncContext: https://github.com/nodejs/node/tree/main/benchmark/async_hooks
 
+[12:15:45.0329] <Chengzhong Wu>
+And we can adopt OpenTelemetry's real world use cases for benchmarking if needed.
+
+[12:15:54.0246] <shu>
+sorry let me be clearer
+
+[12:16:08.0495] <shu>
+the performance concern is that AsyncContext _itself_ will be too slow
+
+[12:16:11.0633] <shu>
+it's fine for new features to be slow
+
+[12:16:31.0376] <shu>
+the way this feature must be implemented is In The Deep at the engine level
+
+[12:16:39.0584] <shu>
+which means it affects performance of _all_ executions even if they don't use the feature
+
+[12:17:02.0887] <shu>
+i would like to see things that suggest that this feature can in fact be pay-as-you-go (or close to it), and executions that don't use the feature don't suffer performance regressions
+
+[12:17:12.0023] <shu>
+ * the performance concern is *not* that AsyncContext _itself_ will be too slow
+
+[12:17:16.0915] <shu>
+oops, missed an operative "not" above
+
+[12:17:29.0940] <Ben Newman (Apollo, @benjamn on GH)>
+V8 is already saving/restoring the `v8::Context::{Get,Set}ContinuationPreservedEmbedderData` today, which is close to what this proposal needs
+
+[12:17:39.0757] <shu>
+please, i know how V8 works
+
+[12:17:54.0615] <Ben Newman (Apollo, @benjamn on GH)>
+I know!
+
+[12:18:25.0313] <littledan>
+Yeah, it will be a clear requirement that this doesn't slow down V8. We can the existing public V8 benchmarks to verify (and I know you have CI that will also verify this after it lands).
+
+[12:18:30.0414] <shu>
+but that thing is set by the embedder in a very bounded way, in a way that V8 folks aren't 100% happy with anyway
+
+[12:18:42.0842] <shu>
+for this to become JS programmable opens up new unknowns we should understand
+
+[12:18:43.0176] <littledan>
+I'm very encouraged by how TaskAttribution landed and is always on in Chrome, apparently without performance overhead
+
+[12:18:44.0230] <Ben Newman (Apollo, @benjamn on GH)>
+fair enough / good to know
+
+[12:18:58.0696] <littledan>
+> <@shuyuguo:matrix.org> but that thing is set by the embedder in a very bounded way, in a way that V8 folks aren't 100% happy with anyway
+
+Would be great to learn in what way V8 folks aren't happy with it for now
+
+[12:19:19.0505] <shu>
+fair, i'll try to understand this unhappiness deeply so i can articulate it
+
+[12:20:06.0335] <Justin Ridgewell>
+> <@littledan:matrix.org> Yeah it'd be great to have a name brainstorm here (in an issue, not during plenary). https://github.com/tc39/proposal-async-context/issues
+
+As long as we don't call this `AsyncLocalStorage`, which is AsyncLocal-Storage and not Async-LocalStorage.      
+
