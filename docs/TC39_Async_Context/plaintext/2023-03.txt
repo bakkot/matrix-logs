@@ -1318,3 +1318,68 @@ to be clear, I mean: if `wrap` is too inefficient, then we should definitely swi
 [10:40:07.0185] <bakkot>
 Mathieu Hofman [moving off thread for readability]: also if you want to pass data from the promise-resolver to the consumer-of-the-resolved-promise, you can just... stick it in the promise? that seems like a very very different thing than the async contexts proposal
 
+[10:40:26.0711] <Ben Newman (Apollo, @benjamn on GH)>
+I think there are some other valid critiques of `wrap`, but it's possible to build many of the patterns you might want in userland, using only the current proposal
+
+[10:40:59.0361] <Justin Ridgewell>
+I agree, I think the promise should be responsible for passing data
+
+[10:41:05.0205] <Mathieu Hofman>
+I do not control intermediary code that creates and resolved these promises
+
+[10:41:07.0870] <littledan>
+> <@benjamn:matrix.org> you might not want to allocate a function for every snapshot you capture?
+
+yeah I was specifically responding to this: you can't rebuild performance in JS
+
+[10:41:15.0276] <Mathieu Hofman>
+ * I do not control intermediary code that creates and resolves these promises
+
+[10:41:24.0094] <littledan>
+but `wrap` captures the expressiveness of snapshotting
+
+[10:41:26.0227] <Mathieu Hofman>
+Hence I cannot pass data throughout
+
+[10:41:32.0712] <Justin Ridgewell>
+And in most cases, because you own the `AsyncContext` that you invoked `.run()` on, it should be possible for you to chain onto the promise and pass the value
+
+[10:41:35.0012] <Mathieu Hofman>
+That's what async context is for in the first place
+
+[10:41:51.0640] <ljharb>
+wouldn't async context Just Work for what mathieu's talking about tho? shouldn't every promise spun off of "one that has the context" also have it?
+
+[10:42:00.0042] <Mathieu Hofman>
+As I mention in the thread, I do no control intermediary promises 
+
+[10:42:14.0303] <Mathieu Hofman>
+ * As I mention in the thread, I do not control intermediary promises 
+
+[10:42:20.0920] <ljharb>
+i'd assume that "adopting the state of another promise" also adopts/merges its context map or whatever the term is
+
+[10:42:22.0539] <Justin Ridgewell>
+No, but you control the promise as it's returned from your `.run()`
+
+[10:42:57.0517] <Mathieu Hofman>
+You're assuming the promise returned by run is related?
+
+[10:43:11.0258] <Ben Newman (Apollo, @benjamn on GH)>
+another issue is that `wrap` always ignores the current calling context of the function, when you might potentially want to merge the originally bound snapshot with the calling snapshot
+
+[10:43:34.0246] <Justin Ridgewell>
+Yes? If it doesn't escape the run, then the context should be whatever is currently in the context.
+
+[10:43:46.0832] <Mathieu Hofman>
+`run` creates an execution flow. the program can store / share promises of their own creation between flows
+
+[10:43:48.0475] <Justin Ridgewell>
+If it does escape the run, then you control it.
+
+[10:44:02.0092] <littledan>
+yeah, this is what I'd like to understand better: the use cases for merging. E.g., do you need to merge over all variables, or just one or two that you're thinking about.
+
+[10:44:54.0192] <Mathieu Hofman>
+I don't control promises resolved from that promise
+
