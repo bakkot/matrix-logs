@@ -1,0 +1,16 @@
+2023-04-01
+[17:51:45.0367] <Domenic>
+> <@aliaksandr.kalenik:matrix.org> hey, I am going through Navigables spec and got a bit confused by HTML document loading step: https://html.spec.whatwg.org/multipage/document-lifecycle.html#navigate-html which is 11.1 step in "Populating a session history entry".
+> 
+> I found https://github.com/whatwg/html/issues/8095#issue-1300437093 and see that the problem appears to be that Fetch callbacks got introduced but this part of spec hasn't been updated yet.
+> 
+> I'm curious if anyone can give a hint of how document loading might look with relevant Fetch spec taken into account. I have vague idea that processResponseEndOfBody should be specified to do something about firing "load" event (which is also confusing because document does not exist on the step that does fetch call so callback cannot capture it). And I am wondering on what step and using what mechanism response body should be piped into HTML parser.
+
+My take last time I looked at this is that we'd use processResponse, incrementally read from the stream to feed it into the parser (replacing step 2), and when there's nothing more in the stream, do the end of step 2. It's not immediately clear how to fit this into an algorithm which currently does a synchronous return of _document_.
+
+[17:53:34.0303] <Domenic>
+Also it's not immediately clear how to fit this with the existing use of processResponse in https://html.spec.whatwg.org/multipage/browsing-the-web.html#create-navigation-params-by-fetching . But these problems are mostly about how to restructure the algorithms, ideally without making them even harder to read than they currently are.
+
+[17:54:30.0118] <Domenic>
+Hmm I guess maybe we just wouldn't use procesResponse in #navigate-html. We just use processResponse to save it into the navigation params, and then we can incrementally read it later. So that isn't a big deal.
+
