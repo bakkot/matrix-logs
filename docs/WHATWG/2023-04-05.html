@@ -52,6 +52,30 @@ step 3 assumes there is "response" from which URL can be obtained but "response"
 step 4 initialize navigationParams params with newly created response but step 5 that creates document using these navigationParams seems to assume that response always has non-empty URL.
 
 am I missing something or there is a bug that "Loading a document for inline content that doesn't have a DOM" should accept url?</td></tr>
+  <tr class="msg" id="L2"><td class="ts-cell"><a class="ts" href="#L2" alt="Tue Apr 04 2023 18:00:30 GMT-0700 (Pacific Daylight Time)">01:00</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-1" title="@domenicdenicola:matrix.org">Domenic</span>&gt;</div></td><td class="msg-cell"><mx-reply><blockquote> a document loading question:<br><br><a href="https://html.spec.whatwg.org/multipage/document-lifecycle.html#read-ua-inline">https://html.spec.whatwg.org/multipage/document-lifecycle.html#read-ua-inline</a><br>step 3 assumes there is "response" from which URL can be obtained but "response" is not listed in the parameters.<br>step 4 initialize navigationParams params with newly created response but step 5 that creates document using these navigationParams seems to assume that response always has non-empty URL.<br><br>am I missing something or there is a bug that "Loading a document for inline content that doesn't have a DOM" should accept url?</blockquote></mx-reply>Looks like a bug to me. I think we can just use about:blank though instead of passing in a URL.</td></tr>
+  <tr class="msg" id="L3"><td class="ts-cell"><a class="ts" href="#L3" alt="Tue Apr 04 2023 18:01:03 GMT-0700 (Pacific Daylight Time)">01:01</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-1" title="@domenicdenicola:matrix.org">Domenic</span>&gt;</div></td><td class="msg-cell"><mx-reply><blockquote> <p>streams question:</p>
+<pre><code>(async () =&gt; {
+  let stream = new ReadableStream(
+    {
+      start(controller) {
+          controller.enqueue(Promise.resolve(0)); // NOTE: enqueuing a promise
+          controller.close();
+      },
+    },
+  );
+  for await (let item of stream) {
+    console.log({ item });
+  }
+})();
+</code></pre>
+<p>(Streams are async iterable as of <a href="https://github.com/whatwg/streams/pull/980">https://github.com/whatwg/streams/pull/980</a>, though only FF has implemented as far as I know.)</p>
+<p>Here, should the <code>console.log</code> be of <code>0</code> or of a Promise for <code>0</code>? If I'm reading the various specs right, it should be a Promise. FF has it as an actual 0. The original conversation about async iterators which yield promises (in the iterator result object) decided that it should be considered a contract violation to do so - see slide 27 of <a href="https://docs.google.com/presentation/d/1U6PivKbFO0YgoFlrYB82MtXf1ofCp1xSVOODOvranBM/edit#slide=id.g223fba4116_0_196">https://docs.google.com/presentation/d/1U6PivKbFO0YgoFlrYB82MtXf1ofCp1xSVOODOvranBM/edit#slide=id.g223fba4116_0_196</a></p>
+<p>this is really an edge case, so maybe the "contract violation" is fine? it's not like the language enforces that contract. but if the intent is that it should be a Promise for 0, that probably warrants a WPT</p>
+</blockquote></mx-reply>I think it'd be best if Web IDL enforced that such cases get unwrapped, like (IIRC) the relevant ES machinery does.</td></tr>
+  <tr class="msg" id="L4"><td class="ts-cell"><a class="ts" href="#L4" alt="Tue Apr 04 2023 18:02:31 GMT-0700 (Pacific Daylight Time)">01:02</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell">there's not much ES machinery, but the closest things are async generators manually <code>yield</code>ing promises, and <code>for-await</code> over sync iterator of promises as in <code>for await (let item of [Promise.resolve(0)]) ...</code>, both of which do indeed unwrap</td></tr>
+  <tr class="msg" id="L5"><td class="ts-cell"><a class="ts" href="#L5" alt="Tue Apr 04 2023 18:03:06 GMT-0700 (Pacific Daylight Time)">01:03</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-1" title="@domenicdenicola:matrix.org">Domenic</span>&gt;</div></td><td class="msg-cell">Yes, this feels analogous to async generators manually <code>yield</code>ing promises</td></tr>
+  <tr class="msg" id="L6"><td class="ts-cell"><a class="ts" href="#L6" alt="Tue Apr 04 2023 18:04:39 GMT-0700 (Pacific Daylight Time)">01:04</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell">unfortunately unwrapping means you have to <code>await</code> every value, which is kind of annoying. maybe there can be a check to see if the type of the iterator could be something <code>await</code>-able, so it's only in generic cases like the ReadableStream ctor rather than having to pay the cost of <code>await</code>ing for all async iterables? but on the other hand maybe not worth trying to optimize away the extra <code>await</code>.</td></tr>
+  <tr class="msg" id="L7"><td class="ts-cell"><a class="ts" href="#L7" alt="Tue Apr 04 2023 18:04:53 GMT-0700 (Pacific Daylight Time)">01:04</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell">anyway, I'll open a webIDL issue</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>
