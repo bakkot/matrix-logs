@@ -1,0 +1,1986 @@
+2022-06-06
+[21:18:13.0183] <Kris Kowal>
+Thank you ljharb for creating this space and welcome interested parties in module loader virtualization. I’ve invited as many handles as I could recognize at a glance and I will try to gather the missing champions and collaborators.
+
+[21:24:03.0794] <Kris Kowal>
+By wave of an update, I’m working with the champion group to narrow the focus of the Compartments proposal to just module loader virtualization https://github.com/tc39/proposal-compartments/pull/46
+
+[21:26:15.0964] <Kris Kowal>
+Specifically in order to present the narrowest profile to the wind. There’s enough interest in the topic and two years of experience vetting the Compartments proposal (stage 1) that it’s time to push for 2.
+
+[21:27:46.0767] <Kris Kowal>
+By which I mean I hope to present on behalf of champions and collaborators, not at this plenary, but the next one in July, resources and alignment willing.
+
+[21:31:28.0179] <Kris Kowal>
+I invite Luca Casonato and guybedford (Guy Bedford) specifically because of our mutual interest. Talking with Guy yesterday, there’s substantial overlap between the problems that import reflection seeks to solve https://github.com/tc39/proposal-import-reflection, and the solutions that Compartments provide. And, Compartments I believe solve those problems without needing new syntax (relitigating the original import assertions proposal (import as)), relaxing idempotent import, or complicating cache keys.
+
+[21:36:03.0402] <Kris Kowal>
+I invite Surma because I believe the Compartments design can help inform the conversation about module blocks. One of our goals with Compartments is to create a clear distinction between a StaticModuleRecord and a ModuleDescriptor, which 262 currently conflates. Separating those concerns makes clear to me at least that we should choose whether a module block is reïfied as a StaticModuleRecord or a ModuleDescriptor, the latter containing the former. If a block is a StaticModuleRecord, that suggests easy portability between workers but doesn’t imply a full module specifier or module metadata.
+
+[21:37:03.0559] <Kris Kowal>
+The Compartments API also cleanly separates module specifier namespaces from module metadata, since we find that import.meta.url in particular must be a host-specific extension, and must be omissible in some hosts.
+
+[21:37:43.0412] <Kris Kowal>
+I think that position also clarifies our feelings about some of the design tensions we see in module blocks and look forward to discussing that.
+
+[21:40:55.0474] <Kris Kowal>
+My hope is to recruit you all to our common cause 🙂
+
+
+2022-06-07
+[21:29:01.0191] <Jack Works>
+Hello ~
+
+[21:53:50.0131] <Jack Works>
+In the [current](https://github.com/tc39/proposal-compartments/blob/6a180313515f6faec2818dad229e6921109b50f5/README.md) `ThirdPartyStaticModuleRecord` API, the initialize function only receives a `ModuleEnvironmentRecord` (which looks like only containing `import` and `export` bindings). There is no way to access the `globalThis` of the current executing compartment.
+
+Lacking this ability make it impossible to compile a ES Module into a `ThirdPartyStaticModuleRecord`.
+
+[22:17:54.0323] <Kris Kowal>
+For folks tuning in, Jack is trying to build a no-eval shim for Compartments that precompiles ESM into a bundle.
+
+[22:18:25.0948] <Kris Kowal>
+I assume you’re aware that third-party static-module-records can’t emulate live bindings.
+
+[22:19:30.0107] <Kris Kowal>
+Jack Works: Have you looked at https://github.com/endojs/endo/blob/master/packages/compartment-mapper/src/bundle.js
+
+[22:20:06.0187] <Kris Kowal>
+That uses the SES shim’s static module record to create a bundle. It’s not a complete implementation, but it might be similar to your approach.
+
+[22:20:07.0298] <Jack Works>
+> <@kriskowal:matrix.org> I assume you’re aware that third-party static-module-records can’t emulate live bindings.
+
+I'm aware that it cannot get the globalThis of the current compartment (it didn't pass as an argument in the initialize function)
+
+[22:21:41.0513] <Kris Kowal>
+Yes. My point was tangential to that concern.
+
+[22:21:57.0796] <Kris Kowal>
+I imagine we could thread globalThis into the initialize options bag.
+
+[22:22:33.0092] <Kris Kowal>
+I’m not entirely sure why it’s necessary for your implementation.
+
+[22:22:58.0425] <Jack Works>
+For example, I write `Math`.
+
+[22:22:58.0894] <Kris Kowal>
+Oh, I see.
+
+[22:23:16.0079] <Jack Works>
+I need to look it up in the current compartment's globalThis 
+
+[22:23:35.0453] <Kris Kowal>
+Thanks, I understand. The crux of the issue is that static module records must be reusable between compartments, and the global environment varies from initialization to initialization.
+
+[22:23:39.0104] <Jack Works>
+And those unresolved global variable lookup should be per-compartment
+
+[22:23:51.0651] <Kris Kowal>
+So, indeed, we should thread globalThis into the initializer.
+
+[22:25:11.0417] <Jack Works>
+I previously understand ModuleRecordEnvironment as "an exotic object that is a reification of 'lexical scope(import export bindings) and dynamic scope (globalThis)" 
+
+[22:25:43.0491] <Jack Works>
+But you just clarified that Module environment record does not contain globalThis so I need a new mechanism for this
+
+[22:26:25.0809] <Kris Kowal>
+That is certainly a reasonable design and I’m open to entertaining the idea still. I will make a point to ask Moddable for a clarification about what they did in XS.
+
+[22:27:27.0190] <Kris Kowal>
+But otherwise, whether or not to have module environment record capture global environment record is something we will want engine vendors to motivate.
+
+[22:32:39.0222] <Kris Kowal>
+Oh, module environment record *mustn’t* capture global environment record, because that includes top-level declarations of Script eval. Modules aren’t supposed to see those.
+
+[22:33:24.0040] <Kris Kowal>
+So either module environment record needs to fall through to properties of globalThis, or we need to thread globalThis into the module initializer.
+
+[22:33:55.0951] <Kris Kowal>
+Again, either way is fine with me.
+
+[22:34:10.0968] <Kris Kowal>
+And I’ll make a note in the proposal README refresh PR.
+
+[22:34:11.0275] <Jack Works>
+Aren't decorations created in Script either eval-by-eval or on globalThis? 
+
+[22:34:21.0744] <Jack Works>
+* Aren't decls created in Script either eval-by-eval or on globalThis? 
+
+[22:34:38.0450] <Kris Kowal>
+Yes, that’s true most of the time. 262 does not currently specify the behavior of REPLs.
+
+[22:34:49.0809] <Kris Kowal>
+But REPLs persist the “global contour” between evals.
+
+[22:35:33.0686] <Jack Works>
+Oh I didn't notice REPLs. Does that specified in the language? I thought it was made by implementation for debugging 
+
+[22:35:48.0048] <Kris Kowal>
+That’s not something I hope to address in Draft 1 but expressly supporting the REPL case in the language would be an obvious thing to add to Compartment.
+
+[22:35:57.0945] <Kris Kowal>
+It’s not specified in the language.
+
+[22:38:48.0368] <Jack Works>
+I'm ok with either, but in a normal ES module, if you import x, then you no longer be able to refer to the global x (globalThis.x is not a direct refer). So if we want to have binding shallow behavior, or you still want to have globalLexicals in the API, I guess making it all in one object will be easier. 
+
+[22:42:32.0982] <Kris Kowal>
+globalLexicals would be analogous to globalContour. The former applies to modules only, the latter to scripts only. I haven’t added globalLexicals to the proposal yet, and might not until we discuss the layering of Lockdown. globalLexicals have a very limited use, and we found a way to avoid it for now at Agoric. That is, metering guest code.
+
+[22:44:09.0232] <Kris Kowal>
+But your hint is good. If we did have globalLexicals, having the module environment record reflect the entire top of stack would be more desirable.
+
+[22:45:21.0284] <Kris Kowal>
+I think that convinces me that we should put the burden on the module environment record.
+
+[09:21:57.0126] <Kris Kowal>
+(Aside: Moddable’s invention of “module descriptors” is truly wonderful in simplifying the Compartment API. We’ve been able to remove the `compartment.module` method and the `moduleMapHook`.)
+
+
+2022-06-08
+[10:06:13.0502] <littledan>
+Hola
+
+[10:06:25.0430] <ryzokuken>
+hola ^2
+
+[10:06:26.0945] <Kris Kowal>
+Como etc
+
+[10:06:36.0469] <shu>
+are we repurposing this room to be for all module-related proposals?
+
+[10:06:57.0816] <shu>
+(could we rename if so?)
+
+[10:07:09.0240] <Kris Kowal>
+Yes, I’m repurposing the compartments proposal for module loader proposal.
+
+[10:07:19.0353] <shu>
+what is the module loader proposal?
+
+[10:07:50.0582] <littledan>
+the non-module-related parts of compartments are being split out
+
+[10:07:50.0653] <Kris Kowal>
+Module loading was a subset of tc39/proposal-compartments. I’ve an open PR to narrow the focus to modules.
+
+[10:08:02.0793] <littledan>
+I'm a huge fan of this change
+
+[10:08:14.0414] <Kris Kowal>
+https://github.com/tc39/proposal-compartments/pull/46
+
+[10:08:16.0477] <littledan>
+how about we call this room "TC39 Modules"
+
+[10:08:25.0847] <shu>
+no i was asking something else, are we repurposing this room to also include the discussion of module blocks and import reflection?
+
+[10:08:28.0799] <shu>
+if so, let's rename
+
+[10:08:32.0963] <shu>
+if not, let's make a new room called TC39 Modules, yes
+
+[10:09:22.0757] <Jack Works>
+> <@kriskowal:matrix.org> Module loading was a subset of tc39/proposal-compartments. I’ve an open PR to narrow the focus to modules.
+
+new globalThis for each compartment is a must on our needs, want to make sure it is not removed from compartment
+
+[10:09:54.0827] <Kris Kowal>
+Ah, I’m in favor of a venue called Modules since it’s not my intention to increase the scope of Compartments to close over blocks and “static import”
+
+[10:10:25.0648] <Kris Kowal>
+My intention is to champion both shared-global and unique-globals.
+
+[10:10:32.0330] <Kris Kowal>
+Both modes are useful.
+
+[10:11:42.0631] <guybedford>
+I guess one question is where should the new StaticModulRecord be specified?
+
+[10:11:49.0480] <guybedford>
+If we can agree that such a userland record should exist?
+
+[10:12:40.0736] <guybedford>
+not userland - user exposed
+
+[10:12:45.0212] <Jack Works>
+> <@guybedford:matrix.org> If we can agree that such a userland record should exist?
+
+for module block proposal, it must exist
+
+[10:14:09.0010] <shu>
+i am supportive of such a thing existing and is user-exposed, yes
+
+[10:14:31.0603] <shu>
+(also let's invite the module blocks folks in here like Surma, not sure how to do that)
+
+[10:14:37.0198] <littledan>
+there's clearly going to be some design which is shared between proposals. I think we should avoid too much churn between repos/URLs as we develop this though
+
+[10:14:52.0713] <Kris Kowal>
+I invited Surma when we created the room.
+
+[10:15:06.0487] <shu>
+ah excellent
+
+[10:15:19.0405] <littledan>
+maybe we should call the intersection of things the "loader proposal" and name things around that?
+
+[10:15:26.0177] <Jack Works>
+> <@littledan:matrix.org> there's clearly going to be some design which is shared between proposals. I think we should avoid too much churn between repos/URLs as we develop this though
+
+now we're going to have a proposal dependency graph to link 🎉
+
+[10:15:53.0770] <shu>
+The Loader of Things
+
+[10:16:04.0686] <Kris Kowal>
+I’m in favor of not thinking too hard about layering yet. We need the proposals to be cohesive and none of them can advance without a notion of StaticModuleRecord.
+
+[10:16:41.0440] <shu>
+let's talk administrative stuff, what's a cadence people are open to at first blush?
+
+[10:16:50.0567] <shu>
+1h @ monthly? too little time?
+
+[10:17:04.0157] <littledan>
+weekly or biweekly would work for me. Monthly seems too slow given the timelines that people mentioned already
+
+[10:17:14.0121] <littledan>
+we could do monthly if we do lots of async work though
+
+[10:17:23.0036] <Kris Kowal>
+> <@shuyuguo:matrix.org> The Loader of Things
+
+I have twin dark fates: to forever toposort dependencies and be in meetings that are thinly veiled parodies of LotR. My last long standing meeting was called “The Fellowship of the Hashring”
+
+[10:17:37.0373] <shu>
+yes i do think monthly is too slow, not sure why i led with that
+
+[10:18:01.0856] <shu>
+i'll put together a doodle for initial time, and lead with 1hr @ every 2 weeks
+
+[10:18:27.0605] <Kris Kowal>
+In the interest of conservation of weekly hours, I will entertain any module conversation at SES Strategy every week, probably forever.
+
+[10:18:59.0156] <Kris Kowal>
+I can participate in a supplementary meetings at a lower cadence.
+
+[10:19:04.0768] <shu>
+i'd rather we move all of it to a module call, unless the SES folks also want to repurpose the SES call to be just about modules
+
+[10:19:28.0202] <Kris Kowal>
+SES straddles Europe/Pacific. The other time should straddle Pacific/Asia
+
+[10:20:17.0112] <Jack Works>
+I can join any meetings (when I am awake), Europe/Pacific meetings usually too late for me
+
+[10:20:28.0711] <Kris Kowal>
+For a limited time, we will prioritize modules over other popular SES Strategy topics. ShadowRealms have mostly graduated. Records and Tuples can wait.
+
+[10:20:41.0742] <shu>
+i'd prefer that folks interested in the module proposals not feel pressured to attend SES calls
+
+[10:20:47.0194] <guybedford>
+Especially given the next meeting is so soon, perhaps a weekly call would be beneficial? There's a lot of material here.
+
+[10:21:10.0266] <guybedford>
+Ideally if we could work roughly to an agenda that might help too
+
+[10:22:00.0680] <shu>
+so i propose that module discussions move out of the SES calls into this new call, *or* non-module SES topics are suspended and we just have one call until the module charter runs out
+
+[10:23:19.0064] <shu>
+and given that SES calls have a set time already, i lean towards the first option
+
+[10:23:28.0722] <guybedford>
+Building cross-specification agreement seems to be the value proposition here, so having a dedicated meeting makes sense to me
+
+[10:23:34.0057] <Kris Kowal>
+Well, I can give you a meeting where SES topics that don’t overlap modules are in indefinitely postponed.
+
+[10:23:48.0001] <Kris Kowal>
+ * Well, I can give you a meeting where SES topics that don’t overlap modules are indefinitely postponed.
+
+[10:24:17.0479] <Jack Works>
+do we need a new repo and all module related proposals refer to it?
+
+[10:24:32.0413] <shu>
+Kris Kowal: are you and the SES folks suspend the SES calls in favor of this one until the module topics runs its course in this independent call?
+
+[10:24:36.0490] <Jack Works>
+ * do we need a new repo for the module record and all module related proposals refer to it?
+
+[10:24:40.0123] <shu>
+ * Kris Kowal: are you and the SES folks open to suspend the SES calls in favor of this one until the module topics runs its course in this independent call?
+
+[10:24:55.0918] <shu>
+i really don't want multiple "rooms where it happens"
+
+[10:24:58.0264] <Kris Kowal>
+I can only say that I only have space in my workweek to run one meeting.
+
+[10:25:12.0313] <shu>
+understood, not asking you to convene
+
+[10:25:32.0608] <Kris Kowal>
+And I would be delighted to convene ;-)
+
+[10:31:21.0353] <Kris Kowal>
+@shu But, by all means, please share a Doodle so we can find a good commons.
+
+[10:31:35.0760] <Kris Kowal>
+ * shu:  But, by all means, please share a Doodle so we can find a good commons.
+
+[10:32:27.0254] <shu>
+making a doodle as we speak
+
+[10:50:05.0798] <Kris Kowal>
+littledan: I could use your eyes on the compartments-as-loader proposal with an eye for how to fit import assertions in. That is one concern I’ve not written in.
+
+[10:51:26.0503] <Kris Kowal>
+There are some obvious places to account for it, like adding an options bag to the import method. Probably also obviously necessary to thread those options into the loadHook.
+
+[10:52:01.0103] <Kris Kowal>
+But also perhaps obviously _not_ thread it into the loadHook, because that invites the virtual host to abuse it for non-assertions.
+
+[10:53:00.0647] <Kris Kowal>
+In order for us to preserve the character of import assertions, it might be necessary to add a “type” property to module descriptors, such that the Compartment is in a position to maintain the assertion.
+
+[10:53:31.0426] <shu>
+reflector issue and doodle up: https://github.com/tc39/Reflector/issues/436
+
+[10:53:42.0588] <shu>
+i'll cross-post in TC39 Delegates for visibility
+
+[10:53:57.0751] <Kris Kowal>
+That in turn makes a case for continuing to encapsulate “link”
+
+[10:57:05.0469] <Kris Kowal>
+Is this intentionally Doodle with a little D, or am I looking at the spreadsheet a form reports to?
+
+[10:59:57.0404] <Kris Kowal>
+https://github.com/tc39/proposal-compartments/issues/37
+
+[13:12:39.0202] <Kris Kowal>
+I withdraw the question. This is clearly superior to Doodle with a big D regardless.
+
+[13:14:08.0515] <Kris Kowal>
+I went ahead and added a column for the 10:00 AM Pacific time slot. We can deconvene SES Strategy if that time slot is winful.
+
+[13:43:27.0866] <shu>
+it is intentionally doodle with little d
+
+[13:43:36.0848] <shu>
+but i have been incorrectly capitalizing it
+
+[13:44:31.0870] <shu>
+i stole the sheet from a PM internally, i was real tired of the huge amount of large banner ads on actual doodle
+
+[13:46:57.0698] <guybedford>
+it's incredibly impressive, certainly decapitalizing doodle there :P
+
+[13:48:18.0545] <shu>
+spreadsheets: the one true programming environment
+
+[14:00:39.0100] <littledan>
+I take it 2-weekly means "every two weeks" not "twice a week" right?
+
+[14:05:42.0388] <shu>
+that's correct
+
+[14:13:17.0893] <littledan>
+that's a relief
+
+[14:40:30.0314] <Kris Kowal>
+The CommonJS debates were about a month of continuous debate with thousands of messages. I definitely can’t sustain that kind of engagement anymore, but I certainly care enough to try 😂
+
+[14:44:39.0919] <Kris Kowal>
+> <@shuyuguo:matrix.org> spreadsheets: the one true programming environment
+
+Pitch: spreadsheets but comic sans.
+
+[14:52:58.0685] <littledan>
+I feel like we don't have all that many points to actually make opinionated decisions here, that most of the API should sort of flow through "naturally"
+
+[14:55:23.0057] <littledan>
+so many things are nailed down already by the nature of modules already
+
+[15:00:59.0070] <Kris Kowal>
+Mark and I have decided to get ahead of the inevitable bikeshed and suggest renaming the Compartments proposal to merely Loader. https://github.com/tc39/proposal-compartments/pull/48
+
+[15:01:55.0786] <littledan>
+love it
+
+[15:01:58.0508] <Kris Kowal>
+It’ll remain Compartment in the quiet of our hearts.
+
+[15:02:00.0950] <littledan>
+lean in
+
+[15:02:35.0159] <littledan>
+(if you want to keep it as compartments, that's fine with me)
+
+[15:02:49.0048] <littledan>
+I guess the sort of core of this being compartment-like is having its global specified
+
+[15:02:57.0774] <littledan>
+i wonder if there's some way to refer to that... I can't think of it
+
+[15:03:04.0761] <Kris Kowal>
+Further simplifications to come to court the majority.
+
+[15:04:22.0133] <Kris Kowal>
+Right, and in the majority use-case, folks will want to share the global environment record from host to guest, so we’re discussing making that the default, and keeping a carve-out for a new-global behavior. We don’t actually need much from the new-global carve-out to build Lockdown in userland.
+
+[15:07:25.0677] <Kris Kowal>
+And I would like to prepare a PR with an inside-out version of Loader like what Guy proposes, based on Compartment shim internals, to vet guybedford’s ModuleInstance by contrast. It will be interesting to see them side-by-side.
+
+[16:54:24.0037] <Kris Kowal>
+In [Guests share host by default #50](https://github.com/tc39/proposal-compartments/pull/50), I’m attempting to make the Loader proposal more juicy for SES-indifferent crowd by making Loader() as useful as possible to what I believe will be many people’s needs with no options provided.
+
+[16:54:59.0460] <Kris Kowal>
+It’s at the end of the day, just pivoting the defaults.
+
+
+2022-06-09
+[17:41:04.0562] <Kris Kowal>
+I sketched guybedford (Guy Bedford) and Luca Casonato ’s ModuleInstance in the context of the Loader née Compartments proposal https://github.com/tc39/proposal-compartments/pull/51
+
+[17:42:06.0018] <Kris Kowal>
+In short, it doesn’t obviate the need for Loader, because dynamic import has to fall through.
+
+[17:42:55.0065] <Kris Kowal>
+It may be interesting to include a `ModuleInstance` constructor regardless, but it doesn’t reduce the scope of the Loader proposal.
+
+[18:23:32.0181] <Kris Kowal>
+On further reflection (updated above PR, it’s possible to implement Loader in user code, with all of the “static import” part of Import Reflection, ModuleInstance, and a Global constructor for the hardened JavaScript case. The user-code Loader wouldn’t be able to do import reflection on your behalf, so you’d have to learn harder on that.
+
+[18:24:50.0500] <Kris Kowal>
+The user code loader would have to thread a dynamic import (or not).
+
+[20:50:02.0934] <Kris Kowal>
+guybedford: When you say “Synthetic”, as in static module record, is that equivalent to how I’ve been using “third-party” in the Loader (née Compartments) proposal? If so, I like it and would be glad to propose a change.
+
+[21:46:08.0612] <Kris Kowal>
+Oh, story checks out. You’re borrowing a term from WebIDL https://github.com/tc39/proposal-compartments/issues/36
+
+[22:52:34.0513] <Jack Works>
+can I join the zoom meeting with a web client and be able to share screen? 👀
+
+[22:53:10.0633] <Jack Works>
+for this event
+
+[23:52:52.0210] <naugtur>
+you definitely can join, didn't test sharing
+
+[23:53:06.0676] <naugtur>
+we can switch to something else if that's an issue
+
+
+2022-06-11
+[15:36:24.0203] <Kris Kowal>
+Sketch for how the compartments proposal might account for import type assertions https://github.com/tc39/proposal-compartments/pull/61
+
+
+2022-06-13
+[11:07:53.0861] <shu>
+i plan to finalize a timeslot and cadence by EOD today: https://github.com/tc39/Reflector/issues/436#issuecomment-1154186322
+
+[11:08:09.0156] <shu>
+if you haven't voted on the doodle excel that is neither Doodle nor Excel, please do so
+
+
+2022-06-14
+[20:04:29.0193] <shu>
+call is finalized: https://github.com/tc39/Reflector/issues/436#issuecomment-1154620771
+
+[20:04:32.0528] <shu>
+check the TC39 calendar!
+
+[20:04:40.0772] <shu>
+and see you all Tuesday, Jun 21
+
+[15:14:40.0059] <Kris Kowal>
+Question for engine vendors: can we reveal the loader hooks of the host to guest code? https://github.com/tc39/proposal-compartments/issues/63
+
+[15:16:05.0767] <Kris Kowal>
+My intuition is “maybe?” The loadHook is basically fetch + compile.
+
+[15:17:35.0430] <naugtur>
+Some loader hooks exist in Node.js https://nodejs.org/api/esm.html#hooks
+
+[15:48:25.0757] <Kris Kowal>
+Ah, this hints at James Browning’s suggestion of passing `defaultLoadHook` as an argument.
+
+[15:52:36.0886] <Kris Kowal>
+Noted in the issue^
+
+[15:52:56.0041] <Kris Kowal>
+So the question remains but specifically for browser vendors.
+
+[15:53:30.0853] <Kris Kowal>
+I posted another motivating example, inter-compartment linkage https://github.com/tc39/proposal-compartments/pull/64/files
+
+[16:01:57.0401] <shu>
+my intuition is a strong "preferably not"
+
+[16:13:06.0703] <Kris Kowal>
+Also, looking for a temperature check for whether to share or detach compartments by default https://github.com/tc39/proposal-compartments/issues/65
+
+[16:47:19.0475] <Kris Kowal>
+Quick fix for namespace object bindings, since `*` is _not_ a reserved export name. https://github.com/tc39/proposal-compartments/pull/66
+
+[16:56:05.0338] <Kris Kowal>
+importMetaHook found to be superfluous https://github.com/tc39/proposal-compartments/pull/67
+
+
+2022-06-16
+[05:09:35.0906] <Jack Works>
+I presented the latest updates of compartment proposal and having some question from the JSCIG
+
+[05:11:00.0342] <Jack Works>
+Why "loader" will provides the virtualization of the global object? They looks overlap with ShadowRealm
+
+[05:13:13.0344] <Jack Works>
+Actually I'm also curious about this problem. If I have Compartment proposal, ShadowRealm is useless to me. It is hard to use and not provide more abilities than compartment (when the intrinsic are froze).
+
+[10:34:12.0435] <Kris Kowal>
+There is indeed some overlap, and some of that falls out naturally from the nesting of the dolls: Every realm is among other things a loader. And there will be some subtlety to whether a Realm or a Compartment is a good fit for a particular use case.
+
+[10:35:56.0151] <Kris Kowal>
+One big difference is that a Loader-with-a-new-global comes with only three fresh intrinsics: new evaluators bound to the compartment.
+
+[10:36:57.0181] <Kris Kowal>
+Consequently, module instances can be shared between loaders, whereas module instances cannot be shared between realms.
+
+[10:37:13.0343] <Kris Kowal>
+Static module records can of course be shared in both cases.
+
+[10:40:11.0357] <Kris Kowal>
+HMR and test watchers can be done with either, but for these cases I think Compartment-with-shared-global is much lighter and can hand off state more easily.
+
+[10:40:52.0082] <Kris Kowal>
+Deferred execution can not be done by a Realm. That’s the case Guy and Luca brought to our last plenary.
+
+[10:41:49.0114] <Kris Kowal>
+This is a good question, though, and we need to document an answer in the Compartment design rationale.
+
+[10:41:52.0385] <legendecas>
+Is deferred execution related to a distinct global object?
+
+[10:42:53.0661] <Kris Kowal>
+And that is in fact issue #1 https://github.com/tc39/proposal-compartments/issues/1
+
+[10:43:20.0559] <Kris Kowal>
+No, you can defer execution with a shared global. That’s orthogonal.
+
+[10:44:39.0776] <Kris Kowal>
+One motivating case for detached global is our Hardened JavaScript isolation mechanism. That’s at least my primary motivation as a champion.
+
+[10:46:02.0082] <Kris Kowal>
+We can shim most of what we need with a very minimal carve-out for a detached global. Without that carve-out, the hardened JavaScript shim (`ses`) would continue to need to fully emulate the loader aspect.
+
+[10:46:54.0534] <legendecas>
+Thanks for the reply. I'm interested in the details about how ShadowRealm could work with Compartment/Loaders
+
+[10:47:14.0475] <legendecas>
+Wondering if that could be done with composing ShadowRealm with Compartments?
+
+[10:48:47.0696] <Kris Kowal>
+So, the way the spec text is likely to go for compartments/loaders begins with a refactoring to decouple the existing Loader from the existing Realm in the spec, such that the Realm is a Loader, but not necessarily the only loader in that realm.
+
+[10:50:09.0486] <Kris Kowal>
+So, as a consequence of the factoring, ShadowRealm and Compartment can be used in tandem. But, I suspect you have something else in mind.
+
+[10:51:34.0809] <legendecas>
+Well, the question about why we need a "detached global" just come up to my mind when I find that the proposal is going to be renamed as Loader, which sounds to me has nothing to do with globals at the first place
+
+[10:52:15.0316] <Kris Kowal>
+One *interesting* motivating use case that would rely on both ShadowRealm and Compartment would be creating a Compartment inside a ShadowRealm with different hooks. That is to say, constructing a ShadowRealm and then bootstrapping a non-host module-loader.
+
+[10:52:50.0336] <Kris Kowal>
+That’s a good argument to continue calling it Compartment, but the substance of the proposal would be identical regardless.
+
+[10:52:52.0616] <legendecas>
+> <@kriskowal:matrix.org> One *interesting* motivating use case that would rely on both ShadowRealm and Compartment would be creating a Compartment inside a ShadowRealm with different hooks. That is to say, constructing a ShadowRealm and then bootstrapping a non-host module-loader.
+
+Yeah, this is what I have in my mind too
+
+[10:53:47.0426] <Kris Kowal>
+As a champion, I’m eager to deëmphasize the detached global feature, but not remove it.
+
+[10:54:20.0142] <Kris Kowal>
+Because there are so many cases where a Compartment with a shared global is useful, I imagine that will be the primary usage.
+
+[10:55:58.0819] <legendecas>
+I would be happy to see the works going on to elaborate the design rationale in the repo on this :D
+
+[10:56:04.0244] <Kris Kowal>
+A Compartment with a detached global is necessary for other single-realm isolation motivating cases.
+
+[10:56:29.0957] <Kris Kowal>
+Yes, for sure.
+
+
+2022-06-21
+[09:02:24.0834] <littledan>
+hi all
+
+[09:02:26.0969] <Kris Kowal>
+I’m in the lobby https://meet.google.com/row-whjm-rpn
+
+[09:02:39.0701] <Jack Works>
++1
+
+[09:02:42.0646] <Kris Kowal>
+Not sure whether this is the venue, shu 
+
+[09:02:49.0657] <littledan>
+me too, waiting to get in
+
+[09:02:53.0974] <naugtur>
+I'm in there too
+
+[09:03:01.0739] <littledan>
+Kris, excellent slides
+
+[09:03:23.0791] <Mathieu Hofman>
+I'm still waiting to be let in
+
+[09:03:27.0684] <Kris Kowal>
+Great, fi was shooting for “bad”
+
+[09:03:35.0507] <shu>
+sorry, previous meeting ran over, omw
+
+[09:09:42.0250] <Luca Casonato>
+If you are in the waiting room, maybe try rejoin?
+
+[10:25:52.0616] <shu>
+yulia: still around?
+
+[10:26:21.0141] <shu>
+can you join the meet again rq? i can't add a co-host via the calendar configuration dialogs for some reason, i wonder if i need to do it within the call itself
+
+[10:26:29.0823] <yulia>
+yes
+
+[10:27:24.0283] <shu>
+okay, i'm off the call now, see if you can rejoin without me being there
+
+[10:27:30.0758] <yulia>
+it forces me to request again
+
+[10:27:33.0857] <yulia>
+so i can't enter without you
+
+[10:27:34.0365] <shu>
+hmm
+
+[10:28:49.0131] <nicolo-ribaudo>
+If I remember correctly, people invited to the calendar event can join without permission. It's not ideal, but we can start by inviting all the people that were present today
+
+[10:29:23.0790] <littledan>
+leo reported being able to join without waiting in the lobby
+
+[10:29:57.0751] <nicolo-ribaudo>
+Leo was one of the people invited on calendar
+
+[10:30:08.0436] <yulia>
+uhhhh
+
+[10:30:10.0888] <yulia>
+it still doesnt work
+
+[10:30:11.0613] <shu>
+oops, forgot to save
+
+[10:30:15.0004] <shu>
+sorry try again
+
+[10:30:16.0162] <yulia>
+ahaha
+
+[10:30:30.0929] <yulia>
+\o/ it works
+
+[10:30:52.0929] <shu>
+okay great, it should also let you admit other people next time
+
+[10:30:54.0874] <shu>
+thanks for testing
+
+[10:32:44.0795] <shu>
+for next time: Yulia, Kris, Dan, and Jack Works are co-hosts and can admit other folks
+
+[10:33:43.0745] <shu>
+also, just realized, next meeting falls on US 4th of July holiday
+
+[10:33:56.0488] <shu>
+any conflicts for same time on Wed, Jul 6?
+
+[10:34:56.0651] <nicolo-ribaudo>
+There is the SES meeting that starts one hour after te modules one, it might be a problem if we do 1:30h
+
+[10:35:35.0672] <shu>
+i see that, yes, though given all the SES folks are here and this is also top-of-mind for them, perhaps it'd be fine
+
+[10:36:09.0686] <guybedford>
+You mean 5th of July right?
+
+[10:36:38.0923] <shu>
+i mean 6th of July
+
+[10:36:42.0621] <shu>
+4th and 5th are both holidays
+
+[10:37:01.0438] <shu>
+at least it is at Google
+
+[10:37:06.0041] <guybedford>
+ah gotcha, consolidating may well be an option for that one then
+
+[10:37:08.0947] <shu>
+if it's just me i can just skip the next call, Yulia is running it anyhow
+
+[10:37:24.0063] <yulia>
+sure
+
+[10:40:31.0463] <guybedford>
+Your call - not sure how many people won't be able to make the 5th? I can do either day.
+
+[10:45:30.0073] <shu>
+i'd like to not create any pressure for US-based folks so i'd prefer moving it to the 6th
+
+[10:49:16.0339] <Kris Kowal>
+> <@nicolo-ribaudo:matrix.org> There is the SES meeting that starts one hour after te modules one, it might be a problem if we do 1:30h
+
+We’ll deconvene the SES meeting if a Compartments meeting overlaps.
+
+[10:49:22.0078] <Kris Kowal>
+That is actually our preference.
+
+[10:51:49.0690] <Kris Kowal>
+Speaking of which, we’d previously built a SES meeting agenda tomorrow for guybedford to join us and hash out what a VirtualStaticModuleRecord for WASM would concretely look like. The artifact would be an example PR for the Compartment proposal. I’m inclined to keep that on the docket and use the PR to sync with this interest group, if there are no objections.
+
+[11:58:46.0903] <Kris Kowal>
+Daniel Ehrenberg: Regarding carrying import.meta and the referrer specifier for a module to another compartment and the importance or non-importance of the identity of a module block https://docs.google.com/document/d/1CD5lIBZLl24XBWbQhokqBdt4Zl7wPAcFJKJrgePr9HU/edit#bookmark=id.o21po234q3z
+
+[11:59:56.0140] <Kris Kowal>
+If a module block is reified as a “module descriptor” ~ {record, specifier, importMeta}, the identity of the object still doesn’t matter. The specifier matters because that is the key in the module memo.
+
+[12:00:38.0403] <Kris Kowal>
+That is to say, a map of module descriptors could be transported to another worker without losing any of the relationships between modules.
+
+[14:04:08.0734] <littledan>
+about layering, I want to push back on the idea that was raised in the meeting today about all proposals depending on compartments or some reduction of it. I'd prefer that we focus on figuring out what the big picture API is, and then it will be more clear which pieces we can ship; I think there are lots of orderings that would work, and we shouldn't focus too excessively on working out one factoring or another. For example, I think it'd be OK to ship module reflection or module blocks before we have an imperative API to provide the way that modules link to each other.
+
+[14:09:35.0454] <shu>
++1
+
+[14:09:56.0479] <shu>
+that is the conclusion i personally would be happier with and we should give it a full discussion next call
+
+[14:10:07.0744] <shu>
+i wanted to explicitly surface the question which i felt was implicit in Kris's presentation
+
+[14:12:48.0861] <littledan>
+I really liked Kris's presentation. It brought together a bunch of ideas really well. I think it's important that we maintain a unified model for how modules work, and the compartments proposal stands out as it exposes so much
+
+[14:14:04.0852] <shu>
+also agree
+
+[14:55:52.0308] <Kris Kowal>
+To be clear, I also consider the question of ordering and layering an open question and I don’t have a preference toward shipping compartments first. I just do not, from where I’m sitting right now, see a way to do that in a way that doesn’t hobble the proposal that lands first.
+
+[14:57:43.0983] <Kris Kowal>
+For example, suppose we land module blocks first? There needs to exist some mechanism for instantiating the block. For deferred execution, same issue. Import reflection could be exposed, but none of the motivating use cases work without a loader.
+
+[14:58:53.0009] <Kris Kowal>
+ShadowRealm may give us a degree of freedom in that regard.
+
+[15:00:30.0103] <Kris Kowal>
+To the extent that ShadowRealm encapsulates a loader. But even then, the result differs in name only from the part we later factor out of realm. So, big +1 to littledan’s point about getting a holistic view before figuring out layering.
+
+[15:01:01.0250] <Kris Kowal>
+ * To be clear, I also consider the question of ordering and layering open and I don’t have a preference toward shipping compartments first. I just do not, from where I’m sitting right now, see a way to do that in a way that doesn’t hobble the proposal that lands first.
+
+[15:01:26.0186] <Kris Kowal>
+ * For example, suppose we land module blocks first. There needs to exist some mechanism for instantiating the block. For deferred execution, same issue. Import reflection could be exposed, but none of the motivating use cases work without a loader.
+
+[15:04:47.0186] <Kris Kowal>
+Also, ShadowRealm and workers of every kind should probably be born with host-defined loader hooks, since serializing a loadHook fraught in the former and dubious in the latter. But in combination with a compartment, having a realm bootstrap off of the host-defined loader and constructing a Compartment with a user-defined loader opens up options.
+
+[15:17:09.0158] <littledan>
+the main mechanism for instantiating module blocks is import()
+
+[15:17:35.0809] <littledan>
+the proposal stands on its own without further control, IMO
+
+[15:18:03.0198] <littledan>
+I agree that ShadowRealm should probably take a LoaderOptions bag as an argument
+
+[15:18:20.0533] <littledan>
+but, also there, ShadowRealm is useful without that
+
+[15:18:22.0714] <Kris Kowal>
+So, assuming that, then Compartments would have import and loadHook competing to register module descriptors.
+
+[15:18:51.0990] <littledan>
+huh?
+
+[15:19:01.0431] <littledan>
+I meant the already-existing dynamic import()
+
+[15:19:12.0650] <littledan>
+as well as passing the module block to structured clone
+
+[15:19:43.0258] <Kris Kowal>
+Understood. I propose that a desirable invariant is for dynamic import and compartment import be nearly the same.
+
+[15:19:48.0109] <littledan>
+I agree that we shouldn't have competing hooks. Surma and I proposed module block without hooks.
+
+[15:19:53.0189] <littledan>
+yes, definitely they should be the same
+
+[15:20:14.0099] <littledan>
+so, sure, you can pass a module block to compartment import once there are compartments
+
+[15:20:15.0333] <Kris Kowal>
+Consider: `import(module { import 'x.js'; })`
+
+[15:21:20.0420] <Kris Kowal>
+Followed by (approximately) `import({ specifier: 'x.js', ...module { } })`
+
+[15:21:35.0271] <Kris Kowal>
+And let’s assume that module blocks correspond to module descriptors.
+
+[15:22:03.0310] <Kris Kowal>
+The behavior of this example is order dependent (even without the introduction of compartment).
+
+[15:22:12.0584] <Kris Kowal>
+Because there already is a host loader in play.
+
+[15:22:54.0719] <Kris Kowal>
+In the former case, you push a module into the module map, but in order for its dependencies to be satisfied, the loader must pull them in.
+
+[15:23:43.0977] <Kris Kowal>
+So you’d have to take care to push your dependencies into the loader from leaf to root. Which is fine, but fragile.
+
+[15:23:55.0994] <Kris Kowal>
+I contend that it’s fragile enough that it is inadvisable.
+
+[15:25:55.0027] <Kris Kowal>
+When compartments get reified, then there’s a missed opportunity for the compartment to represent a capability to induce a module to be loaded, not to determine what is loaded.
+
+[15:26:55.0939] <Kris Kowal>
+That is to say, a loadHook provides a coherent top-down view of how to construct a coherent module graph. Providing a way to inject modules into that graph from *within* the compartment allows a module to interfere with the linkage of its peers.
+
+[15:27:25.0371] <Kris Kowal>
+And that hazard exists regardless of whether or when we reify the Compartment/Loader object.
+
+[15:31:31.0664] <Kris Kowal>
+Inevitable bike shed from which there is no escape: “specifier” is heavy. Maybe this should be “to”, the dual of “from”.
+
+[15:41:59.0216] <littledan>
+yeah, I'd say that when there's a host loader, you shouldn't be able to just push a specifier into the module map
+
+[15:42:20.0259] <littledan>
+so I don't understand the second line of your example
+
+[15:42:49.0829] <littledan>
+(I don't really understand how it works even if you have a custom loader)
+
+[15:43:37.0620] <littledan>
+I haven't done as detailed a look at the current state of the compartments proposal as I should
+
+[15:44:02.0933] <littledan>
+isn't there the same order dependency as if you did `import('x.js')`?
+
+[15:48:20.0185] <Kris Kowal>
+Yeah, let me just excerpt the relevant bit of the proposal.
+
+[15:48:38.0663] <Kris Kowal>
+A module descriptor is shaped like {record, specifier, importMeta}.
+
+[15:48:57.0144] <Kris Kowal>
+Where record is a static module record, or by any other name just as sweet.
+
+[15:49:14.0982] <littledan>
+(is this written somewhere, or is it from discussion after writing took place?)
+
+[15:49:34.0473] <Kris Kowal>
+Module descriptors are landed in the proposal README, yes.
+
+[15:50:30.0123] <Kris Kowal>
+That is, {record, specifier, importMeta} is one of the shapes in the union, and it’s the one I think most sensibly corresponds to a module block after our meeting this morning.
+
+[15:51:34.0194] <Kris Kowal>
+I was of the opinion that blocks might better correspond to static module records, but let’s say I’m tentatively convinced that module descriptors are more useful and do not preclude other motivations I’d had in mind.
+
+[15:51:40.0872] <littledan>
+personally I didn't come to a clear conclusion on what module blocks would correspond to after the meeting
+
+[15:52:01.0040] <Kris Kowal>
+Sure, tentative opinion. Let’s assume for purposes of discussion.
+
+[15:52:04.0031] <littledan>
+also I'm having trouble finding that shape in the union, or maybe I'm looking at the wrong union
+
+[15:52:22.0661] <littledan>
+is "instance" a name for specifier?
+
+[15:53:02.0515] <Kris Kowal>
+Take the first shape in the union.
+
+[15:53:23.0000] <Kris Kowal>
+Then add `"specifier"` ad hoc since module blocks would need that. There’s a PR that would add it for other reasons.
+
+[15:54:02.0223] <Kris Kowal>
+Elsewhere the specifier is implied because the descriptor is value side of a key value pair.
+
+[15:54:24.0878] <littledan>
+which PR should I be looking at?
+
+[15:54:37.0547] <littledan>
+I'm still not sure what the specifier should be for a module block with no explicit name
+
+[15:54:40.0625] <Kris Kowal>
+Or in the case of a loadHook(Specifier) => Promise<ModuleDescriptor>, implied by the argument
+
+[15:54:56.0889] <Kris Kowal>
+_that_ is a good point.
+
+[15:55:45.0888] <littledan>
+I think we run into funny cases if you're allowed to go and claim a specifier and then imperatively insert that into the module map from inside the compartment. I don't think you should be allowed to do that.
+
+[15:56:00.0931] <Kris Kowal>
+I concur.
+
+[15:56:23.0176] <Kris Kowal>
+And that actually sums up the argument I’m clumsily building, actually.
+
+[15:57:36.0346] <Kris Kowal>
+And sways me back to `module {} instanceof StaticModuleRecord`
+
+[15:58:20.0808] <Kris Kowal>
+ * And that actually sums up the argument I’m clumsily building.
+
+[16:00:02.0381] <littledan>
+OK, well, if module blocks were to be added first, we'd have to think about what's observable
+
+[16:00:23.0176] <littledan>
+and the two observable things I can think of are 1) import.meta, and 2) what happens when you import() the same module block twice
+
+[16:00:43.0919] <littledan>
+I think module blocks have a name, but it's a gensym
+
+[16:01:03.0172] <Kris Kowal>
+Right, and gensyms don’t transport.
+
+[16:01:19.0377] <littledan>
+yeah, over transport it makes a new one
+
+[16:01:27.0615] <littledan>
+so structured clone is approximate
+
+[16:01:36.0440] <littledan>
+and each time you postMessage a module block, you get a new copy on the other hand
+
+[16:01:42.0390] <Kris Kowal>
+Which means different invariants locally and remotely. That’s a footgun.
+
+[16:01:44.0425] <littledan>
+but, import.meta on the web *does* transport, and it should for this case
+
+[16:02:04.0156] <Kris Kowal>
+import.meta is host-defined and doesn’t transport *reliably*.
+
+[16:02:34.0827] <littledan>
+> <@kriskowal:matrix.org> Which means different invariants locally and remotely. That’s a footgun.
+
+we're trying to make design tradeoffs; I'm not really interested in trading jabs of reductio ad absurdum
+
+[16:02:43.0351] <Kris Kowal>
+Also, `import.meta` tends to be a function of host-defined behavior that could vary between the sender and receiver.
+
+[16:02:46.0867] <littledan>
+> <@kriskowal:matrix.org> import.meta is host-defined and doesn’t transport *reliably*.
+
+we're talking about what structured clone does, which is also host-defined
+
+[16:03:36.0856] <littledan>
+> <@kriskowal:matrix.org> Also, `import.meta` tends to be a function of host-defined behavior that could vary between the sender and receiver.
+
+hmm, could you say more about this scenario?
+
+[16:03:40.0635] <Kris Kowal>
+Pardon, no jab intended.
+
+[16:04:48.0625] <littledan>
+in my mind, preserving the base address for relative specifier resolution is essential for module blocks
+
+[16:04:54.0317] <Kris Kowal>
+I should say, I personally value the avoidance of that particular footgun over the convenience of pushing a module block over import, and that is partially informed because I think the same ends can be achieved by other means.
+
+[16:05:07.0844] <littledan>
+Oh, let's go into discussing those other means
+
+[16:07:45.0316] <Kris Kowal>
+So, I would concede that it is both possible and convenient in some cases to be able to rely on the assumption that a pair of module loaders have the same resolution semantics. In that situation, the pair of loaders can reliably arrive at equivalent import.meta for the same specifier, except when the specifier is a gensym.
+
+[16:09:56.0430] <Kris Kowal>
+Taking that thought a little farther, I also think having gensyms for module specifiers is not dangerous unless module blocks can be imported, though I’ll grant that module fragments attempt to cross that bridge.
+
+[16:10:20.0131] <littledan>
+well, the purpose of module blocks is indeed to be imported
+
+[16:10:30.0649] <Kris Kowal>
+As opposed to merely executed?
+
+[16:10:39.0668] <Mathieu Hofman>
+> <@littledan:matrix.org> and each time you postMessage a module block, you get a new copy on the other hand
+
+I believe that is still an open issue. I think surma was advocating for preservation of identity
+
+[16:11:00.0167] <littledan>
+> <@mhofman:matrix.org> I believe that is still an open issue. I think surma was advocating for preservation of identity
+
+Ah, thanks, I wasn't sure where that landed
+
+[16:11:07.0918] <littledan>
+> <@kriskowal:matrix.org> As opposed to merely executed?
+
+I don't know how to interpret this question
+
+[16:11:36.0163] <Kris Kowal>
+Oh, you mean imported for the effect of being executed.
+
+[16:11:45.0958] <Kris Kowal>
+I mean imported for the effect of being linked into another module’s environment record.
+
+[16:11:49.0544] <littledan>
+the module blocks proposal did not add a concept of "just executing" a module; you use them by importing them
+
+[16:12:00.0410] <littledan>
+yeah they can't be imported from an import statement
+
+[16:12:07.0361] <littledan>
+just dynamic import or host APIs that do the same
+
+[16:12:20.0620] <littledan>
+oh I see what you meant
+
+[16:13:29.0214] <Kris Kowal>
+Consider an alternate view: what if all modules including module blocks must have a specifier.
+
+[16:14:07.0917] <Kris Kowal>
+In that world, identity of the module instance is moot.
+
+[16:14:10.0271] <littledan>
+well, I got a lot of pushback for that design in module fragments
+
+[16:14:21.0546] <littledan>
+since it would have this same "impersonation" effect
+
+[16:14:24.0734] <Kris Kowal>
+Module blocks become considerably more useful too.
+
+[16:14:36.0170] <littledan>
+well, I just don't know how to respond to that concern
+
+[16:14:52.0786] <Kris Kowal>
+They become useful for modeling bundles of interlinked functionality.
+
+[16:15:05.0369] <Kris Kowal>
+That is, a working set can be captured and transported with module blocks.
+
+[16:15:05.0991] <littledan>
+well, sure, they are unified with module fragments, whose job is that
+
+[16:15:24.0245] <littledan>
+and yes I was hoping that we'd find a way to make module fragments transportable as well
+
+[16:15:54.0069] <Kris Kowal>
+The impersonation problem isn’t because they have specifiers, it is because the specifiers have to be pushed in with a dynamic import or compartment.import.
+
+[16:16:03.0402] <littledan>
+however, we actually got stuck on the mechanics of this exact transportability issue when we discussed module fragments previously
+
+[16:16:12.0699] <Kris Kowal>
+As opposed to being associated with a specifier by being used in the response to a loadHook for a specifier.
+
+[16:16:33.0316] <littledan>
+> <@kriskowal:matrix.org> The impersonation problem isn’t because they have specifiers, it is because the specifiers have to be pushed in with a dynamic import or compartment.import.
+
+I'm not following
+
+[16:20:11.0600] <Kris Kowal>
+Moment. I’m internalizing your model for the roles of module blocks and fragments.
+
+[16:21:05.0182] <Kris Kowal>
+To recap, you’ve refreshed my memory about module blocks having a gensym for its specifier.
+
+[16:21:43.0018] <Kris Kowal>
+This means that my presentation this morning was framed more in terms more akin to module fragments.
+
+[16:23:23.0457] <Kris Kowal>
+That means that I do not have proposal for how to represent a gensym module block.
+
+[16:24:23.0446] <littledan>
+so, my initial proposal for module fragments is that you'd do, like, `module "#foo" { ... } import "#foo";` and the host would just connect the dots as a normal module specifier
+
+[16:24:50.0519] <Kris Kowal>
+But I agree that for import(moduleBlock) to work, moduleBlock needs to capture the referrer module specifier in addition to the static module record.
+
+[16:24:52.0390] <littledan>
+this was rejected because people said, it's weird to step on the specifier space like that and create ambiguities/an order-based resolution
+
+[16:25:26.0081] <littledan>
+> <@kriskowal:matrix.org> But I agree that for import(moduleBlock) to work, moduleBlock needs to capture the referrer module specifier in addition to the static module record.
+
+and this is true for module fragments as well
+
+[16:27:14.0263] <Kris Kowal>
+So, I think we can agree that the module blocks in my presentation are something else.
+
+[16:27:27.0373] <Kris Kowal>
+Neither module blocks as proposed nor module fragments as proposed.
+
+[16:27:57.0268] <Kris Kowal>
+Let’s tentatively call it a “static module block” and as such would be reified as StaticModuleRecord.
+
+[16:28:29.0687] <Kris Kowal>
+I’ll throw up a strawman syntax `static module {}` just so we don’t confuse them.
+
+[16:29:17.0058] <Kris Kowal>
+A static module block *doesn’t* capture its referrer or import.meta.
+
+[16:31:29.0358] <Kris Kowal>
+And it’s the virtue of a static module block that it’s transportable and its identity doesn’t matter.
+
+[16:34:22.0920] <Kris Kowal>
+(Riffing a gist)
+
+[16:36:10.0384] <Kris Kowal>
+This would be the module block behavior through the lens of compartment with a static module block https://gist.github.com/kriskowal/bc9d74a245853d88b7fdd6e4f412c31b
+
+[16:43:15.0188] <Kris Kowal>
+And I believe the example from the presentation this morning more closely addresses the module fragment motivating use cases, but notably doesn’t require the static module blocks to carry a specifier. The specifiers are keys in the transported map.
+
+[16:44:49.0916] <littledan>
+I would say that module fragments each have gensym'd specifiers as well ,but they can refer to each other in a little mini-map that can be transported
+
+[16:44:59.0708] <Kris Kowal>
+I’m thinking module blocks might be coherent with these, in a way that would let them land first.
+
+[16:45:00.0213] <littledan>
+but then when they refer to a string specifier, it's resolved on the other side directly
+
+[16:46:33.0127] <Kris Kowal>
+Mini-map is a good way to put it.
+
+[16:47:29.0375] <Kris Kowal>
+Particularly because the mini-map needs to be transported together in order for it to be coherently linked.
+
+[16:47:35.0296] <littledan>
+yes
+
+[16:48:35.0500] <Kris Kowal>
+That’s a little tricky because it’s still using string specifiers for the linkage that participate in the destination loader according to its resolver semantics, which are not necessarily the same as the sender.
+
+[16:49:21.0345] <Kris Kowal>
+Maybe they would overshadow the specifiers in the target graph.
+
+[16:49:52.0659] <littledan>
+> <@kriskowal:matrix.org> Maybe they would overshadow the specifiers in the target graph.
+
+I think this is an intuitive answer given how module fragments reference each other "lexically"
+
+[16:50:01.0905] <littledan>
+like `module x { } module y { import x }`
+
+[16:50:01.0929] <Kris Kowal>
+Or maybe they need a notation that allows the gensyms to be expressly separate from the namespace of the receiver.
+
+[16:50:15.0038] <Kris Kowal>
+Yes, that’s coherent.
+
+[16:50:29.0030] <Kris Kowal>
+Taking advantage of the distinction between x and "x".
+
+[16:51:50.0854] <littledan>
+for import.meta, maybe we say that module fragments and blocks have literally the same import.meta as the surrounding lexical context. This would complete the loop on not calling into compartment hooks
+
+[16:52:05.0846] <littledan>
+(like, actually the same object identity)
+
+[16:52:24.0465] <Kris Kowal>
+I think we’re at least in agreement that the module proposal and module fragment proposal would not call compartment hooks!
+
+[16:52:47.0173] <littledan>
+well, this had been a blind spot in my design thinking; I agree on that goal but wasn't sure how it'd work out
+
+[16:54:01.0863] <Kris Kowal>
+This also would strengthen the case for having a globalThis.Loader instead of wiring one together from globalThis.ModuleInstance. The loader would be doing a lot of lifting for module blocks and module fragments.
+
+[16:54:29.0768] <littledan>
+I hadn't followed that discussion
+
+[16:56:03.0465] <Kris Kowal>
+I’m at a bit of a loss for what the value type would be for module blocks and fragments.
+
+[16:57:35.0317] <littledan>
+as a placeholder, we could refer to it as ModuleBlock for now
+
+[16:57:39.0261] <littledan>
+we know what it has in it, right?
+
+[16:57:50.0174] <littledan>
+each has a gensym, an import.meta, and a closed-over mini-map
+
+[16:57:53.0396] <littledan>
+is that right?
+
+[16:58:07.0039] <littledan>
+ * each has a gensym, an import.meta, and a closed-over mini-map (of gensym -> ModuleBlock)
+
+[16:58:23.0096] <Kris Kowal>
+It also has a referrer specifier.
+
+[16:58:35.0649] <littledan>
+what is that? isn't that the gensym?
+
+[16:58:55.0082] <Kris Kowal>
+No, it’s for resolving stringy imports.
+
+[16:59:06.0548] <Kris Kowal>
+Presumably inherited from the surrounding module instance.
+
+[16:59:49.0526] <Kris Kowal>
+It *doesn’t* have a StaticModuleRecord.
+
+
+2022-06-22
+[17:00:03.0931] <littledan>
+oh, right
+
+[17:00:19.0699] <littledan>
+wait I thougt it did have a static module record?
+
+[17:00:49.0273] <littledan>
+ * wait I thought it did have a static module record?
+
+[17:00:50.0584] <Kris Kowal>
+The mini-maps are interesting because they contain subgraphs, some of which are potentially cyclic.
+
+[17:01:02.0089] <littledan>
+yes
+
+[17:01:30.0658] <Kris Kowal>
+Thankfully you can arrive at a deterministic ordering of the subgraphs by sampling in order of appearance in the source.
+
+[17:02:02.0113] <littledan>
+well, presumably we'd do this ordering with the same algorithm we use for normal cyclic graphs (depending on where you start with in the cycle)
+
+[17:03:22.0202] <Kris Kowal>
+Yeah, maybe. There might be optimizations that are possible only if the entrypoint doesn’t figure. But that doesn’t surface to JavaScript regardless.
+
+[17:03:46.0923] <littledan>
+well, it's readily observable, unfortunately
+
+[17:03:55.0435] <Kris Kowal>
+As for StaticModuleRecord.
+
+[17:03:59.0082] <Kris Kowal>
+ * As for StaticModuleRecord…
+
+[17:05:26.0144] <Kris Kowal>
+StaticModuleRecords would hang off the nodes of the mini-graph, not off the ModuleBlock.
+
+[17:06:34.0409] <littledan>
+huh, that's a way to represent it, I guess more normalized and less cyclic of a structure than I was imagining
+
+[17:06:39.0525] <littledan>
+sgtm
+
+[17:07:23.0006] <Kris Kowal>
+They don’t correspond to a document per se. Not something you could fetch.
+
+[17:07:37.0583] <Kris Kowal>
+Except perhaps in a compiled form.
+
+[17:08:11.0145] <Kris Kowal>
+One of the interesting things about lexical linkage is that the compiler can erase the names.
+
+[17:09:23.0564] <littledan>
+BTW note that the mini-graph is actually something like a singly linked list of maps, following a scope chain, as you could have (and this is stupid code but still possible),
+```
+module foo { }
+module bar { }
+if (true) {
+  module foo { }
+  module baz { }
+  module bing { import foo; import bar; }
+}
+
+[17:10:09.0433] <littledan>
+also line 6 could've been `eval("module bing { import foo; import bar; }")` -- this scope chain needs to be reified at runtime if there's a direct eval
+
+[17:11:34.0832] <littledan>
+(I feel pretty strongly that you should be able to use module blocks/fragments in sloppy mode code)
+
+[17:11:37.0387] <Kris Kowal>
+Are we in agreement that every time import(ModuleBlock), it’s getting fresh instances of the nodes of its minigraph?
+
+[17:12:03.0591] <littledan>
+hmm, I imagined otherwise, that the gensym would be cached
+
+[17:12:18.0207] <littledan>
+and the duplication would only happen across postMessage
+
+[17:12:56.0358] <Kris Kowal>
+So import(ModuleBlock) would behave differently than e.g., shadowRealm.importValue(ModuleBlock)
+
+[17:13:30.0663] <Kris Kowal>
+Versus, compartment.import(ModuleBlock), maybeAgentSomeday.import(ModuleBlock)
+
+[17:13:52.0899] <littledan>
+> <@kriskowal:matrix.org> So import(ModuleBlock) would behave differently than e.g., shadowRealm.importValue(ModuleBlock)
+
+these both go to the host's module map
+
+[17:14:06.0634] <littledan>
+I mean, for the "fetch" part
+
+[17:14:09.0343] <Kris Kowal>
+Yeh, those both being local.
+
+[17:14:24.0116] <littledan>
+> <@kriskowal:matrix.org> Versus, compartment.import(ModuleBlock), maybeAgentSomeday.import(ModuleBlock)
+
+I don't really know what these statements mean
+
+[17:14:42.0374] <Kris Kowal>
+I suppose it’s here nor there for me.
+
+[17:15:13.0848] <Kris Kowal>
+Just that if a module block has to be serialized and deserialized, you necessarily get a fresh batch of gensyms, so the invariants are different.
+
+[17:15:39.0102] <littledan>
+oh yes I agree with that
+
+[17:15:58.0310] <littledan>
+I mean at least this is what I was picturing
+
+[17:16:18.0264] <Kris Kowal>
+I don’t like there being difference but it concede it’s a value judgement.
+
+[17:16:43.0735] <Kris Kowal>
+And I think we agree it’s an orthogonal concern to compartments.
+
+[17:17:33.0809] <Kris Kowal>
+That is, I’m convinced that module blocks and fragments proposals are orthogonal to compartments.
+
+[17:17:57.0294] <Kris Kowal>
+And that I’ll want to carve a hole for `static module {}` which would be different.
+
+[17:18:03.0022] <littledan>
+yeah, or put differently, I think we have ideas about how this should go that works out orthogonally
+
+[17:18:15.0736] <Kris Kowal>
+Yes.
+
+[17:18:25.0591] <littledan>
+I'd suggest that, as a hack, you could just make a method on a module block which "projects out" the static module record
+
+[17:18:28.0154] <Kris Kowal>
+There are certainly ways that would cross the streams :-)
+
+[17:19:23.0313] <Kris Kowal>
+That’s a good idea.
+
+[17:19:30.0684] <littledan>
+(and I guess it's an error if that leaves you with a free reference to another module fragment)
+
+[17:20:22.0048] <Kris Kowal>
+The StaticModuleRecord is opaque and doesn’t close over source, so the fact that the source is a compiled artifact of some kind is moot. That just raises questions about how it would be represented on the wire if it were transported.
+
+[17:20:58.0252] <littledan>
+wouldn't source code typically work OK?
+
+[17:21:08.0157] <Kris Kowal>
+I don’t think we have to worry about getting that far. I presume you’d get a ReferenceError before you had a handle on the ModuleBlock.
+
+[17:21:51.0769] <Kris Kowal>
+It wouldn’t be source code, but object code (reconstructed source code).
+
+[17:21:52.0619] <littledan>
+> <@kriskowal:matrix.org> I don’t think we have to worry about getting that far. I presume you’d get a ReferenceError before you had a handle on the ModuleBlock.
+
+hmm, I don't see why, here's an example:
+
+```
+module foo { }
+(module { import foo; }).project()
+
+[17:22:04.0139] <littledan>
+the .project() method has to be responsible for throwing the error
+
+[17:22:06.0441] <Kris Kowal>
+Let’s just say that’s spelled `get record()`
+
+[17:23:01.0557] <Kris Kowal>
+I don’t see the error in the example.
+
+[17:23:15.0216] <Kris Kowal>
+`import foo` is satisfied, no?
+
+[17:23:48.0341] <littledan>
+well, would the static module record already have a mini-map?
+
+[17:23:53.0460] <littledan>
+I thought you were saying it shouldn't
+
+[17:24:22.0772] <littledan>
+I guess it probably should
+
+[17:24:26.0165] <Kris Kowal>
+I think the mini-map is a product of compilation.
+
+[17:26:05.0297] <Kris Kowal>
+And, provided we distinguish lexical imports from stringly named imports (which I take to be necessary for the proposal to work, much less entangle itself with compartment concerns), the a module block can throw a ReferenceError if it contains an unmet lexical import.
+
+[17:26:18.0906] <Kris Kowal>
+ * And, provided we distinguish lexical imports from stringly named imports (which I take to be necessary for the proposal to work, much less entangle itself with compartment concerns), then a module block can throw a ReferenceError if it contains an unmet lexical import.
+
+[17:26:40.0275] <littledan>
+hmm, I thought we'd make the lexical errors be early
+
+[17:26:54.0735] <Kris Kowal>
+I think we’re agreeing.
+
+[17:27:40.0693] <Kris Kowal>
+Oh, you mean even earlier. Yes, that’s possible and good.
+
+[17:27:55.0055] <Kris Kowal>
+Like, compiling the surrounding module would fail.
+
+[17:28:02.0426] <littledan>
+exactly
+
+[17:28:24.0900] <Kris Kowal>
+Yeah, that follows.
+
+[17:28:57.0950] <Kris Kowal>
+And if you succeed, the compiled module contains the skeleton of all possible module block graphs, out of which you could project a record for each on demand.
+
+[17:29:36.0390] <littledan>
+> <@kriskowal:matrix.org> And if you succeed, the compiled module contains the skeleton of all possible module block graphs, out of which you could project a record for each on demand.
+
+Hmm, I don't understand this
+
+[17:29:37.0852] <Kris Kowal>
+And the records could be reconstituted to source strings, flattening just the nodes that get mentioned.
+
+[17:29:44.0852] <littledan>
+so, I'm kinda leaning towards, StaticModuleRecord *does* have the minimap
+
+[17:29:53.0584] <littledan>
+is that too weird?
+
+[17:30:31.0157] <littledan>
+so this goes back to, a ModuleBlock is a StaticModuleRecord + a referrer base + an import.meta object + a gensym that allows it to be used as a key in a minimap
+
+[17:31:06.0796] <littledan>
+and each StaticModuleRecord has a minimap which maps gensym -> ModuleBlock
+
+[17:31:17.0618] <littledan>
+this is the "more circular, less normalized" option I was mentioning above
+
+[17:32:14.0249] <guybedford>
+if I might jump in, that framing feels to me like a much simpler model for fragments, in that the rest of the loader pipeline can work as it does already
+
+effectively these are hard compilation-time resolution linkage. something like `[[HardResolutions]] = [SourceTextA, SourceTextB]` they can simply even be an ordered list actually
+
+[17:32:46.0395] <Kris Kowal>
+Yeah, I agree.
+
+[17:33:03.0647] <littledan>
+(guybedford (Guy Bedford): Are you saying you like the design?)
+
+[17:33:24.0067] <guybedford>
+yes I like the approach, although would have some technical clarifications further
+
+[17:33:59.0733] <Kris Kowal>
+I think what this means is that a source text has a corresponding StaticModuleRecord, which can be partitioned into smaller StaticModuleRecords, one per module block.
+
+[17:34:33.0864] <guybedford>
+I'm suggesting the internal ecma-262 object that backs this simply has a list field
+
+[17:35:10.0425] <guybedford>
+that points to other similar objects
+
+[17:35:16.0629] <littledan>
+oh, are you suggesting that the internal datastructure simply be circular instead of indirecting through gensyms and a map?
+
+[17:35:22.0335] <guybedford>
+yes
+
+[17:35:32.0895] <littledan>
+oh that makes sense
+
+[17:35:56.0212] <littledan>
+I agree that that would be valid
+
+[17:36:32.0195] <littledan>
+I think implementations would still need to maintain some maps around in case of eval, though, unfortunately
+
+[17:36:40.0211] <littledan>
+ * I think full implementations would still need to maintain some maps around in case of eval, though, unfortunately
+
+[17:36:58.0784] <littledan>
+but yes, the fact that this representation is possible makes the design feel clean
+
+[17:37:18.0304] <guybedford>
+> <@littledan:matrix.org> I think full implementations would still need to maintain some maps around in case of eval, though, unfortunately
+
+would be interested to dig in further at some point, but won't sidetrack further!
+
+[17:37:49.0209] <littledan>
+Kris Kowal: guybedford , you two have been very helpful here; thank you so much for this discussion
+
+[17:38:05.0235] <littledan>
+I really didn't know where to go next with module blocks/fragments, but this made it very clear
+
+[17:38:52.0157] <Kris Kowal>
+Agreed and thanks for helping me understand the differences.
+
+[17:39:19.0862] <littledan>
+with module blocks and fragments so thoroughly unified (I initially suggested the two names so that they wouldn't be conflated, back when the concepts were a bit different), do you think we should use a different name? Like, "inner modules", where there are both named inner modules/inner module declarations and anonymous inner modules?
+
+[17:39:48.0750] <littledan>
+also presumably a module block expression should be able to provide a name for purely local use, as functions and classes do
+
+[17:40:42.0972] <Kris Kowal>
+I’m still pondering implications myself.
+
+[17:41:27.0592] <Kris Kowal>
+I think static module block might evaporate given `(module {}).record` being a thing.
+
+[17:41:39.0205] <guybedford>
+Definitely +1 to unifying naming and structures, and extending optional naming to module blocks, although hopefully specifications can stay separate?
+
+[17:41:45.0389] <Kris Kowal>
+Especially given that would project the relevant subgraph.
+
+[17:42:49.0576] <littledan>
+> <@guybedford:matrix.org> Definitely +1 to unifying naming and structures, and extending optional naming to module blocks, although hopefully specifications can stay separate?
+
+I think the first step would be to developing the module fragments spec text, and then a strict subset which is just the anonymous cases (for module blocks) can be sorted out
+
+[17:43:12.0913] <Kris Kowal>
+I value the holistic view of blocks being a degenerate case of fragments and don’t particularly care about the layering. If it helps deliver incrementally, I’d say whatever works.
+
+[17:43:42.0529] <littledan>
+they didn't used to be degenerate! they used to be based on the same concept of inserting in a certain class of specifiers into the module map!
+
+[17:43:53.0096] <littledan>
+but yes that's what they are now, degenerates :(
+
+[17:44:06.0605] <Kris Kowal>
+This is why mathematicians can’t have friends.
+
+[17:44:53.0975] <Kris Kowal>
+To be clear, this is also why systems programmers can’t be allowed near children.
+
+[17:46:08.0497] <Kris Kowal>
+But perhaps that’s hyperbole.
+
+[17:47:18.0639] <littledan>
+have a good evening everyone
+
+[20:04:47.0048] <Kris Kowal>
+For those who arrive here and find a vast scroll backlog, littledan had a long conversation where we concluded that module blocks and module fragments could be framed in a way that makes them orthogonal to compartments, such that the order in which the proposals land isn’t coupled.
+
+We concluded that importing a module block or fragment would not involve the loader hooks and would not introduce any module specifiers to the module graph.
+
+This presumes that module blocks are a special case of module fragments and that fragments are named lexically. So, `import x` rather than `import 'x'`. The latter is the purview of the loader hooks. The former is the purview of a lexical binding to `module x {}`. Module blocks have a corresponding static module record, which itself consists of its own module block and its transitive lexically imported module blocks, but also capture the module referrer specifier and import meta.
+
+There remain some free variables in the idea, but that I believe summarizes the consensus we arrived at.
+
+[20:31:56.0296] <Kris Kowal>
+Oh, and I think that the proposals are coherent. A module blocks, including module fragments, would at least satisfy the shape { record, importMeta } so it could be used as a module descriptor in a Compartment loadHook. (I am assuming “record” gets renamed before the proposal’s ink dries, but whatever the names, they’d be the same.)
+
+[20:32:08.0648] <Kris Kowal>
+ * Oh, and I think that the proposals are coherent. Module blocks, including module fragments, would at least satisfy the shape { record, importMeta } so it could be used as a module descriptor in a Compartment loadHook. (I am assuming “record” gets renamed before the proposal’s ink dries, but whatever the names, they’d be the same.)
+
+[11:54:01.0221] <shu>
+hmm, where should we publish the call notes?
+
+[12:16:10.0164] <Kris Kowal>
+I think it’s sufficient to have a rolling agenda document attached to the calendar for discovery purposes. Could link the notes from there. The notes are detailed enough that probably to have separate meeting notes docs for each session.
+
+[12:16:25.0032] <Kris Kowal>
+Similarly, the SES meeting links recordings to the rolling agenda document.
+
+[12:16:58.0683] <littledan>
+I think it ends up being more accessible if notes are published in a markdown file somewhere, as Shu has been doing in some other meetings that he runs
+
+[12:17:22.0401] <littledan>
+we can share the permission to read the notes more widely than the permission to edit old minutes
+
+[13:19:22.0340] <shu>
+i don't want to use just the document because it's world-editable for notetaking
+
+[13:19:39.0589] <shu>
+yeah, what dan said
+
+
+2022-06-27
+[07:40:18.0182] <Kris Kowal>
+Caridy and I had a conversation about paring down the compartments/loader proposal to avoid having to specify any maps at all, to avoid mentioning referrer specifiers at all, to further slim its profile against the wind.
+
+[07:40:55.0905] <Kris Kowal>
+The thought experiment is to return to the proposal Guy and Luca made at plenary and ask more questions.
+
+[07:41:20.0515] <Kris Kowal>
+Suppose new ModuleSource(source) and new ModuleInstance(source, importHook, importMeta?)
+
+[07:41:42.0859] <Kris Kowal>
+Such that source.bindings reflects imports/exports and instance.source refers to the original source.
+
+[07:44:18.0057] <Kris Kowal>
+Suppose also that import reflection gives us the means to obtain either of these through syntax. Recursively, that would mean that ModuleInstances and ModuleSources could be drawn out of ModuleInstance hooks.
+
+[07:45:08.0029] <Kris Kowal>
+Also, supposing that importHook’s signature is importHook(importSpecifier, moduleInstance), such that there is no referrer, but the importHook can associate instances with referrers and do whatever it must internally.
+
+[07:45:29.0986] <Kris Kowal>
+Caridy also proposes that we use dynamic import in the same way as blocks.
+
+[07:45:44.0703] <Kris Kowal>
+Which is to say, in this thought experiment, ModuleInstance corresponds to module {}
+
+[07:46:56.0040] <Kris Kowal>
+With that in mind, it’s sufficient to have a module instance to get the underlying unhooked Module Source, like (module {}).source, but Caridy suggests that would potentially mean the creation of throw-away module instances as in new ModuleInstance((module {}.source), importHook, importMeta)
+
+[07:47:13.0932] <Kris Kowal>
+So we go on to suggest (static module {}) instanceof ModuleSource, bypassing that step
+
+[07:47:47.0432] <Kris Kowal>
+That suggests that there be import syntax that gives us both of those options.
+
+[07:48:55.0784] <Kris Kowal>
+One thing I had not considered until this moment is that importHook would not be sufficient in order to support the ModuleSource import case.
+
+[07:50:36.0628] <Kris Kowal>
+But importHook is sufficient for deferred execution. For the deferred execution case, you’re importing a fully linked ModuleInstance that inherits the surrounding ModuleInstance’s importHook. You would then have the option of using it as a handle in a more elaborate import graph or just import(moduleInstance) at whatever time you deem appropriate to experience jank.
+
+[07:51:22.0026] <Kris Kowal>
+In any case, I sketched this, borrowing as much as possible from the Compartments proposal https://gist.github.com/kriskowal/288d38e62e55e09685bf62c3a3c25565
+
+[07:52:23.0707] <Kris Kowal>
+And note that it varies from Guy and Luca’s proposal in only one meaningful way: there’s no link method. Linking is a side-effect of kicking off the module system with a dynamic import of some leaf instance, which draws in its transitive dependencies.
+
+[07:52:51.0229] <Kris Kowal>
+So the difference is that the importHook gets used for both static and dynamic import.
+
+[07:53:24.0926] <Kris Kowal>
+I need to think more about the ramifications, but you’re all welcome to join me in the thought experiment.
+
+[08:15:32.0085] <Kris Kowal>
+One question ljharb asked on Github was whether it is ever desirable for dynamic import to provide different values for the same specifier (un-idem-potent?), or results inconsistent with `import * as name`. It would be surprising, which is undesirable. I’m not sure whether it’s always undesirable. In the context of this thought experiment, it would be possible to enforce idempotence on dynamic import and consistency with static import by having a locale memo as part of the ModuleInstance state. That comes at a cost we might prefer not to bear, especially if it is adequate to suggest that the responsibility to maintain this invariant be deferred to user code.
+
+[08:17:08.0994] <Kris Kowal>
+Maintaining import consistency at any granularity broader than module instance might be futile though. Since compartments as specified do and must allow inter-compartment linkage, it is possible in the degenerate case for user code to arrange a single compartment for every module instance and do whatever they want.
+
+[08:17:21.0278] <ljharb>
+to be clear, my default assumption is that it should be an unbreakable axiom modulo thenable modules, that static and dynamic imports are the same. I asked when it’d be desirable to figure out if that axiom should hold
+
+[08:18:27.0570] <Kris Kowal>
+Do you mean in the scope of an instance, cohort of instances, or realm?
+
+[08:19:51.0618] <Kris Kowal>
+> <@ljharb:matrix.org> to be clear, my default assumption is that it should be an unbreakable axiom modulo thenable modules, that static and dynamic imports are the same. I asked when it’d be desirable to figure out if that axiom should hold
+
+That’s also my default assumption. I can think of no use for inconsistency in the scope of an instance.
+
+[08:23:32.0096] <Kris Kowal>
+This thought experiment would allow for inconsistency, and although inconsistency is not a desired effect, it does allow us to decouple the module loader from the realm’s module map, since it becomes the responsibility of the module instance hooks to maintain consistency.
+
+[08:24:50.0627] <Kris Kowal>
+The compartments proposal as written today would require module maps to be factored out of Realm so each Compartment can have its own maps. We’re anticipating that will meet resistance, but I don’t know for sure.
+
+[08:28:08.0700] <Kris Kowal>
+nicolo-ribaudo can correct me if I’m wrong, but I believe that module blocks and fragments as littledan has described them to me, would enforce consistency in the same realm by incorporating every module instance into the realm’s module map, using either a gensym or the module instance’s identity as an (ephemeral?) key. That would not allow for inconsistency. But, round-tripping a module instance through an intermediate realm would.
+
+[08:29:26.0130] <Kris Kowal>
+But I think the inconsistency would be limited to fragments themselves. Stringly-named dependencies would remain consistent.
+
+[08:30:03.0982] <Kris Kowal>
+I for one see no reason to expect consistency of fragment identity under any circumstances, but that is a separate matter.
+
+[08:34:24.0715] <Kris Kowal>
+Compartments as proposed do attempt to maintain consistency by having per-compartment maps and consistent-linkage to other compartments. I should try harder to come up with a consistency attack. I’m not sure a meaningful one exists.
+
+[08:35:29.0094] <ljharb>
+> <@kriskowal:matrix.org> Do you mean in the scope of an instance, cohort of instances, or realm?
+
+i mean in a realm, but I’m not paged in on all the new terminology here
+
+[09:10:00.0278] <nicolo-ribaudo>
+I need some time to digest all of this, but I like this direction.
+For module blocks, having "module instances" and "module sources" easily explains why/how passing a module to a different realm (and back) looses the `import()` caching: you now have a new module, just with the same source (like having two identical files on the file system but in two different locations)
+
+[09:17:41.0745] <nicolo-ribaudo>
+The "import axioms" I think we shuold guarantee are (modulo `export function then`):
+- `await import("x")` and `import * as _ from "x"` in the same module must always evaluate to the same object 
+- `await import(fragment)` and `import * as _ from fragment` in the same realm must always evaluate to the same object
+
+And, with your proposed ModuleInstance/ModuleSource,
+- `await import(fragment)` and `await import(new ModuleInstance(fragment.source))` must re-evaluate the module two times
+
+The only thing I'm not sure about is if in module blocks the evaluation context should depend on where `import()` is called or where the module is defined. Given `realm` the `globalThis` of an `iframe`, I don't know if `await import(fragment)` and `await realm.Function("s", "import(s)")(fragment)` should return the same object (because they are importing the same ModuleInstance) or if they should evaluate the module twice (because they are in two different realms).
+For string-based imports they would evaluate the module twice, but with this ModuleSource/ModuleInstance thing maye they should return the same object.
+
+[09:26:43.0548] <nicolo-ribaudo>
+ * The "import axioms" I think we shuold guarantee are (modulo `export function then`):
+
+- `await import("x")` and `import * as _ from "x"` in the same module must always evaluate to the same object
+- `await import(fragment)` and `import * as _ from fragment` in the same realm (compartment?) must always evaluate to the same object
+
+And, with your proposed ModuleInstance/ModuleSource,
+
+- `await import(fragment)` and `await import(new ModuleInstance(fragment.source))` must re-evaluate the module two times
+
+The only thing I'm not sure about is if in module blocks the evaluation context should depend on where `import()` is called or where the module is defined. Given `realm` the `globalThis` of an `iframe`, I don't know if `await import(fragment)` and `await realm.Function("s", "import(s)")(fragment)` should return the same object (because they are importing the same ModuleInstance) or if they should evaluate the module twice (because they are in two different realms).
+For string-based imports they would evaluate the module twice, but with this ModuleSource/ModuleInstance thing maye they should return the same object.
+
+[09:35:44.0316] <nicolo-ribaudo>
+Round-tripping to a worker would be similar to doing `new ModuleInstance(fragment.source)`, and that can explain why you get two different modules.
+
+[10:02:39.0749] <Kris Kowal>
+I think that’s at least coherent, given that `ModuleInstance` would not have a referrer internal slot in this imagining.
+
+[10:17:14.0827] <littledan>
+> <@ljharb:matrix.org> to be clear, my default assumption is that it should be an unbreakable axiom modulo thenable modules, that static and dynamic imports are the same. I asked when it’d be desirable to figure out if that axiom should hold
+
+I'm not a big fan of the "unbreakable axiom" framing but I definitely think that we should have a very good reason for mismatches, and cloning the module is a pretty huge mismatch to explain
+
+[10:17:54.0865] <littledan>
+OTOH it's common for transport to be not 100% perfect and in particular clone things
+
+[10:19:12.0478] <littledan>
+> <@nicolo-ribaudo:matrix.org> Round-tripping to a worker would be similar to doing `new ModuleInstance(fragment.source)`, and that can explain why you get two different modules.
+
+Well, almost. I think round-tripping would preserve the referrer base (and hosts would probably ensure that that tracks through import.meta)
+
+[10:20:26.0157] <Kris Kowal>
+One of Caridy’s premises is that ModuleInstance would _not_ capture the referrer base. If it does, that should be a constructor argument.
+
+[10:20:34.0982] <littledan>
+(sorry I posted those comments before I read all of Kris's first comment that explains that)
+
+[10:20:52.0028] <Kris Kowal>
+And for that to work end to end, probably useful to surface `import.referrer`
+
+[10:21:23.0077] <Kris Kowal>
+Or really lean in on `import.referer` because chaos reigns.
+
+[10:21:31.0362] <littledan>
+hmm, it'd be unfortunate to have a JS-exposed duplicate of something derivable from import.meta.url, but at the same time that is funny because of layering
+
+[10:21:54.0547] <nicolo-ribaudo>
+Q: what is the referrer?
+
+[10:22:25.0028] <littledan>
+nicolo-ribaudo: The base for module specifier resolution
+
+[10:22:27.0362] <Kris Kowal>
+So, Caridy’s goal is to not enshrine an answer to that question. But, it exists in the shadows regardless.
+
+[10:40:28.0701] <Kris Kowal>
+The terminology I’m favoring in the compartments proposal is “import specifier” for strings that appear in source and “full specifier” or “referrer specifier” for strings that are keys in the module memo.
+
+[10:41:14.0979] <Kris Kowal>
+And for those terms to be fully orthogonal to the names “relative specifier” and “absolute specifier” which are specific to CommonJS.
+
+[13:28:43.0012] <shu>
+okay, so, for lack of a better place to post notes, i'm think i'll just put them in the incubator-agendas repo
+
+[13:28:47.0997] <shu>
+any objections?
+
+[13:29:25.0873] <shu>
+ * okay, so, for lack of a better place to post notes, i'm thinking i'll just put them in the incubator-agendas repo
+
+
+2022-06-28
+[02:49:28.0847] <Surma>
+Is there a loader call today?
+
+[02:56:23.0983] <Surma>
+nvm, found the notes doc and it says next call is Jul 6 :)
+
+[02:56:44.0131] <Surma>
+Apologies for missing the first call. I must have forgotten to subscribe to the issue
+
+[04:11:06.0250] <Surma>
+Kris Kowal: Thanks for making the slides very consumable by themselves. Enjoyed reading them.
+
+[04:14:32.0997] <Surma>
+One thing that is currently not quite clear after the slides: Was there tension for module blocks capturing `import.meta.url` of the module they are syntactically embedded in? I believe that’s crucial for module blocks to be successful.
+
+[04:29:52.0675] <nicolo-ribaudo>
+With the long messages above we ended up concluding that the tension is solvable, by separating the concept of "module source" (equivalent to the actual contents of an ESM file) and "module instance" (which has the runtime metadata such as import.meta)
+
+[04:30:16.0800] <nicolo-ribaudo>
+* With the long messages above we concluded that the tension is solvable, by separating the concept of "module source" (equivalent to the actual contents of an ESM file) and "module instance" (which has the runtime metadata such as import.meta)
+
+[04:30:46.0543] <nicolo-ribaudo>
+Module blocks would be the second
+
+[04:38:29.0013] <Surma>
+I think that makes sense, ty
+
+[07:36:59.0796] <littledan>
+Wait, I think there are three things, the "source", the "instance" (which includes imports) and then this third thing which module blocks and fragments are, where their imports aren't bound but where they do have an import.meta.url
+
+[08:05:07.0115] <Kris Kowal>
+I assume module blocks and fragments can be used on hosts that do not provide import.meta.url. Do you mean a referrer internal slot?
+
+[08:05:54.0699] <Kris Kowal>
+I think quite a bit hinges on this referrer property, where and whether it exists.
+
+[08:07:52.0803] <Kris Kowal>
+There is certainly a formulation of module loaders where module instances do not capturer their referrer but are still suitable for bundlers, import mappers, hot module replacement, &c.
+
+[08:08:45.0316] <Kris Kowal>
+Though retaining the referrer wouldn’t break those motivating cases and would probably help more than hurt.
+
+[08:37:37.0905] <Surma>
+The use-case that drives this is the following: It’s quite common (on the web) to refer to assets using the “new URL” pattern, i.e. `const imgURL = new URL("./hero-image.png", import.meta.url)`. This ensures that the path “./hero-image.png” is resolved relative to the module. I want to make sure that this continues to work, even if the modules is postMessage()’d to another realm, which means the module block needs to have the same `import.meta.url` as the module it is syntactically embedded in.
+
+[08:38:21.0419] <littledan>
+> <@kriskowal:matrix.org> I assume module blocks and fragments can be used on hosts that do not provide import.meta.url. Do you mean a referrer internal slot?
+
+Yes, that was just shorthand/an intuitive way of describing it
+
+[10:03:43.0147] <Kris Kowal>
+> <@surma:matrix.org> The use-case that drives this is the following: It’s quite common (on the web) to refer to assets using the “new URL” pattern, i.e. `const imgURL = new URL("./hero-image.png", import.meta.url)`. This ensures that the path “./hero-image.png” is resolved relative to the module. I want to make sure that this continues to work, even if the modules is postMessage()’d to another realm, which means the module block needs to have the same `import.meta.url` as the module it is syntactically embedded in.
+
+Agreed. In perhaps an excessively pedantic stance, I suggest that is a side-effect of carrying import.meta, which may or may not include url depending on the host. Whereas, a referrer is the key in any module related maps regardless of whether it’s a URL. In XS or in a bundle, there would not be a meaningful URL.
+
+[10:04:39.0720] <Kris Kowal>
+But yes, in the not-so-special case of web sending to web, the URL and referrer should be the same and carried with a module block to a web worker.
+
+[16:38:59.0977] <shu>
+https://github.com/tc39/incubator-agendas/blob/main/module-harmony-notes/2022-06-21.md
+
+
+2022-06-29
+[15:02:52.0190] <Kris Kowal>
+nicolo-ribaudo: can you confirm a suspicion for me? Am I right that 262 does not specify a module map at all? All module map behavior is deferred to host hooks?
+
+[15:03:28.0478] <Kris Kowal>
+Follow-up, where does the web anchor its module map? Realm, Agent, Agent Cluster?
+
+[15:06:16.0531] <nicolo-ribaudo>
+> <@kriskowal:matrix.org> nicolo-ribaudo: can you confirm a suspicion for me? Am I right that 262 does not specify a module map at all? All module map behavior is deferred to host hooks?
+
+Yes, you are right 
+
+[15:06:29.0927] <Kris Kowal>
+I’ve been talking to Caridy Patiño about carving the leanest subset possible out of the compartments proposal. One of the motivating reasons is that we are less likely to encounter friction with hosts if we’re not the first proposal to introduce a distinction between import specifier and referrer specifier (where there’s currently just module specifier and that _means_ import specifier), and not confine hosts to implement module maps in any particular way.
+
+[15:06:54.0154] <nicolo-ribaudo>
+> <@kriskowal:matrix.org> Follow-up, where does the web anchor its module map? Realm, Agent, Agent Cluster?
+
+I don't know yet, I might have an answer next week because I still need to finish reading that part of the spec 😬 unless you find it earlier 
+
+[15:07:10.0937] <Kris Kowal>
+Thanks. I would be delighted to benefit from your exploration!
+
+[15:07:46.0343] <Kris Kowal>
+Toward that end, trying to glean as much as I can from the spec text you landed in blocks.
+
+[15:08:33.0621] <Kris Kowal>
+In any case, I think I’m getting closer to isolating the major axes of design tension so we can have a productive conversation at the call next Wednesday.
+
+[15:09:25.0368] <nicolo-ribaudo>
+Awesome! I also still have to fix some other things in module blocks, since my changes were in the good direction but I'm not satisfied yet 
+
+[15:09:42.0402] <nicolo-ribaudo>
+And that involves learning more about how html handles modules 
+
+[15:09:48.0456] <Kris Kowal>
+One of those axes is whether to reify ModuleInstance vs ModuleLoader (by whatever names). ModuleSource (by whatever name) exists in either version.
+
+[15:14:26.0802] <Kris Kowal>
+Along that axes, the dominant design tensions appear to be:
+1. With ModuleInstance, some responsibility passes to the host hooks to maintain idempotence, whereas ModuleLoader can encourage but not enforce idempotence. There’s no viable proposal that fully enforces that invariant, as that would be antithetical to some of the motivating cases.
+2. With ModuleLoader (by whatever name), carry a virtualized module map. That does not need to be an imposition on the current host-defined module map, and it should be *possible* to virtualize the web.
+
+[15:15:07.0183] <Kris Kowal>
+It _might_ be possible to sweep _referrer_ under the rug, but I doubt it.
+
+[15:15:28.0354] <nicolo-ribaudo>
+So actually, I would prefer to move as much as possible from host hooks to 262
+
+[15:15:46.0328] <nicolo-ribaudo>
+And my recent updates to the module blocks proposal go in that direction 
+
+[15:15:56.0383] <Kris Kowal>
+That is, there might be a way for user virtualized hosts to have everything they need just using ModuleInstances and using either expandos or WeakMap to associate them with their referrers.
+
+[15:16:44.0289] <Kris Kowal>
+Well, that’s neat. If hosts are on-board with that, then that takes some tension away from the design.
+
+[15:18:43.0015] <Kris Kowal>
+I will look to see how you are consolidating host hooks into 262. If that’s the direction, then my intuition that module loaders are a thing that can be factored out of some other per-realm behavior, might not be entirely wrong.
+
+[15:19:00.0476] <Kris Kowal>
+Are you going so far as to pull module maps into the spec?
+
+[15:26:44.0647] <Kris Kowal>
+So, assuming, `new ModuleInstance(source: ModuleSource, referrer: string, options: {loadHook, importHook, importMeta})`, `ImportHook(specifier, referrer) => Promise<ModuleInstance>`, I think there’s a proposal that is equally capable of satisfying the motivating cases of `Compartments`, probably more satisfying for hot-module-replacement and WASM, and possibly corresponds more closely to your work on module blocks.
+
+
+2022-06-30
+[04:14:29.0639] <nicolo-ribaudo>
+If by "module maps" you mean a `referrer+specifier -> evaluatedModule` map probably yes, but it's populated lazily when modules are evaluated for the first time
+
+[04:15:12.0801] <nicolo-ribaudo>
+Is it correct that a realm can contain multiple compartments, and a compartment is "owned" by a sigle realm?
+
+[04:42:49.0049] <yulia>
+I would need to see in detail what gets moved, but i think moving things to host hooks may be the appropriate approach here
+
+[04:44:24.0878] <yulia>
+For the july 6 meeting -- can folks think about what their goals are with the module loader api? What capabilities do you want to enable? I will be touching on that, so that we can have a picture as to what problems we are looking to solve.
+
+[08:08:35.0598] <Kris Kowal>
+@yulia Motivating use cases that I know of so far are: bundlers and bundle runtimes, import map generators, import map emulators, hot module replacement for fast reload during development, test and benchmark watchers, and of course sub-realm sandboxing to mitigate supply chain attacks. These are what I’ve captured so far on the proposal [readme](https://github.com/tc39/proposal-compartments/#motivation) and I’m very interested in hearing about other cases.
+
+[08:09:00.0762] <Kris Kowal>
+ * yuliaMotivating use cases that I know of so far are: bundlers and bundle runtimes, import map generators, import map emulators, hot module replacement for fast reload during development, test and benchmark watchers, and of course sub-realm sandboxing to mitigate supply chain attacks. These are what I’ve captured so far on the proposal [readme](https://github.com/tc39/proposal-compartments/#motivation) and I’m very interested in hearing about other cases.
+
+[08:49:42.0494] <yulia>
+Thats also very useful! maybe folks can also think about the motivating cases. What I was thinking of was -- what are peoples goals. For example: Is ergonomics a goal? Is high level configuration a goal? Is support for bundlers a goal etc
+
+[15:58:20.0534] <Kris Kowal>
+At least one design tension stretches over the ergonomics vs web manifesto atomicity dimension! I’m interested to hear which way people lean.
+
+[15:59:08.0056] <Kris Kowal>
+I’ll socialize your request for the folks I know don’t hang out here.
+

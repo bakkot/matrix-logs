@@ -1,0 +1,418 @@
+2023-03-10
+[09:53:31.0395] <yulia>
+I've added the "epics" topic to the agenda and will get some slides together.
+
+[10:59:53.0772] <guybedford>
+I just added an agenda item to the SES meeting schedule for next week, to discuss some module instance functions that might help to avoid reentrancy between C++ and JS during instantiation / linking time
+
+[11:00:03.0305] <guybedford>
+if the meeting is still on, would be great to discuss it further
+
+
+2023-03-14
+[08:40:39.0805] <Jack Works>
+hi sorry I don't engage the meeting recently
+
+[08:40:50.0191] <Jack Works>
+hope I can caught up what happened these days
+
+[09:01:53.0851] <littledan>
+@room modules call now
+
+[10:05:58.0308] <Jack Works>
+I'm worried because to support dynamic import we need a import hook
+
+[10:07:33.0215] <Jack Works>
+but for static import maybe we can bundle them into a single userland call, since the reflection information is available 
+
+[10:55:22.0832] <annevk>
+It would help me a lot if there was some amount of agenda sharing before the meeting. Perhaps we covered all pertinent topics already though.
+
+[11:34:20.0867] <littledan>
+That’s a good point; let’s try to formulate the agenda ahead of time next meeting.
+
+[11:35:25.0698] <littledan>
+Something which we touched on this meeting which I would like to revisit with the group including Annevk, is how expressive the import hook/module linking API should be.
+
+
+2023-03-24
+[05:28:50.0400] <Jack Works>
+question: does defer import support re-export?
+
+[05:29:20.0573] <Jack Works>
+export defer * as ns from "spec"
+
+[05:32:03.0282] <Jack Works>
+and I think disallowing normal exports makes this feature harder to adopt. I know using namespace is easy because it's easier on the spec work, but it's also technically possible to allow named imports
+
+[07:53:13.0434] <nicolo-ribaudo>
+Namespace deferred reexports would be supported for sure; normal reexports are still being investigated 
+
+[07:54:01.0567] <scottwhittaker>
+The proposal also doesn't preclude support for named imports in the future, so it's possible that they could become supported if people turn out to really miss them
+
+[08:49:35.0055] <Jack Works>
+> <@scottwhittaker:matrix.org> The proposal also doesn't preclude support for named imports in the future, so it's possible that they could become supported if people turn out to really miss them
+
+that must happen, people rarely use namespace imports.
+
+[08:50:00.0126] <Jack Works>
+by the way, experimental webpack implementation is on the road
+
+
+2023-03-28
+[05:25:53.0369] <Jack Works>
+🤔
+
+[05:26:28.0072] <Jack Works>
+implementing "assert { webpackSync: true }" in webpack
+
+[05:26:44.0965] <Jack Works>
+asserts the module graph does not contain TLA or Async WebAssembly module
+
+[05:27:20.0301] <Jack Works>
+but asserts have been deprecated, and the "with" keyword does not fit the semantic of this feature. 
+
+[05:28:13.0727] <Jack Works>
+any suggestion? does that mean assert itself has its meaning? or should I rename it to "with { webpackAssertSync: true }"?
+
+[05:29:03.0110] <svensauleau>
+Using `with` the key could express the assertion. What about `with { webpack: { ensureSync: true }}`?
+
+[05:29:18.0604] <Jack Works>
+Note: I also found no boolean literal is allowed which is annoying. I have to use `"true"| instead of `true`
+
+[05:29:28.0256] <Jack Works>
+* Note: I also found no boolean literal is allowed which is annoying. I have to use `"true"` instead of `true`
+
+[05:29:59.0510] <svensauleau>
+another alternative could be `with { webpack: { sync: 'ensure' }}`
+
+[05:31:04.0065] <Jack Works>
+> <@svensauleau:matrix.org> Using `with` the key could express the assertion. What about `with { webpack: { ensureSync: true }}`?
+
+oh... that's also an option, but webpack internal does not have the evaluation of object literals means it will be a lot more work for me to do this
+
+[05:32:29.0402] <Jack Works>
+for multiple attributes provided by the same tool chain, does the proposal champions supports "webpackX: val, webpackY: val" or nested "webpack: { x: val, y: val }"?
+
+[05:33:04.0304] <svensauleau>
+there was a discussion about that and I don't remember the outcome. I think we should support `with { webpack: { ... }}`.
+
+[05:33:09.0517] <svensauleau>
+ * there was a discussion about that but I don't remember the outcome. I think we should support `with { webpack: { ... }}`.
+
+[05:33:23.0055] <Jack Works>
+* for multiple attributes provided by the same tool chain, does the proposal champions recommend "webpackX: val, webpackY: val" or nested "webpack: { x: val, y: val }"?
+
+[05:44:28.0568] <littledan>
+Currently only strings are supported
+
+[05:45:29.0204] <littledan>
+For multiple webpack-defined keys, you can use `with { _webpackFoo: “xyz”, _webpackBar: “abc” }`
+
+[05:45:51.0088] <littledan>
+We should probably do more ASAP to document and socialize this convention
+
+[05:46:33.0307] <littledan>
+I don’t think we should be adding features right now; we just had a period of reconsideration and explicitly decided to keep the expressiveness of values the same 
+
+[09:01:47.0264] <nicolo-ribaudo>
+Meeting now?
+
+[09:02:49.0837] <Kris Kowal>
+I’m still away and tending to a newborn and toddler, but I’m very much interested in summaries if someone has a moment to describe progress/regress from plenary or today’s module meeting.
+
+[09:03:13.0086] <Luca Casonato>
+I'm sitting in the waiting room - no-one else around to join today?
+
+[09:04:03.0869] <nicolo-ribaudo>
+> <@lucacasonato:matrix.org> I'm sitting in the waiting room - no-one else around to join today?
+
+Same
+
+[09:07:42.0901] <nicolo-ribaudo>
+> <@kriskowal:matrix.org> I’m still away and tending to a newborn and toddler, but I’m very much interested in summaries if someone has a moment to describe progress/regress from plenary or today’s module meeting.
+
+Most significant updates:
+- import assertions are back to Stage 3 (conditional on editors reviews), without the constraint that they cannot affect loading and cannot be part of the cache key
+- Luca and Guy gave a presentation in plenary about the various phases of loading a module, from resolution to evaluation, showing how different proposals are just "stop at an early phase"
+- Guy is thinking about possible design suggestions to compartments Layer 0 to work around some of the feedback given in the November meeting
+
+[09:08:05.0630] <nicolo-ribaudo>
+> <@kriskowal:matrix.org> I’m still away and tending to a newborn and toddler, but I’m very much interested in summaries if someone has a moment to describe progress/regress from plenary or today’s module meeting.
+
+ * Most significant updates:
+
+- import assertions are back to Stage 3 (conditional on editors reviews) as "import attributes", without the constraint that they cannot affect loading and cannot be part of the cache key
+- Luca and Guy gave a presentation in plenary about the various phases of loading a module, from resolution to evaluation, showing how different proposals are just "stop at an early phase"
+- Guy is thinking about possible design suggestions to compartments Layer 0 to work around some of the feedback given in the November meeting
+
+[09:08:55.0651] <guybedford>
+unfortunately I don't have permissions either, also in waiting room...
+
+[09:08:58.0220] <Luca Casonato>
+> Luca and Guy gave a presentation in plenary about the various phases of loading a module, from resolution to evaluation, showing how different proposals are just "stop at an early phase"
+I think the presentation was well received. We have some feedback from Jordan to think about return types for "source" phase imports, but we think we can tackle this and attempt Stage 3 at next plenary.
+
+[09:09:11.0545] <Luca Casonato>
+ * > Luca and Guy gave a presentation in plenary about the various phases of loading a module, from resolution to evaluation, showing how different proposals are just "stop at an early phase"
+
+I think the presentation was well received. We have some feedback from Jordan to think about return types for "source" phase imports, but we think we can tackle this and attempt Stage 3 at next plenary.
+
+[09:09:33.0576] <Luca Casonato>
+To join the video meeting, click this link: https://meet.google.com/afs-kzui-qsx
+Otherwise, to join by phone, dial +31 20 257 4432 and enter this PIN: 775 821 400#
+To view more phone numbers, click this link: https://tel.meet/afs-kzui-qsx?hs=5
+
+[09:09:48.0497] <Luca Casonato>
+let's just use a different room then :)
+
+[09:10:15.0702] <littledan>
+(I'm skipping this meeting but I can briefly join to let people in if needed)
+
+[09:10:36.0250] <Luca Casonato>
+littledan: we've figured it out
+
+[09:11:13.0588] <Luca Casonato>
+guybedford: new link, can you join there?
+
+[09:36:14.0383] <annevk>
+Nice work on Import Attributes, btw!
+
+[09:44:22.0155] <Luca Casonato>
+Mathieu Hofman: https://crbug.com/567999
+
+[10:03:58.0896] <Luca Casonato>
+What do you all think about making the loader meeting 1 hour again, but doing it weekly rather than bi-weekly? Please vote below:
+
+[10:22:30.0944] <littledan>
+> <@lucacasonato:matrix.org> > Luca and Guy gave a presentation in plenary about the various phases of loading a module, from resolution to evaluation, showing how different proposals are just "stop at an early phase"
+> 
+> I think the presentation was well received. We have some feedback from Jordan to think about return types for "source" phase imports, but we think we can tackle this and attempt Stage 3 at next plenary.
+
+Is the proposed solution described anywhere?
+
+[10:23:31.0116] <littledan>
+I really think we need a general set of built-in type-checkers similar to isArray, as was previously proposed. I don't think it's optimal that we're doing this case-by-case (it comes up for many proposals).
+
+[10:37:48.0179] <nicolo-ribaudo>
+Jordan's concern here was not "that thing has an internal slot I cannot check", but "that thing has no internal slot to uniquely describe it as the result of import reflection"
+
+[10:48:52.0190] <littledan>
+> <@littledan:matrix.org> I really think we need a general set of built-in type-checkers similar to isArray, as was previously proposed. I don't think it's optimal that we're doing this case-by-case (it comes up for many proposals).
+
+please don't give too much importance to this comment; I'm fine with a specific solution for this case, for now.
+
+[11:00:29.0782] <nicolo-ribaudo>
+* Jordan's concern here was not "that thing has an internal slot we cannot check", but "that thing has no internal slot to uniquely describe it as the result of import reflection"
+
+[12:48:47.0941] <Luca Casonato>
+> that thing has no internal slot to uniquely describe it as the result of import reflection
+
+Which I think it will - the internal slot that will be used by the `new Module()` constructor to figure out what it is meant to do with a given source.
+
+[12:49:33.0934] <littledan>
+So, what's the proposed solution? Do we create a predicate specifically for this, or do we say it will be solved when we later add `new Module`, or what?
+
+[12:49:40.0928] <littledan>
+or do we add `new Module` already?
+
+[12:50:20.0674] <Luca Casonato>
+That I am not sure on yet - ljharb: would you be OK with the predicate being the `Module` constructor itself?
+
+[12:50:49.0909] <Luca Casonato>
+We still have 6 weeks to figure it out :D
+
+[12:52:01.0942] <ljharb>
+how would that work?
+
+[12:52:26.0442] <ljharb>
+like new Module throws unless it has a single argument that’s a module source instance, and creating a Module has no immediate side effects?
+
+[12:52:31.0606] <Luca Casonato>
+if `new Module(source)` throws it is not a source, if it does not, it is a source
+
+[12:52:35.0395] <Luca Casonato>
+creating a module has no side-effects
+
+[12:52:45.0295] <Luca Casonato>
+evaluation only happens when you call `await import(module)`
+
+[12:53:13.0887] <ljharb>
+seems fine to me. How can i synchronously detect what’s a Module instance? :-)
+
+[12:54:02.0072] <littledan>
+I agree that the `Module` constructor would naturally throw if passed a non-source thing. and it'd return a Module instance directly, not a Promise, so no need to worry about asynchrony.
+
+[12:54:43.0694] <littledan>
+We could also have a Module constructor which initially *doesn't* allow an importHook, but this would still maybe not be the best, as the idea for Wasm source imports is that it then *wouldn't* pull in Wasm/ESM integration
+
+[12:54:48.0745] <Luca Casonato>
+`Module.isModule()`? 😆
+
+[12:56:12.0182] <Luca Casonato>
+What do you mean by that? I'd expect Wasm/ESM integration to happen if we ship import reflection. Wasm source import reflection without Wasm/ESM integration seems very weird 😃
+
+[12:57:42.0601] <littledan>
+well, there had previously been a lot of doubt about whether importing Wasm all the way, directly, was useful for anyone at all. The argument was made that source imports are more useful, and that direct Wasm imports would only really work well with "the component model" or something similar to do the glue code for you
+
+[13:13:11.0009] <Luca Casonato>
+I think there are use-cases where it works fine
+
+[13:13:22.0571] <Luca Casonato>
+The WASM just needs to be compiled specifically for JS
+
+[13:13:48.0975] <Luca Casonato>
+namely imports in the wasm need to be relative JS specifiers
+
+[13:14:13.0947] <littledan>
+well, just relative paths in general (to JS or Wasm)
+
+[13:14:14.0700] <Luca Casonato>
+the problem is that "arbitrary" wasm (ie compiled for WASI) would not work well
+
+[13:14:33.0001] <Luca Casonato>
+right that's what i mean. don't know why i said "JS specifiers" lol
+
+[13:14:58.0932] <Luca Casonato>
+i'd still like to ship wasm/esm in Deno soon
+
+[13:15:20.0088] <littledan>
+I think something which would help is, demonstrations of use
+
+[13:15:48.0338] <littledan>
+WebKit and SpiderMonkey have Wasm/ESM integration largely implemented, and are just holding back on whether it's useful
+
+[13:15:51.0128] <littledan>
+(IIRC)
+
+[13:15:56.0606] <Luca Casonato>
+but i need Chromium to agree to ship it at the same time. unfortunately I was the one that told them that we should probably all hold off until we had wasm source imports. sorry!
+
+[13:16:11.0639] <littledan>
+did Chromium even start implementing it?
+
+[13:16:29.0424] <Luca Casonato>
+i had a call with shu and 2 chrome engineers
+
+[13:16:36.0336] <Luca Casonato>
+but i don't think that went anywhere
+
+[13:16:43.0487] <littledan>
+> <@lucacasonato:matrix.org> but i need Chromium to agree to ship it at the same time. unfortunately I was the one that told them that we should probably all hold off until we had wasm source imports. sorry!
+
+I think this was reasonable since we didn't know at the time that it would be possible to separate source from instance imports
+
+[13:16:48.0183] <littledan>
+> <@lucacasonato:matrix.org> i had a call with shu and 2 chrome engineers
+
+When was this?
+
+[13:17:48.0318] <littledan>
+> <@lucacasonato:matrix.org> but i don't think that went anywhere
+
+If it was a year or two ago, I think you successfully convinced them that Wasm/ESM integration was not useful in practice--that's the takeaway that I got out of conversations with them.
+
+[13:17:53.0914] <Luca Casonato>
+we did implement it largely in Deno (without changes to V8), but then ran into issues with V8 synthetic modules that need to be async
+
+[13:17:59.0052] <Luca Casonato>
+it was 24 May 2022
+
+[13:18:37.0155] <littledan>
+oh OK I guess they were convinced that Wasm/ESM integration wasn't useful earlier than that
+
+[13:19:09.0709] <Luca Casonato>
+I never said it was not useful in practice - just that source imports would be more powerful from the get go. asumu was also on this call. Now that we know we can do both, we should probably re-visit
+
+[13:19:37.0218] <Luca Casonato>
+I think it's safe to do Wasm/ESM now because we can do both source and instance import
+
+[13:19:52.0888] <littledan>
+I didn't say that you said that, but this seems to be their current impression
+
+[13:20:13.0168] <Luca Casonato>
+Yeah, just clarifying what I said on the call :)
+
+[13:20:27.0580] <littledan>
+anyway yeah I think we have the conflict resolved, but we also shouldn't block shipping one on the other (since it will be less work to ship just source imports)
+
+[13:21:12.0613] <Luca Casonato>
+But if it's essentially done in WebKit and Gecko, we should just ship it. asumu you we're working on pushing this - is this still something you're pursuing?
+
+[13:21:13.0960] <littledan>
+I was so nervous about all of this ~8 months ago; I'm really glad that we're so close to a resolution
+
+[13:21:29.0191] <Luca Casonato>
+Yeah, and I think the solution is pretty elegant also :)
+
+[13:23:40.0184] <littledan>
+> <@lucacasonato:matrix.org> But if it's essentially done in WebKit and Gecko, we should just ship it. asumu you we're working on pushing this - is this still something you're pursuing?
+
+Previously, Asumu was doing this work on contract with Bloomberg. At this point, if we're talking about 1-2 weeks of effort from here, I think we can squeeze it into our tab. More would probably be too much of a tangent to be funded by us (but maybe Asumu is independently motivated, hint hint guybedford)
+
+[13:27:13.0629] <asumu>
+Yes Wasm ESM source imports was mostly done in WebKit, but it's been on pause for a while in terms of work on the spec and finishing the implementation. Not sure if I will have time to work on it currently.
+
+[13:27:39.0749] <littledan>
+asumu, was your work in WebKit or Gecko, I forgot
+
+[13:27:55.0318] <asumu>
+It was in WebKit, yeah.
+
+[13:27:55.0340] <littledan>
+maybe there is no Gecko implementation and just WebKit
+
+[13:28:08.0266] <asumu>
+I suspect Gecko doesn't have it, but not sure.
+
+[13:28:18.0514] <littledan>
+yeah I'd suspect the same
+
+[13:28:29.0745] <littledan>
+anyway Constellation was almost up for shipping it in the past, right?
+
+[13:31:33.0131] <asumu>
+They were definitely happy to accept patches on it anyway, though we didn't discuss shipping it yet. He was also working on import assertions implementation in WK too IIRC, and wanted to know how those would work together too.
+
+[14:21:43.0177] <ljharb>
+sgtm :-p
+
+[14:28:42.0482] <littledan>
+I think the idea was: WebAssembly is *not* marked differently, since long-term we want JS to be redone in Wasm without changing how it's invoked
+
+[14:28:49.0454] <littledan>
+but we should discuss this more explicitly at some poitn
+
+[15:40:18.0789] <guybedford>
+all sounds quite sensible to me
+
+
+2023-03-29
+[00:15:22.0104] <Jack Works>
+oh
+
+[00:15:36.0673] <Jack Works>
+`with: { webpack: { ... } }` isn't valid syntax today
+
+[03:53:37.0062] <littledan>
+Nope
+
+[07:59:16.0058] <nicolo-ribaudo>
+During the call yesterday I was wrong: CSP for wasm is only checked once, during compilation. I was confused by the CSP check in `WebAssembly.instantiate`, but it only happens when calling it with raw bytes and not with an already compiled `WebAssembly.Module`
+
+[07:59:54.0228] <littledan>
+> <@nicolo-ribaudo:matrix.org> During the call yesterday I was wrong: CSP for wasm is only checked once, during compilation. I was confused by the CSP check in `WebAssembly.instantiate`, but it only happens when calling it with raw bytes and not with an already compiled `WebAssembly.Module`
+
+Is it implemented the same way across browsers these days?
+
+[08:04:54.0659] <nicolo-ribaudo>
+From what I understood yesterday, it's entirely hypotetical because different CSPs between the main thread and workers are not properly supported
+
+[08:08:22.0634] <nicolo-ribaudo>
+(or at least, both Chrome and Firefox have problems, would need to check Safari)
+
+[09:14:03.0872] <littledan>
+there was earlier a disagreement between browsers about which stage CSP should be checked at. If that's resolved now, that's great
+

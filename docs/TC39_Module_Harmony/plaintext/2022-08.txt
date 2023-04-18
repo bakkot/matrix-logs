@@ -1,0 +1,697 @@
+2022-08-01
+[05:02:25.0570] <naugtur>
+When I need to create a mental model of something, it helps to recreate it in a medium I can look at all at once. So I did:
+https://gist.github.com/naugtur/daf2aaf415e03e6c3ae5030e06f7b20e
+This is an attempt to visualize the change in Layer 0 refactoring. 
+
+
+[05:03:55.0644] <naugtur>
+Having done that, I compared with something I tried to model earlier.
+
+I compared the Layer0 refactor with the old refactor writeup from Mark Miller (https://github.com/erights/tc39pr-refactor-ModuleRecord) and the most significant difference is:
+```
+We separate into a distinct ModuleInitialization object the bookkeeping needed to guide module instantiation, linking, initialization, etc. Thus, once the initialization process completes, this bookkeeping state is no longer present. This helps us reason about post-initialization state separately.
+```
+Which was introduced to make CyclicModuleRecord cleaner. I think it could also remove the need for bidirectional reference between Module and SourceTextModuleRecord if introduced to Layer 0 refactor. 
+
+[11:35:54.0341] <Kris Kowal>
+yulia littledan Do we have a convener for Module Harmony tomorrow?
+
+[11:37:15.0426] <littledan>
+I'm happy to run the meeting and take notes. Is anything more needed as part of "convening" it?
+
+[11:40:38.0413] <Kris Kowal>
+Not to my knowledge. I’ve started proposing topics on the agenda https://docs.google.com/document/d/1CD5lIBZLl24XBWbQhokqBdt4Zl7wPAcFJKJrgePr9HU/edit#
+
+[11:57:52.0179] <Kris Kowal>
+Also, I did a recorded reprise of my talk at plenary for anyone who missed that. https://youtu.be/NluxPr6eFVk
+
+[13:16:34.0945] <Kris Kowal>
+* Also, recorded a reprise of my talk at plenary for anyone who missed that. https://youtu.be/NluxPr6eFVk
+
+[16:57:31.0163] <Kris Kowal>
+Aside: I want to write the phrase “link and load” even though the words are clearly in the wrong order.
+
+
+2022-08-02
+[05:02:26.0943] <Jack Works>
+😆
+
+[09:00:17.0145] <Kris Kowal>
+I’ll be on the call shortly
+
+[09:02:40.0240] <Luca Casonato>
+is anyone in the call that could let me in?
+
+[10:42:14.0625] <yulia>
+sorry for coming across so strong. My opinion is not so intense. It was largely due to the time constraint
+
+[10:42:42.0819] <littledan>
+it's fine, I was also probably talking too much that meeting and apologize for that
+
+[10:43:09.0150] <Kris Kowal>
+We’re in agreement that the syntax should be thoroughly discussed.
+
+[10:55:59.0282] <Kris Kowal>
+> <@jackworks:matrix.org> sent an image.
+
+What’s this? Looks like the future.
+
+[11:03:52.0283] <mkubilayk>
+I do sympathize with yulia's point of `import module` potentially being confusing to a regular developer, who would naturally think that they have always been importing "modules" but now there is this thing called `import module` that does something different. 
+
+[11:05:16.0243] <mkubilayk>
+Separately, I really like the idea of building a topology of the ongoing proposals and similarly a capability graph. I think they would be massively helpful to anyone like me who's getting into this space.
+
+[11:08:38.0222] <Kris Kowal>
+Module is one of _those words_. Mark Miller insists that nothing should be called _module_ because so many things could be called modules when you strip off the qualifiers.
+
+[11:08:53.0850] <Kris Kowal>
+I mean one of “those words” which is the category including words like _test_.
+
+[11:10:46.0561] <Kris Kowal>
+Of course, there’s no more sensible word than `module` for module blocks, and it should be intuitively obvious that module blocks are instances of `Module` once word gets out.
+
+[11:11:08.0249] <Kris Kowal>
+One thing sort of leads to another from there.
+
+[11:12:36.0996] <littledan>
+hmm, I feel like I'm the source of asking that we go back and use module for everything...
+
+[11:12:46.0429] <littledan>
+and it seems like a bad idea exactly for the reason Mark says
+
+[11:13:27.0637] <littledan>
+> <@kriskowal:matrix.org> One thing sort of leads to another from there.
+
+I agree that this is how we arrived where we are but it seems bad
+
+[11:14:43.0580] <Kris Kowal>
+I also could buy `import x from 'y' as module`, but that doesn’t address the “what’s a module? i thought _module_ was a synecdoche of _ module exports namespace exotic objects_.
+
+[11:14:53.0175] <Kris Kowal>
+ * I also could buy `import x from 'y' as module`, but that doesn’t address the “what’s a module? “i thought _module_ was a synecdoche of \_ module exports namespace exotic objects\_.”
+
+[11:15:02.0847] <Kris Kowal>
+ * I also could buy `import x from 'y' as module`, but that doesn’t address the “what’s a module? i thought _module_ was a synecdoche of \_ module exports namespace exotic objects\_.”
+
+[11:15:13.0517] <Kris Kowal>
+ * I also could buy `import x from 'y' as module`, but that doesn’t address the “what’s a module? i thought _module_ was a synecdoche of _module exports namespace exotic objects_.”
+
+[11:15:28.0023] <littledan>
+> <@kriskowal:matrix.org> I also could buy `import x from 'y' as module`, but that doesn’t address the “what’s a module? i thought _module_ was a synecdoche of _module exports namespace exotic objects_.”
+
+Yes, and it means that `as identifier` means two different things *in import statements* (even worse than when it was `as "string"`)
+
+[11:15:57.0736] <littledan>
+but generally yes I can buy putting the modifier on the right
+
+[11:15:59.0831] <Kris Kowal>
+Yeah, I agree that’s not ideal.
+
+[11:16:08.0724] <Kris Kowal>
+Right.
+
+[11:16:28.0249] <littledan>
+and I can buy "object literals are just too syntactically heavy for this"
+
+[11:16:38.0226] <Kris Kowal>
+I’m still leaning on left, but also don’t like that it would overlap with lexically named module fragments maybe someday.
+
+[11:17:14.0735] <littledan>
+well, I don't think that `module` *needs* to be the only keyword that introduces something into the lexically named module fragments namespace
+
+[11:17:50.0342] <Kris Kowal>
+It’s an interesting puzzle once all the pieces are out :-)
+
+[11:19:17.0000] <Kris Kowal>
+If we go back to qualifying “module”, I don’t like “instance” because it leads to language like “`ModuleInstance` instance”.
+
+[11:22:02.0501] <yulia>
+I'm potentially amenable to `import source x from y`
+
+[11:22:33.0964] <littledan>
+I think that'd make sense for module blocks/fragments too, to use `source` as the keyword
+
+[11:22:37.0134] <yulia>
+import assertions / the right hand side, not being used is maybe a shame. but as mentioned if we have a clear relationship as daniel outlined that may be fine
+
+[11:23:03.0821] <yulia>
+my comments in the call were more that daniel and i had discussed the issue, but i wanted to hear what you folks thought of my complaints
+
+[11:23:16.0953] <littledan>
+oh! sorry for talking so much
+
+[11:24:27.0341] <littledan>
+> <@yulia:mozilla.org> I'm potentially amenable to `import source x from y`
+
+but... it's funny since we were thinking of the "source" brand for, you know, the ModuleSource, as opposed to the ModuleInstance
+
+[11:24:51.0192] <yulia>
+yep, this would fit more with guy's thinking
+
+[11:24:56.0139] <yulia>
+i don't know what to call the thing in between
+
+[11:25:01.0849] <yulia>
+instance is... a bit weird
+
+[11:25:15.0796] <littledan>
+well, yeah, this still doesn't resolve the question about whether we want two new kinds of import statements or one
+
+[11:26:14.0457] <littledan>
+or if we feel that `import module` is not an important thing to be able to express, otoh
+
+[11:26:22.0926] <Kris Kowal>
+Module Node would be valid.
+
+[11:27:38.0226] <Kris Kowal>
+And we’ve already denied corporate aggressors ownership of “meta”. No reason not to do the same to those who would appropriate common words like “node” or “go”.
+
+[11:27:58.0749] <Kris Kowal>
+/me checks caffeine. Uh oh.
+
+[11:28:01.0242] <littledan>
+`import agoric x from "./y"`
+
+[11:29:40.0674] <Kris Kowal>
+> <@littledan:matrix.org> `import agoric x from "./y"`
+
+As long as that’s coming from you! From me, one might construe that it increases shareholder value too much.
+
+[11:29:55.0480] <littledan>
+or maybe destroys your trademark
+
+[11:30:02.0887] <Kris Kowal>
+RIP
+
+[11:30:09.0616] <guybedford>
+this could be a JS sponsorship opportunity....
+
+[11:30:41.0799] <guybedford>
+`reflect` as a keyword might be interesting
+
+[11:30:46.0859] <guybedford>
+`source` is good
+
+[11:30:50.0305] <Kris Kowal>
+“And that’s how `import oracle` happened.”
+
+[11:31:01.0357] <guybedford>
+lol, that'll show them
+
+[11:31:08.0875] <Kris Kowal>
+> <@guybedford:matrix.org> `reflect` as a keyword might be interesting
+
+I don’t hate it.
+
+[11:31:29.0481] <Kris Kowal>
+> <@guybedford:matrix.org> lol, that'll show them
+
+Owning the trademark was clearly not enough.
+
+[11:31:39.0996] <littledan>
+I feel like `reflect` is a bit ambiguous; there's lots of layers of reflection in JS
+
+[11:31:48.0726] <Kris Kowal>
+That’s true.
+
+[11:31:53.0402] <littledan>
+ideally we'd find a word which somehow means like "uninstantiated"
+
+[11:32:08.0862] <Kris Kowal>
+Module “nodes” and sources are both reflections.
+
+[11:32:29.0338] <Kris Kowal>
+> <@littledan:matrix.org> ideally we'd find a word which somehow means like "uninstantiated"
+
+The state is not guaranteed to be any particular value.
+
+[11:33:57.0284] <guybedford>
+I'd just hope we can avoid picking up the syntax discussion as explicitly name bikeshedding too much for now
+
+[11:34:50.0584] <guybedford>
+I mean for the next meeting
+
+[11:34:58.0702] <Kris Kowal>
+```
+import s from 'x.js' as source; // module source
+import n from 'x.js' as node; // module node
+import * as e from 'x.js'; // module namespace guarantees n is in evaluated state
+```
+
+[11:35:02.0115] <guybedford>
+if we're making syntax the initial starting point
+
+[11:35:38.0763] <guybedford>
+I can get behind most of the suggestions above though!
+
+[11:36:31.0167] <littledan>
+sorry what does "node" mean?
+
+[11:36:47.0832] <Kris Kowal>
+Riffing on “node of module graph” what we’re currently calling a `Module` instance.
+
+[11:37:26.0740] <yulia>
+what about `import lazy` for uninstantiated?
+
+[11:37:29.0089] <littledan>
+> <@guybedford:matrix.org> I'd just hope we can avoid picking up the syntax discussion as explicitly name bikeshedding too much for now
+
+Well, on the contrary, I think when we came to the point of understanding that we might just change the keyword "module" for something else, and that might be a solution, that was some real progress. Let's timebox any bikeshedding though.
+
+[11:38:09.0917] <littledan>
+> <@yulia:mozilla.org> what about `import lazy` for uninstantiated?
+
+I like this, though it really doesn't map to module blocks
+
+[11:38:44.0147] <yulia>
+hmm module blocks are linked right?
+
+[11:39:05.0772] <Kris Kowal>
+Remind me what the effect of `lazy` is?
+
+[11:39:09.0409] <littledan>
+no, they can be imported but they are "lazy" in the same way
+
+[11:39:20.0445] <yulia>
+its a linked module source that hasn't been evaluated yet
+
+[11:39:32.0520] <littledan>
+what do you mean by linked?
+
+[11:39:35.0670] <yulia>
+ * Lazy: its a linked module source that hasn't been evaluated yet
+
+[11:39:40.0981] <Kris Kowal>
+(Because I suspect we get lazy for free from importing nodes of the module graph and module blocks)
+
+[11:39:41.0008] <yulia>
+as in, the module graph is traversed
+
+[11:39:44.0850] <yulia>
+and all of its peers are loaded
+
+[11:39:54.0489] <yulia>
+but not executed
+
+[11:39:56.0241] <Kris Kowal>
+Ah.
+
+[11:40:01.0182] <littledan>
+well, I think for the Wasm use case for import reflection, we really can't eagerly traverse the module graph
+
+[11:40:10.0391] <yulia>
+right, but we would have source for that
+
+[11:40:11.0677] <littledan>
+because the specifiers may mean something totally different
+
+[11:40:25.0127] <Kris Kowal>
+Aye. That’s also necessary for bundling.
+
+[11:40:36.0209] <littledan>
+hmm, well, this is a meaningful place where we have multiple policies, and something we should discuss IMO
+
+[11:40:48.0363] <yulia>
+yes, of course
+
+[11:40:48.0787] <Kris Kowal>
+Module blocks and module imports should be inherently lazy, imo.
+
+[11:41:05.0184] <Kris Kowal>
+ * Module blocks and module “node in graph” imports should be inherently lazy, imo.
+
+[11:41:11.0338] <littledan>
+I think there are use cases for both policies
+
+[11:41:19.0590] <Kris Kowal>
+I agree.
+
+[11:41:20.0819] <littledan>
+and... you could have attributes that let you select
+
+[11:41:38.0340] <Kris Kowal>
+I’m not sure whether the policy belongs in syntax. I have to think about it.
+
+[11:41:56.0524] <littledan>
+I don't know either
+
+[11:41:58.0803] <Kris Kowal>
+But bundling motivates both lazy and eager, depending on the context.
+
+[11:41:59.0550] <yulia>
+ok so for the schema, right now we have `import [stage] x from y [modifiers`
+
+[11:42:02.0606] <yulia>
+thats pretty intersting
+
+[11:42:28.0070] <yulia>
+it gets a bit messy when we also have `import type <etc>` though
+
+[11:42:30.0109] <littledan>
+I'm not really sure if stage and laziness are the same thing
+
+[11:42:53.0043] <yulia>
+maybe layer is a better term?
+
+[11:42:59.0642] <yulia>
+what i mean is we don't apply all steps of module loading
+
+[11:43:29.0514] <Kris Kowal>
+On the producer side of a bundle, all static imports must be eager. On the consumer side, module blocks in a bundle must be lazy.
+
+[11:44:24.0356] <Kris Kowal>
+Though, there are likely exceptions to the rule.
+
+[11:44:57.0108] <Kris Kowal>
+And it would be not so good to force bundlers to resort to comments. That would be antithetical to providing a system that doesn’t require a JS parser.
+
+[11:45:29.0272] <yulia>
+why would they need comments? sorry if i am not catching the obvious
+
+[11:45:33.0024] <Kris Kowal>
+ * And it would be not so good to force bundlers to resort to comments. That would be antithetical to providing a system that doesn’t require a usercode JS parser.
+
+[11:45:48.0113] <littledan>
+to indicate stage/layer if we don't make a syntax for it?
+
+[11:46:01.0954] <Kris Kowal>
+It’s fine. Consider the case of bundling a module block for purposes of transmission to a worker.
+
+[11:46:07.0135] <yulia>
+ah, because `module` vs `lazy`
+
+[11:46:35.0495] <yulia>
+would it be lazy in the context of a worker?
+
+[11:47:29.0191] <yulia>
+i would have guessed that it is executed on arrival but i may not have kept up / got it wrong
+
+[11:47:46.0995] <Kris Kowal>
+You’re not wrong.
+
+[11:47:52.0153] <littledan>
+we're talking about laziness of fetching imports, right?
+
+[11:48:13.0940] <yulia>
+yes, roughly aligned with what i was thinking for deferred evaluation, minus the behind-the-scenes replacement
+
+[11:48:38.0727] <yulia>
+which is still an important dx thing.. but i am open to the discussion
+
+[11:49:09.0362] <littledan>
+like, there are four possible levels of laziness:
+- Laziest: Don't even fetch at the top level (asset reference)
+- Lazier: Fetch at the top level, don't fetch dependencies (what I thought `import module` was)
+- Unexecuted: Fetch dependencies but don't execute (what's being raised for bundlers needing)
+- Just a normal import: Fetch dependencies and execute
+
+[11:49:55.0460] <yulia>
+lazier aligns with what i thought import module was (though i quite like `import source`?)
+
+[11:50:00.0229] <Kris Kowal>
+I propose a useful constraint on our design: it should be possible to author an entire application that includes workers and transmits module blocks to workers in such a way that the sources do not need to be altered between development and production.
+
+[11:51:04.0217] <Kris Kowal>
+Or, paraphrase, the sources must not be changed in order for tooling to produce production object code.
+
+[11:51:10.0296] <littledan>
+I think a general design goal should be, it should be possible for build pipelines to shrink over time if optimizations aren't happening. This is an incremental process, not really something we can consider an absolute constraint.
+
+[11:51:20.0539] <littledan>
+like, we're not proposing JSX
+
+[11:51:26.0998] <Kris Kowal>
+Right.
+
+[11:51:33.0374] <yulia>
+Lol my computer died mid sentence
+
+[11:51:44.0810] <yulia>
+I’ll head off for the night 
+
+[11:51:48.0429] <yulia>
+I think it’s a sign
+
+[11:52:01.0552] <Kris Kowal>
+But the point is that the build pipeline will see module blocks that require various treatments for purposes of generating bundles for each worker.
+
+[11:52:03.0272] <littledan>
+good night! I'm looking forward to continuing this discussion
+
+[11:52:11.0708] <yulia>
+Likewise
+
+[11:52:23.0593] <Kris Kowal>
+Sleep well, yulia and yulia’s computer.
+
+
+2022-08-03
+[20:18:58.0150] <Jack Works>
+> <@kriskowal:matrix.org> What’s this? Looks like the future.
+
+Install `@jackworks/typescript@4.8.0-dev.20220802-2` (do not open source map, it will crash)
+
+[20:19:38.0539] <Kris Kowal>
+I see. You’re hacking TS :-)
+
+[20:29:56.0783] <Jack Works>
+> <@kriskowal:matrix.org> I also could buy `import x from 'y' as module`, but that doesn’t address the “what’s a module? i thought _module_ was a synecdoche of _module exports namespace exotic objects_.”
+
+`import x from 'y' as uninitialized`
+
+[20:31:13.0737] <Kris Kowal>
+I dislike `uninitialized` because:
+```
+import x from 'y';
+import x as xModule from 'y' as uninitialized; // <- actually initialized
+```
+
+[09:23:20.0093] <yulia>
+> <@robpalme:matrix.org> Good morning, all. I wanted to reiterate a bit on what I said in plenary and also afterwards direct to Kris last week.
+> 
+> The layered modules APIs that Kris presented are great at permitting a bunch of use-cases. In particular I like the idea of using them for achieving mocking in a test runner (avoiding the need for code to use DI patterns or custom host hooks).
+> 
+> The bigger win (value proposition) is if we can identify features that will allow the wider ecosystem to adopt ES modules. npm & Node mostly ship and execute CommonJS. No one has provided a compelling or easy migration story. So we have a situation that may even be worse than the Python 2/3 switchover.
+> 
+> A key specific use-case that CJS still beats ESM on is the ability to ergonomically/quickly achieve fast load times via lazy loading. Meaning the Babel option "lazy" on the ESM->CJS transform that injects conditional synchronous requires to defer loading static imports to instead be just-in-time.
+> 
+> ESM has no ergonomic way to achieve this. Instead users are forced to rewrite their app to become async and use dynamic `import() `. Because switching sync->async functions have ripple effects back to the caller.
+> 
+> Originally Yulia's defer-eval proposal looked like it might solve this problem. But I understand the sync part of that proposal is now under debate.
+> 
+> My purpose in conveying this is not to demand sync loading. It is to highlight that, if you can make migration from CJS to ESM easier, then (1) the community/ecosystem will love you and see the value of your work, and (2) it will be easier to fund this work stream.
+
+Sorry I am really late on this. I want to call out this part of this:
+
+> Originally Yulia's defer-eval proposal looked like it might solve this problem. But I understand the sync part of that proposal is now under debate.
+
+I would need to clarify what "sync" means here, but i would say that the proposal is still very much in its original form and goal. The goal is described here: https://docs.google.com/presentation/d/17NsxHzAC2RlP5rB3wrns9O2Z-NduSpcm2_GOVo2TnKE/edit#slide=id.p -- I think it may be worthwhile to go over this proposal with the group again, and talk a bit more about the alternative (that I presented back in 2021, and recently got more feedback on) in light of the discussion in this group
+
+[09:26:32.0817] <yulia>
+I don't think this conflicts much with what we are discussion which is why I haven't been bringing it up. It can benefit from the adjustments that are made by the core proposal.
+
+[09:26:44.0639] <yulia>
+So, I haven't dropped it, in case anyone was wondering
+
+[12:12:53.0029] <littledan>
+Yeah, I like the idea of going through this proposal with the group again when you have the chance
+
+
+2022-08-04
+[03:27:11.0625] <Jack Works>
+https://github.com/DimensionDev/aot-secure-ecmascript/blob/bdeb5076eee8d52996ae0d4106885a31c91b6bd8/packages/compartment/test/module/top-level-await.ts
+
+[03:27:24.0532] <Jack Works>
+my implementation of the current proposal can run some basic tests and looks good!
+
+
+2022-08-05
+[14:43:18.0553] <Rob Palmer>
+In the July meeting I mentioned how ESM isn't widely adopted yet, particularly by Node/npm ecosystem.
+
+Here's a thread confirming that, which also highlights lots of unhappy users. I think most are more upset at the Node migration story, and the tooling ecosystem rather than the spec.
+
+My original point remains that, if we can do anything to assist the migration story, it will solve a huge industry problem.
+
+https://twitter.com/wooorm/status/1555258256582385664
+
+[15:54:48.0136] <littledan>
+in the meeting earlier this week, Yulia suggested we all discuss our goals, and basically everyone shared the CJS/ESM migration as a core goal they have in these efforts
+
+
+2022-08-07
+[18:33:31.0830] <Jack Works>
+What is faux
+
+[18:36:08.0182] <Jack Works>
+I used to be one of them (upset users ) but after I made my code run in esm mode, all the problem goes! 
+
+[05:50:37.0606] <Rob Palmer>
+Faux means code authored as ESM that is transpiled by Babel/tsc so that the published code is CJS with a magic symbol on the exported object.
+
+
+2022-08-12
+[01:59:23.0780] <yulia>
+I will be missing next weeks meeting -- wanted to give a heads up
+
+
+2022-08-16
+[07:38:55.0063] <shu>
+i've been on PTO, is there someone already volunteered to run the call today?
+
+[08:14:56.0567] <Jack Works>
+Maybe I can 
+
+[08:47:10.0051] <Kris Kowal>
+I’ll probably be a little late, but I think a round on progress from champions would be good. Nicolò and Caridy have been busy. 
+
+[08:48:22.0334] <Kris Kowal>
+And I have not done my homework: you can all still look forward to updates in the compartments explainer and prose for the module proposals feature unlock graph (tech tree if you will)
+
+[08:56:52.0877] <littledan>
+Yeah I'm available to run the call but also happy to defer to others; I haven't prepared anything for today
+
+[08:57:07.0585] <shu>
+👍️
+
+[09:02:06.0101] <shu>
+i'm trying to find a free conference room, may be a few mins late
+
+[09:03:41.0323] <guybedford>
+I seem to have misplaced the meeting link again
+
+[09:03:44.0505] <guybedford>
+can someone share it?
+
+[09:03:57.0523] <littledan>
+Dm'd you it
+
+[11:32:50.0809] <Kris Kowal>
+Some high level take-aways from this morning’s conversation with Guy:
+
+[11:33:24.0600] <Kris Kowal>
+Everyone agrees that virtual import hooks are not serializable.
+
+[11:34:24.0665] <Kris Kowal>
+I’m conceding that `new Worker().addModule(virtualModuleInstance)` should throw an error because its `importHook` isn’t serializable, rather than just silently stripping it off.
+
+[11:35:24.0357] <Kris Kowal>
+Dan, Shu, and I are still arguing about how import maps get coordinated between workers, but our motives appear to be similar. Shu and I agree that the serialization of a module instance should not close over the import hook. Dan and I agree that relying on an HTTP header to indicate the import map is not sufficient either. So, something will have to give.
+
+[11:36:38.0973] <Kris Kowal>
+It seems like everyone would be satisfied if in the fullness of time, workers can either inherit the host environment’s import-map or be expressly constructed with an import-map, or both.
+
+[11:40:13.0890] <Kris Kowal>
+Guy very briefly alluded to the possibility and constraints on runtime evolution of an import-map, which I think is sufficiently tricky that I’d like to not think about it. But, in short, import-maps could evolve at runtime as long as appending a new scope does not contradict any resolution already achieved. That problem is considerably simpler if it’s not possible to resolve references that are outside of a known scope.
+
+[11:40:56.0445] <Kris Kowal>
+Otherwise, whether a new scope can be added depends on whether a module in that scope was already loaded. Yikes.
+
+[11:42:00.0605] <Kris Kowal>
+Similar weird things around appending a scope that has a common prefix with an existing scope.
+
+[11:45:38.0738] <guybedford>
+Great summary, thanks Kris for the clarity. With regards to import map extension, there was some fruitful discussion in https://github.com/guybedford/import-maps-extensions/issues/17.
+
+For most use cases though, I think web sandboxes just are fine with using iframes. So the 99% use case remains static maps as opposed to dynamic. I can get behind serialization or not, ideally only as an alternative if there aren't other means of achieving the use case.
+
+[11:48:03.0935] <Kris Kowal>
+ * Dan, Shu, and I are still arguing about how import maps get coordinated between workers, but our motives appear to be similar. Shu and I agree that the serialization of a module instance should not close over the import-map. Dan and I agree that relying on an HTTP header to indicate the import map is not sufficient either. So, something will have to give.
+
+
+2022-08-17
+[07:42:55.0256] <Jack Works>
+> <@kriskowal:matrix.org> Everyone agrees that virtual import hooks are not serializable.
+
+but if you want, it can return a Module Instance that contains a native source, I believe it can be serializable.
+
+[07:44:00.0683] <Jack Works>
+> <@kriskowal:matrix.org> Dan, Shu, and I are still arguing about how import maps get coordinated between workers, but our motives appear to be similar. Shu and I agree that the serialization of a module instance should not close over the import-map. Dan and I agree that relying on an HTTP header to indicate the import map is not sufficient either. So, something will have to give.
+
+since in most cases, devs will use the same import map in a worker and the main page, it will be simpler to drop the import map and use the host resolution
+
+[16:17:02.0744] <littledan>
+> <@jackworks:matrix.org> since in most cases, devs will use the same import map in a worker and the main page, it will be simpler to drop the import map and use the host resolution
+
+Well, if we can get the host to apply the right import map, that'd be great. So far, Chrome expressed skepticism about that, for reasons I don't really understand, at https://github.com/WICG/import-maps/issues/2#issuecomment-415073206
+
+
+2022-08-18
+[17:42:19.0681] <Kris Kowal>
+Has anyone else here considered the possibility of `Module.prototype.import` instead of overloading dynamic import?
+
+[17:43:26.0732] <Kris Kowal>
+(And consequently `Module.prototype.load` seems to be equivalent to `import.reflect`)
+
+[17:43:52.0856] <Kris Kowal>
+ * (And consequently `Module.prototype.load`)
+
+[09:08:12.0912] <nicolo-ribaudo>
+Are GitHub pages enabled for https://github.com/tc39/proposal-compartments?
+
+[09:51:13.0964] <Kris Kowal>
+> <@nicolo-ribaudo:matrix.org> Are GitHub pages enabled for https://github.com/tc39/proposal-compartments?
+
+I’ve enabled them now, from root. That does not appear to be sufficient.
+
+[09:59:38.0840] <nicolo-ribaudo>
+It works! https://tc39.es/proposal-compartments/0-module-and-module-source.html
+
+
+2022-08-19
+[08:51:39.0976] <littledan>
+> <@kriskowal:matrix.org> Has anyone else here considered the possibility of `Module.prototype.import` instead of overloading dynamic import?
+
+I would be fine with that. I guess ultimately dynamic import needs to be a special form to get the right referrer but ModuleInstance s already have their referrer.
+
+[08:52:02.0450] <littledan>
+As long as we are remaining analogous to import()!
+
+[10:12:15.0123] <Kris Kowal>
+Yeah, for sure.
+
+
+2022-08-30
+[08:27:08.0380] <shu>
+hi folks, i have a conflict today unfortunately
+
+[08:27:22.0373] <littledan>
+mind if we meet without you? I'm happy to moderate still
+
+[08:27:24.0319] <shu>
+if there's anything you'd like direct feedback on, please ping me in this channel
+
+[08:34:19.0407] <shu>
+littledan: oh yes please do, that was the intention of my telling y'all
+
+[10:18:39.0285] <yulia>
+littledan: here?
+
+[10:18:57.0494] <littledan>
+sure or in the google meet chat
+
+[10:47:51.0426] <yulia>
+https://github.com/WICG/import-maps/issues/248
+
+
+2022-08-31
+[13:49:29.0520] <nicolo-ribaudo>
+Can anyone point me to where the HTML spec says that `import()` yields to the event loop? Is it implied in the "Wait until the algorithm asynchronously completes" (for example, step 6 of [HostImportModuleDynamically](https://html.spec.whatwg.org/#hostimportmoduledynamically(referencingscriptormodule,-modulerequest,-promisecapability))) and "asynchronously complete this algorithm with" (for example, step 2 of [fetch an import() module script graph](https://html.spec.whatwg.org/#fetch-an-import()-module-script-graph)) phrasing?
+
+[16:49:06.0270] <littledan>
+It’s not quite that, it’s in this algorithm, where even on a module map hit, it queues a task to complete the algorithm, just to avoid zalgo I guess https://html.spec.whatwg.org/#fetch-a-single-module-script
+
+[16:50:17.0208] <Kris Kowal>
+he comes
+
+[16:50:21.0264] <littledan>
+Oh wait sorry I misread, am still looking 
+
+[16:53:46.0874] <littledan>
+Huh, I can’t find the part where it queues a task in the cache hit case…
+
+[16:54:14.0181] <littledan>
+Maybe Yulia will know.
+

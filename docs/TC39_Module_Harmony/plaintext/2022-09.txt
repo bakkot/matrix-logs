@@ -1,0 +1,234 @@
+2022-09-02
+[07:07:39.0107] <nicolo-ribaudo>
+If anyone is interested to see how the hooks change looks on the HTML side: https://github.com/whatwg/html/pull/8253
+
+
+2022-09-23
+[17:23:31.0116] <Kris Kowal>
+yulia | OOO until sept 26th: I’ve started working on a Module Harmony tech tree, arrows from motivating uses cases to features. To get there, I’m starting with a sketch of the graph, instead of starting with prose. I’m this far: https://gist.github.com/kriskowal/268d46617cd68015b811a2f5fdaf3217
+
+
+2022-09-24
+[00:09:44.0032] <Jack Works>
+https://github.com/tc39/proposal-compartments/pull/78/
+
+I tried to implement this change but I found it is invalid
+
+[00:10:00.0188] <Jack Works>
+the referral parts goes away
+
+[08:20:45.0763] <Kris Kowal>
+At the last SES meeting, we agreed that I’d add a non-normative note that the "options bag" is passed as `this` to the hooks, so you can use `this.referrer` in an `importHook`.
+
+[08:24:34.0417] <Jack Works>
+> <@kriskowal:matrix.org> At the last SES meeting, we agreed that I’d add a non-normative note that the "options bag" is passed as `this` to the hooks, so you can use `this.referrer` in an `importHook`.
+
+That's very unintuitive 
+
+[08:24:58.0459] <Jack Works>
+Proxy handler supports sharing between multiple proxy
+
+[08:25:13.0607] <Jack Works>
+And it's real target is given by the first argument 
+
+[08:25:48.0100] <Jack Works>
+If this design requires different object instance for each module, it will be a performance cliff 
+
+[08:52:30.0456] <Kris Kowal>
+I’ve been unable to convince Caridy that referrer should be explicitly mentioned. He’s quite adamant about leaving it to user code.
+
+[08:52:53.0666] <Kris Kowal>
+Caridy does accept that the hooks themselves cannot be per-module closures.
+
+[08:54:38.0427] <Kris Kowal>
+In any case, Caridy is the one among us who needs to be convinced. In our last SES call, Caridy convinced Mark and me at least that his design does not limit expressivity.
+
+[09:09:10.0530] <nicolo-ribaudo>
+The middle ground between Caridy's and Jack's positions is to use `new Module(source, handler, thisArg/context)`, rather than mixing the handler and the thisArg in the same parameter. This also feels cleaner, since we have a clearly separation between "an object with clearly defined properties" and "something that the user can use as they wish"
+
+[09:10:11.0204] <nicolo-ribaudo>
+(I propose it as a middle ground to not mention the referrer while still reusing the same handler object every time, but it also happens to be my favourite design)
+
+[12:31:34.0780] <littledan>
+If we go that way, my bikeshed on top of that would be to pass context as an argument rather than `this`.
+
+[12:32:20.0210] <littledan>
+reusing handlers seems useful, though I can accept that it's less clean in some sense or other than making different closures each time
+
+
+2022-09-26
+[19:22:36.0449] <Kris Kowal>
+The combined effect of your preferences would be to rename `referrer` to `context`, and if that is what it takes to satisfy Caridy, I’m all for it.
+
+[19:23:31.0172] <Kris Kowal>
+That is, new Module(source, sharedHandler, context) where sharedHandler = { importHook(specifier, context) => Module }
+
+[19:25:14.0164] <Kris Kowal>
+And from a performance perspective, it doesn’t reduce allocations, but the handler object can be an ephemeral options object, which would presumably go into the nursery and get collected cheaply, instead of being retained for the lifetime of the Module.
+
+[02:48:17.0879] <yulia | OOO until sept 26th>
+the graph looks great! that was what i was thinking of doing but it looks like it helped you organize your thoughts. I'll read through
+
+[07:52:44.0141] <yulia>
+compartments layers 1,2,3 seem to have no dependencies, putting them at what I would imagine to be the same layer. Any reason they cannot be done concurrently?
+
+[14:51:56.0254] <Kris Kowal>
+They can certainly be done concurrently.
+
+[14:54:13.0844] <Kris Kowal>
+Reminder: Module Harmony meeting tomorrow. I’m hoping to share this Module Harmony Graph.
+
+[14:56:16.0562] <Kris Kowal>
+Putting this together has helped me tease apart some of the finer layers, which are academically interesting at least: Like, having ModuleSource instances is useful even even without a ModuleSource constructor.
+
+[14:57:17.0207] <Kris Kowal>
+And there are cases where the constructor might be omitted but instances would still be present, like some configurations of XS that don’t include the JS parser but would have use for  import module syntax.
+
+[14:58:13.0287] <Kris Kowal>
+And cases where a ModuleSource instance would have CSP origin information in the underlying host data, which would not be possible to construct with the ModuleSource constructor (unless generalized to thread trusted types)
+
+
+2022-09-27
+[05:08:54.0301] <littledan>
+I will probably miss the call today since I am a bit sick 
+
+[10:32:46.0282] <nicolo-ribaudo>
+Kris Kowal: Is this a correct polyfill for `new ModuleSource(sourceString)`? (imaging that we only have `ModuleSource` instances but not a working `ModuleSource` constructor, i.e. removing the node currently without incoming arrows in your DAG)
+```js
+function getModuleSource(sourceString) {
+  return eval(`module {${sourceString}}`).source;
+}
+```
+
+[10:35:32.0086] <nicolo-ribaudo>
+ * Kris Kowal: Is this a correct polyfill for `new ModuleSource(sourceString)`? (imagining that we only have `ModuleSource` instances but not a working `ModuleSource` constructor, i.e. removing the node currently without incoming arrows in your DAG)
+
+```js
+function getModuleSource(sourceString) {
+  return eval(`module {${sourceString}}`).source;
+}
+```
+
+[10:36:27.0926] <Kris Kowal>
+Looks equivalent to me.
+
+[10:37:20.0251] <Kris Kowal>
+The DAG doesn’t have a concept of “this edge or that edge” to distinguish sufficient from necessary.
+
+[10:37:37.0157] <Kris Kowal>
+Maybe dotted lines for sufficient and hard lines for necessary.
+
+[10:39:22.0652] <Kris Kowal>
+shu what’s the process for publishing the meeting transcript?
+
+[11:48:27.0793] <Kris Kowal>
+> <@nicolo-ribaudo:matrix.org> Kris Kowal: Is this a correct polyfill for `new ModuleSource(sourceString)`? (imagining that we only have `ModuleSource` instances but not a working `ModuleSource` constructor, i.e. removing the node currently without incoming arrows in your DAG)
+> 
+> ```js
+> function getModuleSource(sourceString) {
+>   return eval(`module {${sourceString}}`).source;
+> }
+> ```
+
+Caveat, `ModuleSource` would throw for sourceStrings like `}, module {`.
+
+[12:14:34.0087] <shu>
+Kris Kowal: i pasted it into the agenda doc
+
+[12:14:44.0528] <shu>
+folks who spoke, please look and correct themselves if you remember what you said
+
+[12:14:48.0768] <shu>
+otherwise, good luck to our readers
+
+[13:05:40.0989] <nicolo-ribaudo>
+I tried writing a rudimental bundler using Layer 0, Module Blocks and Import Reflection: https://gist.github.com/nicolo-ribaudo/81f18db096659ac8447ca94f50f2c37a
+
+[13:53:09.0373] <Kris Kowal>
+These are some high quality transcription errors. I don’t want to fix them.
+
+[14:00:01.0356] <shu>
+"With the monsters is a bouquets"
+
+[14:00:05.0353] <shu>
+that's beautiful
+
+
+2022-09-28
+[02:36:44.0024] <nicolo-ribaudo>
+This is the interaction between dynamic import and event loop that I mentioned yesterday: https://github.com/web-platform-tests/wpt/pull/35949
+
+[07:45:08.0743] <mkubilayk>
+> <@nicolo-ribaudo:matrix.org> I tried writing a rudimental bundler using Layer 0, Module Blocks and Import Reflection: https://gist.github.com/nicolo-ribaudo/81f18db096659ac8447ca94f50f2c37a
+
+could you have used `ModuleSource` constructor instead of the module block here?
+
+[08:49:52.0663] <Kris Kowal>
+Certainly
+
+
+2022-09-29
+[02:55:54.0045] <nicolo-ribaudo>
+> <@mkubilayk:matrix.org> could you have used `ModuleSource` constructor instead of the module block here?
+
+Yes, but it's better to avoid it for CSP reasons
+
+[02:58:25.0017] <littledan>
+and double-parsing reasons!
+
+[02:58:34.0976] <littledan>
+(loading performance)
+
+[09:51:42.0933] <Rob Palmer>
+Pete Hunt (one of the original Facebook crew that created React) has created hostile forks of popular npm modules that decided to convert to ESM.  They are publishing under the npm scope `@actuallyworks`.  The motivation is to allow CJS modules to pin themselves to the fork, avoiding any of the interop pain that comes from trying to make CJS modules load ESM.
+
+Here is one example:
+
+https://www.npmjs.com/package/@actuallyworks/chalk
+
+[09:54:24.0492] <Rob Palmer>
+As I mentioned in July plenary, ESM is kinda failing to take hold in the ecosystem today.  I interpret this "let's stick to the old ways" forking as proof of that.  It is not random stubbornness - it is born out of the practicalities of migration.  The migration is painful and costly and is causing some folk to invest in going backwards.
+
+[10:01:07.0010] <Rob Palmer>
+The root of this, in my opinion, is a lack of the ability to synchronously load ESM in Node.  Deno does not have this problem because it's all async from day 1.  Bun is potentially going to avoid this problem too by permitted a mixed-mode loader (support both sync and async).  In Bloomberg, our loader does not have this problem for the same reason - it can handle both forms of loading.
+
+Whilst we could just say "this is a Node-specific problem due to Node's historical choices", I think the need for sync loading is a more generic and shared need.  A further evidence point that I have cited many times is the need for non-viral lazy loading, i.e. conditional loading that can happen inside normal non-async functions.  This type of lazy loading is widely used in the pre-ESM ecosystem today by large apps.  And we still have no equivalent in ESM.
+
+[10:01:23.0106] <Rob Palmer>
+ * The root of this, in my opinion, is a lack of the ability to synchronously load ESM in Node.  Deno does not have this problem because it's all async from day 1.  Bun is potentially going to avoid this problem too by permitting a mixed-mode loader (support both sync and async).  In Bloomberg, our loader does not have this problem for the same reason - it can handle both forms of loading.
+
+Whilst we could just say "this is a Node-specific problem due to Node's historical choices", I think the need for sync loading is a more generic and shared need.  A further evidence point that I have cited many times is the need for non-viral lazy loading, i.e. conditional loading that can happen inside normal non-async functions.  This type of lazy loading is widely used in the pre-ESM ecosystem today by large apps.  And we still have no equivalent in ESM.
+
+[10:03:18.0664] <Rob Palmer>
+I'm not sure I'm saying anything particularly novel here.  Mostly just pointing out there's more evidence of the problem here, so we are all up to date.
+
+[10:06:30.0205] <Rob Palmer>
+ * Pete Hunt (one of the original Facebook crew that created React) has created hostile forks of popular npm modules that decided to convert to ESM.  They are publishing equivalent CJS versions under the npm scope `@actuallyworks`.  The motivation is to allow CJS modules to pin themselves to the fork, avoiding any of the interop pain that comes from trying to make CJS modules load ESM.
+
+Here is one example:
+
+https://www.npmjs.com/package/@actuallyworks/chalk
+
+[10:25:07.0189] <nicolo-ribaudo>
+I wonder if we should also try to solve the problem from the Node.js side other than from the TC39 side. In theory Node.js could support `require("./an-esm-file-without-TLA.js")` regardless of what TC39 says
+
+[10:27:32.0024] <nicolo-ribaudo>
+Ok well, I assume that it isn't a novel idea
+
+[10:28:53.0725] <littledan>
+I think this ESM migration story comes up in more contexts than just Node.js, but sure, part of the solution may be Node-specific.
+
+[12:52:56.0794] <ljharb>
+i don't think it could; it's been pursued before
+
+[12:53:22.0123] <ljharb>
+plus all the "be like browser" contingent would never allow it because it'd move node farther from browser ESM, not closer to it
+
+[12:54:01.0871] <ljharb>
+imo there just won't *be* a concerted migration until the transition and interop story with the largest language ecosystem in history is smooth
+
+
+2022-09-30
+[21:17:24.0231] <Kris Kowal>
+Module harmony dependency graph ready for review https://github.com/tc39/proposal-compartments/pull/81
+

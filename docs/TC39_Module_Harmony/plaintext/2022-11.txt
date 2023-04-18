@@ -1,0 +1,433 @@
+2022-11-02
+[15:22:29.0025] <Kris Kowal>
+nicolo-ribaudo: I got a question from guybedford and want to confirm we’re on the same page: reflective import would advance the module to loaded but not to linked and its dependencies won’t be loaded.
+
+[15:23:24.0917] <Kris Kowal>
+I can easily imagine `import(x, {reflect: true, state: 'linked'})` or some such would load transitive dependencies without initializing or executing.
+
+[15:27:03.0806] <nicolo-ribaudo>
+Right, it would not load it's dependencies.
+However, I hope it will not just result in a ModuleSource but in something that contains all the info necessary to later load&link it's dependencies 
+
+[15:30:11.0313] <nicolo-ribaudo>
+"would advance the module to loaded" -> Informally yes. Formally, it doesn't advance the module's state because the first state change happens when loading all its dependencies. It just makes us go from "I have nothing" to "I have a Module/ModuleSource"
+
+[15:30:56.0550] <Kris Kowal>
+I assume it would not be an observable optimization if the Module Record was born with a null pointer to the structs needed to advance past the loaded state.
+
+[15:34:41.0394] <Kris Kowal>
+We are in agreement about having a `Module` object and not just a `ModuleSource` but guybedford would like us to at least contemplate the alternative given that deferred `await import(reflectedModule)` doesn’t go as far as yulia’s proposing for deferred execution. I don’t think our current agreement precludes going farther and I think it’s compelling for code splitting, but it wouldn’t initialize a dependency on the stack of the first access of one of its exports.
+
+[15:36:52.0569] <Kris Kowal>
+In any case, I wanted to make sure about reflection being shallow since that’s important to Guy. It’s important to me too, since it’s possible to load a module that can’t advance to linked without a custom import hook.
+
+[15:37:29.0147] <nicolo-ribaudo>
+> <@kriskowal:matrix.org> We are in agreement about having a `Module` object and not just a `ModuleSource` but guybedford would like us to at least contemplate the alternative given that deferred `await import(reflectedModule)` doesn’t go as far as yulia’s proposing for deferred execution. I don’t think our current agreement precludes going farther and I think it’s compelling for code splitting, but it wouldn’t initialize a dependency on the stack of the first access of one of its exports.
+
+Yeah, we are not solving deferred execution.
+
+I'm almost hoping we can have `import.link(module) -> Promise` and import.evaluateSync(module)` 😬
+
+[15:38:02.0820] <nicolo-ribaudo>
+> <@kriskowal:matrix.org> In any case, I wanted to make sure about reflection being shallow since that’s important to Guy. It’s important to me too, since it’s possible to load a module that can’t advance to linked without a custom import hook.
+
+I'm 100% aligned with that. I have use cases for not loading the whole graph, and import reflection should be shallow.
+
+[15:39:09.0823] <nicolo-ribaudo>
+For JS, it's exactly like `module { export * from "x" }` which doesn't load the graph until the block is imported (except that reflection loads "x", this almost-equivalent-module-block doesn't)
+
+[15:39:46.0210] <nicolo-ribaudo>
+* Yeah, we are not solving deferred execution.
+I'm almost hoping we can have `import.link(module) -> Promise` and `import.evaluateSync(module)` 😬
+
+[15:40:04.0769] <Kris Kowal>
+Right, I expect module expressions to be shallow too.
+
+[15:40:22.0836] <Kris Kowal>
+Same reasons. They might be sent somewhere their linkage is possible even if that’s not local.
+
+
+2022-11-03
+[20:47:01.0506] <littledan>
+Yeah, being shallow is critical for the Wasm case as those modules could be interpreted completely differently 
+
+[20:47:14.0959] <littledan>
+* Yeah, being shallow is critical for the Wasm case as those module specifiers could be interpreted completely differently
+
+[15:16:33.0555] <nicolo-ribaudo>
+Kris Kowal: Could you link https://tc39.es/proposal-compartments/0-module-and-module-source.html maybe in the proposal readme, or as the website of the reposory? To make it easer to find it withuot having to manually copy the filename into the url 😅
+
+[15:17:12.0396] <Kris Kowal>
+README’s a good spot for that. Thanks!
+
+[15:23:43.0302] <guybedford>
+very glad to hear shallow reflections can work, and I'm still hopefuly we can tackle good lazy loading scenarios properly as well
+
+[15:23:47.0268] <guybedford>
+ * very glad to hear shallow reflections can work, and I'm still hopeful we can tackle good lazy loading scenarios properly as well
+
+[15:24:22.0430] <guybedford>
+Apologies as well I haven't made the modules meetings for a while, will aim to be at the next one if it is still on
+
+[15:30:23.0373] <Kris Kowal>
+https://github.com/tc39/proposal-compartments/pull/86
+
+
+2022-11-04
+[07:55:02.0650] <littledan>
+> <@guybedford:matrix.org> very glad to hear shallow reflections can work, and I'm still hopeful we can tackle good lazy loading scenarios properly as well
+
+Yeah, shallow reflection corresponds exactly to what we want for module expressions anyway--you shouldn't load those dependencies until you load that module
+
+[07:55:08.0723] <littledan>
+> <@guybedford:matrix.org> Apologies as well I haven't made the modules meetings for a while, will aim to be at the next one if it is still on
+
+same!
+
+
+2022-11-08
+[08:35:07.0948] <shu>
+i will not be to attend next meeting; this and next week conflict with some chrome events (blinkon next week, some other thing this week)
+
+[08:57:03.0954] <Kris Kowal>
+We did not prepare an agenda. If guybedford is prepared to show us some WASM integration, this would probably be a fine meeting to do so.
+
+[09:00:22.0364] <guybedford>
+I guess we could work through a status update of the various specs perhaps since we haven't had a sync in a while
+
+[09:01:52.0141] <guybedford>
+not much to show for Wasm right now short of the basic reflection use case which we can always go through again, but was actually considering giving a more in depth Wasm components intro as a TC39 presentation possibly for the next meeting
+
+[09:02:26.0754] <guybedford>
+(and sorry just fumbling for the meeting link here!)
+
+[10:06:52.0371] <yulia>
+oh, we still had another half hour on the time
+
+[10:08:39.0860] <nicolo-ribaudo>
+Dinner time for all of us near GMT, it's fine to end earlier :P
+
+[10:10:32.0205] <nicolo-ribaudo>
+Mathieu Hofman I was wrong, `(async function f() { try { await import("data:text/javascript, throw new Error()") } catch (e) { return console.log("STACK", e.stack) } })()` doesn't leak the function name neither in Chrome nor in Firefox.
+
+The error stack contains the function name only when the error is a CSP error, but in that case it throws fresh errors every time.
+
+[11:26:15.0748] <Mathieu Hofman>
+interesting that the CSP error contains more information
+
+[11:26:48.0920] <Mathieu Hofman>
+We really need to move the error stack proposal forward to put them within tc39 scope
+
+[11:31:30.0854] <littledan>
+My understanding from comments from shu was that adding an error stack API wouldn't cause browsers to necessarily change how they expose non-standard information. I think you'd have to persuade them to make those changes more directly.
+
+[11:31:49.0397] <littledan>
+(please correct me if I misunderstood)
+
+[11:40:56.0250] <Mathieu Hofman>
+The main problem is that right now it's hard to talk about stacks in the spec, and what information can and cannot be exposed through them
+
+[11:41:37.0884] <Mathieu Hofman>
+We're seeing this with the ShadowRealm proposal, we're seeing it potentially with the lazy/deferred module loading.
+
+[11:42:26.0643] <Mathieu Hofman>
+it may or may not be a problem for any changes we want to make to promises as well
+
+[11:42:47.0462] <littledan>
+this relates a lot to the lack of a shared model for what constitutes an information leak, though
+
+[11:42:49.0813] <shu>
+i haven't checked since last time this was brought up but littledan's summary still sounds accurate
+
+[11:43:13.0472] <littledan>
+(and I think this is not as simple as documenting what the SES group believes is an information leak--there is a sort of ideological disagreement)
+
+[11:43:42.0739] <Mathieu Hofman>
+burring out head in the sand pretending stacks don't exist is not right, as programs very much can observe them and change their execution
+
+[11:44:04.0821] <shu>
+who is doing that in your opinion, tc39?
+
+[11:44:44.0161] <littledan>
+yeah, so I think the project of addressing these leaks will consist more of persuading folks about these issues, more than exposing an additional stack API
+
+[11:45:18.0499] <Mathieu Hofman>
+I believe we/tc39 keep forgetting that some changes may have visible impact through stack information
+
+[11:45:55.0567] <Mathieu Hofman>
+because stacks are not currently defined anywhere in ecma262
+
+[11:46:25.0874] <littledan>
+my point is, you're misanalyzing the causation there
+
+[11:46:54.0048] <littledan>
+causality? cause?
+
+[11:46:58.0209] <Mathieu Hofman>
+today on the call, noone was sure of the content of the stack property for an error contructed during evaluation of dynamically imported module 
+
+[11:48:18.0061] <Mathieu Hofman>
+we all somewhat agreed that having potentially different evaluation behavior based on the dynamic import stack would be weird
+
+[11:48:19.0675] <littledan>
+if we add an additional stack API, the existing ones will continue to exist, so it wouldn't really resolve that...
+
+[11:49:30.0443] <Mathieu Hofman>
+I think it'd provide a place to explicitly discuss and eventually agree on what stack frames should reveal or not
+
+[11:50:39.0132] <littledan>
+well, it would risk being ambiguous if we don't know whether it applies to the existing APIs. Anyway, the first thing we'll need to do in that discussion is resolve exactly that persuasion/ideological issue I mentioned.
+
+[11:52:26.0479] <Mathieu Hofman>
+fair
+
+
+2022-11-09
+[12:16:44.0594] <Kris Kowal>
+yulia: We discussed deferred execution with Mark Miller at the SES meeting today. The recording will finish processing shortly. https://youtu.be/YH6UmSmFlP8
+
+
+2022-11-10
+[23:50:15.0922] <yulia>
+thanks kris, you represented it really well -- listening to the feedback section now
+
+[00:17:28.0043] <yulia>
+I'm curious, does the re-entrancy problem discussed, or the potential of it, also exist in dynamic import? because by the time you can trigger a lazy module that operates on an already imported module, is if you are at the ancestor module that imports both. that means that C has already evaluated, and it's state is set. B is similar to an async dynamic import, but without the async tick. Why does the re-entrancy hazard come up only in the case where there is no async tick?
+
+[00:19:37.0691] <yulia>
+I think I don't quite understand what the hazard is, curious to hear more
+
+[00:20:41.0435] <yulia>
+as for providing a low level api, yes this is also a possibility. I think there is benefit to having syntax however, because even within firefox we had 3 separate implementations and that is just in one code base. One used common js, one used our JSM loader, and one was iirc a mix of the two
+
+[00:21:49.0234] <yulia>
+I can also write mark directly about this, I just haven't had time
+
+[05:45:01.0653] <Kris Kowal>
+Reentrancy can only occur when one module’s stack runs on another module’s stack. Even with dynamic import today, there is no such possibility.
+
+[05:48:35.0363] <Kris Kowal>
+So the shape of a reentrancy hazard in composition with deferred (synchronous) import would necessarily involve a callback. We haven’t yet successfully formulated a case where there’s an observable behavior difference, but we’re betting that there is one. I think we’re less sure that it constitutes a hazard.
+
+[05:49:28.0888] <Kris Kowal>
+And we’re looking for composition hazards, not security hazards.
+
+[07:57:33.0297] <guybedford>
+Kris Kowal: calling a function in a cycle to a module that is not already executed sounds like the same issue to me?
+
+[08:00:00.0731] <guybedford>
+a.js -> b.js -> a.js something like `import { bfn } from './b.js'; export function afn () {};` and `import { afn } from './a.js'; export function bfn () {}; afn('called before executed')`
+
+[08:56:54.0208] <Kris Kowal>
+Similar. With a cycle, every module necessarily participates in the cycle voluntarily. The question is whether a set of modules can be correct in isolation and break when a deferred import gets introduced.
+
+[09:35:03.0626] <guybedford>
+Acutally is it even the same with the cycle stuff since what one is executing is an interior function as opposed to the outer evaluation scope
+
+[09:35:19.0764] <guybedford>
+I can appreciate that is a difference, thanks for explaining! I think I've got it...
+
+[09:35:51.0570] <guybedford>
+that said, I think this is very much a fundamental tradeoff of the concept of sync deferred evaluation itself, as opposed to being a design concern
+
+[09:44:09.0542] <Kris Kowal>
+Do you take design concern in this case to mean a point on which multiple avenues are possible that fulfill the requirements of deferred evaluation?
+
+[09:46:11.0037] <Kris Kowal>
+Also, I take for granted that if there is a hazard inherent to deferred evaluation, this hazard is intrinsic to CommonJS, and nobody’s told me about a bad experience yet.
+
+[09:50:48.0105] <guybedford>
+right, and specifically for a synchronous framing of the problem
+
+[09:53:56.0140] <Kris Kowal>
+It afflicts async CommonJS too, to the extent CommonJS can be async.
+
+[09:54:05.0913] <Kris Kowal>
+That is to say, bundling.
+
+[10:04:20.0118] <guybedford>
+so you'd include async stacks as reentrant too in this scenario?
+
+[10:04:40.0014] <Kris Kowal>
+Definitely not.
+
+[10:42:16.0041] <yulia>
+> <@kriskowal:matrix.org> So the shape of a reentrancy hazard in composition with deferred (synchronous) import would necessarily involve a callback. We haven’t yet successfully formulated a case where there’s an observable behavior difference, but we’re betting that there is one. I think we’re less sure that it constitutes a hazard.
+
+why would this exist only in the synchronous case?
+
+[10:44:28.0742] <yulia>
+i was looking at the examples, and I am wondering if you replace the deferred import acces with `import(...).then(x => x.callMe())` 
+
+[10:44:54.0852] <yulia>
+(im making dinner, will probably only respond tomorrow)
+
+[10:59:40.0234] <Kris Kowal>
+That’s definitely not a hazard, since the module initialization of (presumably) x.js has run to completion by the time x’s namespace is seen in a new event. For there to be a reentrance hazard, there must be a program lower on the synchronous stack that can be rendered incorrect by interleaving the initialization of another module in a stacked callframe.
+
+[11:02:09.0091] <Kris Kowal>
+However, as far as hypothetical interleaving hazards are concerned, `const x = import('x.js', { sync: true })` would be equally worrying to deferred execution.
+
+[11:03:41.0352] <Kris Kowal>
+For values of worry between “eventually proven to not be worth worrying about” to “sometimes but rarely breaks working programs”
+
+
+2022-11-11
+[01:42:14.0875] <yulia>
+when you say "since the module initialization of (presumably) x.js has run to completion by the time x’s namespace is seen in a new event." -- do you mean module evaluation? because initialization has also run in the deferred case
+
+[01:43:19.0739] <yulia>
+i am understanding initialization as it was before we renamed it link
+
+[01:58:44.0668] <yulia>
+ * when you say "since the module initialization of (presumably) x.js has run to completion by the time x’s namespace is seen in a new event." -- do you mean module evaluation? because initialization has run in the deferred case, not in the dynamic import case.
+
+[02:26:42.0045] <yulia>
+ * when you say "since the module initialization of (presumably) x.js has run to completion by the time x’s namespace is seen in a new event." -- do you mean module evaluation? because initialization has run in the deferred case, not in the dynamic import case. Evaluation for both happens at the same point in time. 
+
+
+2022-11-15
+[10:07:32.0556] <Kris Kowal>
+I do not think my understanding of the meaning of “initialization” matches in that case, but this is an area I haven’t read 262 closely enough to speak with confidence. I interpret “link” to mean “establish connections between the module lexical scopes of a module graph such that corresponding imported and exported values refer to the same memory”. I interpret “initialize” to mean “assign initial values into the module lexical scope for hoisted imports and exports like function declarations”. I interpret “evaluate” to be the subsequent execution of the module, which is synchronous up to the first await. I’m foggy on top-level-await behavior beyond that.
+
+[10:08:24.0324] <Kris Kowal>
+Please correct me where my terms don’t match the shared vernacular as writ.
+
+[10:14:44.0669] <nicolo-ribaudo>
+The spec matches your wording, except that the Initialize AO is called by the Link AO for each module (so they are interleaved processes)
+
+[10:23:09.0251] <Kris Kowal>
+That’s good to know.
+
+[10:25:17.0073] <Kris Kowal>
+> <@yulia:mozilla.org> when you say "since the module initialization of (presumably) x.js has run to completion by the time x’s namespace is seen in a new event." -- do you mean module evaluation? because initialization has run in the deferred case, not in the dynamic import case. Evaluation for both happens at the same point in time.
+
+And I think that yulia is correct that I meant evaluation, not link/init, but I’m again foggy on the ramifications of top-level-await in relation to the time that the promise returned by a dynamic import settles.
+
+
+2022-11-16
+[09:44:26.0586] <Kris Kowal>
+nicolo-ribaudo I’m putting together a PR to add my module harmony graph presentation to the agenda, as well as Caridy’s Module and ModuleSource constructors for stage 2 presentation. https://github.com/tc39/agendas/pull/1259
+
+
+2022-11-21
+[18:13:25.0632] <Jack Works>
+write a webpack plugin to support `import(spec, { reflect: true })`, it returns a VirtualModuleSource (since there is no native ModuleSource available
+
+[18:14:31.0599] <Jack Works>
+but with slightly different semantics, it will call esbuild to bundle all transitive dependencies of `./danger.js`, which is different than our proposal proposed.
+
+[18:25:25.0916] <Jack Works>
+I think we need to consider this case in the module reflection proposal:
+
+[18:26:55.0082] <Jack Works>
+when using a library, it might contains many dependencies, but if we're reflecting them one-by-one and use importHook to provide all those files, it will be annoying to adopt, also with worse performance
+
+[18:28:40.0910] <Jack Works>
+e.g. lodash-es has 1000+ esm files, it is unrealistic to import them all as Reflected Module and provide them in `importHook`, because you need to enumerate all files under that package.
+
+[18:29:40.0072] <Jack Works>
+maybe we can change how import reflection works to make this case more convenient (and easier to be implemented in a bundler)
+
+[18:39:29.0179] <Jack Works>
+proposed change:
+
+the import reflection "bundles"/"includes" all transitive dependencies by default, but takes an exclude list for Virtualization.
+
+e.g. 
+
+> danger/index.js
+
+```js
+import * as fs from 'node:fs'
+import { get } from 'lodash-es'
+import { helper } from './utils.js'
+```
+
+When we reflect this module, `await import('danger/index.js', { reflect: true })`, and feed it to a `Module` constructor, it will call `importHook` to acquire `node:fs`, `lodash-es` and `./utils.js`
+
+This is not coinvent if we have many dependencies to virtualize
+
+[18:42:03.0989] <Jack Works>
+Proposed behavior:
+
+it will fetch `lodash-es` and `utils.js` in it's Module cache except `node:fs` (because it is a privilege/native module with no (?) source code)
+
+now it will only call `importHook` for `node:fs` to fetch I/O ability
+
+[18:47:08.0323] <Jack Works>
+with a new option to "exclude" some module from the module tree
+
+[18:48:29.0345] <Jack Works>
+e.g. `await import('./lib.js', { reflect: true, excludes: ["react"] })`. This allows something like "peer dependency"
+
+[18:48:57.0908] <Jack Works>
+The problem of this new proposed way is we need to introduce `referrer` back again
+
+
+2022-11-22
+[07:16:46.0178] <nicolo-ribaudo>
+Hey the agenda for today is empty, but if you want I can talk about Module declarations. I have an alternative version of the slides I'll present in plenary but more tailored to this group.
+
+[07:17:23.0549] <nicolo-ribaudo>
+However, I would only be able to present starting from ~30 mins after the beginning of the meeting
+
+[08:47:37.0301] <Kris Kowal>
+I will not be present. 
+
+[09:04:06.0338] <Luca Casonato>
+It seems that no-one is there?
+
+[09:05:30.0355] <guybedford>
+also waiting to join here
+
+[09:05:54.0084] <guybedford>
+do we need to setup a new link? or do we have someone with access?
+
+[09:05:54.0903] <nicolo-ribaudo>
+I can join in 5 minutes if there is a quorum 
+
+[09:10:07.0510] <guybedford>
+since I wasn't getting access, heres another link we can use if it helps - https://meet.google.com/mgj-pcun-rkx
+
+[09:15:19.0764] <nicolo-ribaudo>
+Nice firefox crashedd
+
+[09:15:22.0265] <nicolo-ribaudo>
+ * Nice firefox crashed
+
+[10:36:57.0185] <nicolo-ribaudo>
+The slides I showed today: https://docs.google.com/presentation/d/1YBIdCxo9u2niMS5aPrCjYMFBoy_El0qejij5kmwcoqY/edit
+
+They are the same as what I added to the agenda, except for the "How do they interact with other proposals?" section which I will skip to save time (but it's probably the most interesting one for this group).
+
+[10:37:09.0533] <nicolo-ribaudo>
+ * The slides I showed today: https://docs.google.com/presentation/d/1YBIdCxo9u2niMS5aPrCjYMFBoy\_El0qejij5kmwcoqY/edit
+
+They are the same as what I added to the agenda for the TC39 meeting, except for the "How do they interact with other proposals?" section which I will skip to save time (but it's probably the most interesting one for this group).
+
+
+2022-11-23
+[07:38:11.0582] <yulia>
+I wasn't able to make it yesterday -- do you folks still want me to present on the layered proposal thing? i have something half way there and can finish it today
+
+[07:38:26.0747] <yulia>
+also will the notes be posted from yeterday?
+
+[09:55:24.0329] <guybedford>
+not many were present yesterday, so we just went through the slides and discussed various details of the declarations proposal
+
+
+2022-11-29
+[18:04:18.0371] <Kris Kowal>
+I’ve got slides for +7hr https://drive.google.com/file/d/19Kxk7ohUgqBNlHpH63s91Fak0F1uSraA/view
+
+[18:11:19.0146] <Kris Kowal>
+Intended to be 20 minutes of appetizer for this week’s bevy of module proposals.
+
+[01:35:51.0796] <Kris Kowal>
+In case of emergency, use Google Slides https://docs.google.com/presentation/d/1EcfdospqfvDvE_7Qb2wbxNiJ4_3pM6RNNrQ7h6ghB3o/
+
+[06:32:05.0146] <chair | yulia>
+ok, i should have made the slides for tiered proposals...
+

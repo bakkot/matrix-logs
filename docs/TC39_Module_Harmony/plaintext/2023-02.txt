@@ -1,0 +1,116 @@
+2023-02-14
+[09:05:55.0383] <nicolo-ribaudo>
+Reminder: meeting now!
+
+[09:06:13.0774] <nicolo-ribaudo>
+ * Reminder: meeting now! Is anyone else joining?
+
+[09:06:59.0097] <Jack Works>
+oh have any interesting topic?
+
+[09:07:43.0538] <nicolo-ribaudo>
+Talking about next steps with import assertions and integrations with the other proposals
+
+[09:10:12.0480] <Jack Works>
+not coming I need to get up early tomorrow 👀 have a nice day!
+
+[09:34:20.0456] <Luca Casonato>
+Justin Ridgewell: what happens with:
+```js
+import module mod from "./foo";
+mod instanceof Module;
+await import(mod,  { with: { foo: "bar" } }); // should this throw? I think so!
+```
+
+[09:34:46.0251] <Luca Casonato>
+dynamic import must not support `with` while loading a `Module` object instead of a specifier
+
+[09:35:44.0456] <Luca Casonato>
+if reflection is a `with` attribute, this would break if you dynamic defer import a module object. ie `await import mod, { reflect: "defer" })`
+
+[09:36:09.0285] <Luca Casonato>
+ * if reflection is a `with` attribute, this would break if you dynamic defer import a module object. ie `await import mod, { reflect: "defer" })` vs `await import mod, { with: { reflect: "defer" } })`
+
+[09:36:41.0875] <Luca Casonato>
+> <@lucacasonato:matrix.org> dynamic import must not support `with` while loading a `Module` object instead of a specifier
+
+because resolution and loading has already occured. the dyn import is a purely ecma262 behaviour.
+
+[09:37:51.0719] <Luca Casonato>
+shoehorning `reflect` into `with` would mean that `with` would have a million edgecases related to `reflect`. like for example `reflect` would be the only `with` attribute allowed on a dynamic import of a module object. this is very confusing
+
+[11:07:05.0311] <Justin Ridgewell>
+It’s clear that my opinions don’t match the rest of the groups, which is fine. As long as the syntax space is completely open for bundlers (and the attribute loading restriction that’s now removed allows bundlers to _use_ the syntax), I’m happy
+
+[11:08:11.0229] <littledan>
+Justin Ridgewell: I guess the proposal is, the `with` space would be open for bundlers, but the `import <keyword>` space would specifically *not* be open, and just be defined by ECMA-262. Would this work for you?
+
+[11:08:33.0700] <Justin Ridgewell>
+Yes
+
+[13:43:59.0544] <Justin Ridgewell>
+Re future compat concerns, I think we could do either of the following:
+- Open the value syntax so that we can stick bundler concerns into a specific key `assert { turbopack: { foo: 'bar' } }`
+- Reserve `_` prefix for non-TC39 use (alternatively `x-` prefix, but that forces wrapping keys in strings `'x-foo': 'bar'`)
+
+[13:57:39.0868] <littledan>
+I guess I was convinced by Anne's analogy with HTML tag attributes that it isn't as much of a concern as I was imagining
+
+[13:58:00.0180] <littledan>
+I do like the idea of going with a convention which differentiates built-in from custom things
+
+
+2023-02-15
+[23:39:15.0681] <annevk>
+I think if we want some kind of API-like thing though whereby we pass along the data there to service workers or even actual servers, I think we'd want that isolated in some way from the built-ins. Either by using `custom: blah` or indeed reserving `_`-prefixed identifiers for web developers.
+
+[01:37:59.0362] <svensauleau>
+Note that the prefix `X-` was commonly used for HTTP headers and is deprecated now: https://www.rfc-editor.org/rfc/rfc6648.
+
+[01:54:01.0111] <annevk>
+Yeah, though HTTP headers not having this kind of distinction has resulted in all kinds of block and safelists in browsers
+
+[01:54:35.0040] <annevk>
+And `X-` got deprecated because it was a convention, not an API entry point as `_` would be
+
+[01:55:11.0714] <annevk>
+ * And `X-` got deprecated because it was a (bad) convention that often resulted in two headers or a weird name we were stuck with, not an API entry point as `_` would be
+
+[03:08:55.0348] <littledan>
+Yeah I guess I was replacing x- with data- in my head
+
+[03:11:26.0174] <littledan>
+“Contains _” (or -) seems like a practical convention IMO. I think we want to do something like, our the “namespace” in there too, so it’s like turbopack_foo
+
+[03:11:57.0098] <littledan>
+Though if someone wants to do _foo nothing would stop them
+
+[03:12:35.0610] <svensauleau>
+`assert { turbopack: { foo: 'bar' } }` is effectively namespacing and feels more practical to me
+
+[03:19:03.0496] <littledan>
+I agree that this serves the name spacing purpose, but could you explain more about why you prefer it?
+
+[03:19:14.0959] <littledan>
+What makes it more practical?
+
+[03:23:17.0164] <svensauleau>
+It doesn't require parsing a `_`/`X-` delimiter
+
+[03:24:21.0125] <svensauleau>
+A bundler can pass the entire attributes object to the corresponding tool, implementation-wise it feels easier.
+
+[03:24:28.0084] <svensauleau>
+ * A bundler/tool can pass the entire attributes object to the corresponding tool, implementation-wise it feels easier.
+
+[04:15:42.0797] <littledan>
+Oh, I don’t think anyone would parse it, it would just be a convention 
+
+[04:16:03.0443] <littledan>
+Otoh the nested structures would require a grammar change that we haven’t done yet
+
+
+2023-02-20
+[01:34:47.0351] <annevk>
+https://twitter.com/robpalmer2/status/1627281404324192256 another good reason to avoid assert
+

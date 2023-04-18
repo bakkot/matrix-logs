@@ -1,0 +1,1442 @@
+2022-12-01
+[07:03:39.0015] <Kris Kowal>
+So, my big take away here is that we need a Shark Week but Modules.
+
+[07:04:06.0365] <Kris Kowal>
+And we’re back to having a lot to discuss.
+
+
+2022-12-05
+[13:40:59.0415] <littledan>
+lol I'm going to be extremely dead at our meeting tomorrow, after a whole-day Ecma GA meeting
+
+[13:42:04.0984] <littledan>
+Anyway I'd like us to discuss this somewhat urgent issue of the relationship between import assertions and HTML--the web platform might not actually support module types in the "assertion" style we were imagining. https://github.com/tc39/proposal-import-assertions/issues/125
+
+[13:42:29.0933] <littledan>
+I've invited Anne van Kesteren as our special guest (now of WebKit, formerly Mozilla)
+
+[13:43:07.0297] <littledan>
+This is time-sensitive both because the proposal is already at Stage 3 and because it's under consideration for "Interop 2023", which would accelerate its implementation in other browsers
+
+[13:43:41.0025] <Kris Kowal>
+Always good to cross paths with Anne. Thank you for reminding me that this is an odd-numbered week.
+
+[13:43:56.0521] <littledan>
+Fundamentally, the problem is: The Web actually wants to make requests to the server in different ways depending on which kind of resource is anticipated. That changes the interpretation of the module and is not consistent with the "assertion" invariant.
+
+[13:45:10.0093] <littledan>
+I'd add: the fact that HTML folks have been discussing this idea for a year and didn't notice the mismatch is kinda a mark against the "assertion" mental model. (The initial discussion was about CSP checks on the response, but the HTML people should've been thinking about the effects on the request too, which isn't as obvious to us humble TC39 folks)
+
+[13:45:52.0024] <Kris Kowal>
+In my estimate, that will force our hand into incorporating the type in the module instance’s memo. At least we can be explicit about that in 262 now that we’ve borged the logic for loading.
+
+[13:46:11.0578] <littledan>
+well, it'd be as simple as deleting a line
+
+[13:46:18.0190] <Kris Kowal>
+And if we entertain this, I’m in favor of renaming `assert` to `with` as soon as possible.
+
+[13:46:27.0970] <littledan>
+but, we'd have to think about the implications...
+
+[13:47:05.0280] <littledan>
+> <@kriskowal:matrix.org> And if we entertain this, I’m in favor of renaming `assert` to `with` as soon as possible.
+
+yes, certainly the keyword `assert` doesn't make any sense at all if we made that simple change you're tinking of
+
+[13:47:19.0590] <littledan>
+we'll need to think about whether this is the change we want to make
+
+[13:47:25.0986] <Kris Kowal>
+It’d imply that `importHook` needs to accept the `type` as an optional argument. We would want to be very clear that this is the only additional term of the module map we’re considering.
+
+[13:47:34.0271] <littledan>
+> <@kriskowal:matrix.org> And if we entertain this, I’m in favor of renaming `assert` to `with` as soon as possible.
+
+ * yes, certainly the keyword `assert` doesn't make any sense at all if we made that simple change you're thinking of
+
+[13:47:47.0707] <Kris Kowal>
+ * It’d imply that `importHook` needs to accept the `type` as an optional argument. We would want to be very clear that this is the only additional term of the module memo keyspace we’re considering.
+
+[13:48:22.0298] <Kris Kowal>
+As a safety, we’d probably also want the `Module` to have a `type` so it can make sure it gets what it asked for.
+
+[13:48:34.0753] <Kris Kowal>
+ * As a safety, we’d probably also want the `Module` to have a `type` so the importing `Module` can make sure it gets what it asked for.
+
+[13:48:58.0486] <Kris Kowal>
+Otherwise we have a maybe-ignore-the-requested-type footgun.
+
+[13:49:41.0119] <Kris Kowal>
+It’s a considerable complication, but if it’s table stakes, we can do it.
+
+[13:49:54.0210] <littledan>
+The two things which would be strongly dispreferrable to me are:
+- If HTML gets to have special rights around how to use the type (or other arguments) that  other environments/hooks don't see, assuming HTML uses them in a significant-enough way
+- If HTML does a willful violation (or violates a _should_ recommendation) around how assertions are used--we're designing this largely for HTML, so everything really should match up
+
+[13:50:09.0196] <littledan>
+I actually noticed that the HTML spec says it is a willful violation when it actually isn't! I need to file an issue on that
+
+[13:50:46.0218] <Kris Kowal>
+How is it not a willful violation if the author knew to write that it was a willful violation (as opposed to accidental?)
+
+[13:51:09.0267] <Kris Kowal>
+Change of authors?
+
+[13:51:31.0473] <littledan>
+I'd categorize HTML's current use of the assertion--just to duplicate a cache entry but not to actually make the request differently--as a not-significant-enough way of using the type which makes it not so bad that it's omitted from the import hook 
+
+[13:51:58.0870] <littledan>
+it was a willful violation in a previous draft. We went out of our way to make it not a violation, but I guess that wasn't noticed by the editors of HTML.
+
+[13:52:17.0575] <Kris Kowal>
+I must have missed that gambit.
+
+[13:52:26.0481] <littledan>
+and there were lots of strong opinions flying around, including strong expectations that we wouldn't ever have alignment (from both sides!)
+
+[13:53:22.0097] <Kris Kowal>
+I agree creating a duplicate cache entry as a side-effect is expressible with an importHook without threading the `type`, and is at least required for other kinds of redirects.
+
+[13:53:34.0153] <littledan>
+oh it is?
+
+[13:53:43.0761] <littledan>
+that's not what I was saying but it's sort of a relief if so
+
+[13:54:14.0681] <Kris Kowal>
+Ah, well, maybe not so great for `type` not to be virtualizable.
+
+[13:54:26.0863] <littledan>
+> <@kriskowal:matrix.org> It’d imply that `importHook` needs to accept the `type` as an optional argument. We would want to be very clear that this is the only additional term of the module memo keyspace we’re considering.
+
+We will need to think about whether we want to just thread through one parameter or multiple. If it's just one, maybe we should go back and think about that nice-looking `as` syntax which Guy initially used to present import reflection...
+
+[13:54:42.0969] <littledan>
+we tried to be super general with import assertions but then we don't really have enough supporting use cases
+
+[13:54:52.0862] <Kris Kowal>
+But `importHook` does need to make notes about redirects and symbolic links in some cases, so it produces consistent results for all ways to address an identical module.
+
+[13:55:14.0173] <littledan>
+I guess it just makes those notes for node-like environments. In the web it doesn't/
+
+[13:55:27.0839] <littledan>
+it just identifies them as different modules
+
+[13:55:34.0973] <Kris Kowal>
+I’m pretty sure import reflection is orthogonal.
+
+[13:56:14.0903] <Kris Kowal>
+> <@littledan:matrix.org> it just identifies them as different modules
+
+Presumably import-map is doing the work of emulating what Node.js does for a published artifact.
+
+[13:56:43.0609] <littledan>
+> <@kriskowal:matrix.org> I’m pretty sure import reflection is orthogonal.
+
+well, I don't want to drag import reflection down with this--if we want import reflection to create something which can be statically imported within a nested module, it is definitely a different construct. Let's focus on import assertions by themselves first and then figure out how it relates to all the other module proposals.
+
+[13:56:59.0409] <Kris Kowal>
+Aye.
+
+[13:57:00.0723] <littledan>
+> <@kriskowal:matrix.org> Presumably import-map is doing the work of emulating what Node.js does for a published artifact.
+
+Not really... it just doesn't attempt to solve this redirect problem
+
+[13:57:30.0905] <Kris Kowal>
+That’s surprising.
+
+[13:57:49.0161] <littledan>
+I mean, native modules on the web omit solutions to lots of problems... and they aren't used so much... maybe there's a connection
+
+[13:58:25.0901] <Kris Kowal>
+There is no emoji for my face right now.
+
+[13:59:08.0496] <Kris Kowal>
+In any case, this is a good topic for the agenda and I look forward to it.
+
+[14:02:15.0305] <Kris Kowal>
+I’m also interested in discussing how we go forward given bakkot’s express desire to “not introduce another path to eval”. That’s the one piece of feedback I believe we either need to address or argue around to advance Layer 0. I think there’s a coherent thinner sliver we can bring to the next plenary, where there are module sources but no ModuleSource, where we recover Layere 0 (grammar validation) Layer 1 (binding reflection) with a `Module.parse`.
+
+[14:03:33.0592] <Kris Kowal>
+I believe that maneuver still covers most of the motivating use cases, given that we grudgingly can fall back to `Module.parse(source); (0, eval)(\`module {${source}}\`)`
+
+[14:03:47.0303] <Kris Kowal>
+ * I believe that maneuver still covers most of the motivating use cases, given that we grudgingly can fall back to `Module.parse(source); (0, eval)('module {${source}}')`
+
+[14:04:01.0285] <Kris Kowal>
+ * I believe that maneuver still covers most of the motivating use cases, given that we grudgingly can fall back to `Module.parse(source); (0, eval)('module {${source}}')` (note ticks to avoid confusing markdown)
+
+[14:04:59.0396] <Kris Kowal>
+And of course, that also allows us to revisit `ModuleSource` when less reasonable folks come out with picks and torches some years hence.
+
+[14:06:25.0778] <littledan>
+huh, I think it'd be fine to have the ModuleSource class, and just its constructor throws
+
+[14:06:38.0560] <Kris Kowal>
+And, on the other hand, to make sure we’ve communicated the mitigating nuances of our design, I think we should separate `ModuleSource` into another layer and explain its mitigating qualities for CSP, just in case that was missed.
+
+[14:06:46.0640] <littledan>
+like the whole same design, just without that part
+
+[14:06:57.0741] <littledan>
+yes the fallback would be bad due to injection...
+
+[14:07:05.0906] <Kris Kowal>
+Yeah, I’m okay with that too, though it’s not necessary.
+
+[14:07:16.0718] <littledan>
+Wait Module.parse? Wouldn't that be another path to eval?
+
+[14:07:22.0302] <littledan>
+I thought bakkot was saying we should'nt have that
+
+[14:07:38.0629] <Kris Kowal>
+Right the fallback would be bad for injection, but as long as you `Module.parse` first, safety is recoverable.
+
+[14:07:56.0558] <littledan>
+well but would bakkot be OK with Module.parse?
+
+[14:08:17.0913] <Kris Kowal>
+No, `Module.parse` gives you parse but not eval, and doesn’t provide an object you can expect to pass to `Module`, so therefore no path from arbitrary string to evaluation.
+
+[14:08:26.0567] <littledan>
+what does it return?
+
+[14:08:28.0696] <Kris Kowal>
+That’s a question I need to ask.
+
+[14:08:43.0087] <Kris Kowal>
+`Module.parse` would return `{ bindings }`.
+
+[14:09:20.0905] <Kris Kowal>
+Or throw `SyntaxError`.
+
+[14:09:23.0185] <littledan>
+I'm not really convinced... I think we should be making more of an all-or-nothing decision
+
+[14:09:51.0980] <littledan>
+(I'm open to being persuaded)
+
+[14:10:04.0856] <Kris Kowal>
+My preference is to convince all relevant parties that what we’ve already proposed is good.
+
+[14:10:39.0278] <littledan>
+Yeah I like the ModuleSource constructor
+
+[14:11:04.0513] <Kris Kowal>
+But barring that, I’d like to make monotonic incremental progress and not preclude the possibility of going back for what’s left behind.
+
+[14:11:13.0537] <littledan>
+it would certainly have to be taken seriously as another entrypoint to eval, I agree with that
+
+[14:11:25.0767] <Kris Kowal>
+Same.
+
+[14:11:33.0613] <Kris Kowal>
+I will now feed the child. Back in a bit.
+
+[15:18:44.0175] <Kris Kowal>
+And back.
+
+
+2022-12-06
+[10:59:52.0031] <Kris Kowal>
+We conveniently forgot to record a transcript for the module harmony meeting. I would encourage participants to instead write down your key take-ways in the minutes.
+
+[11:02:53.0379] <nicolo-ribaudo>
+Have we already discussed about just recording the meeting, like we do for SES?
+
+[11:09:24.0111] <Kris Kowal>
+I of course believe that’s a better system, but when this last came up, being under the umbrella of ECMA, the same constraints apply as plenary. But, discovering whether those constraints still apply is difficult.
+
+[11:11:09.0694] <nicolo-ribaudo>
+I remember we recorded some parts (presentations?) of some plenaries after making sure that everyone in the meeting was ok with it, so I'd expect the same rule to apply
+
+[11:14:27.0459] <Kris Kowal>
+That’d be good by me.
+
+[12:54:50.0884] <Mathieu Hofman>
+I had a transcription tool running: https://docs.google.com/document/d/16Wh6xh3b1li3O1xbVL0gPYdCD5OXLLH2QAmQtxXpzqA/edit
+
+[13:01:42.0425] <Kris Kowal>
+yulia: Thanks for the ref to C4; I’ll give it a read.
+
+[15:05:21.0202] <Kris Kowal>
+Oh, resolutions from today’s meeting seemed to include “Carve out a Module Harmony Layers repository”. That sounds to me like a clone of tc39/proposal-compartments, plus layer files for expressions, declarations, and import reflection, then additional documents to contemplate intersection semantics in various ways.
+
+[15:06:10.0794] <Kris Kowal>
+Then presumably I turn tc39/proposal-compartments back into its former self, and eject the layer-0 spec text and explainer into tc39/proposal-module-class and tc39/proposal-module-source-class.
+
+[15:07:15.0763] <Kris Kowal>
+Then eject explainers for would-be tc39/proposal-module-parse (binding reflection), tc39/proposal-evaluators, tc39/proposal-module-source-protocols.
+
+[15:08:58.0008] <Kris Kowal>
+Tentatively, tc39/module-harmony, unless yulia would like to establish a precedent for a layer explainer repository name.
+
+[15:09:13.0414] <Kris Kowal>
+ * Tentatively, tc39/module-harmony, unless yulia would like to establish a precedent for a layer explainer repository naming convention.
+
+[15:13:57.0960] <littledan>
+tc39/epic-module-harmony ?
+
+[15:15:19.0280] <guybedford>
+do you think of module and module source as potential separate new layers Kris Kowal?
+
+[15:15:46.0351] <guybedford>
+or perhaps we just all get behind module expressions for this progression?
+
+[15:20:17.0645] <Kris Kowal>
+> <@littledan:matrix.org> tc39/epic-module-harmony ?
+
+Apart from my profound respect for @ljharb’s violent Jira allergy, I think this would be good. I also like `tc39/eda-`, `tc39/saga-`, `tc39/veda-`, and `tc39/book-`, but I suspect that Epic is more likely to convey the right impression.
+
+[15:21:19.0391] <Kris Kowal>
+> <@guybedford:matrix.org> do you think of module and module source as potential separate new layers Kris Kowal?
+
+They’re separable anyway.
+
+[15:23:56.0382] <Kris Kowal>
+I like the idea of cutting features finely for reasons unrelated to bundling or unpacking proposals. Whether that means separate proposals or not is less my concern, unless they have to be separated if Module can advance but ModuleSource cannot. But again, we resolved that would be premature at this stage.
+
+[15:25:09.0426] <guybedford>
+I would prefer we structure in a way that fits the TC39 process though I think
+
+[15:25:23.0218] <Kris Kowal>
+Describing them as separate features in the Epic will allow me to draw up a couple tables, with features along one axis, motivating use cases along the other axis, and clear distinctions between necessary, sufficient, and ergonomic for various combinations of features.
+
+[15:26:02.0089] <guybedford>
+a critical path diagram for stage progressions...
+
+[15:26:17.0164] <Kris Kowal>
+Very much in favor of packing proposals around TC39 process.
+
+[15:28:58.0586] <Kris Kowal>
+And to that end, I think it makes sense for TC39 to evaluate each of the layers as separate proposals. I’m also happy with the restraint folks here have shown, generally trying to get related proposals to similar stages of advancement together.
+
+
+2022-12-07
+[17:45:31.0068] <littledan>
+The idea of introducing the concept of epics was well received by the committee 
+
+[17:45:53.0953] <littledan>
+I agree that we shouldn’t merge these all into a single proposal that proceeds lockstep
+
+[17:46:09.0954] <littledan>
+The epic wouldn’t have a stage but be a place to document and discuss relationships 
+
+[02:47:35.0626] <yulia>
+> <@kriskowal:matrix.org> Tentatively, tc39/module-harmony, unless yulia would like to establish a precedent for a layer explainer repository naming convention.
+
+no strong feelings from my side
+
+
+2022-12-08
+[09:40:36.0256] <Justin Ridgewell>
+👋 just discussed module reflection, lazy, and import assertions with my team
+
+[09:43:19.0609] <Justin Ridgewell>
+A few notes we have:
+- the `import module` syntax is acceptable if we can't move this into the assertions
+- If we do move into assertions, we really should rename `assert` (we might need to do this anyways based on implementer feedback in https://github.com/tc39/proposal-import-assertions/issues/125)
+- If we move this into assertions, we can simplify the 2nd param to dynamic import (instead of `import("", { assert: { key: value } })`, just make it `import("", { key: value })`
+- The `module` in `import module` is confusingly named, I'm already importing from ES modules
+
+[09:43:54.0882] <Justin Ridgewell>
+So I'm not blocking import reflection anymore, but would still very much like to move it into assertions
+
+[09:54:34.0826] <Justin Ridgewell>
+ * So I'm not going to lone block import reflection anymore, but would still very much like to move it into assertions
+
+[09:54:43.0815] <Kris Kowal>
+At this point, I’m in favor of changing the shape of import reflection to `import example from 'example.com' with { type: 'e.g.,destination' }` and `import('example.com', { type: 'e.g.,destination' })`.
+
+If our constituents demand that the `type` string key must be communicated to the import hook, for example to direct content-negotiation, I can be convinced on the condition that the `type` must be threaded thru `importHook`. Evidently, the web platform doesn’t wish for this to be an assertion at all, since the `type` can be ignored and the response content-type dictates what kind of module source it will produce.
+
+I will be difficult to convince that the `with` parameters be opened up as an arbitrary key-value space that virtual modules can fiddle with because of the internal complications that implies for memoizing import. I want TC39 to curate this space and be free to extend it with other properties, like `reflect`, `lazy`, `phase` or so on, with behaviors that can’t be emulated by an `importHook`.
+
+[09:54:47.0273] <Justin Ridgewell>
+ * A few notes we have:
+
+- the `import module` syntax is acceptable if we can't move this into the assertions
+- If we do move into assertions, we really should rename `assert` (we might need to do this anyways based on implementer feedback in https://github.com/tc39/proposal-import-assertions/issues/125)
+- If we move this into assertions, we can simplify the 2nd param to dynamic import (instead of `import("", { assert: { key: value } })`, just make it `import("", { key: value })`)
+- The `module` in `import module` is confusingly named, I'm already importing from ES modules
+
+[09:55:59.0634] <Kris Kowal>
+ * At this point, I’m in favor of changing the shape of import reflection to `import example from 'example.com' with { reflect: true }` and `import('example', { reflect: true })`, which would imply import assertions would look like `import example from 'example.com' with { type: 'e.g.,destination' }` and `import('example.com', { type: 'e.g.,destination' })`.
+
+If our constituents demand that the `type` string key must be communicated to the import hook, for example to direct content-negotiation, I can be convinced on the condition that the `type` must be threaded thru `importHook`. Evidently, the web platform doesn’t wish for this to be an assertion at all, since the `type` can be ignored and the response content-type dictates what kind of module source it will produce.
+
+I will be difficult to convince that the `with` parameters be opened up as an arbitrary key-value space that virtual modules can fiddle with because of the internal complications that implies for memoizing import. I want TC39 to curate this space and be free to extend it with other properties, like `reflect`, `lazy`, `phase` or so on, with behaviors that can’t be emulated by an `importHook`.
+
+[09:57:52.0940] <Kris Kowal>
+My opinion shifted in that direction because our SES shim for “hardened JavaScript” censors dynamic import to deny guest programs an escape hatch, and for that to continue being effective going forward, `import.module`, `import.reflect`, or `import.anything` would be problematic. I don’t expect that argument to convince anyone else that we should funnel reflection through dynamic import, but I also don’t expect anyone else to need to be convinced!
+
+[10:01:09.0123] <Kris Kowal>
+In any case, the behavior of an `importHook` doesn’t depend on the `reflect` parameter, so I don’t think it should be communicated in an options bag. The behavior of `importHook` would also not vary based on yulia’s proposed `lazyInit` (by whatever name) either. There’s an implied `phase` or `goalState` parameter that currently defaults to `"loaded"` if `reflect: true` and defaults to `"evaluated"` otherwise. Neither of those should be communicated to `importHook`.
+
+[10:02:45.0193] <Kris Kowal>
+If we did expose an options bag, we’d need something analogous to HTTP cache-control headers to dictate what properties of the options bag should be incorporated in the module key and in what order. We don’t have a suitable position to stand for those to be consistent between modules or scopes of modules (like packages).
+
+[10:04:46.0758] <Justin Ridgewell>
+(Can wait till after your current thoughts are down, but I disagree with the not-being communicated to `importHook` and it not affecting the import behavior)
+
+[10:04:48.0408] <Kris Kowal>
+So, my reasoning is that we have to consider _why_ we’d want an arbitrary options bag, and if there’s a better way to solve the same problem. My reasoning is that it’s relatively straight-forward to construct Node.js-alike behavior in terms of the current harmony state, using out-of-band information (e.g., `package.json`) that keys most of these choices on the specifier, and imposes coherence across all modules in scope.
+
+[10:05:11.0983] <Kris Kowal>
+> <@jridgewell:matrix.org> (Can wait till after your current thoughts are down, but I disagree with the not-being communicated to `importHook` and it not affecting the import behavior)
+
+A concrete case will help me understand your objection.
+
+[10:05:42.0789] <Kris Kowal>
+And to be clear, I mean for a subset of the `with` options to be communicated to `importHook`, specifically `type`.
+
+[10:06:05.0659] <Kris Kowal>
+On the premise that the engine knows to incorporate `type` in the memo key.
+
+[10:07:19.0068] <Justin Ridgewell>
+This doesn't come up until Stage 2 of compartments, right, so I'm not objecting to anything currently
+
+[10:07:31.0867] <Justin Ridgewell>
+Why not pass the full options bag to import hook?
+
+[10:08:33.0238] <Justin Ridgewell>
+My mental model is that the `lazy` and `module` keywords are evaluators of the imported module, and should be passed to import
+
+[10:08:50.0024] <Justin Ridgewell>
+And it just starts getting weird if TC39 has to standardize the keys that are passed to it
+
+[10:09:37.0023] <Kris Kowal>
+Passing arbitrary key values to the options bag creates composition hazards. Consider the case that A imports 'my.ttf' with bold and B imports 'my.ttf' with italic. Application C imports A and B. There is a reasonable expectation that the environment coördinates these such that in general, A and B get the same module instance.
+
+[10:10:35.0442] <Justin Ridgewell>
+A `loaders` option is the case that we're currently interested in, but that's definitely not a TC39 concern (and I'm not sure how it'd be done at runtime so this isn't a perfect use case)
+
+[10:11:15.0348] <Kris Kowal>
+Loaders doesn’t require the loader to be expressed in individual modules.
+
+[10:11:35.0151] <Justin Ridgewell>
+See https://github.com/tc39/proposal-import-assertions/issues/125#issuecomment-1340173901, _not_ passing the imports is also a composition hazard
+
+[10:11:48.0114] <Justin Ridgewell>
+ * See https://github.com/tc39/proposal-import-assertions/issues/125#issuecomment-1340173901, _not_ passing the assertions is also a composition hazard
+
+[10:12:16.0566] <Kris Kowal>
+It’s straightforward to key the loader off the extension and map it to a behavior out-of-band, in a way that will apply to all modules in the same scope, preserving singleton modules.
+
+[10:12:33.0233] <Kris Kowal>
+All the more straightforward with Layer 0 in play.
+
+[10:12:52.0372] <Kris Kowal>
+Though I will agree that functionality should also be implemented by import maps.
+
+[10:12:59.0772] <Justin Ridgewell>
+I don't see these cases as being separate? All assertions are possible out of band, so why have any inline?
+
+[10:13:20.0876] <Kris Kowal>
+And specifically in the hardened JavaScript case, we’ll want to isolate the loaders in their own “compartments”. It’s a fun scenario to implement.
+
+[10:14:22.0957] <Kris Kowal>
+> <@jridgewell:matrix.org> I don't see these cases as being separate? All assertions are possible out of band, so why have any inline?
+
+I agree! My personal preference would be to not entertain assertions. But, I will also not block them, provided they compose well with the module memo.
+
+[10:14:50.0882] <Kris Kowal>
+I _vehemently_ agree.
+
+[10:15:07.0018] <littledan>
+I agree with the 90% of what you two are saying which overlaps, and I could see things either way for the remaining 10%!
+
+[10:15:12.0348] <Justin Ridgewell>
+I think ergonomics will suffer because of it.
+
+[10:15:12.0361] <littledan>
+vehemently so
+
+[10:15:45.0675] <Justin Ridgewell>
+Inline configuration is just easier to do
+
+[10:15:49.0102] <littledan>
+I could honestly see things either way on TC39 vs yolo to maintain the space of attribute keys
+
+[10:16:01.0241] <Kris Kowal>
+“Faster, easier, more seductive”
+
+[10:16:04.0522] <littledan>
+(leaning towards TC39 tbh)
+
+[10:17:18.0494] <littledan>
+it would be pretty nice to have keys that are entirely handled by the JS spec. Both reflect and lazyInit make sense for this.
+
+[10:17:19.0999] <Kris Kowal>
+I’m also trying to recapitulate the creation of a closet industry of WebPack Configuration Engineers, which just falls out from failing to allow libraries to configure themselves locally. I think we agree on that.
+
+[10:17:24.0695] <Justin Ridgewell>
+Oh man, don't make me go back to specifying loaders in config, I don't want https://esbuild.github.io/api/#loader again
+
+[10:17:57.0382] <littledan>
+OK, I think this is actually the core disagreement: some people think it's good to factor the configuration out into a separate file and some people think it should be inline
+
+[10:17:58.0955] <Justin Ridgewell>
+Static inline is just so nice to deal with during tooling
+
+[10:18:31.0708] <littledan>
+I think we should dig into this more somehow. We've just been shouting opposite assertions at each other on this topic, so far
+
+[10:18:44.0457] <Kris Kowal>
+I would suffice it to say, have done that differently https://github.com/gutentags/system#extensions
+
+[10:19:47.0391] <littledan>
+If we do want inline configuration, this isn't necessarily incompatible with a TC39-curated list of top-level keys. We could, in theory, reserve a particular key for this purpose
+
+[10:20:04.0263] <Kris Kowal>
+For the record, I agree that inline configuration is nice. I just think it’s an attractive nuisance.
+
+[10:20:04.0752] <littledan>
+this key could be rejected at runtime, or ignored at runtime (or we could have two keys, one with each behavior...)
+
+[10:20:26.0513] <littledan>
+(this is assuming that you can embed further objects inside of that key)
+
+[10:20:29.0238] <Kris Kowal>
+And I also agree littledan that having the _major_ version in a specifier is a good alternate universe, as in Go.
+
+[10:20:54.0893] <littledan>
+> <@kriskowal:matrix.org> And I also agree littledan that having the _major_ version in a specifier is a good alternate universe, as in Go.
+
+We actually do this internally in Bloomberg and it works really well; I totally recommend it.
+
+[10:20:57.0771] <Kris Kowal>
+ * (Aside from a prior conversation: And I also agree littledan that having the _major_ version in a specifier is a good alternate universe, as in Go.)
+
+[10:21:13.0186] <littledan>
+but yeah it is too late
+
+[10:22:12.0802] <Kris Kowal>
+(In the Go ecosystem, incorporating the major version in the name allows libraries to gracefully migrate implementation between major version trains, since applications can have a singleton of both versions.)
+
+[10:22:23.0031] <littledan>
+aside: If we do switch to `with`, we might consider a syntax which is a little nicer, with fewer brackets, like `import json from "./foo.json", type: "json"`. This could extend to arbitrary keys without ASI hazards.
+
+[10:22:35.0740] <Kris Kowal>
+It’s never too late to make a `name2` package.
+
+[10:23:34.0893] <littledan>
+`assert` was essential to be explicit, since this was chosen to indicate the mental model. `with` doesn't mean anything in particular.
+
+[10:23:38.0615] <Kris Kowal>
+The colons might even be unnecessary.
+
+[10:23:51.0317] <littledan>
+eh I guess so, but the comma is necessary
+
+[10:23:56.0815] <littledan>
+to avoid ASI hazards
+
+[10:24:11.0322] <littledan>
+it becomes more important if you have multiple things attached; with just one `assert` it is manageable
+
+[10:24:54.0486] <littledan>
+we could use C++ initializer list syntax! the possibilities are endless! `import json from "./foo.json" type("json") {}`
+
+[10:24:58.0419] <littledan>
+the `{}` is just for fun
+
+[10:25:37.0445] <littledan>
+ * we could use C++ initializer list syntax! the possibilities are endless! `import json from "./foo.json", type("json") {}`
+
+[10:26:26.0063] <nicolo-ribaudo>
+> <@littledan:matrix.org> the `{}` is just for fun
+
+It's to incorporate module declarations in that syntax!
+
+[10:26:50.0505] <littledan>
+I guess with a colon, it gives an intuition of "these are arbitrary key/value pairs" and without, it feels like "this is a keyword that TC39 made" (probably I'm overthinking this)
+
+[10:26:50.0817] <Kris Kowal>
+> <@littledan:matrix.org> If we do want inline configuration, this isn't necessarily incompatible with a TC39-curated list of top-level keys. We could, in theory, reserve a particular key for this purpose
+
+Returning to the theme, are you concretely suggesting something like `import example from 'example.com', type 'woff2', lazyInit true, etc {bold: true, italic; true}`?
+
+[10:27:05.0710] <Justin Ridgewell>
+Lol, one of the suggestions was to not have a keyword `import foo from 'foo' { type: 'json' }`
+
+[10:27:06.0666] <littledan>
+> <@kriskowal:matrix.org> Returning to the theme, are you concretely suggesting something like `import example from 'example.com', type 'woff2', lazyInit true, etc {bold: true, italic; true}`?
+
+yeah this is what I was suggesting
+
+[10:27:14.0837] <Justin Ridgewell>
+(with appropriate NLT)
+
+[10:27:18.0537] <Kris Kowal>
+Where, `etc` is not incorporated in the memo key?
+
+[10:27:57.0623] <littledan>
+I would argue that anything in etc should be rejected in non-tooling
+
+[10:28:08.0923] <littledan>
+that is, the whole syntax of `, etc {...}` would be tooling-only syntax
+
+[10:28:20.0392] <Kris Kowal>
+Ah, like TypeScript comments.
+
+[10:28:41.0908] <littledan>
+well, maybe it would be ignored at runtime, or maybe rejected. type annotations are based on the "ignore" idea.
+
+[10:28:53.0676] <littledan>
+my intuition was rejected but Rob was leaning ignore
+
+[10:29:12.0630] <littledan>
+rejected is compatible with just not mentioning the `etc` key in the spec at all :)
+
+[10:29:39.0380] <Kris Kowal>
+> <@littledan:matrix.org> rejected is compatible with just not mentioning the `etc` key in the spec at all :)
+
+True
+
+[10:30:12.0359] <Kris Kowal>
+> <@jridgewell:matrix.org> (with appropriate NLT)
+
+Pardon my ignorance, NLT?
+
+[10:30:22.0882] <littledan>
+also, if we have a fixed set of keys, we can say that some of them don't bother with arguments. So we can do `import example from './path', lazyIniti`
+
+[10:30:29.0225] <Justin Ridgewell>
+No Line Terminator, it's to prevent ASI hazards
+
+[10:30:30.0580] <littledan>
+ * also, if we have a fixed set of keys, we can say that some of them don't bother with arguments. So we can do `import example from './path', lazyInit`
+
+[10:30:47.0662] <littledan>
+or, to create them!
+
+[10:30:50.0694] <Justin Ridgewell>
+https://tc39.es/ecma262/multipage/notational-conventions.html#sec-no-lineterminator-here
+
+[10:31:46.0130] <Kris Kowal>
+Yeah, I’m familiar. Just never internalized the initialism. Thank you!
+
+[10:33:52.0041] <Kris Kowal>
+Justin Ridgewell: How do bundlers currently deal with the scenario I presented above, with a diamond dependency and conflicting hints? Do these scenarios just not occur in practice, or just seldom enough that it’s easy to live with arbitrary merge rules?
+
+[10:35:04.0366] <Kris Kowal>
+I could easily see libraries responding to bugs that emerge from arbitrary conflict resolution with the old “doctor doctor it hurts” / “stop hitting yourself”
+
+[10:35:41.0367] <Justin Ridgewell>
+In esbuild/turbopack I would be using special specifiers to communicate to the bundler, which means they're individual instances
+
+[10:36:04.0342] <Justin Ridgewell>
+I'm not sure how webpack handles it's inline loader specifier, if it performs dedupe
+
+[10:36:08.0968] <Justin Ridgewell>
+ * I'm not sure how webpack handles it's inline loader specifier, if it performs dedupe or throws
+
+[10:36:12.0426] <Kris Kowal>
+So the specifiers and the meta would need to agree?
+
+[10:36:14.0035] <littledan>
+I think such cloning is more acceptable for some kinds of assets than for stateful code
+
+[10:36:27.0691] <littledan>
+people don't really want their stateful modules to be cloned
+
+[10:36:37.0504] <littledan>
+especially if they forget they are stateful
+
+[10:36:50.0684] <Justin Ridgewell>
+This isn't something I usually hit, though, because importing a special loader module is usually handled by one parent module that wraps
+
+[10:36:51.0515] <Kris Kowal>
+or identity discontinuity surprises
+
+[10:37:01.0317] <littledan>
+right that too
+
+[10:37:16.0668] <Kris Kowal>
+Yeah, I agree that with care, the hazard can be avoided.
+
+[10:37:23.0505] <Justin Ridgewell>
+Yah, esbuild has no deduping unless the loader plugin specifically does it
+
+[10:38:04.0259] <littledan>
+this is specifically why we didn't want to have arbitrary uninterpreted evaluator attributes that you could access with import.meta.attributes--because the implicit cloning is unintuitive.
+
+[10:38:52.0844] <Kris Kowal>
+And also that the `importHook` is in a position where it can implement an arbitrary policy for duplicating, sharing, or rejecting for conflicts, as long as it knows all the keys used by the corresponding user code.
+
+[10:39:35.0350] <Kris Kowal>
+It sounds like we agree that the specifier should be the only cache key though, which is interesting.
+
+[10:39:45.0885] <Kris Kowal>
+ * It sounds like we agree that the specifier should be the only memo key though, which is interesting.
+
+[10:40:02.0120] <littledan>
+> <@kriskowal:matrix.org> It sounds like we agree that the specifier should be the only memo key though, which is interesting.
+
+hmm, I'm not sure that's always true, I'd need to think more about it
+
+[10:40:10.0555] <littledan>
+definitely not true if you want to configure assets sometimes
+
+[10:40:21.0064] <littledan>
+for JS code... maybe...
+
+[10:40:27.0190] <Kris Kowal>
+I mean, it seems like Justin Ridgewell always uses unique memo keys to avoid the hazard, at least.
+
+[10:41:24.0597] <Kris Kowal>
+The trouble is that `importHook` is not in a position to choose the memo key based on arbitrary import etcdata.
+
+[10:41:56.0968] <Justin Ridgewell>
+That's just a side-effect of only the specifier being extensible, not because I specifically designed it that way
+
+[10:41:58.0530] <Kris Kowal>
+Because the importing module dictates the memo key and uses it to memoize the promise returned by `importHook`.
+
+[10:42:25.0052] <littledan>
+> <@jridgewell:matrix.org> That's just a side-effect of only the specifier being extensible, not because I specifically designed it that way
+
+well, we're discussing whether the specifier should be extensible...
+
+[10:42:31.0557] <Justin Ridgewell>
+If I moved from special specifier to module assertions, I think the output should be similar, which would mean it's up to the loader to dedupe
+
+[10:42:57.0160] <Justin Ridgewell>
+Sorry, I'm using "specifier" to reference the string literal
+
+[10:43:28.0410] <Justin Ridgewell>
+If you're including attributes as part of "specifier", I was using a different meaning
+
+[10:43:48.0561] <Kris Kowal>
+I only use “specifier” to refer to a string, and use module memo key in cases where the specifier might not necessarily be equivalent.
+
+[10:44:09.0889] <Justin Ridgewell>
+ * If I moved from special specifier to module attributes, I think the output should be similar, which would mean it's up to the loader to dedupe
+
+[10:44:19.0889] <Kris Kowal>
+ * I only use “specifier” to refer to a string, and use “module memo key” in cases where the specifier might not necessarily be equivalent.
+
+[10:47:35.0253] <Kris Kowal>
+An interesting scenario is `example.woff?bold&italic` vs `example.woff?italic&bold`.
+
+[10:48:12.0503] <Kris Kowal>
+Using specifiers leaves a degree of freedom to the import site where, failing to canonicalize the query string, they effectively control whether they load the same asset twice.
+
+[10:48:51.0817] <littledan>
+> <@jridgewell:matrix.org> If I moved from special specifier to module attributes, I think the output should be similar, which would mean it's up to the loader to dedupe
+
+right, so, this raises the question: what should be the behavior when we don't have a builder-based loader
+
+[10:48:56.0715] <Kris Kowal>
+Perhaps not that interesting. The `importHook` is in a position to canonicalize every key it knows about. It’s also in a position to decide whether to refer to a canonicalized import specifier.
+
+[10:49:34.0353] <Kris Kowal>
+> <@littledan:matrix.org> right, so, this raises the question: what should be the behavior when we don't have a builder-based loader
+
+Presumably, a host loader would ignore the `etc` data.
+
+[10:49:49.0067] <Kris Kowal>
+Or reject if there are any.
+
+[10:50:13.0299] <littledan>
+> <@kriskowal:matrix.org> Presumably, a host loader would ignore the `etc` data.
+
+the reason I'm skeptical of this is because it would have different semantics from what the build tool would do. And, if we don't want cloning, the information wouldn't be visible through `import.meta`
+
+[10:52:43.0113] <Justin Ridgewell>
+With a `importHook`, I view that as a loader, so I would pass everything and let it decide the same way my build-time loader does.
+Without a hook, I kinda think the browser should reject any it doesn't understand, and perform deduping on matching attributes
+
+[10:53:07.0925] <Justin Ridgewell>
+Deduping here being the controversial part
+
+[10:54:29.0791] <Justin Ridgewell>
+As I said in https://github.com/tc39/proposal-import-assertions/issues/125, I don't think there **must** be only one representation of a module, just that it might be a bug to have multiple in some cases
+
+[10:54:42.0008] <Justin Ridgewell>
+ * As I said in https://github.com/tc39/proposal-import-assertions/issues/125, I don't think there must be only one representation of a module, just that it might be a bug to have multiple in some cases
+
+[10:55:27.0408] <Kris Kowal>
+We could make that safer by requiring the `importHook` to express what it took into account. The only remaining problem with memo keys is the case that a single module repeatedly imports with the same specifier and varying etc.
+
+[10:56:05.0601] <Justin Ridgewell>
+Doesn't `importHook` return a module instance, or does it return metadata for the browser to perform the load?
+
+[10:56:20.0478] <Justin Ridgewell>
+If it returns an instance, why have it return anything else?
+
+[10:56:28.0351] <Kris Kowal>
+The `importHook` is obliged to return a `Module` instance.
+
+[10:57:16.0878] <Kris Kowal>
+> <@jridgewell:matrix.org> With a `importHook`, I view that as a loader, so I would pass everything and let it decide the same way my build-time loader does.
+> Without a hook, I kinda think the browser should reject any it doesn't understand, and perform deduping on matching attributes
+
+This entrains the concern of a specific kind of deep equality.
+
+[10:57:39.0608] <Justin Ridgewell>
+That's a loader concern, though, not a browser concern
+
+[10:58:16.0388] <littledan>
+Yeah I agree that, in general, loaders should reject attributes they don't understand, rather than ignoring them. So, on the web by default, if you used `etc` for anything, it would fail to load
+
+[10:58:31.0600] <littledan>
+Then, the question is: do we want custom import hooks to be able to tie into `etc`, or do we want that to be an error as well?
+
+[10:59:00.0180] <Kris Kowal>
+> <@littledan:matrix.org> Yeah I agree that, in general, loaders should reject attributes they don't understand, rather than ignoring them. So, on the web by default, if you used `etc` for anything, it would fail to load
+
+And it would be an easy mistake to write an `importHook` that ignores the `etc`. It would in fact be the default first pass at any `importHook`.
+
+[11:02:44.0250] <Kris Kowal>
+I think this herds us into a particular solution space, where a translating bundler is already in the only right place to have an opinion about etc metadata, and is also in a position to erase it.
+
+[11:05:31.0329] <Kris Kowal>
+Then, tragically, using etc metadata locks a portion of the ecosystem into using one of of a compatible cohort of translating bundlers.
+
+[11:05:49.0968] <Kris Kowal>
+ * Then, tragically, using etc metadata locks a portion of the ecosystem into using one of a compatible cohort of translating bundlers.
+
+[11:06:03.0434] <littledan>
+yeah, this is the reason why I lean towards TC39 specifying all of the keys and `etc` not being one of them
+
+[11:06:20.0904] <littledan>
+it'd be fine for tools to extend the language and make `etc` but it's not something I'm convinced we should encourage
+
+[11:06:40.0647] <littledan>
+fundamentally, use of `etc` is not aligned towards unification of the language semantics
+
+[11:13:22.0588] <Justin Ridgewell>
+Agreed, but I think it's helpful to have a syntax reservation for these use cases
+
+[11:13:54.0214] <littledan>
+maybe the syntax reservation can be similar to how we reserve TS syntax now: it's a parse error, and we promise to keep it that way
+
+[11:13:58.0562] <Justin Ridgewell>
+I just had to implement `new URL('foo.txt', import.meta.url)` support, and it's god-awful complication because of the SSR and CSR splits we have to handle
+
+[11:14:14.0907] <littledan>
+yeah I agree we absolutely need asset references
+
+[11:14:25.0290] <Justin Ridgewell>
+Allowing me to implement `type: 'text'` now without waiting for TC39 to standardize would make this usecase much nicer
+
+[11:14:29.0774] <Kris Kowal>
+Same. We need asset references.
+
+[11:14:48.0866] <Justin Ridgewell>
+Asset references wouldn't solve it
+
+[11:14:50.0063] <littledan>
+so... the "without waiting" part is the part that concerns me. Our goal (or, my goal) is to define a common language.
+
+[11:15:01.0600] <Justin Ridgewell>
+Because I would still need different references in browser and node
+
+[11:15:09.0396] <littledan>
+I was picturing asset references would resolve to basically the equivalent of what `new URL` returns
+
+[11:15:16.0817] <littledan>
+so, in what way wouldn't it solve it?
+
+[11:15:24.0968] <Justin Ridgewell>
+I need to compile the code once for both envs, because the asset reference to address a file is different
+
+[11:15:31.0168] <littledan>
+could you elaborate on that?
+
+[11:15:43.0498] <Justin Ridgewell>
+With `type: text`, it's one interpretation and I can do it as if it were a real JS module
+
+[11:15:49.0212] <Kris Kowal>
+For what it’s worth, Endo’s bundler already does `text` and `bytes` based on package metadata, for the same reasonable need.
+
+[11:16:41.0190] <littledan>
+> <@jridgewell:matrix.org> With `type: text`, it's one interpretation and I can do it as if it were a real JS module
+
+so, it sounds like you're not giving the whole code sample for what it is that you are implementing
+
+[11:16:49.0359] <Justin Ridgewell>
+For Browser, I need to ensure the request handler is prepped to serve the file, and write a `http://localhost/path/to/file`
+For node, I need a `file://absoltue/path/to/file` and to copy the file to disk somewhere
+
+[11:17:19.0951] <Kris Kowal>
+And “module subgraph as an asset that needs to be bundled so I can portably hydrate a worker” is also something I’m very interested in.
+
+[11:17:36.0257] <Justin Ridgewell>
+`type: 'text'` would transform the imported file like https://gist.github.com/jridgewell/fa9754e38299d1f067e8aa8ac9ae336e#file-1-md does for JSON
+
+[11:17:54.0088] <Justin Ridgewell>
+Sorry, that was in reply to Dans' above comment
+
+[11:17:59.0692] <Justin Ridgewell>
+(I need to remember the reply feature…)
+
+[11:18:01.0810] <littledan>
+> <@jridgewell:matrix.org> For Browser, I need to ensure the request handler is prepped to serve the file, and write a `http://localhost/path/to/file`
+> For node, I need a `file://absoltue/path/to/file` and to copy the file to disk somewhere
+
+I'm having trouble understanding why asset references don't solve this
+
+[11:18:12.0477] <Kris Kowal>
+> <@jridgewell:matrix.org> `type: 'text'` would transform the imported file like https://gist.github.com/jridgewell/fa9754e38299d1f067e8aa8ac9ae336e#file-1-md does for JSON
+
+Same, but depending on whether Endo’s building a bundle or a zip archive.
+
+[11:18:40.0030] <Justin Ridgewell>
+Because the asset reference needs to be real code that can be used? How do I code an asset reference in today's ES2022?
+
+[11:18:43.0086] <Kris Kowal>
+I’m also interested in assets that entrain further asset dependencies.
+
+[11:18:56.0073] <Justin Ridgewell>
+The code output would be env dependent, because the way you access the file is env dependent
+
+[11:19:37.0519] <Justin Ridgewell>
+ * Because the asset reference needs to be runtime value that can be used? How do I code an asset reference in today's ES2022?
+
+[11:20:13.0114] <littledan>
+> <@jridgewell:matrix.org> Because the asset reference needs to be runtime value that can be used? How do I code an asset reference in today's ES2022?
+
+there aren't any asset references in ES2022, so that's not a question that can be answered...
+
+[11:20:20.0218] <littledan>
+however, I thought asset references would evaluate to a runtime value--that was always the idea, I thought
+
+[11:20:38.0309] <littledan>
+it'd be an environment-dependent signifier that you could use in an environment-dependent way
+
+[11:20:45.0571] <littledan>
+maybe it'd be the URL or maybe it'd be something else
+
+[11:21:06.0256] <Justin Ridgewell>
+So during bundling, the chunk which contains that runtime value would be env-dependent
+
+[11:21:30.0317] <Justin Ridgewell>
+I'd need to compile that twice, and also perform the copying to allow that file to be accesssed
+
+[11:22:07.0761] <Kris Kowal>
+Asset references should be accessed synchronously by value.
+
+[11:22:08.0231] <littledan>
+huh? I really don't understand what transformation you're thinking of
+
+[11:22:54.0559] <littledan>
+if you need the text, sure, `type "text"` seems reasonable, but the example you gave above was implementing `new URL(..., import.meta.url)`
+
+[11:23:00.0183] <Kris Kowal>
+You must be thinking that the transpiled form of an asset might just be a relative URL that the bundler arranges to resolve.
+
+[11:24:00.0445] <Kris Kowal>
+Or rather, the transpiled form is alternately a relative path or URL and either a Node.js or Browser API for obtaining the text.
+
+[11:24:11.0984] <Kris Kowal>
+As opposed to encoding as a string.
+
+[11:24:37.0240] <Kris Kowal>
+And that’s more germane in the CSS case where the transpiled form is probably just adding a link to the document.
+
+[11:26:29.0705] <Kris Kowal>
+Lots of stuff gets intertwingled in this space.
+
+[11:27:17.0919] <Justin Ridgewell>
+The point of the `new URL("foo.txt", import.meta.url)` example is that I need to access that file.
+If I used an asset reference, how would I access that file?
+In a browser, that reference would need to be `http://localhost:3001/path/to/foo.txt`
+In node, that reference would need to be an absoulte/relative file path
+
+[11:27:28.0340] <Justin Ridgewell>
+ * The point of the `new URL("foo.txt", import.meta.url)` example is that I need to access that file.
+If I used an asset reference, how would I access that file?
+In a browser, that reference would need to be `http://localhost:3001/path/to/foo.txt`
+In node, that reference would need to be an absoulte/relative file path `../path/to/foo.txt`
+
+[11:27:40.0480] <Justin Ridgewell>
+So the runtime value is dependent on execution env, right?
+
+[11:28:16.0576] <Justin Ridgewell>
+If I'm a bundler, and bundle that asset reference's runtime value into a larger bundle, that large file is now env dependent
+
+[11:29:12.0048] <Justin Ridgewell>
+That is an issue for my bundler, because it means I'm doing repeat work that could have been already cached
+
+[11:29:41.0137] <Kris Kowal>
+So, it’s useful to distinguish an asset module from an asset reference module, I think.
+
+[11:29:52.0832] <Justin Ridgewell>
+If I could just `type: text` import, then it's no longer env dependent, because the imported `foo.txt` file can be treated like another module without any other runtime value
+
+[11:30:28.0530] <Justin Ridgewell>
+Just a `default export "foo.txt string contents", and bundle that up into the larger file
+
+[11:30:34.0112] <Justin Ridgewell>
+ * Just a \`default export "foo.txt string contents"`, and bundle that up into the larger file
+
+[11:30:46.0118] <Kris Kowal>
+There’s only one kind of asset module, but there are in fact environment dependent notions of an asset reference module (path, URL), and then further combinations if the notion is to make the asset reference portable (fetch, url module, fs module, filesystem API).
+
+[11:31:08.0504] <Justin Ridgewell>
+Exactly
+
+[11:32:20.0758] <Kris Kowal>
+Shimming an asset module is trivial (albeit gross), either embedding a string or a byte array or a base64 encoded string. Something like that. That covers one case.
+
+[11:32:31.0402] <Kris Kowal>
+And you can shim an asset module today the way you suggest for text.
+
+[11:32:58.0885] <Kris Kowal>
+Potentially an enormous bundle, and doesn’t capture the asset in a way that’s easy to pass around, like a URL.
+
+[11:33:55.0978] <Kris Kowal>
+Asset reference modules, and asset retrieval modules (a module that closes over both the reference and the means to load it, presumably async) remain…
+
+[11:44:08.0540] <Kris Kowal>
+I think the module harmony proposals provide an adequate foundation for these problems as written and having a import `etc` metadata reduces to the same argument we’ve tread today. You in fact have multiple options. With a virtual module source (even the lesser variant), you don’t even need to generate code for any of these cases. The downside is that you have to express an indication of your intent in the specifier. Ultimately, the argument hinges on whether the indication that a module is an asset, asset reference (host-dependent), or asset retriever (host-dependent), can be expressed in-band or out-of-band, and we digress into the argument we’ve already tread.
+
+[13:02:33.0473] <littledan>
+I am still confused by the connection Justin is drawing between whether it is a URL vs the text contents and whether it is cross-platform. It seems completely orthogonal 
+
+[13:14:37.0175] <Justin Ridgewell>
+I'm not sure how to clarify it futher?
+
+[13:15:36.0420] <Justin Ridgewell>
+Text imports and asset references/URLS are orthogonal designs, my comments here are that URLs are a subpar experience because they are env specific
+
+[13:15:46.0465] <Justin Ridgewell>
+A text import is not platform specific
+
+[14:42:30.0441] <Kris Kowal>
+I could see importing a URL as analogous to import reflection, and being interesting if that could generalize to transitive dependencies.
+
+[14:46:25.0249] <Kris Kowal>
+I mentioned that there’s an implicit “goal state” parameter that has a different default for reflective import vs others. Goal states being: loaded, (transitively loaded), linked, (initialized), evaluated. The ones in parens are not interesting to a user, but being able to indicate or control loaded vs linked vs evaluated is interesting. Reflective import _must_ not imply a goal state farther than loaded.
+
+[14:48:37.0864] <Kris Kowal>
+Perhaps analogous to import reflection, there’d be meta import, which would not execute but would vend out the `import.meta` (so the URL) of something (including assets) without attempting to execute it. I propose the default “goal state” for that would be “transitively loaded” or “linked”, because that would indicate to bundlers that the asset and its deps must be bundled.
+
+[14:49:21.0180] <Kris Kowal>
+Meta reflection lets us dodge the issue of URLs being a host-specific concern.
+
+[14:50:03.0163] <Kris Kowal>
+And this is a better solution than just exposing `import.meta.resolve`, because it can express dependency statically.
+
+[14:52:04.0136] <Kris Kowal>
+Concretely, the basic case, on the web: `import kittyMeta from 'kitty.jpg', meta, goal "linked"; const kittyImg = document.createElement('img'); kittyImg.src = kittyMeta.url;`
+
+[14:52:46.0024] <Kris Kowal>
+But also: `import workerMeta from 'worker.js', meta, goal "linked"; new Worker().addModule(workerMeta.url)`
+
+[14:54:24.0166] <Kris Kowal>
+One virtue of this approach is that it would work both in dev and prod, and with a bundler, without modification to sources.
+
+
+2022-12-09
+[05:20:06.0448] <littledan>
+> <@jridgewell:matrix.org> Text imports and asset references/URLS are orthogonal designs, my comments here are that URLs are a subpar experience because they are env specific
+
+It sounds to me like you're saying, "the design must be based on type: "text" and not asset references because asset references are impossible to make work"
+
+[05:20:29.0875] <littledan>
+I was feeling more optimistic about them...
+
+[05:22:23.0831] <littledan>
+I'd note: If we go for a general key/value pair scheme, but make each key be built-in to JS syntax, maybe we could even handle reflective module imports that can be statically imported later--the problem becomes action at a distance, not logical impossibility
+
+[05:23:13.0644] <littledan>
+e.g., if the syntax is (strawperson!) `import foo from "./foo.js", module`
+
+[08:01:53.0569] <Justin Ridgewell>
+No, in these comments about asset references/URLs vs actual JS values, I'm explicitly saying the using an asset reference is subpar, because it is env specific
+
+[08:02:18.0688] <Justin Ridgewell>
+There was no intention of commenting on the syntax of the proposals (though I have opinions on that too)
+
+[08:05:18.0281] <Justin Ridgewell>
+It's been suggested a few times that asset references are a replacement for the ability to import text
+
+[08:05:38.0060] <Justin Ridgewell>
+In the strict sense, yes, because they'd allow me to reference and access the asset the same way we currently do for URLs
+
+[08:06:01.0439] <Justin Ridgewell>
+But that doesn't make it a good experience to use, it just means it's better than the current URL approach (which is awful)
+
+[10:57:08.0919] <Kris Kowal>
+I like to tease apart the motivating use cases. I think there are cases where URLs are necessary, but the current approaches miss an opportunity to statically express dependency on a URL asset (and its transitive dependencies) in a way that bundlers could see. Embedded binary assets are useful for different things too, not least of which is that they don’t couple a mechanism for reading them, so they’re necessarily more portable.
+
+[10:59:29.0604] <Kris Kowal>
+Then all the remaining embedded asset types follow from the various treatments you can make on the binary, particularly UTF-8 text, but also others. An interesting dimension to that problem is that each of those cases has potentially different treatments at runtime or bundle time, and those treatments can be environment-specific.
+
+[11:02:47.0746] <Kris Kowal>
+For example, with Guten Tags, there’s a treatment for HTML. During development, it translates the HTML to JavaScript on the client, but for production, the translation occurs in the bundler (in a compartment that can see the dev dependencies, and ideally producing a module that executes in a corresponding compartment with access to the translator’s prod dependencies). There could be alternate treatments that use virtual module sources and interpret the HTML at runtime. And a key feature here is that the surrounding mechanism dictates whether you get an implementation of the translator that uses the DOM for parsing HTML, or brings in JSDOM for the bundler.
+
+[11:05:29.0927] <Kris Kowal>
+Concretely, bundling with a “text” loader implies very different trade-offs depending on whether you’re compiling to an archive or a bundle. With an archive, it makes sense to keep the original binary and use a virtual module source to decode it to a string on the fly. For a stringy bundle, it makes more sense to translate the asset to JavaScript.
+
+[11:22:32.0169] <Kris Kowal>
+cc naugtur 
+
+[11:25:03.0470] <Kris Kowal>
+Mentioning here because I aspire to add translators as a feature to Endo’s compartment mapper, and it strikes me that translated modules would need to run in a synthetic compartment that has is internally identical to the source package, but additionally has access to the prod dependencies of the translator package. In Guten Tags, I wanted to write a translator for a custom bindings language that would necessarily need access to certain runtime components that the destination package didn’t necessarily have access to.
+
+[11:25:46.0671] <Kris Kowal>
+Specifically, observer utilities, like the ones you see in stuff like `immer`.
+
+[11:26:21.0137] <Kris Kowal>
+Because it’s prohibitively expensive and unnecessary to entrain the entirely of a runtime like FRB https://github.com/kriskowal/frb
+
+[13:04:29.0161] <littledan>
+Hey, could someone with permissions invite @peetk:matrix.org ?
+
+[13:04:39.0638] <littledan>
+This is a coworker of mine in Bloomberg
+
+
+2022-12-12
+[02:02:50.0225] <naugtur>
+This feels similar to some of what I intended to do around attenuations for policy in Endo, but at this time I don't see much potential overlap for actual implementation because of where the translators and attenuators need to be plugged in. 
+I could also imagine a way to use attenuations to give translated modules access to different dependencies dependeing on a situation, but it's probably an example of "when you have a hammer..."
+
+Anyway, with a separate compartment you get a separate policy so if "a module that executes in a corresponding compartment with access to the translator’s prod dependencies" is a requirement, current draft implementation of policies would allow that.
+
+
+2022-12-13
+[05:29:10.0498] <Mathieu Hofman>
+Relevant es-disourse topic: https://es.discourse.group/t/utf8-buffer-import-type-assertions/1556
+
+
+2022-12-14
+[06:54:33.0111] <Jack Works>
+plz try at https://github.com/webpack/webpack/pull/16567
+
+[06:55:00.0440] <Jack Works>
+implemented in webpack, only support ES Module (no CommonJS) yet
+
+[07:17:16.0889] <Jack Works>
+cc yulia 👀
+
+[07:18:38.0360] <yulia>
+oh neat, is there a specific question you have regarding the behavior or any observations you have?
+
+[08:00:53.0161] <Rob Palmer>
+oh wow - this looks excellent.  I am very pleased to see the first working implementation
+
+[14:52:21.0068] <Jack Works>
+> <@yulia:mozilla.org> oh neat, is there a specific question you have regarding the behavior or any observations you have?
+
+Until now it looks good. I only have some problem with webpack internals. I plan to make it work for CommonJS too and use it in our production to see how it works before & after
+
+[14:53:26.0675] <guybedford>
+Jack Works: this looks amazing!
+
+[14:54:09.0037] <guybedford>
+one nit - we've been trying to use the term "defer" over "lazy" (which is easy to confuse with lazy loading)
+
+[14:54:40.0347] <guybedford>
+will be very interested to hear implementation feedback further
+
+[14:55:21.0303] <Jack Works>
+I have feedback for import assertion. It only supports string but I want boolean here 🤣
+
+[14:59:54.0130] <Jack Works>
+I use explicit { sync: true } assertion in this implementation but I worry if that means we need to standardize this property in the 262.
+I can implement both 3 options (ignore; link error; require sync: true assertion for all defer import) when there is TLA in the graph. 
+
+
+2022-12-20
+[08:57:40.0420] <nicolo-ribaudo>
+I'll join the meeting ~10 minutes late
+
+[10:40:24.0419] <Luca Casonato>
+The latest iteration of the syntax proposal as discussed:
+
+https://gist.github.com/lucacasonato/6f7db6a449fd7e047999343810309ca0
+
+- Only "as" is part of the cache key and it is interpreted exclusively by the host hook. It can be any primitive (including records & tuples when they ship).
+- All other keys in the import options are not cache keys, and are defined and interpreted exclusively by ECMA262. They are never passed to host hooks or the compartments import hook.
+
+
+
+[11:01:16.0683] <Kris Kowal>
+Justin Ridgewell, for the record, please confirm your position is that a mechanism that feeds into the cache key is necessary, and an `as <primitive>` + records and tuples as primitives would suffice.
+
+[11:01:30.0487] <Kris Kowal>
+Let’s get this written up in our minutes. Thank you Luca Casonato 
+
+[11:14:52.0143] <littledan>
+huh, what's the rationale for the # being in the syntax?
+
+[11:15:29.0482] <littledan>
+not all primitives can be included (e.g., symbols can't) so conceiving of this as "primitives" seems a little funny
+
+[11:16:20.0314] <Kris Kowal>
+The reified value corresponding to the syntax must be a primitive.
+
+[11:16:28.0594] <littledan>
+ah, OK, why?
+
+[11:16:49.0909] <Kris Kowal>
+In order to ensure that the cache key is canonical.
+
+[11:17:07.0252] <littledan>
+ah
+
+[11:17:17.0754] <Kris Kowal>
+Also, given that this is occurring pre-evaluating, that imposes some limits on what’s expressible.
+
+[11:17:37.0541] <littledan>
+well.... we should keep in mind the possibility that R&T won't go to Stage 3 in their current form
+
+[11:17:54.0475] <littledan>
+I don't even know if we have consensus on having any kind of syntax for them, at this point.
+
+[11:18:11.0887] <Kris Kowal>
+That is to say, however the value is lifted off the page, it has to occur in the parse phase, not the evaluation phase, and not in a lexical scope, so what’s expressible is inherently limited. I don’t have strong feelings about how that’s expressed syntactically.
+
+[11:18:38.0959] <Kris Kowal>
+Yeah, we’re aware that this is precarious.
+
+[11:19:55.0265] <littledan>
+(R&T syntax obviously doesn't imply that it doesn't contain expressions)
+
+[11:20:01.0153] <Kris Kowal>
+As solutions go, this so far uniquely addresses all the concerns of both cache key formation, separation of the cache key namespace from non-cache key namespace, and extensibility in bundlers such that the portions participating in the cache key are visible to importHook.
+
+[11:20:09.0567] <littledan>
+also why not : after as? does that indicate that it's not part of the cache key?
+
+[11:20:20.0446] <littledan>
+ * also why not : after as? does that indicate that it's part of the cache key?
+
+[11:20:34.0484] <Kris Kowal>
+Yes, `as` indicates both that it participates in the cache key, allows for composite cache keys, and threading to import hook.
+
+[11:20:56.0011] <littledan>
+well, I'm not sure if using the : for the other keys does a great job indicating that visually
+
+[11:21:07.0438] <littledan>
+as opposed to just, remembering the name
+
+[11:21:16.0224] <Kris Kowal>
+Using the colon is not germane, I think.
+
+[11:21:40.0978] <littledan>
+anyway: I'm happy with the general design of having `as` participate in the cache key, and the other keys are defined by ecma262 and do not
+
+[11:22:23.0391] <Kris Kowal>
+That is to say, we’re looking for any syntactic solution with the properties:
+1. distinguishes cache key from not
+2. if cache key, also visible to import hook
+3. cache key is extensible
+4. cache key canonicalizes order
+
+[11:22:41.0472] <littledan>
+Should we still design things (e.g., import()'s second arg, the thing passed to importHook) to allow more keys in the cache besides `as`, even if we don't define them yet?
+
+[11:23:14.0919] <Kris Kowal>
+We also have general support among participants that dynamic `import(x, bag)` corresponds 1:1 to a shallow static import syntax managed by 262.
+
+[11:23:48.0054] <Kris Kowal>
+Yes. That’s the direction supported by everyone on the call.
+
+[11:23:55.0732] <littledan>
+> <@kriskowal:matrix.org> We also have general support among participants that dynamic `import(x, bag)` corresponds 1:1 to a shallow static import syntax managed by 262.
+
+I see, that sounds ideal
+
+[11:24:34.0954] <littledan>
+yeah this sounds like a huge amount of progress that you all made
+
+[11:24:42.0979] <littledan>
+who were the attendees participating in the agreement?
+
+[11:25:17.0850] <Kris Kowal>
+That is to say, what gets plucked from the options bag is determined by 262, and anything else would presumably get ignored. What gets threaded to importHook is just specifier and `as`. Every other key has behavior well-defined in 262.
+
+[11:26:00.0137] <littledan>
+hmm, ignored, and not treated as an error?
+
+[11:26:15.0369] <Kris Kowal>
+Present and participating on todays call were Justin Ridgewell nicolo-ribaudo yulia guybedford Luca Casonato and myself. Mathieu Hofman and Richard Gibson observed. Please forgive any omissions!
+
+[11:26:15.0645] <littledan>
+(I've heard arguments on both sides and was personally leaning towards "error")
+
+[11:26:35.0358] <Kris Kowal>
+> <@littledan:matrix.org> hmm, ignored, and not treated as an error?
+
+I say presumably because that detail was not discussed, but forward compatibility is desirable.
+
+[11:26:49.0046] <Kris Kowal>
+Yeah, I could be swayed either way.
+
+[11:26:51.0518] <littledan>
+forward compatibility cuts both ways
+
+[11:27:03.0006] <littledan>
+or, I guess leans towards error
+
+[11:27:28.0585] <littledan>
+the counterargument is "upgrade path" which is a bit different
+
+[11:27:37.0077] <Kris Kowal>
+Again, I’ve not thought in depth on that detail. I’m presuming from the him.
+
+[11:27:40.0210] <Kris Kowal>
+ * Again, I’ve not thought in depth on that detail. I’m presuming from the hip.
+
+[11:29:16.0892] <littledan>
+well, anyway, I'm extremely happy with this direction, and looking forward to the details being spelled out. Did someone sign up for that part?
+
+[11:30:16.0563] <Kris Kowal>
+In any case, it was a good conversation and we found that there’s not a great deal of disagreement in abstract and we just need to get more concrete about one of the many possible directions. Possibly a statement of some kind about vision for evolution of this keyspace and how we accommodate it. guybedford expressly doesn’t want to push in that direction and recognizes that import reflection needs a color for that bikeshed, just doesn’t have strong color preferences. Just a preference not to be blocked on the issue for long.
+
+[11:31:07.0323] <Kris Kowal>
+I’m personally hoping you’re up for writing something up, littledan.
+
+[11:31:15.0345] <littledan>
+/me hides
+
+[11:31:29.0659] <littledan>
+can I nominate... anyone but me to do this?
+
+[11:31:37.0928] <littledan>
+all of you who were in the discussion would be good
+
+[12:16:37.0019] <Justin Ridgewell>
+> <@kriskowal:matrix.org> Justin Ridgewell, for the record, please confirm your position is that a mechanism that feeds into the cache key is necessary, and an `as <primitive>` + records and tuples as primitives would suffice.
+
+Yes, having some extensible mechanism that feeds into the cache key is a necessity for things we want to implement in our bundler. If we want to specify that as allowing records, that fine, though I don't see much difference between a record cache key and cache that does a shallow (non-ordered) equality of a static object literal.
+
+[12:21:41.0571] <littledan>
+well, one difference is Records don't exist yet...
+
+[12:22:17.0462] <Justin Ridgewell>
+As for why an extensible value that participates in a cache key is necessary, we can draw from the `@next/font` [examples](https://nextjs.org/docs/basic-features/font-optimization).
+
+Currently, you have a runtime function that has to be invoked with options, but if that function escapes the callgraph at all, it's not possible to analyze anymore. I'd be ideal if we can move all these settings into the `as` record, so that we have a guaranteed static analyzable syntax (this is standard static syntax improves ergonomics vs dynamic evaluation). I've actually reliazed last week that this is all dev facing, I failed to consider that when I was describing this previously.
+
+[12:23:00.0510] <Justin Ridgewell>
+ * As for why an extensible value that participates in a cache key is necessary, we can draw from the `@next/font` [examples](https://nextjs.org/docs/basic-features/font-optimization#google-fonts).
+
+Currently, you have a runtime function that has to be invoked with options, but if that function escapes the callgraph at all, it's not possible to analyze anymore. I'd be ideal if we can move all these settings into the `as` record, so that we have a guaranteed static analyzable syntax (this is standard static syntax improves ergonomics vs dynamic evaluation). I've actually reliazed last week that this is all dev facing, I failed to consider that when I was describing this previously.
+
+[12:24:05.0950] <littledan>
+so the syntax will help explain the limitations on usage, making it non-escaping by construction?
+
+[12:24:36.0856] <littledan>
+I kinda thought that having it refuse to build with a descriptive error message would be enough
+
+[12:26:58.0109] <Justin Ridgewell>
+Yes, we can fail the build if we see things that aren't correct, but still not a great DX
+
+[12:27:18.0772] <Justin Ridgewell>
+It'd be better if we can syntactially say that something doesn't work
+
+[12:27:46.0855] <Justin Ridgewell>
+Eg, what if the user does `Roboto({ weights })`, with `weights` being some dynamic array?
+
+[12:28:28.0523] <Justin Ridgewell>
+A static import syntax improves DX by having obvious restrictions
+
+[12:48:02.0378] <Kris Kowal>
+> <@jridgewell:matrix.org> As for why an extensible value that participates in a cache key is necessary, we can draw from the `@next/font` [examples](https://nextjs.org/docs/basic-features/font-optimization#google-fonts).
+> 
+> Currently, you have a runtime function that has to be invoked with options, but if that function escapes the callgraph at all, it's not possible to analyze anymore. I'd be ideal if we can move all these settings into the `as` record, so that we have a guaranteed static analyzable syntax (this is standard static syntax improves ergonomics vs dynamic evaluation). I've actually reliazed last week that this is all dev facing, I failed to consider that when I was describing this previously.
+
+The case of fonts is _interesting_ because it involves a need to *merge* the expression of dependencies at a particular commit point that doesn’t exist in the Module API but necessarily exists with bundlers.
+
+[12:48:16.0829] <Kris Kowal>
+A commit point beyond which no further modules will be imported, that is.
+
+[12:50:45.0837] <Justin Ridgewell>
+I think that's an optimization, but not a requirement. When I was doing font work for AMP, I saw tons of publishers who would have multiple imports for the same font with different variations, or multiple imports for different fonts with the same variations. They _could_ all be coalesced into a single stylesheet request, but it's prevented
+
+[12:59:21.0067] <Kris Kowal>
+That optimization might be expressible in terms of the proposed framework.
+
+[13:22:47.0795] <shu>
+Kris Kowal: you've had access to the transcript docs, right?
+
+[13:27:30.0330] <littledan>
+> <@jridgewell:matrix.org> A static import syntax improves DX by having obvious restrictions
+
+OK, I can understand this; thanks for explaining.
+
+[13:40:39.0439] <Kris Kowal>
+> <@shuyuguo:matrix.org> Kris Kowal: you've had access to the transcript docs, right?
+
+I got a transcript for this week and will post shortly.
+
+[13:40:50.0331] <Kris Kowal>
+Mathieu Hofman had the foresight to get a transcript last week.
+
+[13:40:56.0643] <Kris Kowal>
+ * Mathieu Hofman had the foresight to get a transcript last ~week~ fortnight.
+
+[13:41:02.0464] <Kris Kowal>
+ * Mathieu Hofman had the foresight to get a transcript last ~~week~~ fortnight.
+
+[13:41:18.0251] <Kris Kowal>
+ * Mathieu Hofman had the foresight to get a transcript last <del>week</del> fortnight.
+
+[13:42:42.0313] <shu>
+Kris Kowal: cool just wanted to make sure they were accessible
+
+[13:43:08.0372] <Kris Kowal>
+Ah, I see. They show in your drive, but since I pressed the button, I’ve also got access. Thanks.
+
+[13:43:58.0710] <Kris Kowal>
+I’ll “yeat” that up now.
+
+[13:49:54.0273] <Kris Kowal>
+I’ve posted a summary of our conversation and the transcription. https://docs.google.com/document/d/1CD5lIBZLl24XBWbQhokqBdt4Zl7wPAcFJKJrgePr9HU/edit#bookmark=id.wpzrt0f9aa58
+
+[14:31:37.0777] <shu>
+that reminds me
+
+[14:31:51.0186] <shu>
+do you think the new yorker writes yeët
+
+[14:32:47.0435] <Kris Kowal>
+Not unless it’s polysyllabic. The diaeresis indicates that eë is not a diphthong.
+
+[14:33:10.0281] <Kris Kowal>
+Which is to say, stress between the first and second E.
+
+[14:33:21.0346] <shu>
+do you not say yee-it
+
+[14:33:49.0523] <Kris Kowal>
+I don’t but I’m not a member of the correct generation to speak authoritatively!
+
+[14:34:24.0081] <Kris Kowal>
+Pretty sure “yeet” lasted approximately negative ten minutes in the collective consciousness of neologisms.
+
+[14:34:28.0693] <shu>
+on god i'm old too
+
+[14:35:46.0937] <Kris Kowal>
+I’m told the appropriate reactji is ☠️ but I’m going to run with X-| in solidarity.
+
+[14:39:40.0641] <Kris Kowal>
+But the fun game is using a diaeresis in words that the New Yorker probably never had reason to print. Like, “reïfy”.
+
+[14:40:48.0434] <shu>
+sick
+
+
+2022-12-22
+[15:42:19.0420] <Kris Kowal>
+Caridy and I talked about Virtual Module Source yesterday https://www.youtube.com/watch?v=KrD44Upkez0
+
+[15:42:57.0351] <Kris Kowal>
+Caridy is recalling his earlier work with Dave Herman on a lower-level API for controlling a module exports namespace’s bindings.
+

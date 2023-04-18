@@ -1,0 +1,110 @@
+<!DOCTYPE html><html><head>
+  <title>TC39 Module Harmony on 2022-07-10</title>
+  <link rel="stylesheet" href="../style.css">
+  <script>window.room = "TC39 Module Harmony";</script><script src="../render-roomlist.js"></script>
+  <script src="../logs.js"></script>
+</head>
+<body><div class="wrapper">
+<div class="sidebar">
+<div class="title">TC39 Module Harmony<br>2022-07-10<br><a href="plaintext/">plaintext logs</a></div>
+<div class="nav">
+<a href="2022-07-09" class="nav-link"><span>prev</span></a>
+<a href="2022-07-11" class="nav-link"><span style="float:right">next</span></a>
+</div>
+    <div class="all-rooms"><noscript>JavaScript is required to load the channel index, but you can go to <a href="../..">the static index</a> directly.</noscript></div>
+<div class="footer"><a href="https://github.com/bakkot/matrix-archive-bot">source on github</a></div>
+</div>
+<div class="rhs">
+<div class="rhs-header">
+<span id="error" style="color: red; display:none">error</span>
+
+<input type="text" id="query" size="25" placeholder="Search TC39 Module Harmony">
+<a id="search-submit" class="button icon-link" title="Search">
+  <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path d="M505 442.7L405.3 343c-4.5-4.5-10.6-7-17-7H372c27.6-35.3 44-79.7 44-128C416 93.1 322.9 0 208 0S0 93.1 0 208s93.1 208 208 208c48.3 0 92.7-16.4 128-44v16.3c0 6.4 2.5 12.5 7 17l99.7 99.7c9.4 9.4 24.6 9.4 33.9 0l28.3-28.3c9.4-9.4 9.4-24.6.1-34zM208 336c-70.7 0-128-57.2-128-128 0-70.7 57.2-128 128-128 70.7 0 128 57.2 128 128 0 70.7-57.2 128-128 128z"></path></svg>
+</a>
+</div>
+
+<div class="log"><table id="log-table"><tbody id="log-tbody">
+
+  <tr class="msg" id="L0"><td class="ts-cell"><a class="ts" href="#L0" alt="Sat Jul 09 2022 20:42:25 GMT-0700 (Pacific Daylight Time)">03:42</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@jackworks:matrix.org">Jack Works</span>&gt;</div></td><td class="msg-cell">there are 2 things in the language have this property, <code>export function</code> and <code>export var</code>.</td></tr>
+  <tr class="msg" id="L1"><td class="ts-cell"><a class="ts" href="#L1" alt="Sat Jul 09 2022 20:42:48 GMT-0700 (Pacific Daylight Time)">03:42</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@jackworks:matrix.org">Jack Works</span>&gt;</div></td><td class="msg-cell">I can see <del>two way</del> only one way to solve this problem but they all have their own problems</td></tr>
+  <tr class="msg" id="L2"><td class="ts-cell"><a class="ts" href="#L2" alt="Sat Jul 09 2022 20:49:10 GMT-0700 (Pacific Daylight Time)">03:49</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@jackworks:matrix.org">Jack Works</span>&gt;</div></td><td class="msg-cell"><p>having two stage initialization for virtual modules, just like systemjs</p>
+<pre><code class="language-js">const record = static module {
+    export function a() {}
+    console.log(a)
+}
+</code></pre>
+<p>becomes</p>
+<pre><code class="language-js">const record = {
+    bindings: [{export: "a"}],
+    initialize(env, context) {
+        function a() {}
+        env.a = a
+        return () =&gt; {
+            console.log(a)
+        }
+    }
+}
+</code></pre>
+</td></tr>
+  <tr class="msg" id="L3"><td class="ts-cell"><a class="ts" href="#L3" alt="Sat Jul 09 2022 20:50:55 GMT-0700 (Pacific Daylight Time)">03:50</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@jackworks:matrix.org">Jack Works</span>&gt;</div></td><td class="msg-cell">but the problem is, it is allowing the virtual module to run some arbitrary code <em>before</em> the evaluation stage</td></tr>
+  <tr class="msg" id="L4"><td class="ts-cell"><a class="ts" href="#L4" alt="Sat Jul 09 2022 20:59:30 GMT-0700 (Pacific Daylight Time)">03:59</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@guybedford:matrix.org">guybedford</span>&gt;</div></td><td class="msg-cell">That's correct about the emulation. But SystemJS has very different contraints of course, and yes likely doesn't fit this model. If needing this level of parity you might be better off just using a static record from a string source to do the emulation I think, then passing bindings through import.meta or custom imports?</td></tr>
+  <tr class="msg" id="L5"><td class="ts-cell"><a class="ts" href="#L5" alt="Sat Jul 09 2022 21:02:19 GMT-0700 (Pacific Daylight Time)">04:02</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@jackworks:matrix.org">Jack Works</span>&gt;</div></td><td class="msg-cell">I'm considering (and my use case need) an eval-free version of downlevel compiling module blocks, so I hope the Virtual Module can do the full emulation</td></tr>
+  <tr class="msg" id="L6"><td class="ts-cell"><a class="ts" href="#L6" alt="Sat Jul 09 2022 21:06:16 GMT-0700 (Pacific Daylight Time)">04:06</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-16" title="@kriskowal:matrix.org">Kris Kowal</span>&gt;</div></td><td class="msg-cell">What if <code>a</code> is rewritten to <code>env.a</code> at every mention?</td></tr>
+  <tr class="msg" id="L7"><td class="ts-cell"><a class="ts" href="#L7" alt="Sat Jul 09 2022 21:07:03 GMT-0700 (Pacific Daylight Time)">04:07</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@jackworks:matrix.org">Jack Works</span>&gt;</div></td><td class="msg-cell"><mx-reply><blockquote> What if <code>a</code> is rewritten to <code>env.a</code> at every mention?</blockquote></mx-reply>The problem is circular reference + function hoist</td></tr>
+  <tr class="msg" id="L8"><td class="ts-cell"><a class="ts" href="#L8" alt="Sat Jul 09 2022 21:07:29 GMT-0700 (Pacific Daylight Time)">04:07</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@jackworks:matrix.org">Jack Works</span>&gt;</div></td><td class="msg-cell"><p>Consider these two modules compiled into Virtual module:</p>
+<pre><code class="language-js">import {b} from './b'
+export function a() {}
+console.log(b)
+</code></pre>
+<pre><code class="language-js">import {a} from './a'
+export function b() {}
+console.log(a)
+</code></pre>
+</td></tr>
+  <tr class="msg" id="L9"><td class="ts-cell"><a class="ts" href="#L9" alt="Sat Jul 09 2022 21:11:05 GMT-0700 (Pacific Daylight Time)">04:11</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@jackworks:matrix.org">Jack Works</span>&gt;</div></td><td class="msg-cell"><del>oh wait, this works. let me consider that again</del></td></tr>
+  <tr class="msg" id="L10"><td class="ts-cell"><a class="ts" href="#L10" alt="Sat Jul 09 2022 22:08:31 GMT-0700 (Pacific Daylight Time)">05:08</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@jackworks:matrix.org">Jack Works</span>&gt;</div></td><td class="msg-cell">I compared it with CommonJS (because the code above works after being compiled into CommonJS).</td></tr>
+  <tr class="msg" id="L11"><td class="ts-cell"><a class="ts" href="#L11" alt="Sat Jul 09 2022 22:10:49 GMT-0700 (Pacific Daylight Time)">05:10</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@jackworks:matrix.org">Jack Works</span>&gt;</div></td><td class="msg-cell"><pre><code class="language-js">const record = {
+    bindings: [],
+    async initialize(env, context) {
+        function a() {}
+        env.a = a
+        
+        const mod = await context.import("./b")
+        console.log(mod.b)
+    }
+}
+</code></pre>
+<p>But this is problematic because of then-able</p>
+</td></tr>
+  <tr class="msg" id="L12"><td class="ts-cell"><a class="ts" href="#L12" alt="Sat Jul 09 2022 22:13:00 GMT-0700 (Pacific Daylight Time)">05:13</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@jackworks:matrix.org">Jack Works</span>&gt;</div></td><td class="msg-cell"><p>So CommonJS behave more like this. They also have a "pre-evaluation" to setup those bindings (before and after <code>require</code> calls)</p>
+<pre><code class="language-js">"use strict";
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+Object.defineProperty(exports, "b", {
+    enumerable: true,
+    get: ()=&gt;b
+});
+const _a = require("./a");
+console.log(_a.a);
+function b() {}
+</code></pre>
+</td></tr>
+  <tr class="msg" id="L13"><td class="ts-cell"><a class="ts" href="#L13" alt="Sun Jul 10 2022 00:04:55 GMT-0700 (Pacific Daylight Time)">07:04</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@jackworks:matrix.org">Jack Works</span>&gt;</div></td><td class="msg-cell"><p>I can think of some way to alleviate this problem, to make <code>env</code> and <code>context</code> in some kind of dead zone in this pre-evaluation stage, which means</p>
+<pre><code class="language-js">    initialize(env, context) {
+        // when in here, context is an empty object with no "meta" or "import" property on it
+        // when in here, any other property access than "a" throws a TDZ error
+        function a() {}
+        env.a = a
+        return () =&gt; {
+            // now access env and context is ok
+            env.console.log(a)
+        }
+    }
+</code></pre>
+<p>Construct all assets =&gt; Link stage =&gt; Pre-evaluation (run all <code>initialize</code> function with TDZ <code>env</code> and <code>context</code> and collect the return closure) =&gt; <code>env</code> and <code>context</code> out of TDZ =&gt; Evaluation</p>
+</td></tr>
+
+</tbody></table></div></div></div>
+</body></html>
