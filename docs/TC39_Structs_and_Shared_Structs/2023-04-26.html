@@ -117,6 +117,35 @@
   <tr class="msg" id="L78"><td class="ts-cell"><a class="ts" href="#L78" alt="Wed Apr 26 2023 14:08:14 GMT-0700 (Pacific Daylight Time)">21:08</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@littledan:matrix.org">littledan</span>&gt;</div></td><td class="msg-cell">I don't yet understand the problem with my suggestion to use module specifiers, given that the weighty part of the class (the method definitions) can be factored out</td></tr>
   <tr class="msg" id="L79"><td class="ts-cell"><a class="ts" href="#L79" alt="Wed Apr 26 2023 14:09:16 GMT-0700 (Pacific Daylight Time)">21:09</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@mhofman:matrix.org">Mathieu Hofman</span>&gt;</div></td><td class="msg-cell">as I've mentioned before a mutable registry with forgeable string keys scoped to an agent or realm is a non starter for me </td></tr>
   <tr class="msg" id="L80"><td class="ts-cell"><a class="ts" href="#L80" alt="Wed Apr 26 2023 14:10:03 GMT-0700 (Pacific Daylight Time)">21:10</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@littledan:matrix.org">littledan</span>&gt;</div></td><td class="msg-cell">I see how the registry solves the problem, but I don't understand why the other solution doesn't work as well.</td></tr>
+  <tr class="msg" id="L81"><td class="ts-cell"><a class="ts" href="#L81" alt="Wed Apr 26 2023 14:10:26 GMT-0700 (Pacific Daylight Time)">21:10</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell"><p>Something like:</p>
+<pre><code class="language-js">// main.js
+import { Worker } from "worker_threads";
+import { Vector } from "./vector.js";
+
+const worker = new Worker("./worker.js", { structTypes: { "some-string-for-vector": Vector.prototype } });
+worker.postMessage(new Vector());
+
+// worker.js
+import { parentPort } from "worker_threads";
+import { Vector } from "./vector.js";
+
+parentPort.addStructType("some-string-for-vector", Vector.prototype);
+parentPort.onmessage = msg =&gt; {
+  msg // a Vector
+};
+</code></pre>
+</td></tr>
+  <tr class="msg" id="L82"><td class="ts-cell"><a class="ts" href="#L82" alt="Wed Apr 26 2023 14:11:25 GMT-0700 (Pacific Daylight Time)">21:11</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@mhofman:matrix.org">Mathieu Hofman</span>&gt;</div></td><td class="msg-cell">A per channel registry however like above is fine</td></tr>
+  <tr class="msg" id="L83"><td class="ts-cell"><a class="ts" href="#L83" alt="Wed Apr 26 2023 14:11:43 GMT-0700 (Pacific Daylight Time)">21:11</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">What I'm suggesting is a per-channel registry.</td></tr>
+  <tr class="msg" id="L84"><td class="ts-cell"><a class="ts" href="#L84" alt="Wed Apr 26 2023 14:12:50 GMT-0700 (Pacific Daylight Time)">21:12</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@littledan:matrix.org">littledan</span>&gt;</div></td><td class="msg-cell">huh, I don't understand how this would be implemented. It has to be that we <em>don't</em> have wrapper objects per instance. So the channel can't be transforming what goes across it.</td></tr>
+  <tr class="msg" id="L85"><td class="ts-cell"><a class="ts" href="#L85" alt="Wed Apr 26 2023 14:12:58 GMT-0700 (Pacific Daylight Time)">21:12</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell"><p>An alternative, which makes things even less mutable might be:</p>
+<pre><code class="language-js">import { parentPort, MessagePortWrapper } from "worker_threads";
+const parent = new MessagePortWrapper(parentPort, { structTypes: { ... } });
+parent.onmessage = msg =&gt; { ... };
+</code></pre>
+</td></tr>
+  <tr class="msg" id="L86"><td class="ts-cell"><a class="ts" href="#L86" alt="Wed Apr 26 2023 14:13:55 GMT-0700 (Pacific Daylight Time)">21:13</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@littledan:matrix.org">littledan</span>&gt;</div></td><td class="msg-cell">I don't see how a registry not scoped to the agent could satisfy the no-linear-work-across-postmessage property</td></tr>
+  <tr class="msg" id="L87"><td class="ts-cell"><a class="ts" href="#L87" alt="Wed Apr 26 2023 14:14:39 GMT-0700 (Pacific Daylight Time)">21:14</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">Ah, I think I see what you mean. You want the remote agent to define these types once for the agent.</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>

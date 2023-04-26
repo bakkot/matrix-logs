@@ -319,3 +319,54 @@ as I've mentioned before a mutable registry with forgeable string keys scoped to
 [14:10:03.0220] <littledan>
 I see how the registry solves the problem, but I don't understand why the other solution doesn't work as well.
 
+[14:10:26.0530] <rbuckton>
+Something like:
+
+```js
+// main.js
+import { Worker } from "worker_threads";
+import { Vector } from "./vector.js";
+
+const worker = new Worker("./worker.js", { structTypes: { "some-string-for-vector": Vector.prototype } });
+worker.postMessage(new Vector());
+
+// worker.js
+import { parentPort } from "worker_threads";
+import { Vector } from "./vector.js";
+
+parentPort.addStructType("some-string-for-vector", Vector.prototype);
+parentPort.onmessage = msg => {
+  msg // a Vector
+};
+```
+
+[14:11:25.0698] <Mathieu Hofman>
+A per channel registry however is fine
+
+[14:11:35.0884] <Mathieu Hofman>
+ * A per channel registry however like above is fine
+
+[14:11:43.0492] <rbuckton>
+What I'm suggesting is a per-channel registry.
+
+[14:12:50.0735] <littledan>
+huh, I don't understand how this would be implemented. It has to be that we *don't* have wrapper objects per instance. So the channel can't be transforming what goes across it.
+
+[14:12:58.0430] <rbuckton>
+An alternative, which makes things even less mutable might be:
+
+```js
+import { parentPort, MessagePortWrapper } from "worker_threads";
+const parent = new MessagePortWrapper(parentPort, { structTypes: { ... } });
+parent.onmessage = msg => { ... };
+```
+
+[14:13:55.0460] <littledan>
+I don't see how a registry scoped to the agent could satisfy the no-linear-work-across-postmessage property
+
+[14:14:03.0813] <littledan>
+ * I don't see how a registry not scoped to the agent could satisfy the no-linear-work-across-postmessage property
+
+[14:14:39.0432] <rbuckton>
+Ah, I think I see what you mean. You want the remote agent to define these types once for the agent.
+
