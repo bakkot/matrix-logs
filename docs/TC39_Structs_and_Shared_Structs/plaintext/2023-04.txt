@@ -571,3 +571,53 @@ This approach is similar to Electron's preload mechanism
 [14:46:35.0191] <rbuckton>
 https://www.electronjs.org/docs/latest/tutorial/tutorial-preload, for reference.
 
+[14:50:45.0127] <rbuckton>
+In that approach, you might write something like:
+
+```js
+// point.js
+@Reflect.StructIdentity("796eb01e-70d2-42c6-a30f-8bdce572db3d")
+export shared struct Point {
+  x;
+  y;
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+  }
+  toString() {
+    return `${this.x},${this.y}`;
+  }
+}
+
+// main.js
+import { Point } from "./point.js";
+import { Worker } from "worker_threads";
+
+const worker = new Worker("worker.js", { type: "module", preload: "preload.js" });
+worker.postMessage(new Point(0, 0));
+
+// preload.js
+import "./point.js";
+
+// worker.js
+import { parentPort } from "worker_threads";
+parentPort.onmessage = msg => {
+  console.log(msg.toString()); // prints: 0,0
+}
+```
+
+[14:51:35.0306] <littledan>
+I think this requires a kind of centralized coordination that I'd prefer to not require
+
+[14:53:14.0771] <rbuckton>
+It's pretty much a given that we must perform some kind of coordination. I'm borrowing from electron's model because its fairly widely adopted.
+
+[14:53:56.0357] <littledan>
+sure there's coordination across threads to load the corresponding code, but coordinating all the "preload" code to be packaged up together seems like a different kind of thing
+
+[14:54:27.0241] <littledan>
+also Electron is using this for privileged APIs, but I'd prefer that this is conceptually unprivileged
+
+[14:54:27.0742] <rbuckton>
+A different approach might be something fully statically analyzable during module import evaluation, so long as it still allows bundling/minification/tree shaking.
+
