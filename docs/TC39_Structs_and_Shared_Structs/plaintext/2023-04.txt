@@ -242,3 +242,46 @@ The tree shaking concern isn't conjecture either. If "the way" to do multithread
 [13:59:23.0741] <Mathieu Hofman>
 Right, but the main question is whether this should be possible without an explicit "synchronization" message between A and B
 
+[14:00:31.0091] <littledan>
+> <@rbuckton:matrix.org> A and B may have subtly different implementations of `Vector` (due to tree shaking, etc.), so there needs to be some way for A and B to coordinate what a `Vector` is.
+
+so, I guess the question is, whether we especially want to permit this difference
+
+[14:00:32.0622] <rbuckton>
+> <@mhofman:matrix.org> Right, but the main question is whether this should be possible without an explicit "synchronization" message between A and B
+
+Or a way to register the prototype via a Worker
+
+[14:01:07.0308] <rbuckton>
+> <@littledan:matrix.org> so, I guess the question is, whether we especially want to permit this difference
+
+I think it's important to permit it. If we can't share code, we need to be able to reduce overhead in other ways. 
+
+[14:01:45.0030] <littledan>
+> <@rbuckton:matrix.org> The tree shaking concern isn't conjecture either. If "the way" to do multithreading in JS is going to require duplicating runtime code in each thread, developers are going to want to find ways to minimize the memory footprint of short-lived threads by tree shaking away unused functionality.
+
+I can see how this is nice to have; what I have trouble understanding is whether it's an absolute blocker. There are reasons, on the other hand, to prefer that this correspondence in the code loaded is mandatory
+
+[14:01:51.0871] <Mathieu Hofman>
+Aka if and how can A and B define their `Vector` independently and for the vector instance send by A to B to have the same prototype as the one created independently by B
+
+[14:03:14.0358] <littledan>
+Actually: I think it should work just fine to use a small module which just contains the field definitions, and then have other chunks of code (different in different workers/agents) which go back and install methods on the class.
+
+[14:03:22.0647] <Mathieu Hofman>
+My understanding is that module identifiers are somewhat problematic with bundlers
+
+[14:03:47.0179] <Mathieu Hofman>
+and I don't see a way to accomplish this with module blocks
+
+[14:04:06.0167] <rbuckton>
+Bundlers, minifiers, and treeshakers exist for a reason. Performance is important, so whatever solution we come up with must be able to handle web reality.
+
+[14:04:12.0779] <littledan>
+> <@littledan:matrix.org> Actually: I think it should work just fine to use a small module which just contains the field definitions, and then have other chunks of code (different in different workers/agents) which go back and install methods on the class.
+
+these later "installation" chunks of code could use various different techniques to minimize the memory footprint, as rbuckton mentioned
+
+[14:04:37.0369] <littledan>
+the must-be-the-same parts are really limited to, what field names are there (which is mandatory to correspond anyway)
+
