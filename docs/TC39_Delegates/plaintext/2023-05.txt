@@ -1715,3 +1715,33 @@ import attributes isn't exactly "evaluators" tho.
 [12:44:42.0172] <ljharb>
  * import attributes isn't exactly "evaluators" tho - they can do that but that's not the purpose of them
 
+[12:46:07.0295] <rbuckton>
+I have a weak preference against `import <keyword>` for the static syntax.
+I have a stronger preference for `import.<phase>()` for the dynamic syntax as the `import(url, { phase })` syntax either introduces unnecessary asynchrony for asset references, or it introduces a non-promise return value from `import` (for asset references). The `import(url, { phase })` syntax also introduces complexity for future proposals that may need to somehow navigate `phase` and `with` attributes on the object.
+
+[12:46:09.0310] <HE Shi-Jun>
+module from {}
+import source from from
+
+[12:47:02.0828] <Kris Kowal>
+> <@jridgewell:matrix.org> My reasoning is that phase is conceptually similar to an evaluator, meaning it changes the source text of the thing it imports (and this is how it's going to be implemented in bundlers)
+
+The intersection semantics with importHook would be quite bad in that case. The importHook is responsible for returning a Module irrespective of the phase, and the importHook will need to see the whole options bag, and the importHook is memoized according to the specifier + all attributes. You will get duplicate instances if you import with multiple phases.
+
+[12:47:52.0584] <Michael Ficarra>
+I don't really understand the syntax brittleness argument, all syntax is brittle to some degree
+
+[12:48:19.0451] <Michael Ficarra>
+we don't have like syntax checksums or ECC for syntax
+
+[12:48:54.0197] <Justin Ridgewell>
+I think you're relying on the engine to do the memoization, instead of letting the `importHook`?
+
+[12:49:40.0379] <nicolo-ribaudo>
+> <@kriskowal:matrix.org> The intersection semantics with importHook would be quite bad in that case. The importHook is responsible for returning a Module irrespective of the phase, and the importHook will need to see the whole options bag, and the importHook is memoized according to the specifier + all attributes. You will get duplicate instances if you import with multiple phases.
+
+The only way this could work is to "hide" the phase attribute and not pass it to the importHook even if it's specified
+
+[12:49:42.0616] <Kris Kowal>
+The `Module` instance is relied upon to do the memoization, yes.
+
