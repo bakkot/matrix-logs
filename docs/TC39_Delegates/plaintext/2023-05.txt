@@ -1745,3 +1745,102 @@ The only way this could work is to "hide" the phase attribute and not pass it to
 [12:49:42.0616] <Kris Kowal>
 The `Module` instance is relied upon to do the memoization, yes.
 
+[12:50:32.0732] <Michael Ficarra>
+if everything was S-expressions, I guess it would be less brittle, but also it would look like (()()()))()()()()(())())()()())))()()((()((())
+
+[12:50:36.0421] <littledan>
+> <@rbuckton:matrix.org> I have a weak preference against `import <keyword>` for the static syntax.
+> I have a stronger preference for `import.<phase>()` for the dynamic syntax as the `import(url, { phase })` syntax either introduces unnecessary asynchrony for asset references, or it introduces a non-promise return value from `import` (for asset references). The `import(url, { phase })` syntax also introduces complexity for future proposals that may need to somehow navigate `phase` and `with` attributes on the object.
+
+I can understand this argument, but also it seems really specific to asset references, which we really haven't worked out yet.
+
+[12:50:42.0468] <rbuckton>
+Its somewhat odd that we can `import asset ...` to resolve a url, and `import source ...` to fetch AND compile, but no way to just fetch via syntax.
+
+[12:51:01.0509] <Justin Ridgewell>
+> <@nicolo-ribaudo:matrix.org> The only way this could work is to "hide" the phase attribute and not pass it to the importHook even if it's specified
+
+The `importHook`'s memo can handle that case pretty easily?
+
+[12:51:21.0750] <nicolo-ribaudo>
+> <@michaelficarra:matrix.org> if everything was S-expressions, I guess it would be less brittle, but also it would look like (()()()))()()()()(())())()()())))()()((()((())
+
+Is uglily-js still used?
+
+[12:51:26.0746] <rbuckton>
+> <@littledan:matrix.org> I can understand this argument, but also it seems really specific to asset references, which we really haven't worked out yet.
+
+I'm not a fan of turning `import` into an RPC call, i.e., specifying the operation via a property in an object as opposed to an imperative call.
+
+[12:51:34.0580] <HE Shi-Jun>
+ * module from {}
+import source from from
+"url"
+
+[12:51:54.0420] <littledan>
+> <@rbuckton:matrix.org> Its somewhat odd that we can `import asset ...` to resolve a url, and `import source ...` to fetch AND compile, but no way to just fetch via syntax.
+
+Environments might add that through import attributes, but at the same time it's a little risky since you could never GC such a fetch result
+
+[12:52:03.0444] <rbuckton>
+It feels akin to asking someone to write `array.do({ action: "filter", callback: fn })`
+
+[12:52:12.0724] <nicolo-ribaudo>
+> <@jridgewell:matrix.org> The `importHook`'s memo can handle that case pretty easily?
+
+You wouldn't want an user-defined hook to potentially load a different module depending on the specified phase
+
+[12:52:40.0109] <littledan>
+> <@rbuckton:matrix.org> It feels akin to asking someone to write `array.do({ action: "filter", callback: fn })`
+
+it sounds like you're arguing against import assertions then?
+
+[12:52:51.0117] <littledan>
+> <@rbuckton:matrix.org> It feels akin to asking someone to write `array.do({ action: "filter", callback: fn })`
+
+ * it sounds like you're arguing against import attributes then?
+
+[12:53:06.0453] <HE Shi-Jun>
+> <@haxjs:matrix.org> module from {}
+> import source from from
+> "url"
+
+is this case cause syntax ambiguity ?
+
+[12:53:13.0443] <Justin Ridgewell>
+That's the responsibility of the code import hook code. If you use a power-use feature, you're expected to follow the rules
+
+[12:53:21.0555] <Michael Ficarra>
+why do SES folks have the time to burden every proposal with this requirement but they don't have the time to work on the `getIntrinsics` proposal or whatever it is?
+
+[12:53:23.0256] <rbuckton>
+> <@littledan:matrix.org> it sounds like you're arguing against import attributes then?
+
+No, import attributes are a bit more esoteric. This is far more obviously an operation
+
+[12:53:48.0643] <littledan>
+> <@haxjs:matrix.org> is this case cause syntax ambiguity ?
+
+Yeah, I think `from` should be banned in all these cases; it's good that you and Waldemar are pointing this out
+
+[12:54:39.0953] <nicolo-ribaudo>
+> <@haxjs:matrix.org> is this case cause syntax ambiguity ?
+
+Yes this is probably what WH was worried about. It can be specced as unambiguous (and in parser it's a two tokens lookahead, or just "eat three identifiers and then decide if they are bindings or syntax").
+It would still "read" as unambiguous, but how often would you import a `source` binding from a module declaration named `from`? (how many files do you have called `from.js`?)
+
+[12:54:43.0976] <littledan>
+> <@rbuckton:matrix.org> No, import attributes are a bit more esoteric. This is far more obviously an operation
+
+oh, I see, we're back on `import.stage()` and not talking about the put-it-all-in-attributes side (which would be fine with phase:)
+
+[12:54:47.0062] <nicolo-ribaudo>
+> <@haxjs:matrix.org> is this case cause syntax ambiguity ?
+
+ * Yes this is probably what WH was worried about. It can be specced as unambiguous (and in parser it's a two tokens lookahead, or just "eat three identifiers and then decide if they are bindings or syntax").
+It would still "read" as unambiguous, but how often would you import a `source` binding from a module declaration named `from`? (how many files do you currently have called `from.js`?)
+
+[12:54:57.0424] <nicolo-ribaudo>
+ * Yes this is probably what WH was worried about. It can be specced as unambiguous (and in parser it's a two tokens lookahead, or just "eat three identifiers and then decide if they are bindings or syntax").
+It would still "read" as ambiguous, but how often would you import a `source` binding from a module declaration named `from`? (how many files do you currently have called `from.js`?)
+
