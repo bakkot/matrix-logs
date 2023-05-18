@@ -4151,3 +4151,51 @@ because i think losing-values is just a core part of the bargain for general con
 [09:16:52.0461] <ljharb>
 (in an exception case)
 
+[09:30:17.0739] <bakkot>
+to elaborate on why `filter` is weird:
+
+let's say you do
+```
+let it = [1, 2].toAsync().filter(pred);
+it.next().then(console.log);
+it.next().then(console.log);
+```
+
+and let's sa your predicate returns `true` for the second call instantly, but takes a minute to finish for the first call.
+
+if you are trying to preserve order at all, you can't resolve _either_ promise until the first call settles, because if the first call settles with `true` then the first promise needs to get `{ done: false, value: 1 }` and if it settles with `false` then the first promise needs to get `{ done: false, value: 2 }`.
+
+the only way to get things earlier than that is to give up on order _entirely_, so that in the case your predicate returns `false` for `1` then the first line prints `{ done: true }` and the second prints `{ done: false, value: 2 }`.
+
+[09:31:23.0146] <shu>
+yes, good example, the done-ness signal further reinforces my mental model of iterators being inherently ordered things
+
+[09:31:41.0763] <bakkot>
+ * to elaborate on why `filter` is weird:
+
+let's say you do
+
+```
+let it = [1, 2].toAsync().filter(pred);
+it.next().then(console.log);
+it.next().then(console.log);
+```
+
+and let's say your predicate returns `true` for the second call instantly, but takes a minute to finish for the first call.
+
+if you are trying to preserve order at all, you can't resolve _either_ promise until the first call settles, because if the first call settles with `true` then the first promise needs to get `{ done: false, value: 1 }` and if it settles with `false` then the first promise needs to get `{ done: false, value: 2 }`.
+
+the only way to get things earlier than that is to give up on order _entirely_, so that in the case your predicate returns `false` for `1` then the first line prints `{ done: true }` and the second prints `{ done: false, value: 2 }`.
+
+[09:32:06.0461] <HE Shi-Jun>
+It seems `done` should be also a promise 😅
+
+[09:33:43.0059] <Michael Ficarra>
+shu: I still don't think so. It doesn't mean that any iterator derived from this one will be done. It's just used as a signal to the consumer to not pull anymore.
+
+[09:34:38.0948] <shu>
+that strikes me as not the prevalent intuition
+
+[09:35:01.0222] <shu>
+and will be confusing for the majority programmer if we adopted it
+
