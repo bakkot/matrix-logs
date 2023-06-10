@@ -82,3 +82,735 @@ Also covers other things like `Float64Array`s
  * I should read spec, does it cover uniform array views? or just DataView which are slower than uniform array views (TypedArrayViews)
 Also covers other things like `Float64Array`s
 
+
+2023-06-02
+[17:12:23.0289] <Domenic>
+> <@annevk:matrix.org> or even _String type_ vs String
+
+In ES, <dfn>'s CSS is italics.
+
+[23:45:54.0607] <annevk>
+Domenic: fair. I think I still can't use the typedefs though because that would not obviously allow for resizable buffers
+
+[23:47:12.0187] <annevk>
+Domenic: I guess I should just introduce some terms for the "values"
+
+[23:47:22.0316] <Domenic>
+Or just say "an instance of one of the buffer source types"
+
+[23:47:30.0621] <Domenic>
+Or define new typedefs if they're useful
+
+[23:48:00.0625] <Domenic>
+Actually I'm not sure what's wrong with the typedefs...
+
+[23:48:32.0728] <Domenic>
+> To create one of the buffer view types from a byte sequence bytes in a realm realm:
+
+Here "buffer view types" links to a dfn that says it's DataView + Uint8Array + ...
+
+[23:48:50.0325] <Domenic>
+But we already have a typedef for that: ArrayBufferView
+
+[23:49:45.0269] <annevk>
+I'm not saying my current wording works with my new understanding of types, but https://webidl.spec.whatwg.org/#AllowResizable suggests it creates a new IDL type
+
+[23:50:50.0145] <Domenic>
+Yeah, I guess the question is whether the "create" algorithm is meant to allow creating resizable ABs etc.
+
+[23:50:56.0946] <Domenic>
+But presumably some of them are
+
+[23:51:16.0744] <Domenic>
+E.g. "byte length"
+
+[23:51:30.0739] <Domenic>
+So for "byte length" could you use `AllowSharedBufferSource`?
+
+[23:51:44.0290] <annevk>
+That still doesn't include AllowResizable
+
+[23:51:54.0594] <Domenic>
+Got it
+
+[23:51:58.0198] <Domenic>
+So, preexisting issue
+
+[23:52:42.0025] <Domenic>
+I guess you have to say "annotated type whose inner type is..." and then you have to use "instance" because you're in type-land
+
+[23:52:43.0162] <annevk>
+Yeah I suppose, WebKit doesn't seem to have AllowResizable
+
+[23:53:00.0273] <annevk>
+Domenic: that doesn't help with `for` though
+
+[23:53:23.0440] <Domenic>
+I think having `for` not be rigorous is OK
+
+[23:53:30.0552] <annevk>
+oh
+
+[23:54:25.0666] <Domenic>
+Making people type `[=[AllowResizable] Uint8Array/byte length=]` instead of `[=Uint8Array/byte length=]` seems unnecessary, even if they're technically operating on a value whose type is `[AllowResizable] Uint8Array`
+
+[23:55:20.0565] <annevk>
+We could define `InclusiveAllowSharedBufferSource` I suppose, hmm
+
+[23:55:39.0485] <annevk>
+Well I would expect something like "buffer objects/byte length" maybe
+
+[23:55:53.0574] <annevk>
+But I could live with not fixing it, certainly less to fix downstream
+
+[23:56:09.0861] <Domenic>
+It's true we probably do need a typedef that includes [AllowResizable]
+
+[23:56:19.0745] <Domenic>
+Is anyone using [AllowResizable]? Hmm.
+
+[23:56:33.0280] <Domenic>
+WebDex says no https://dontcallmedom.github.io/webdex/a.html#AllowResizable%40%40%40%40extended-attribute
+
+[23:56:47.0316] <Domenic>
+But yeah it seems likely anyone who did use it would quickly want a typedef
+
+[23:57:00.0895] <Domenic>
+Either AllowResizableBufferSource or AllowSharedAndResizableBufferSource
+
+[23:57:16.0680] <Domenic>
+(shared and resizable = growable, I guess??)
+
+[00:07:06.0252] <annevk>
+Domenic: yeah maybe, I don't really know what kind of operations you need with resizable, perhaps we should wait until someone actually attempts to do it
+
+[00:07:16.0768] <Domenic>
+Yeah fair enough
+
+[00:07:58.0652] <annevk>
+Domenic: I guess I'll restore the existing `for` attributes and such and file a follow-up issue
+
+[04:29:13.0141] <sideshowbarker>
+zcorpan: (and on the off chance there might be actually be any others here that care about the error-checking behavior of the vnu/mozilla HTML parser) Good news about my investigation of the fubarred behavior for error checking for ampersands is: From testing now, I can say:
+
+- the relevant patch as I had originally written it myself (almost 3 years ago now) was actually passing all the tests; that’s to first commit at https://github.com/validator/htmlparser/pull/30/commits
+- as Henri and I were reviewing my patch, we somewhere introduced the bug that caused the regression we only recently discovered we had — from it being reported in the issue at https://github.com/validator/htmlparser/issues/82
+- the exact commit where we introduced the bug that caused the regression is https://github.com/validator/htmlparser/pull/30/commits/9814070b66f5d48f7798f97820fac14d36950243
+- so I need to back at that commit in fine detail, and trace through it, and test changes to it to try to pinpoint exactly what part of it is where the regression bug was introduced
+
+[05:14:37.0666] <Zomatree>
+Are there emcascript type IDL definitions or in another machine readable format? im working on some bindings to another language and would rather not have to manually write it all out
+
+[05:26:49.0318] <annevk>
+Zomatree: TypeScript has those, maybe?
+
+[05:29:55.0363] <Zomatree>
+parsing ts types would be a nightmare with how complex the type system is
+
+[05:39:48.0598] <annevk>
+sideshowbarker: if you're still around, does https://github.com/whatwg/html/pull/9372 look good to you? I'll merge
+
+[05:51:41.0293] <sideshowbarker>
+> <@annevk:matrix.org> sideshowbarker: if you're still around, does https://github.com/whatwg/html/pull/9372 look good to you? I'll merge
+
+Looking now
+
+[05:54:04.0672] <nicolo-ribaudo>
+It's not exactly what you are looking for, but with https://github.com/es-meta/esmeta you can parse the ecmascript spec and extract type definitions from it
+
+[06:00:38.0057] <sideshowbarker>
+> <@annevk:matrix.org> sideshowbarker: if you're still around, does https://github.com/whatwg/html/pull/9372 look good to you? I'll merge
+
+Quick answer for now for here is: I think I am unliking to willingly implement this in the HTML Checker, because I think that on balance this restriction will end up wasting more time of HTML developer-authors than it helps others. Use cases for `summary` are very different from use cases for `button`.
+
+For one thing, a `summary` often acts essentially as a title/heading, as far as its informational purposes go, rather than just its function. I understand and recognize the very-real accessibility problems with allowing it, and I am in no way dismissing those as being ignorable and unimportant.  But in this particular very special case, I do not judge the accessibility problems to be sufficient to merit the restriction being implemented in the HTML checker.
+
+[06:02:22.0349] <sideshowbarker>
+Incidentally, all that said, I would have sworn that the spec previously already this restriction (and I had been already intentionally not implementing it), and I so I am a bit surprised to discover that the spec has actually not had this restriction, and this PR is needed to add it.
+
+[06:02:57.0830] <sideshowbarker>
+I need to make time to go back and figure out _why_ I had thought this restriction was already in the spec.
+
+[06:03:33.0867] <annevk>
+Alright, if you could put your concerns in the issue or PR that would be good. If it's not going to be enforced there's no real reason to make the change.
+
+[06:03:53.0063] <sideshowbarker>
+Well I may really be in the wrong side of this
+
+[06:03:56.0869] <annevk>
+Or at least it warrants some further discussion I think
+
+[06:04:07.0522] <sideshowbarker>
+for sure
+
+[06:06:31.0657] <sideshowbarker>
+and for now, I will put the comments into the PR — and then find some time to look back through my stuff and try to see what had confused previously about this already being in the spec. I guess that’s moot/irrelevant anyway as far as this PR goes — but it’s just I feel unsettled about not being able to remember yet why I had this apparent misapprehension so far, about this being in the spec already
+
+[06:06:46.0400] <sideshowbarker>
+thanks for the heads-up about the PR
+
+[06:07:28.0121] <sideshowbarker>
+I had actually seen notifications about that PR rolling by, but been lazy about not actually going to take a look and read the issue description
+
+[07:28:45.0104] <annevk>
+sideshowbarker: I just realized this would also outlaw WebKit's PR bot comments
+
+[07:32:01.0445] <sideshowbarker>
+> <@annevk:matrix.org> sideshowbarker: I just realized this would also outlaw WebKit's PR bot comments
+
+There you go. I think there are many other existing uses that it would outlaw — all over the place. I think if we look, we could find plenty of them — because it’s actually a logical normal natural reasonable use case to anybody
+
+[07:33:16.0454] <sideshowbarker>
+I am recalling some of this, and what led me before to already having come to the the conclusion that I would not implement it
+
+[07:33:24.0624] <sideshowbarker>
+ * I am recalling some of this, and what led me before to already having come to the conclusion that I would not implement it
+
+[07:33:26.0217] <annevk>
+Yeah, this no longer seems like a good fix
+
+[07:34:05.0568] <annevk>
+I hope you did not provide pushback before and that was not conveyed to us this time around...
+
+[07:35:03.0028] <annevk>
+Anyway, no harm done (and we could have always reverted had it been merged, although that would be somewhat bad)
+
+[07:36:15.0627] <sideshowbarker>
+Yeah — and I know when I say this that it’s a standard cop-out we have been accused of using since forever in discussions with the accessibility advocates — but it really seems like what needs to happen here is for the AT to be refined to provide the right UX for this
+
+[07:36:36.0542] <sideshowbarker>
+I mean, it’s in the wild already being used very commonly for years
+
+[07:37:11.0438] <sideshowbarker>
+And we know that developers are not going to change there existing stuff just because the HTML checker starts barking at them
+
+[07:37:23.0183] <sideshowbarker>
+ * And we know that many (or most) developers are not going to change their existing stuff just because the HTML checker starts barking at them
+
+[08:47:27.0476] <annevk>
+sideshowbarker: oops I was wrong, the WebKit PR bot doesn't put interactive content in `summary`, just in `details`
+
+[08:47:51.0264] <annevk>
+sideshowbarker: for `summary` it does seem less likely, but there are probably existing cases
+
+[09:09:20.0887] <annevk>
+Wait, why does the selector *|test serialize as test?
+
+[09:24:02.0290] <annevk>
+I guess that's just how it works, unless you use @namespace it's all global
+
+[09:24:31.0578] <annevk>
+So there's no need for *|* if you don't have @namespace either, something to keep in mind for the "global style sheet" I suppose
+
+[09:24:43.0670] <annevk>
+ * So there's no need for `*|*` if you don't have @namespace either, something to keep in mind for the "global style sheet" I suppose
+
+[09:37:59.0485] <sideshowbarker>
+ * zcorpan: (and on the off chance there might be actually be any others here that care about the error-checking behavior of the vnu/mozilla HTML parser) Good news about my investigation of the fubarred behavior for error checking for ampersands is: From testing now, I can say:
+
+- the relevant patch as I had originally written it myself (almost 3 years ago now) was actually passing all the tests; that’s the first commit at https://github.com/validator/htmlparser/pull/30/commits
+- as Henri and I were reviewing my patch, we somewhere introduced the bug that caused the regression we only recently discovered we had — from it being reported in the issue at https://github.com/validator/htmlparser/issues/82
+- the exact commit where we introduced the bug that caused the regression is https://github.com/validator/htmlparser/pull/30/commits/9814070b66f5d48f7798f97820fac14d36950243
+- so I need to back at that commit in fine detail, and trace through it, and test changes to it to try to pinpoint exactly what part of it is where the regression bug was introduced
+
+[10:37:57.0086] <Eric Portis (he/him)>
+zcorpan: Trying to wrap my head around concrete object size ignoring natural dimensions. Is this correct? https://gist.github.com/eeeps/3b6c4b90f7275526534d5928a978fbaa
+
+[10:38:41.0779] <Yagiz Nizipli>
+We just released Ada's website, as well as Rust, Python and Go clients. Appreciate any feedback from WHATWG. http://ada-url.com
+
+[10:40:26.0747] <Eric Portis (he/him)>
+> <@etportis:matrix.org> zcorpan: Trying to wrap my head around concrete object size ignoring natural dimensions. Is this correct? https://gist.github.com/eeeps/3b6c4b90f7275526534d5928a978fbaa
+
+(thinking through a new wrinkle, adding an example with height: auto...)
+
+[10:45:45.0379] <Eric Portis (he/him)>
+> <@etportis:matrix.org> zcorpan: Trying to wrap my head around concrete object size ignoring natural dimensions. Is this correct? https://gist.github.com/eeeps/3b6c4b90f7275526534d5928a978fbaa
+
+ * <del>(thinking through a new wrinkle, adding an example with height: auto...)</del> nevermind, I forgot how height:auto + width and height work, ignore me...
+
+[10:46:24.0598] <Eric Portis (he/him)>
+ * <del>(thinking through a new wrinkle, adding an example with height: auto...)</del> nevermind, I forgot how height:auto + width and height work, ignore me... still curious to check my understanding of the two examples in the gist though
+
+[10:56:50.0479] <Eric Portis (he/him)>
+Also, my reading of https://whatpr.org/html/8008/images.html#parsing-a-sizes-attribute is that once you've specified `loading=lazy`, an img will behave equivalently with or without `sizes=auto`. Aka lazy-loaded images get auto-sizes by default. Is that right?
+
+[14:59:43.0119] <sideshowbarker>
+> <@annevk:matrix.org> sideshowbarker: for `summary` it does seem less likely, but there are probably existing cases
+
+One concrete thing I can do that with give us some actual data ー though _aggregated_ data, as opposed to a list of sites ー is: I can add a use counter to the HTML checker, and then take a look at the number from that, after the counter has been in there for a few days
+
+[15:07:05.0566] <sideshowbarker>
+That is, the counter will give us a percentage of sites which are using interactive content or tabindex inside `summary`
+
+[15:09:07.0422] <sideshowbarker>
+...and in parallel to me adding that ice counter, zcorpan or somebody else here who's set up to run HTTPArchive queries can run one for this
+
+[15:09:22.0675] <sideshowbarker>
+* ...and in parallel to me adding that use counter, zcorpan or somebody else here who's set up to run HTTPArchive queries can run one for this
+
+[15:12:38.0764] <sideshowbarker>
+But separate still from both of those, it would be greatly helpful for somebody to try to create a list of existing widely-visited sites which are using it (interactive content or tabindex inside `summary`)
+
+[15:14:35.0831] <sideshowbarker>
+Maybe Scott Ohara or Steve Faulkner already know of some big sites which are
+
+
+2023-06-03
+[20:00:37.0637] <Domenic>
+We previously had some of this discussion about the sections at the bottom of https://participate.whatwg.org/agreement
+
+[20:03:20.0148] <Domenic>
+> <@yagiznizipli:matrix.org> We just released Ada's website, as well as Rust, Python and Go clients. Appreciate any feedback from WHATWG. http://ada-url.com
+
+Pretty cool. One thing that might be nice is highlighting how up-to-date you currently are. For jsdom/whatwg-url I link to the commit hash of the spec I've most recently updated to. https://github.com/jsdom/whatwg-url#specification-conformance If you put in more work you could translate that into "# of commits behind whatwg/url main".
+
+I think that would be some of the most important info I'd be looking for in a URL Standard-focused URL parser library. Basically, is it maintained.
+
+[20:04:30.0634] <Domenic>
+Also for your FAQ entry on WHATWG, maybe consider linking to https://whatwg.org/, and/or https://whatwg.org/faq
+
+[06:06:06.0453] <annevk>
+Found an issue with the universal selector, prolly of interest to some people here: https://github.com/w3c/csswg-drafts/issues/8911
+
+
+2023-06-05
+[00:22:10.0507] <zcorpan>
+> <@annevk:matrix.org> So there's no need for `*|*` if you don't have @namespace either, something to keep in mind for the "global style sheet" I suppose
+
+right but it's a bit of a footgun e.g. if implementers add the "global" rules into html.css
+
+[00:25:27.0343] <zcorpan>
+> <@etportis:matrix.org> zcorpan: Trying to wrap my head around concrete object size ignoring natural dimensions. Is this correct? https://gist.github.com/eeeps/3b6c4b90f7275526534d5928a978fbaa
+
+For example 1, since img is display: block it would be 60rem wide. cf. https://software.hixie.ch/utilities/js/live-dom-viewer/saved/11739
+
+[00:25:50.0714] <zcorpan>
+(or less if the viewport is smaller)
+
+[00:27:44.0090] <zcorpan>
+Eric Portis (he/him): https://drafts.csswg.org/css-images/#specified-size
+
+[00:29:12.0149] <zcorpan>
+Eric Portis (he/him): example 2 seems correct
+
+[00:39:22.0425] <annevk>
+zcorpan: hmm yeah, tests? 😀
+
+[01:00:19.0898] <zcorpan>
+> <@sideshowbarker:matrix.org> ...and in parallel to me adding that use counter, zcorpan or somebody else here who's set up to run HTTPArchive queries can run one for this
+
+Done, with these exceptions: <a> (sans href) is included, <img>, <audio>, <video> are excluded. It would be harder to get these right, and marginal returns. 105,235 sites out of 12,808,711 (~0.82%). The result was too large to export in full to google sheets, but the first 1327 results (ordered by rank) are here: https://docs.google.com/spreadsheets/d/1o2X2ld_S0JjYdZs2vPKNwfrAIdceiVH2HLSmo4BLYTI/edit?usp=sharing
+
+[01:01:18.0292] <zcorpan>
+annevk: maybe interaction with 'display' isn't tested yet :)
+
+[01:01:50.0792] <zcorpan>
+annevk: oh you meant for html.css
+
+[01:04:06.0932] <zcorpan>
+Turns out <summary tabindex="-1"> is included
+
+[01:04:39.0066] <zcorpan>
+I made at least 2 mistakes in the regexp :)
+
+[01:05:37.0044] <sideshowbarker>
+> <@zcorpan:mozilla.org> Done, with these exceptions: <a> (sans href) is included, <img>, <audio>, <video> are excluded. It would be harder to get these right, and marginal returns. 105,235 sites out of 12,808,711 (~0.82%). The result was too large to export in full to google sheets, but the first 1327 results (ordered by rank) are here: https://docs.google.com/spreadsheets/d/1o2X2ld_S0JjYdZs2vPKNwfrAIdceiVH2HLSmo4BLYTI/edit?usp=sharing
+
+Thanks much. I had expected a lot more usage than 0.82%. That makes me see that having the HTML checker report an error would not be disruptive to as many developers as I had imagined it might be.
+
+[01:06:00.0011] <zcorpan>
+sideshowbarker: I expected less
+
+[01:06:17.0113] <sideshowbarker>
+Oh
+
+[01:08:17.0521] <zcorpan>
+summary is used on 0.9% of pages per https://docs.google.com/spreadsheets/d/1grkd2_1xSV3jvNK6ucRQ0OL1HmGTsScHuwA8GZuRLHU/edit#gid=2057119066&range=I80
+
+[01:09:03.0818] <zcorpan>
+so then 91% of pages using `summary` also use interactive content
+
+[01:09:45.0442] <sideshowbarker>
+> <@zcorpan:mozilla.org> sideshowbarker: I expected less
+
+Well it's significantly high by our normal thresholds for feature deprecations. But for the thresholds I have used for the HTML checker in past cases, it's not high.
+
+[01:15:36.0159] <sideshowbarker>
+> <@zcorpan:mozilla.org> so then 91% of pages using `summary` also use interactive content
+
+Oh wow yeah then that changes my mind completely.  Forget everything else I just said. The how-many-summary-have-interactive-content is what we need to care about here. And of course having the checker disrupt things for 91% of the developers using summary is nowhere close to be acceptable. It's a complete non-starter.
+
+[01:16:16.0434] <sideshowbarker>
+* Oh wow yeah then that changes my mind completely.  Forget everything else I just said. The how-many-summary-have-interactive-content case is what we need to care about here. And of course having the checker disrupt things for 91% of the developers using summary is nowhere close to be acceptable. It's a complete non-starter.
+
+[01:16:28.0734] <zcorpan>
+> <@zcorpan:mozilla.org> so then 91% of pages using `summary` also use interactive content
+
+This was bogus, since `summary` usage has increased since sep 2022 :) New query with the same dataset gives 226,719 sites using `summary`, so it's "only" 46% of sites using `summary` also using interactive content in `summary`
+
+[01:30:54.0220] <sideshowbarker>
+> <@zcorpan:mozilla.org> This was bogus, since `summary` usage has increased since sep 2022 :) New query with the same dataset gives 226,719 sites using `summary`, so it's "only" 46% of sites using `summary` also using interactive content in `summary`
+
+Ah ok. But 46% is still not anywhere even close to be acceptable for the checker to be reporting errors about. 
+
+[01:32:06.0771] <sideshowbarker>
+This week I will try to add a use counter to the checker, to see how well it aligns with that number.
+
+[01:32:57.0141] <zcorpan>
+sideshowbarker: also we might need to solve how to make nested interactive content work well so that the UX isn't broken for 0.82% of sites
+
+[01:33:26.0085] <sideshowbarker>
+Yup
+
+[01:55:18.0894] <Domenic>
+https://github.com/w3c/html-aam/issues/345#issuecomment-931495836 discusses that. I guess at least Facebook's accessibility specialist thinks it's too hard: " Whenever I try to imagine a way to solve all the problems associated with that, my brain feels like it falls into a bottomless hurt pit."
+
+[01:56:19.0707] <Domenic>
+I think it's sad when accessibility experts say that giving AT users experience parity with mouse/keyboard users is too hard, but, to be fair, I haven't tried to write AT software myself.
+
+[07:00:22.0309] <annevk>
+Mattias Buelens: any update on https://github.com/whatwg/streams/pull/1083?
+
+[07:02:48.0419] <annevk>
+Mattias Buelens: similar question for https://github.com/whatwg/streams/pull/1271. I guess they come down to https://github.com/whatwg/streams/pull/1264. Does what Youenn suggests there seem reasonable?
+
+[09:31:53.0687] <Eric Portis (he/him)>
+zcorpan: Why did you change the <img> to a <span class=img>, and why (or perhaps when) does the <img> have a computedStyle width of 0?  https://software.hixie.ch/utilities/js/live-dom-viewer/?saved=11742
+
+[09:32:09.0513] <Eric Portis (he/him)>
+ * zcorpan: Why did you change the \<img> to a \<span class=img>, and why (or perhaps when) does an \<img> have a computedStyle width of 0?  https://software.hixie.ch/utilities/js/live-dom-viewer/?saved=11742
+
+[09:32:46.0245] <zcorpan>
+Eric Portis (he/him): I changed it to remove weird behaviors of `img`
+
+[09:33:16.0102] <Eric Portis (he/him)>
+@zcorpan ok. Does sizes=auto have to contend with those weird behaviors?
+
+[09:33:47.0226] <zcorpan>
+Eric Portis (he/him): the size is 0 if it's inline or inline-block and no width or min-width, for example
+
+[09:37:40.0015] <Eric Portis (he/him)>
+I guess my question is, will the concrete size ignoring natural dimensions in this example be 60em, even though what's getting logged is 0px: https://software.hixie.ch/utilities/js/live-dom-viewer/?saved=11742 If so why?
+
+[09:39:43.0662] <zcorpan>
+Eric Portis (he/him): oh right it's 0px because img is a replaced element. So my `span` example is wrong
+
+[09:40:54.0345] <Eric Portis (he/him)>
+Ok! So both of the gist examples are correct, and this is testable by putting an empty img in a layout and looking at its dimensions.
+
+[09:42:07.0693] <zcorpan>
+Eric Portis (he/him): I think so, but might need to use `alt=""` so that the alt text doesn't affect sizing when testing since alt isn't shown while loading
+
+[09:42:57.0206] <Eric Portis (he/him)>
+zcorpan: makes sense. Thanks!
+
+[10:02:15.0148] <zcorpan>
+Eric Portis (he/him): to be sure fallback doesn't affect sizing, use a very-slow-loading image
+
+[10:04:53.0609] <Eric Portis (he/him)>
+zcorpan: what do you mean by “fallback”?
+
+[10:05:17.0656] <zcorpan>
+Eric Portis (he/him): "showing alt"
+
+[10:06:01.0810] <zcorpan>
+even if the empty string, there can be a difference between inline box and replaced inline box
+
+[10:09:46.0981] <Eric Portis (he/him)>
+zcorpan: ok. I don’t see any differences in Safari/FF/Chrime but I’ll take your word for it that that’s not necessarily spec’s/guaranteed
+
+[10:09:55.0118] <Eric Portis (he/him)>
+* zcorpan: ok. I don’t see any differences in Safari/FF/Chrime but I’ll take your word for it that that’s not necessarily spec’d/guaranteed
+
+[10:10:12.0648] <Eric Portis (he/him)>
+* zcorpan: ok. I don’t see any differences in Safari/FF/Chrome but I’ll take your word for it that that’s not necessarily spec’d/guaranteed
+
+[10:12:28.0689] <zcorpan>
+Eric Portis (he/him): e.g. I think https://www.w3.org/TR/CSS2/visuren.html#position-props is different
+
+[10:18:56.0480] <zcorpan>
+Eric Portis (he/him): https://software.hixie.ch/utilities/js/live-dom-viewer/saved/11743
+
+[10:19:24.0483] <zcorpan>
+3 different results in 3 browser engines, good times!
+
+[10:22:06.0523] <zcorpan>
+https://html.spec.whatwg.org/#images-3 - ah actually `alt=""` means it "repesents nothing" (if there's no image), and so it should act as a 0x0 replaced element
+
+[16:30:08.0134] <Eric Portis (he/him)>
+zcorpan: so an <img alt=""> should behave the same, for sizes="auto"-testing purposes, as an <img src="5-second-ttfb.jpeg" /> or whatever. Because the [default object size](https://drafts.csswg.org/css-images/#default-object-size) of both a [loading image](https://drafts.csswg.org/css-images/#loading-image) and an ["img element that represents nothing and the user agent does not expect this to change"](https://html.spec.whatwg.org/#images-3) are both 0x0.
+
+[16:46:20.0017] <Eric Portis (he/him)>
+zcorpan: although according to the loading image definition, images in this state "may trigger fallback rendering". Is there anything in the "concrete object size ignoring natural dimensions" spec that forbids fallback rendering dimensions from being used?
+
+
+2023-06-06
+[17:34:21.0840] <ntim>
+Hi! can someone help merge this editorial typo fix: https://github.com/whatwg/html/pull/9388 ?
+
+[01:13:51.0468] <annevk>
+Jake Archibald: note that `className` is already defined on `Element` as I pointed out earlier; I guess SVG overrides it, though you could probably use the other one if you really wanted to
+
+[01:15:39.0351] <Jake Archibald>
+annevk: when did you previously point that out? (Or do you mean `classList`?)
+
+[01:19:49.0379] <annevk>
+Jake Archibald: I pointed out in the issue that it's defined in DOM so the request should maybe be tracked there
+
+[01:20:21.0108] <annevk>
+Jake Archibald: don't blame you for missing it though, there's a lot of noise :-)
+
+[01:22:30.0372] <Jake Archibald>
+annevk: ahh I did see that, but I didn't join the dots to "it's on `Element`"
+
+[01:22:40.0370] <Jake Archibald>
+But yeah, that makes sense
+
+[01:46:59.0087] <Jake Archibald>
+annevk: happy to move it to DOM, but I figured it'd be better to wait until there's general "let's do it for className and htmlFor" agreement, then split it into two issues
+
+[03:50:10.0275] <annevk>
+Ms2ger: how does the Wasm CG render proposals relative to the main spec? Like https://github.com/WebAssembly/gc/issues/376 makes a bunch of changes to the main spec and then I guess the main spec is occasionally merged back in or some such? But is the result rendered somewhere?
+
+[04:10:35.0981] <Ms2ger>
+annevk: yeah, proposals are done in a fork of the main spec repo, which is merged into it occasionally. The result is rendered if someone managed to get the CI working
+
+[04:13:22.0717] <Ms2ger>
+Example: https://webassembly.github.io/content-security-policy/js-api/#host-ensure-can-compile-wasm-bytes 
+
+[04:37:46.0633] <sideshowbarker>
+> <@ms2ger:igalia.com> annevk: yeah, proposals are done in a fork of the main spec repo, which is merged into it occasionally. The result is rendered if someone managed to get the CI working
+
+I've been asked to fix that CI. So I just need to make time to go in and do it. Next week at the earliest
+
+[04:38:01.0756] <Ms2ger>
+You have?
+
+[04:38:24.0234] <sideshowbarker>
+Yeah, by PLH
+
+[04:39:03.0701] <sideshowbarker>
+My understanding is that the former team contact set up that build?
+
+[04:39:50.0251] <sideshowbarker>
+And that it's... a bit baroque? Idiosyncratic
+
+[04:40:58.0557] <Ms2ger>
+I think you're talking about the `.rst` → HTML build
+
+[04:41:26.0431] <Ms2ger>
+ * I think you're talking about the `.rst` → W3C-styled HTML build
+
+[04:41:30.0858] <sideshowbarker>
+Ah
+
+[04:41:55.0119] <sideshowbarker>
+To be honest, I haven't even looked at any of it yet
+
+[04:42:47.0430] <sideshowbarker>
+PLH told me long ago some stuff had stopped working there
+
+[04:43:09.0071] <sideshowbarker>
+But I as yet have zero idea of the specifics
+
+[04:44:10.0182] <sideshowbarker>
+Regardless, I'd be glad to help good whatever's busted
+
+[04:45:03.0557] <sideshowbarker>
+In particular whatever bits are the ones Eric had been taking care of
+
+[04:45:56.0214] <Ms2ger>
+This isn't the thing Eric did, but since you offered, https://github.com/WebAssembly/js-types/issues/23 has been ignored for the last 2.5 years
+
+[04:47:17.0101] <sideshowbarker>
+Well that's a long time
+
+[04:47:26.0542] <sideshowbarker>
+I will go in and take a look
+
+[04:50:02.0199] <sideshowbarker>
+The reason I'm good at fixing strangely engineered builds that are broken is that I'm good at strangely engineering them to begin with myself, and breaking them
+
+[05:06:42.0074] <Ehsan Azari>
+Is there any `EventSource` (or `EventSource`-like) web api client/browser side?
+
+[05:28:16.0597] <Ehsan Azari>
+ * Is there any `EventSource` (or `EventSource`-like) web api for client/browser side communications?
+
+[05:35:21.0246] <Ehsan Azari>
+ * Is there any `EventSource` (or `EventSource`-like) web api for client/browser side communications?
+I mean having event sources in client/browser side too, to consume those client/browser-side events when is needed 
+
+[05:49:16.0388] <Ehsan Azari>
+ * Is there any `EventSource` (or `EventSource`-like) web api for client/browser side communications?
+I mean having event sources in client/browser side too, to consume those client/browser-side events when is needed mainly client/browser side (and maybe even server-side?)
+
+I mean following the philosophy of `EventSource` and `EventTarget` for both client/browser and server side
+To me it seems that `EventSource` and `EventTarget` comes from those old days that just server was the event source
+
+
+[05:50:05.0827] <Ehsan Azari>
+ * Is there any `EventSource` (or `EventSource`-like) web api for client/browser side communications?
+I mean having event sources in client/browser side too, to consume those client/browser-side events when is needed mainly client/browser side (and maybe even server-side?)
+
+I mean following the philosophy of `EventSource` and `EventTarget` for both client/browser and server side
+To me it seems that `EventSource` and `EventTarget` comes from those old days when just server was the event source
+
+[05:50:31.0215] <Ehsan Azari>
+ * Is there any `EventSource` (or `EventSource`-like) web api for client/browser side communications?
+I mean having event sources in client/browser side too, to consume those client/browser-side events when is needed mainly client/browser side (and maybe even server-side?)
+
+I mean following the philosophy of `EventSource` and `EventTarget` for both client/browser and server sides
+To me it seems that `EventSource` and `EventTarget` comes from those old days when just server was the event source
+
+[06:10:50.0282] <Ehsan Azari>
+ * Is there any `EventSource` (or `EventSource`-like) web api for client/browser side communications?
+I mean having event sources in client/browser side too, to consume those client/browser-side events when is needed mainly client/browser side (and maybe even from server-side?)
+
+I mean following the philosophy of `EventSource` and `EventTarget` for both client/browser and server sides
+To me it seems that `EventSource` and `EventTarget` comes from those old days when just server was the event source
+
+[06:11:30.0195] <Ehsan Azari>
+ * Is there any `EventSource` (or `EventSource`-like) web api for client/browser side communications?
+I mean having event sources in client/browser side too, to consume those client/browser-side events when is needed mainly client/browser side (and maybe even from server-side?)
+
+I mean following the philosophy of `EventSource` and `EventTarget` for both client/browser and server sides
+To me it seems that `EventSource` and `EventTarget` come from those old days when just server was the event source
+
+[06:14:39.0959] <annevk>
+sideshowbarker: 🎉
+
+[06:25:21.0690] <Ehsan Azari>
+Isn't a good idea to have event sources in client/browser side too?
+
+[06:27:11.0119] <Ehsan Azari>
+ * Isn't a good idea to have event sources on client/browser side too?
+
+[09:16:40.0246] <smaug>
+annevk: in https://fetch.spec.whatwg.org/#fetch-groups, the last sentence, should it be "and keepalive", not "or keepalive" ?
+
+[09:42:34.0644] <Ehsan Azari>
+> <@smaug:mozilla.org> annevk: in https://fetch.spec.whatwg.org/#fetch-groups, the last sentence, should it be "and keepalive", not "or keepalive" ?
+
+It looks correct with or
+It allows for either condition to be true for the associated fetch record's controller to be terminated
+
+[11:55:58.0340] <smaug>
+but we don't want to terminate keepalives, no?
+
+[14:38:47.0857] <annevk>
+smaug: yeah, that looks wrong, file an issue?
+
+[14:39:06.0918] <annevk>
+smaug: seems to have been wrong since I first drafted this concept: https://github.com/whatwg/fetch/commit/744d8b3bbe3b59492cff5f0fdd49b8dd053c4571
+
+[14:52:20.0484] <smaug>
+https://github.com/whatwg/fetch/issues/1669
+
+[16:39:03.0533] <Anton Maliev>
+Hey folks, question on the Storage spec. I'm trying to get a callback for every site that accesses any form of non-cookie storage. Looking at the spec https://storage.spec.whatwg.org/, which is the best algorithm to monkey patch? I'm considering "obtain a storage bottle map / shelf / key", but I'm not clear on the flow. Are these called once the first time an origin accesses local or session storage, and never before then? Could the browser run them for a non-site reason?
+
+
+2023-06-07
+[18:56:18.0563] <sirisian>
+Question about differing behavior in FF and Chrome when focusing outside of a contenteditable with inline-block vs grid. Click below the contenteditable: https://jsfiddle.net/swk91rpx/ Notice for grid it finds the first text content and places the cursor in it in Chrome. I suspect this is a bug in Chrome as I think this happened with inline-block 7 years ago and was changed. Anyone familiar with this topic and could clarify the expected behavior so I know where to file this. (For all I know this edge-case is right for chrome and FF is the one handling it wrong).
+
+[00:41:56.0478] <annevk>
+Anton Maliev: that might be correct, yeah; problem is that not everything has been refactored and we have been running into some issues with this abstraction
+
+[00:42:31.0292] <annevk>
+Anton Maliev: filing an issue and copying inexorabletash and asuth might be a good start
+
+[00:44:02.0076] <annevk>
+sirisian: filing an issue against all of https://github.com/w3c/contentEditable/issues/new, Chromium, and Gecko seems like a good start
+
+[00:44:41.0664] <annevk>
+sirisian: unfortunately the spec is not maintained so this has to be addressed on a case-by-case basis and likely slowly
+
+[03:02:44.0081] <Andreu Botella>
+That might also be a hit testing issue, rather than a contenteditable issue
+
+[03:03:02.0667] <Andreu Botella>
+and hit testing isn't really fully specified anywhere
+
+[03:17:33.0290] <zcorpan>
+> <@etportis:matrix.org> zcorpan: so an <img alt=""> should behave the same, for sizes="auto"-testing purposes, as an <img src="5-second-ttfb.jpeg" /> or whatever. Because the [default object size](https://drafts.csswg.org/css-images/#default-object-size) of both a [loading image](https://drafts.csswg.org/css-images/#loading-image) and an ["img element that represents nothing and the user agent does not expect this to change"](https://html.spec.whatwg.org/#images-3) are both 0x0.
+
+I think so! But from my test it looks like at Chromium doesn't implement it correctly
+
+[03:19:13.0621] <zcorpan>
+> <@etportis:matrix.org> zcorpan: although according to the loading image definition, images in this state "may trigger fallback rendering". Is there anything in the "concrete object size ignoring natural dimensions" spec that forbids fallback rendering dimensions from being used?
+
+I don't follow. Both cases are replaced element 0x0 per spec?
+
+[04:15:22.0645] <annevk>
+Adam Rice: since Mattias Buelens seems to be out, do you have any thoughts on https://github.com/whatwg/streams/pull/1264? Otherwise I'm gonna approve splitting the test out for now so Youenn is unblocked
+
+[07:39:58.0741] <Eric Portis (he/him)>
+zcorpan: re: you not following, yes -- ignore me, I was confused. Even if the fallback representation is showing, that only adds an intrinsic size, it doesn't change the default or specified sizes.
+
+What does Chromium do? Is "your test" part of the WPTs?
+
+[07:55:50.0504] <zcorpan>
+Eric Portis (he/him): https://software.hixie.ch/utilities/js/live-dom-viewer/saved/11743
+
+[07:57:35.0315] <zcorpan>
+Eric Portis (he/him): since the second element gets full width, chromium treats it as a non-replaced element instead of a replaced element with 0x0 natural dimensions. Haven't written a wpt for this
+
+[12:33:18.0960] <ntim>
+Hi! Can someone please merge  https://github.com/whatwg/html/pull/9397 ?
+
+[12:41:42.0738] <jub0bs>
+Apologies freddy. Work got in the way. I'll shoot you an email as soon as I have more time.
+
+[12:41:54.0837] <jub0bs>
+ * Apologies, freddy. Work got in the way. I'll shoot you an email as soon as I have more time.
+
+[15:27:53.0789] <Jeffrey Yasskin>
+FYI, https://github.com/w3ctag/design-principles/pull/441 about how to monkeypatch well merged to https://w3ctag.github.io/design-principles/#cant-avoid-monkey-patching. I think it describes what this group wants from monkeypatches, but if I got anything wrong, feel free to comment on the PR, and I'll try to fix it. (or you can always send your own PR of course.)
+
+[15:39:59.0921] <Eric Portis (he/him)>
+annevk: Safari 17's `Accept` header when making image fetches seems to be: `image/webp,image/avif,image/jxl,image/heic,image/heic-sequence,video/*;q=0.8,image/png,image/svg+xml,image/*;q=0.8,*/*;q=0.5` (124 bytes). IIUC from https://github.com/whatwg/fetch/issues/862 and https://fetch.spec.whatwg.org/#cors-safelisted-request-header, the limit before a preflight is required is 128 bytes. Is that an impending problem, or (more likely) am I misunderstanding how CORS works?
+
+[15:43:14.0313] <Eric Portis (he/him)>
+zcorpan: Ah! I had only been testing with *no* src attribute, which behaves differently than an attribute with no value. Fun!
+
+[15:44:31.0472] <Eric Portis (he/him)>
+zcorpan: Anyways, I think I finally have my mental model straight on this. Hoping to write something up about it soon; I'll definitely ping you for review once I do.
+
+
+2023-06-08
+[03:46:41.0101] <annevk>
+Eric Portis (he/him): that does seem like a potential problem
+
+[03:51:26.0474] <Noam Rosenthal>
+annevk: Eric Portis (he/him)  We recently had the same problem with chtomium where tinkering with the Accept header triggered preflights. perhaps we can find a solution for this in the standard, like special-case the `Accept` header for the 128bytes limit?
+
+[04:37:13.0585] <annevk>
+I'd rather we just reduce the bloat somehow
+
+[14:28:32.0035] <Eric Portis (he/him)>
+annevk: Noam Rosenthal I have toyed with the idea of something like `Sec-CH-Accept-Codecs` when thinking about how UAs could add `codecs` or `profiles` parameters to media types when requesting videos. I ended up deciding this was a bad idea: videos are generally requested late so you can use the Media Capabilities API before making a request. But images are requested early, so maybe Client Hints could be a useful tool here.
+
+
+2023-06-09
+[22:25:54.0277] <Noam Rosenthal>
+> <@annevk:matrix.org> I'd rather we just reduce the bloat somehow
+
+I wish... Sounds like a big project in terms of compatibility 
+
+[22:27:18.0844] <Noam Rosenthal>
+Separate topic: is the event loop still alive when a document is bfcached? Seems like it is but making sure
+
+[22:27:28.0737] <Noam Rosenthal>
+Domenic: ^^
+
+[22:31:25.0888] <Domenic>
+> <@noamr:matrix.org> Separate topic: is the event loop still alive when a document is bfcached? Seems like it is but making sure
+
+Event loops are per-agent, not per-document. All tasks are tagged with a document though, and those coming from "not fully active" documents (including those in bfcache) will not run, while in bfcache.
+
+[03:30:56.0274] <Noam Rosenthal>
+annevk: perhaps the accept header can be a topic for TPAC?
+

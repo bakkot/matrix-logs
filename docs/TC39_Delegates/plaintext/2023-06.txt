@@ -62,3 +62,238 @@ while attractive I think that probably is in fact overkill
 [09:10:05.0350] <Michael Ficarra>
 I mean, I'm up for it if implementers are
 
+
+2023-06-02
+[01:00:25.0117] <eemeli>
+A `Math.sum` that does Kahan summation actually sounds exactly like the sort of thing I think we ought to add to JS. It's a bit tricky to get right, and it solves a problem that's not necessarily obvious for a developer to realise is a problem or that the solution even exists.
+
+[13:45:05.0442] <Justin Ridgewell>
+Related: https://github.com/swc-project/swc/pull/7478
+
+
+2023-06-03
+[08:53:25.0963] <Hemanth H.M>
+👏 which is the best way to set up an incubator call? 
+
+
+2023-06-05
+[22:53:26.0025] <bakkot>
+why do the dataview methods default to big-endian 
+
+[22:54:15.0558] <bakkot>
+who is running JS on big-endian systems and why did we decide they should get the simpler form
+
+[22:56:33.0893] <bakkot>
+sidebar: we should probably expose endianness as a constant somewhere
+
+[22:57:00.0461] <bakkot>
+it is kind of unfortunate that it's implementation-defined but since it is we at least ought to let you test for it without having to write a value and read it back
+
+[01:54:43.0510] <littledan>
+> <@bakkot:matrix.org> who is running JS on big-endian systems and why did we decide they should get the simpler form
+
+Internet protocols??
+
+[01:55:07.0755] <littledan>
+> <@bakkot:matrix.org> it is kind of unfortunate that it's implementation-defined but since it is we at least ought to let you test for it without having to write a value and read it back
+
+Sure but is there an actual (valid) use case for that?
+
+[08:10:06.0652] <bakkot>
+> <@littledan:matrix.org> Sure but is there an actual (valid) use case for that?
+
+if you're using DataView methods you need to be explicit about it 
+
+[08:10:41.0408] <bakkot>
+since they don't fall back to the platform default
+
+[08:11:39.0410] <bakkot>
+bare `float64Array[x] = y` does fall back to the platform default, so if you write a value using that syntax and then want to read it with a DataView you need to know which endianness to specify for the DataView methods
+
+[12:38:04.0217] <littledan>
+Sure but who is forcing you to use the DataView methods?
+
+[13:32:55.0251] <ljharb>
+lol is that a serious question? there's a reason dataview exists
+
+[13:50:53.0457] <littledan>
+Well, I don’t really see any particular logic to the system beyond, TypedArray is for when you want to use native endianness, and DataView is when you want explicit endianness
+
+[14:01:41.0481] <Kris Kowal>
+Unfortunately, DataView is not that orthogonal to other TypedArrays in its design. It’s also useful for heterogenous data like a serial protocol buffer, for which big-endian is indeed a great default, or an allocation arena for structs, where little-endian would be a great default.
+
+[14:06:45.0096] <littledan>
+Well, it’s unergonomic but can’t you superimpose different TypedArrays on top of the same arraybuffer to do that heterogeneous, native endian access?
+
+[14:07:02.0134] <littledan>
+If we enable more, it seems like ergonomics would be the motivation, right?
+
+[14:11:54.0436] <Kris Kowal>
+You also need to superimpose your Uint64Array at 8 initial offsets, and do some math to choose.
+
+[14:12:07.0413] <Kris Kowal>
+So, yes, ergonomics.
+
+[14:12:45.0097] <Kris Kowal>
+As opposed to contortion.
+
+[14:14:01.0614] <littledan>
+So, sure, I have nothing against an ergonomics-motivated way to get at the platform endianness, for the sake of passing into the DataView methods
+
+[14:14:17.0649] <littledan>
+*BigUint64Array
+
+[14:14:52.0318] <littledan>
+Also when you use that API please write a note to the poor implementers who did all the work and weren’t sure if it was useful
+
+
+2023-06-08
+[16:04:27.0350] <ljharb>
+it seems weird to me that there's no DataView methods for getUint8C and setUint8C - it's the only typed array type that doesn't have them
+
+[16:16:16.0796] <bakkot>
+`get` doesn't really make sense
+
+[16:16:25.0189] <bakkot>
+the special behavior is only when setting
+
+[16:48:00.0767] <Michael Ficarra>
+the setter seems pretty well motivated, especially since it's not all that easy to write the round-ties-to-even behaviour of ToUint8Clamped
+
+[16:48:59.0292] <Michael Ficarra>
+ * the setter seems pretty well motivated, especially since it's not all that easy to write the round-ties-to-even behaviour of ToUint8Clamp
+
+[16:49:22.0251] <Michael Ficarra>
+ * the setter seems pretty well motivated, especially since it's not all that easy to write the round-ties-to-even behaviour of ToUint8Clamp yourself
+
+
+2023-06-09
+[17:03:18.0020] <bakkot>
+ehhh... I feel like the dataview methods only tend to make sense when you have data of mixed types in a buffer, and I don't think that's very likely for Uint8ClampedArray data
+
+[17:04:02.0956] <bakkot>
+wouldn't be opposed though
+
+[22:06:56.0671] <ljharb>
+any reason not to have the get tho, for consistency?
+
+[22:07:00.0153] <ljharb>
+ * any reason not to have the get tho also, for consistency?
+
+[22:23:54.0267] <bakkot>
+I feel like it is misleading? or like... allows people who are confused to lean into their confusion instead of discovering it
+
+[22:24:16.0355] <bakkot>
+it is better to notice what you are doing and just use getUint8 if you actually want it
+
+[22:24:35.0384] <bakkot>
+if someone reaches for it and it's not there, and then they stop and think about why that is, that's good
+
+[23:14:51.0927] <leftmostcat>
+I think it's rare that toolboxes are complete enough that most devs will think, "Should I not be doing this?" if the tool is missing, so that intent would need to be well-documented.
+
+[05:50:03.0246] <littledan>
+I think Clamped is good to leave out; it is just some weird canvas legacy
+
+[08:37:54.0889] <ljharb>
+it’s there everywhere else tho
+
+[10:21:59.0153] <ljharb>
+ok well i made https://github.com/ljharb/proposal-dataview-get-set-uint8c and put it on the agenda, we can see what everyone thinks :-)
+
+[10:26:09.0057] <Michael Ficarra>
+the get method makes me pretty uncomfortable
+
+[10:27:46.0567] <ljharb>
+why?
+
+[10:34:35.0990] <Michael Ficarra>
+because it's no different than the regular Uint8 getter
+
+[10:34:51.0991] <Michael Ficarra>
+and someone will be confused by its existence
+
+[10:36:54.0512] <ljharb>
+seems like just part of the confusion of Uint8ClampedArray existing itself
+
+[10:38:58.0499] <bakkot>
+It is kind of weird that Uint8Clamped exists, but it at least does a coherent, non-duplicative thing
+
+[10:39:06.0208] <bakkot>
+ * It is kind of weird that Uint8ClampedArray exists, but it at least does a coherent, non-duplicative thing
+
+[10:39:10.0878] <bakkot>
+but getUint8Clamped would be duplicative
+
+[10:40:31.0187] <ljharb>
+`[0]` on a Uint8Array and Uint8ClampedArray is duplicative too, no?
+
+[10:41:24.0716] <ljharb>
+adding the set without the get is still improving consistency imo, but i really don't see the harm here of having it be duplicative.
+
+[10:43:51.0196] <bakkot>
+> `[0]` on a Uint8Array and Uint8ClampedArray is duplicative too, no?
+
+... no? I mean if you have a Uint8ClampedArray you do need to be able to read from it
+
+[10:46:08.0388] <ljharb>
+right but i mean that there's no difference in reading values from both of the uint8 arrays
+
+[10:47:00.0203] <bakkot>
+yes but you can't provide Uint8ClampedArray without the ability to read from it
+
+[10:47:13.0908] <bakkot>
+so it does not make sense to say that `[0]` is duplicative
+
+[10:47:41.0689] <bakkot>
+"ability to read from a Uint8Array" and "ability to read from a Uint8ClampedArray" are distinct operations even though they implement the same logic
+
+[10:48:05.0109] <bakkot>
+but "read a Uint8 from an ArrayBuffer" is not a distinct operation from "read a Uint8Clamped from an ArrayBuffer"
+
+[10:48:20.0735] <ljharb>
+fair
+
+[10:48:48.0733] <ljharb>
+the current state means i have to special-case my code that dynamically builds the dataview method name, because Uint8C isn't there
+
+[10:48:59.0298] <ljharb>
+so for me, having it missing is what's confusing
+
+[10:50:58.0213] <bakkot>
+I think that case is probably pretty niche
+
+[10:52:26.0304] <ljharb>
+sure, but i'd bet in a similar bucket of niche as using the dataview methods at all
+
+[11:49:44.0302] <rbuckton>
+> <@ljharb:matrix.org> sure, but i'd bet in a similar bucket of niche as using the dataview methods at all
+
+Just for `Uint8` or in general? `ar[0]` uses native endianness. `dataView.get*` and `dataView.set*` use big-endian/native byte order by default, and allows you to specify little-endian if needed, so they're pretty useful for decoding binary-format files without having to detect endianness and adjust
+
+[11:50:01.0970] <rbuckton>
+> <@ljharb:matrix.org> sure, but i'd bet in a similar bucket of niche as using the dataview methods at all
+
+ * Just for `Uint8` or in general? `ar[0]` uses native endianness. `dataView.get*` and `dataView.set*` use big-endian/native byte order by default, and allows you to specify little-endian if needed, so they're pretty useful for decoding binary-format files without having to detect endianness and adjust manually
+
+[11:50:05.0359] <ljharb>
+fair
+
+[11:50:16.0630] <ljharb>
+ * fair, altho i think that's not a common use case :-)
+
+[11:50:30.0653] <ljharb>
+not saying they're not useful, just not common
+
+[11:50:47.0826] <ljharb>
+the ability to specify endianness is why i'm using them
+
+[11:51:04.0186] <rbuckton>
+I would venture to guess folks using web sockets would disagree that it's not common.
+
+[12:07:41.0803] <Michael Ficarra>
+anybody processing any binary network protocols, really
+
+[12:38:06.0372] <rbuckton>
+Of course, then there's me, using `DataView` to parse a PE header to find the base address of a Windows executable (which are encoded in little-endian)...
+
