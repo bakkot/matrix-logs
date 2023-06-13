@@ -71,3 +71,41 @@ To be clear, I think this would amount to internal-only snapshot calls leading t
 [14:07:36.0488] <Mathieu Hofman>
 As I mentioned above, I think that whether a user API for snapshots is involved or not has no bearing on the problem. If a pending promise with reaction can be collected without the reactions being executed, that means task termination is intrinsically tied to GC. If these resolver-less promise cannot be collected, that means these tasks will leak / never terminate. If task termination is tied to GC, we would be opposed to a user exposed API specific to task termination, as we are invested in keeping gc observability to the existing WeakRef / FinalizationRegistry feature.
 
+[14:27:18.0808] <littledan>
+About the GC tie-in, I completely disagree. If task termination does necessarily tie into GC, then I agree with others that we should keep it far away from AsyncContext and not add it in TC39.
+
+> What is the expected behavior of termination in the case of pending promises (or captured snapshots) which are garbage collected, thus preventing any future execution in the context to occur through them. Do we expect the task to be considered terminated in that case (if they were the last related promise / snapshots) ?
+
+Remember that a Promise captures a snapshot when you .then it, not when the Promise is created. If that promise never resolves... well, then that task is left hanging and never terminates. Maybe there should be some kind of event to notify folks when that happens, but I don't think it's the normal termination event, or should ever be treated as similar to one.
+
+[14:27:56.0894] <littledan>
+Allocating a resolver-less promise doesn't make any particular task hang
+
+[14:28:20.0752] <littledan>
+ * About the GC tie-in, I completely disagree. If task termination does necessarily tie into GC, then I agree with you and others that we should keep it far away from AsyncContext and not add it in TC39.
+
+> What is the expected behavior of termination in the case of pending promises (or captured snapshots) which are garbage collected, thus preventing any future execution in the context to occur through them. Do we expect the task to be considered terminated in that case (if they were the last related promise / snapshots) ?
+
+Remember that a Promise captures a snapshot when you .then it, not when the Promise is created. If that promise never resolves... well, then that task is left hanging and never terminates. Maybe there should be some kind of event to notify folks when that happens, but I don't think it's the normal termination event, or should ever be treated as similar to one.
+
+[14:28:56.0091] <Mathieu Hofman>
+> About the GC tie-in, I completely disagree. If task termination does necessarily tie into GC, then I agree with others that we should keep it far away from AsyncContext and not add it in TC39.
+I guess we agree? I'm saying I don't want a TC39 API for AsyncContext task termination if it would ultimately allow to observe GC
+
+[14:28:58.0747] <littledan>
+I 100% agree about how we should limit GC observability
+
+[14:29:03.0866] <Mathieu Hofman>
+ * > About the GC tie-in, I completely disagree. If task termination does necessarily tie into GC, then I agree with others that we should keep it far away from AsyncContext and not add it in TC39.
+
+I guess we agree? I'm saying I don't want a TC39 API for AsyncContext task termination if it would ultimately allow to observe GC
+
+[14:29:04.0446] <littledan>
+yeah sounds like we agree
+
+[14:29:19.0369] <littledan>
+I'm just disagreeing that we should do anything in particular about GC'd promises
+
+[14:29:24.0621] <littledan>
+or that it'd make any kind of sense to
+
