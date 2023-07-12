@@ -1766,3 +1766,41 @@ just encouraged, not required
 [03:19:37.0644] <rbuckton>
 If we're not doing full context managers, then the goal of the proposed change would be to resolve a concern about "unused" disposables. That would be addressed by `Symbol.enter` without the need to introduce a `Symbol.asyncEnter`. `await using` would still verify/capture `[Symbol.asyncDispose]` as it does today, but would call `[Symbol.enter]()` synchronously without the need to introduce an extra `Await` at the declaration site. That would also avoid needing to rethink `AsyncDisposableStack.prototype.use` to handle the async case.
 
+[03:20:18.0955] <Ashley Claymore>
+for using `Symbol.enter` as a way for types to _enforce_ they are being assigned to `using`, could this also be done with `Symbol.dipose` setting a `userHasAcknoledgedLifetime` flag that either errors/warns if other methods are called without that flag set?
+
+[03:20:24.0521] <bakkot>
+> <@littledan:matrix.org> re: streaming: I think, in general, it's vaguely best practice that primitives that deals with data should have zero-copy and streaming APIs for doing stuff with them. To me, the main question is whether there are valid use cases for doing base64 on a fairly big thing that can't fit in memory/packets all together. I don't know of such use cases/environments.
+
+it's not just about whether it all fits in memory; for example, one might reasonably stream base64'd wasm bytecode into WebAssembly.compileStreaming. the advantage of streaming in this case is that you can start doing work before waiting for the whole download to finish. which is nice!
+
+[03:21:12.0270] <bakkot>
+similarly, if you're uploading base64'd data to a server, you might do binary data -> compression stream -> base64 stream -> `fetch`; it's nice to be able to start the network request as early as possible
+
+[03:21:43.0418] <Ashley Claymore>
+my gut feeling is also that `DisposeStack.p.return` is a simpler API to explain that the enter/exit symbols.
+
+[03:21:44.0173] <rbuckton>
+> <@aclaymore:matrix.org> for using `Symbol.enter` as a way for types to _enforce_ they are being assigned to `using`, could this also be done with `Symbol.dipose` setting a `userHasAcknoledgedLifetime` flag that either errors/warns if other methods are called without that flag set?
+
+Yes, a user-defined implementation could conceivably make `[Symbol.dispose]` a getter that indicates the method was at least read.
+
+[03:21:58.0224] <rbuckton>
+> <@aclaymore:matrix.org> my gut feeling is also that `DisposeStack.p.return` is a simpler API to explain that the enter/exit symbols.
+
+what is `return`?
+
+[03:22:03.0391] <Ashley Claymore>
+sorry, move
+
+[03:22:06.0860] <Ashley Claymore>
+ * sorry, `move`
+
+[03:22:13.0457] <Ashley Claymore>
+ * my gut feeling is also that `DisposeStack.p.move` is a simpler API to explain that the enter/exit symbols.
+
+[03:24:46.0181] <rbuckton>
+> <@bradfordcsmith:matrix.org> Regarding the GC cleanup issue: I thought Ron was suggesting that engines could be encouraged to clean up any disposables that they themselves created (not every possible disposable) if they go out of scope without "leaking" anywhere else from the scope where they were created.
+
+My intent was to state that as a remediation for an "unused" disposable, a host could leverage GC if necessary to ensure native handles don't leak, and that a user could use `FinalizationRegistry` to do the same. I worded it too strongly to expect that to always be the case, and that the outcome should be resource cleanup rather than a warning message like as what can happen for unhandled promise rejections. That wording was based on my prior experience with C#'s `IDisposable` and the C# team's recommendations to do likewise.
+
