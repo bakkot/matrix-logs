@@ -2059,3 +2059,150 @@ so it still feels like the code sample above should just work as written
 [05:20:03.0047] <ljharb>
 hm, can you `class extends AbstractModuleSource { }` if it's not constructable or callable?
 
+[05:20:13.0416] <shu>
+i don't understand the spec draft as written
+
+[05:20:14.0554] <littledan>
+if you use direct Wasm imports, then that Wasm module can import a memory from a different ESM module that explicitly constructs it.
+
+[05:20:16.0379] <bakkot>
+> <@bakkot:matrix.org> however, no real program relies on hoisting import declarations, because that's batshit
+
+(hoisting in the function declaration sense, that is)
+
+[05:20:19.0578] <nicolo-ribaudo>
+> <@ljharb:matrix.org> hm, can you `class extends AbstractModuleSource { }` if it's not constructable or callable?
+
+Yes but you cannot then call `super()`
+
+[05:20:39.0739] <shu>
+> (hoisting in the function declaration sense, that is)
+really? you don't write mutually recursive functions?
+
+[05:20:47.0656] <shu>
+ * > (hoisting in the function declaration sense, that is)
+
+really? you don't write mutually recursive functions?
+
+[05:21:00.0981] <ljharb>
+> <@nicolo-ribaudo:matrix.org> Yes but you cannot then call `super()`
+
+ok so there's no way for a subclass to get the internal slot in a self-hosted-in-JS implementation?
+
+[05:21:10.0502] <nicolo-ribaudo>
+> <@shuyuguo:matrix.org> > (hoisting in the function declaration sense, that is)
+> 
+> really? you don't write mutually recursive functions?
+
+Well, you don't write mutually recursive imports
+
+[05:21:21.0031] <shu>
+oh i misunderstood the point
+
+[05:21:34.0201] <shu>
+not that nobody relies on the hoisting function semantics, but the hoisting import semantics that are like the hoisting function semantics
+
+[05:21:36.0090] <littledan>
+It's pretty common to use function hoisting in a sillier way, like
+
+```js
+foo.onbar = fn;
+function fn() { }
+```
+
+In fact, fear of breaking this particular pattern is what's holding back function decorators
+
+[05:21:51.0062] <bakkot>
+> <@shuyuguo:matrix.org> not that nobody relies on the hoisting function semantics, but the hoisting import semantics that are like the hoisting function semantics
+
+right exactly
+
+[05:21:54.0218] <littledan>
+> <@shuyuguo:matrix.org> not that nobody relies on the hoisting function semantics, but the hoisting import semantics that are like the hoisting function semantics
+
+anyway yes this is how import statements work
+
+[05:22:21.0767] <bakkot>
+concretely, no one writes an `import` declaration at the bottom of a file and code which runs right away which uses a binding from the `import` at the top of the file
+
+[05:22:22.0907] <Michael Ficarra>
+nicolo-ribaudo: it shouldn't unconditionally throw, it should just throw if it's its own NewTarget
+
+[05:22:54.0128] <shu>
+i think the current spec draft is just wrong about the abstract constructor thing
+
+[05:22:59.0819] <Michael Ficarra>
+https://github.com/tc39/ecma262/pull/3094#discussion_r1230304753
+
+[05:23:01.0666] <nicolo-ribaudo>
+(I need to look at the proposal spec before answering to that)
+
+[05:23:02.0403] <shu>
+it's unconditionally throwing now but the comment suggests otherwise
+
+[05:23:16.0136] <littledan>
+> <@shuyuguo:matrix.org> it's unconditionally throwing now but the comment suggests otherwise
+
+This is resolved by the Wasm subclass behavior
+
+[05:23:28.0229] <shu>
+how can you resolve that in the subclass behavior
+
+[05:23:52.0796] <shu>
+what installs the brand?
+
+[05:23:58.0826] <littledan>
+the cyclic module record superclass throws; the wasm module subclass does another thing
+
+[05:24:11.0493] <littledan>
+it's installed when parsing the Wasm module, by construction
+
+[05:24:12.0201] <rbuckton>
+> <@littledan:matrix.org> It's pretty common to use function hoisting in a sillier way, like
+> 
+> ```js
+> foo.onbar = fn;
+> function fn() { }
+> ```
+> 
+> In fact, fear of breaking this particular pattern is what's holding back function decorators
+
+sillier? This is a common practice in the TS codebase, i.e.:
+```ts
+function createFoo() {
+  const quxx = ...;
+
+  return {
+    bar,
+    baz,
+  };
+
+  function bar() { ... }
+  function baz() { ... }
+}
+```
+
+[05:24:23.0473] <littledan>
+> <@rbuckton:matrix.org> sillier? This is a common practice in the TS codebase, i.e.:
+> ```ts
+> function createFoo() {
+>   const quxx = ...;
+> 
+>   return {
+>     bar,
+>     baz,
+>   };
+> 
+>   function bar() { ... }
+>   function baz() { ... }
+> }
+> ```
+
+sorry I shouldn't've included a value judgement
+
+[05:24:25.0924] <shu>
+littledan: i don't understand. happy to see spec text though
+
+[05:24:54.0723] <littledan>
+shu: https://webassembly.github.io/esm-integration/js-api/index.html#get-module-source
+
