@@ -1021,3 +1021,34 @@ ideally i would like to be able to store a 64 bit int in a variable and do maths
 [14:24:42.0529] <Richard Gibson>
 yes, that is possible with BigInt
 
+[14:58:13.0724] <Richard Gibson>
+for example:
+```
+// Make an array-like view over a byte buffer containing the data for
+// 3 big-endian uint64s with the first two set to 2**63 - 1.
+const uint8View = new Uint8Array([
+  127, ...Array(7).fill(255),
+  127, ...Array(7).fill(255),
+  ...Array(8),
+]);
+const dataView = new DataView(uint8View.buffer);
+const uint64View = {
+  get: i => dataView.getBigUint64(i * 8),
+  set: (i, n) => dataView.setBigUint64(i * 8, n),
+};
+
+// Read the first two values and set the third to their sum.
+const a = uint64View.get(0);
+const b = uint64View.get(1);
+assert(a === 2n ** 63n - 1n, "a");
+assert(b === 2n ** 63n - 1n, "b");
+const c = a + b;
+uint64View.set(2, c);
+
+// Verify the results from both perspectives.
+assert(uint64View.get(2) == 2n ** 64n - 2n, "c");
+assert.deepEqual(uint8View.slice(0, 8), [127, ...Array(7).fill(255)], "a bytes");
+assert.deepEqual(uint8View.slice(8, 16), [127, ...Array(7).fill(255)], "b bytes");
+assert.deepEqual(uint8View.slice(16, 24), [...Array(7).fill(255), 254], "c bytes");
+```
+
