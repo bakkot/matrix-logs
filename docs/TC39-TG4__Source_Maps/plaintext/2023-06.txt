@@ -1,0 +1,468 @@
+2023-06-01
+[04:25:44.0946] <Jack Works>
+Source code:
+
+```js
+import { x } from 'y'
+x
+debugger
+```
+
+Result code:
+
+```js
+const __webpack_harmony_import_y = () => { ... }
+__webpack_harmony_import_y().x
+debugger
+```
+
+Is it possible for the source map spec we have today to create a sourcemap that, when I type `x`, the debugger translate it back to `__webpack_harmony_import_y().x` and gives me the correct result?
+
+[04:26:53.0595] <Jack Works>
+I'm investigating if https://github.com/webpack/webpack/issues/3957 is possible to solve. I looked at the `names` field, but seems isn't help much
+
+[06:05:23.0324] <littledan>
+> <@jackworks:matrix.org> Source code:
+> 
+> ```js
+> import { x } from 'y'
+> x
+> debugger
+> ```
+> 
+> Result code:
+> 
+> ```js
+> const __webpack_harmony_import_y = () => { ... }
+> __webpack_harmony_import_y().x
+> debugger
+> ```
+> 
+> Is it possible for the source map spec we have today to create a sourcemap that, when I type `x`, the debugger translate it back to `__webpack_harmony_import_y().x` and gives me the correct result?
+
+Yes, we have identified mapping variable names as a shared goal of this group, and it is great to work on that already in issues like the one you linked, and in this chat.
+
+[06:05:50.0470] <littledan>
+Or also the names of properties
+
+[06:06:13.0169] <littledan>
+Maybe this is actually a third kind of mapping? Anyway I see it as in scope if this is a common/important transformation 
+
+[06:06:49.0442] <littledan>
+However, in our calls, new features for improving name mapping will be prioritized after nailing down the details of the current source map specification and capabilities.
+
+[10:58:45.0351] <Devin Rousso>
+IMO this is one of the reasons i dont think Source Maps are super viable long term (at least as they are)
+
+[10:59:26.0999] <Devin Rousso>
+we've come a _looooong_ way from "i just merged a bunch of files and want to unmerge them, so please tell me how to translate a location in the unified source to a location in the separated source"
+
+[11:00:38.0884] <Devin Rousso>
+i think if we really want something futureproof (or at least much longer term) we need to have a way to include the some understanding of the context (i.e. "am i in a statement or expression?", "has this been inlined?", etc.) alongside the location
+
+[11:02:26.0347] <Devin Rousso>
+but even then there's probably a _lot_ of scenarios where even that info wouldn't be enough to allow the developer to have some semblance of reconstruction
+
+[11:04:12.0279] <Devin Rousso>
+ * for example, if this
+
+```
+class Foo {
+	#bar = [ 42 ];
+
+	takeBar() {
+		let bar = this.#bar;
+		this.#bar = null;
+		return bar;
+	}
+}
+
+let foo = new Foo;
+let bar = foo.takeBar();
+console.log(bar);
+```
+
+gets simplified into something like this
+
+```
+console.log((new Foo).bar())
+```
+
+then i dont think there's anything sort of mapping/encoding/translation/etc. for `bar` that we could encode into the Source Map that would actually work 😕
+
+[11:04:21.0540] <Devin Rousso>
+for example, if this
+
+```
+class Foo {
+	#bar = [ 42 ];
+
+	takeBar() {
+		let bar = this.#bar;
+		this.#bar = null;
+		return bar;
+	}
+}
+
+let foo = new Foo;
+let bar = foo.takeBar();
+console.log(bar);
+```
+
+gets simplified into something like this
+
+```
+console.log((new Foo).bar())
+```
+
+then i dont think there's anything sort of mapping/encoding/translation/etc. for `bar` that we could encode into the Source Map that would actually work 😕
+
+[11:13:35.0459] <Jack Works>
+in that case, maybe we can encode that there _was_ a variable called _foo_ but it's no longer available in the dev tools due to inline and give understandable error?
+
+[11:14:42.0368] <Devin Rousso>
+yeah that's a possibility
+
+[11:14:47.0386] <Jack Works>
+yes and I agree. the location way isn't suitable for today, which we have super complicated transformation and bundling. we even have foreign programming languages translated to JavaScript 
+
+[11:14:51.0649] <Devin Rousso>
+but even that might not be the easiest thing to actually explain because of variable shadowing and whatnot 😕
+
+[11:16:47.0451] <Devin Rousso>
+tho we might be able to inject a variable with the same name that's an error object in that case?  🤔  but that's really funky
+
+[11:31:56.0605] <Jack Works>
+An example of what I said above is:
+```js
+const someA = expr
+setTimeout(() => {
+    const someB = expr2
+    debugger
+})
+```
+ 
+that compressed to
+```js
+const e = expr
+setTimeout(() => {
+    const e = expr2
+    debugger 
+})
+```
+
+1. map e#0 to line 0 col 6, map e#1 to line 2 col 10
+2. map "someA" to e#0 in the outer and inner scope, map "someB" to e#1 in only inner scope
+3. when dev tools evaluate "someA" it first finds e#0, then finds the variable it's referencing. (I don't know if the debugger protocol can do this today but it's possible anyway)
+
+[11:35:08.0934] <Jack Works>
+* removed. need more consideration 
+
+[11:35:19.0427] <littledan>
+Even if there are fundamental limitations of source maps, doesn’t it make sense to attempt to make some improvements locally on what we have right now, given their wide deployment?
+
+[11:35:40.0003] <Devin Rousso>
+oh yeah definitely im not suggesting we abandon them
+
+[11:35:54.0383] <littledan>
+Also, couldn’t we squeeze whatever new thing into some other json property?
+
+[11:36:01.0628] <Devin Rousso>
+just that i think trying to chase some of the more complex things is perhaps not the best approach
+
+[11:37:31.0955] <littledan>
+Yeah I think it is good to think about these possible futures while still focusing on nailing down the basics first
+
+[11:37:58.0106] <littledan>
+And to understand the design space 
+
+[11:39:21.0049] <littledan>
+> <@dcrousso:matrix.org> i think if we really want something futureproof (or at least much longer term) we need to have a way to include the some understanding of the context (i.e. "am i in a statement or expression?", "has this been inlined?", etc.) alongside the location
+
+Ultimately, maybe the reparsing approach we heard about in past calls isn’t the worst for this kind of problem…
+
+[11:40:05.0849] <Jack Works>
+my thought is, we have 10 even 100 years in the future we need source map, we should really do the correct thing even if that means there will be some compatibility issue or even a redesign.
+ipv6, http2 they're both good examples of this.
+
+[11:40:43.0198] <Jack Works>
+* my thought is, we have 10 even 100 years in the future we need source map, we should really do the correct thing even if that means there will be some compatibility issue or even a redesign.
+compatibility issue will gone, but a insufficient design won't 
+ipv6, http2 they're both good examples of this.
+
+[11:42:33.0719] <littledan>
+I don’t know if there is a “correct” for all of these things, but yeah, if we introduce a variable mapping feature, we should try to make it reliable rather than best-effort, if that is what you mean.
+
+[11:48:32.0099] <Jack Works>
+if the current way (location only mapping) can work with modern needs, that's good.
+but if we eventually found we're adding too much deferents and epicycles, I hope we can drop it and build a new thing
+
+[11:52:21.0963] <Jack Works>
+I also support a binary format, like http to http2. source map don't need (and it's not) human readable. I'm not saying we must build a new binary format for this, a JSON-like binary format (like CBOR) is good enough.
+
+[12:01:21.0111] <littledan>
+Sorry, what do you mean by deferents and epicycles?
+
+[12:01:53.0463] <littledan>
+> <@jackworks:matrix.org> I also support a binary format, like http to http2. source map don't need (and it's not) human readable. I'm not saying we must build a new binary format for this, a JSON-like binary format (like CBOR) is good enough.
+
+What do you think the advantage of such a different format would be? Efficiency?
+
+[12:02:57.0106] <Jack Works>
+size? speed? VLQ can be binary instead of Base64?
+
+[12:10:26.0570] <littledan>
+Yeah, I like the idea of a superficial mapping to CBOR with the same data model (to reduce cost of adoption), and then comparing this with benchmarks (of size and/or speed) to see if it would help. Once we know the potential benefit, we can weigh whether that’s worth the upgrade cost
+
+
+2023-06-02
+[12:19:58.0881] <swatinem>
+just throwing this out there as you are discussing binary encoding…
+for resolving stack traces, one of the priorities is random access and quick binary searching. a highly compressed format like vlq is good if you optimize for file size, but you gotta parse the whole thing at once to be able to look up a single position in it
+
+[12:21:39.0655] <swatinem>
+at Sentry we created the `SourceMapCache` which serves that purpose. it can be loaded in `O(1)` time, and you can binary search one mapping in it directly. it is however not optimized for file size, quite the opposite, it might be larger than the original sourcemap, though I haven’t done real comparisons there
+
+[12:24:41.0387] <Justin Ridgewell>
+Depending on the output file, we could include a side-table that records the cumulative data for the start of each line
+
+[12:25:59.0009] <Justin Ridgewell>
+Though that wouldn’t help for output files with excessively long lines, it would allow you to scan for `;` in the VLQ and only decode the appropriate line
+
+[12:27:22.0372] <Justin Ridgewell>
+(I wish minifiers used new lines and relied on ASI instead out using semicolons and continuing the same line)
+
+[12:27:36.0088] <Justin Ridgewell>
+* (I wish minifiers used new lines and relied on ASI instead of using semicolons and continuing the same line)
+
+
+2023-06-05
+[01:53:07.0489] <littledan>
+On Wednesday, the Igalia Web Engines hackfest will have a breakout session on “standards and developer experience”, which includes discussion of source maps. All are welcome to join online (this is a hybrid format). See time and call-in link at https://github.com/Igalia/webengineshackfest/issues/21
+
+
+2023-06-06
+[00:48:33.0439] <Jaroslav Sevcik>
+> <@jackworks:matrix.org> if the current way (location only mapping) can work with modern needs, that's good.
+> but if we eventually found we're adding too much deferents and epicycles, I hope we can drop it and build a new thing
+
+I believe you always need source mappings. Both DWARF and PDB debug info formats contain similar info to mappings. As for binary/text - the difference in sizes is small if you compress the payload. A naively designed binary format can actually be less compressible than a source map. In fact, the encoding of positions in source maps is quite efficient compared to DWARF (mostly because of poor design for encoding columns in DWARF).
+
+If you are talking about names specifically, there is a DWARF inspired proposal to encode the names and scopes - https://github.com/source-map/source-map-rfc/blob/main/proposals/env.md. That encoding allows expressions for Bindings - this should allow encoding the imported name bindings (but is less expressive and harder to work with  than DWARF).
+
+[01:11:32.0055] <littledan>
+Jaroslav Sevcik: It sounds like you did some pretty significant research on this topic; maybe you could share your results in some more detail, either async or in an upcoming call?
+
+[06:58:43.0448] <Jaroslav Sevcik>
+> <@littledan:matrix.org> Jaroslav Sevcik: It sounds like you did some pretty significant research on this topic; maybe you could share your results in some more detail, either async or in an upcoming call?
+
+Sure, I am happy to talk about the DWARF/source-map line table size experiments I have done. It would be also good to hear from 
+swatinem 
+As for the scopes/names proposal, this is the one that Holger builds upon in https://github.com/source-map/source-map-rfc/issues/37.
+
+
+
+[07:02:36.0266] <Jaroslav Sevcik>
+(Sent too early) It would be good to hear from swatinem about their requirements on fast lookup. Since Chrome DevTools alway downloads the entire source map anyway, building a lookup index is a relatively small overhead.
+
+
+2023-06-07
+[15:52:12.0289] <justingrant>
+FYI: source maps user perf complaint https://twitter.com/marvinhagemeist/status/1666480071933145090?s=46&t=QSggAfTZ89VDmJRcZoeQ0A
+
+
+2023-06-08
+[00:09:15.0303] <littledan>
+Yeah I'm having second thoughts on declaring size/perf "for later". Maybe we should consider that a fourth line of research.
+
+[00:11:47.0347] <littledan>
+but, there's an effort on Error.stack in TC39 (which seems stalled)... if we want to work on that in this group, we should recruit the participation of those working on that project.
+
+[00:12:08.0765] <littledan>
+I think defining Error.stack is an important project but I don't think we'll be capable of fixing everything at once
+
+[00:13:34.0350] <littledan>
+Maybe we should just try to work with that existing project in TG1? We could set up a chat room and everything. I'm sure they would like help.
+
+[00:14:49.0420] <littledan>
+(also maybe we should invite Marvin in particular to hang out with us in these places)
+
+[00:41:14.0441] <justingrant>
+One thing that might be helpful (if not already done) could be to list the use cases or capabilities that we want to prioritize. 
+
+For example, here's a few that I know about:
+* Show a call stack with original function names and file/row/col
+* Allow debuggers to set breakpoints in original (pre-traspiled/un-minified) sources
+* Allow debuggers to inspect local variables using original names.
+* Address package maintainer concerns that are leading them to turn off sourcemaps.
+* Make it easier for maintainers to create sourcemaps that are valid.
+
+And so on. Does this list exist already? If not then I could help build one if folks are interested.
+
+It may be helpful to have a list of things that users want to do, to prioritize tossed things, to understand what's blocking then from doing those things today, and then to figure out what needs to change to unblock the top priorities.
+
+Also not saying that TG4 can solve it all, only that it might be helpful to have a high level understanding for what the ecosystem overall needs to do, and then we can figure out how we can best help achieve those goals and how we can recruit others to do their parts.
+
+The alternative I guess is just to focus on the file format as the necessary first step for everything else, but I'd worry a bit that we may not know yet what are the format changes needed to unblock the most important use cases.
+
+[00:41:51.0265] <littledan>
+Yeah this list sounds great to start in an issue
+
+[00:42:58.0239] <littledan>
+tbh I'm pretty confident that "consolidating a strong definition for the web reality of source maps" will be a useful step no matter what comes next; I think this mostly has implications for the other projects, e.g., about improving mappings for names.
+
+[03:04:34.0079] <Kamil Ogórek>
+In case anyone wants to play around with different behaviors, I prepared a playground with the most widely used tools in the JS ecosystem that can be used to do so - https://github.com/kamilogorek/sourcemaps-playground
+
+[03:05:23.0399] <Kamil Ogórek>
+It's interesting to see that _all_ tools produce different code. All of them.
+
+```js
+➜  ~/Projects/sourcemaps/playground git:(master) ✗ cat dist/webpack.bundle.js
+(()=>{"use strict";(function(n,o){!function(n,o){n(o)}(n,"boop")})((function(n){throw new Error(n)}))})();
+//# sourceMappingURL=webpack.bundle.js.map
+➜  ~/Projects/sourcemaps/playground git:(master) ✗ cat dist/rollup.bundle.js
+!function(){"use strict";var n;n=function(n){throw new Error(n)},function(n,o){!function(n,o){n(o)}(n,o)}(n,"boop")}();
+//# sourceMappingURL=rollup.bundle.js.map
+➜  ~/Projects/sourcemaps/playground git:(master) ✗ cat dist/vite.bundle.js
+(function(){"use strict";function t(n,o){n(o)}function c(n,o){t(n,o)}function f(n,o){c(n,o)}f(function(o){throw new Error(o)},"boop")})();
+//# sourceMappingURL=vite.bundle.js.map
+➜  ~/Projects/sourcemaps/playground git:(master) ✗ cat dist/esbuild.bundle.js
+(()=>{function t(r,o){r(o)}function n(r,o){t(r,o)}function f(r,o){n(r,o)}f(function(o){throw new Error(o)},"boop");})();
+//# sourceMappingURL=esbuild.bundle.js.map
+➜  ~/Projects/sourcemaps/playground git:(master) ✗ cat dist/rspack.bundle.js
+!function(){var e={62:function(e,r,t){"use strict";function n(e,r){e(r)}Object.defineProperty(r,"__esModule",{value:!0}),Object.defineProperty(r,"bar",{enumerable:!0,get:function(){return n}})},447:function(e,r,t){"use strict";Object.defineProperty(r,"__esModule",{value:!0}),Object.defineProperty(r,"foo",{enumerable:!0,get:function(){return o}});var n=t("62");function o(e,r){(0,n.bar)(e,r)}},151:function(e,r,t){"use strict";Object.defineProperty(r,"__esModule",{value:!0});var n,o,u=t("447");n=function(e){throw Error(e)},o="boop",(0,u.foo)(n,o)}},r={};!function t(n){var o=r[n];if(void 0!==o)return o.exports;var u=r[n]={exports:{}};return e[n](u,u.exports,t),u.exports}("151")}();
+//# sourceMappingURL=rspack.bundle.js.map
+➜  ~/Projects/sourcemaps/playground git:(master) ✗ cat dist/parcel.index.js
+(function(o){throw Error(o)})("boop");
+//# sourceMappingURL=parcel.index.js.map
+```
+
+[03:37:17.0846] <Kamil Ogórek>
+I also posted about few obvious differences, found just with this initial base test here -https://twitter.com/kamilogorek/status/1666754385660235781
+
+[03:37:25.0898] <Kamil Ogórek>
+ * I also posted about few obvious differences, found just with this initial base test here - https://twitter.com/kamilogorek/status/1666754385660235781
+
+
+2023-06-13
+[03:31:05.0994] <littledan>
+> <@kamilogorek:matrix.org> In case anyone wants to play around with different behaviors, I prepared a playground with the most widely used tools in the JS ecosystem that can be used to do so - https://github.com/kamilogorek/sourcemaps-playground
+
+Wow, this is really interesting. Maybe we could continue conversation about it in an issue on the rfc repo?
+
+[07:10:16.0280] <Kamil Ogórek>
+> <@littledan:matrix.org> Wow, this is really interesting. Maybe we could continue conversation about it in an issue on the rfc repo?
+
+Sounds good to me!
+
+
+2023-06-14
+[12:58:53.0002] <littledan>
+Are folks OK if the naming call is on Thursdays, rather than Wednesdays, alternating two weeks away from the main source maps call, at noon NY time? This would avoid a conflict with a different meeting (the TC39 Tools meeting, which many of you may also be interested in)
+
+[13:10:16.0116] <Justin Ridgewell>
+That would conflict with another meeting for me (though I'm not super important for the naming discussion)
+
+[13:10:28.0580] <Justin Ridgewell>
+Could we do offset 1-week instead of 2?
+
+[13:10:58.0807] <littledan>
+> <@jridgewell:matrix.org> Could we do offset 1-week instead of 2?
+
+I was thinking about this but that makes a weirdly uneven cadence (two meetings in two weeks and then a three-week gap)
+
+[13:11:02.0135] <Justin Ridgewell>
+Ie, starting June 21 or July 5
+
+[13:11:04.0448] <littledan>
+is that uneven cadence better?
+
+[13:11:23.0460] <littledan>
+also it sounded like John Lenz was unable to attend this meeting time, with a regular conflict, so I thought changing it up might avoid that for some people
+
+[13:11:32.0459] <Justin Ridgewell>
+It's 2 on, 2 off, right?
+
+[13:11:48.0945] <littledan>
+yes that's what it'd be if we did the 1-week offset
+
+
+2023-06-18
+[15:50:13.0407] <Artem Kobzar>
+About the issue (https://github.com/source-map/source-map-rfc/issues/15). Do we already have some repository for the tests? 
+
+
+2023-06-19
+[06:25:27.0384] <Kamil Ogórek>
+> <@artem.kobzar:matrix.org> About the issue (https://github.com/source-map/source-map-rfc/issues/15). Do we already have some repository for the tests?
+
+I don't believe there is any
+
+[06:30:47.0096] <Artem Kobzar>
+Also, what do we want to have related to the source-map tests story before the next meeting? 
+
+[09:01:39.0522] <littledan>
+If you can write a test plan, that would be great
+
+[09:01:48.0833] <littledan>
+How about I create a different repo in the same org?
+
+[09:10:41.0828] <Artem Kobzar>
+It will be great, thank you 🙏
+
+[11:53:29.0071] <littledan>
+To answer the deleted question: the tools call is separate from source maps
+
+[11:53:42.0364] <littledan>
+Romulo is organizing that and can let people know of the agenda 
+
+
+2023-06-20
+[14:32:58.0054] <littledan>
+Artem Kobzar: Kamil Ogórek You can work on source map tests here: https://github.com/source-map/source-map-tests
+
+[14:33:14.0523] <littledan>
+Let me know if anyone wants write access; I think it's fine to use this as scratch space at first
+
+[14:34:06.0475] <littledan>
+separately: Does anyone want to volunteer to give the TC39 presentation to officially charter TG4? It turns out it wasn't chartered last meeting because I didn't present a scope or program of work, so the presentation would be about that
+
+[14:34:37.0746] <littledan>
+I'm happy to review/mentor anyone for this presentation (or, as backup, do it myself, but I think this would be a good opportunity for someone else to get involved)
+
+[14:35:10.0313] <littledan>
+in general: everyone here who is registered as an invited expert is welcome to attend TC39 in person in Norway in a few weeks, or online (and you can present from either place)
+
+[14:35:24.0445] <littledan>
+and if you're not yet registered as an invited expert and wish to be, please let me know
+
+[14:36:32.0428] <littledan>
+> <@littledan:matrix.org> separately: Does anyone want to volunteer to give the TC39 presentation to officially charter TG4? It turns out it wasn't chartered last meeting because I didn't present a scope or program of work, so the presentation would be about that
+
+You can edit this: https://docs.google.com/presentation/d/11Cv2XnTZfd9yBCq1WctKzSwc9Q2ZJkhklOVTbNyUyxU/edit#slide=id.p
+
+
+2023-06-21
+[04:30:33.0735] <Artem Kobzar>
+What are the requirements to be registered? I would like to attend.
+
+[04:31:12.0690] <Artem Kobzar>
+ * What are the registration requirements? I would like to take part.
+
+[06:10:45.0721] <littledan>
+I will nominate you. The requirements are interest in participating in TG4 and your employer signing the intellectual property licensing form
+
+
+2023-06-27
+[15:23:13.0324] <Chris de Almeida>
+we should get this on the agenda asap, even if placeholder for the presenter.  we also need to include the appointment/consensus for the convenor(s)/chair(s) of TG4
+
+[15:24:12.0610] <Chris de Almeida>
+suggest adding this under the TG3 item in the agenda.  how long do you think is needed for the presentation portion?
+
+
+2023-06-28
+[09:26:36.0708] <Chris de Almeida>
+https://github.com/tc39/agendas/pull/1406
+
