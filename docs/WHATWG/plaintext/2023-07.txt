@@ -1360,3 +1360,99 @@ notice the URL, https://ab457e4a-7a76-49c5-ad28-d5b08e7bfbdc.mdnplay.dev/en-US/d
 
 It’s a dynamically-generated subdomain. And if you want to try replicating the hosting for that, it requires some relatively complex DNS setup.
 
+[20:10:08.0253] <sideshowbarker>
+But if instead you just don’t use `allow-same-origin` in the `sandbox` value of the iframe, then you can just use the same origin, and you don’t need to do any complex DNS setup.
+
+The tradeoff is that anything you run from that iframe that requires an origin check won’t work in the “Playground” environment.
+
+So for users, that would mean that for any of those articles that have code snippets with features that `allow-same-origin` to work as expected, the users won’t be able to have the convenience of using the Playground to test changing the code from the snippets and to see the effects.
+
+[20:10:23.0017] <sideshowbarker>
+ * incidentally, the specific context is the behavior of the “Playground” in MDN — which is a feature where you can directly edit MDN-article code snippets directly in the browser, and see the results immediately.
+
+So if you go for example to https://webdocs.dev/en-us/docs/web/api/document/cookie#example\_1\_simple\_usage and click the Play link, it opens a new tab to https://webdocs.dev/en-us/play with the content of the snippets from that MDN article. And if you inspect the source for the iframe in the right-hand side there, you’ll see this:
+
+```html
+<iframe title="runner" src="https://ab457e4a-7a76-49c5-ad28-d5b08e7bfbdc.mdnplay.dev/en-US/docs/Web/CSS/minmax/runner.html" sandbox="allow-scripts allow-same-origin"></iframe>
+```
+
+notice the URL, https://ab457e4a-7a76-49c5-ad28-d5b08e7bfbdc.mdnplay.dev/en-US/docs/Web/CSS/minmax/runner.html
+
+It’s a dynamically-generated subdomain. And if you want to try replicating the hosting for that, it requires some relatively complex DNS setup.
+
+[20:12:02.0220] <sideshowbarker>
+ * But if instead you just don’t use `allow-same-origin` in the `sandbox` value of the iframe, then you can just use the same origin, and you don’t need to do any complex DNS setup.
+
+The tradeoff is that anything you run from that iframe that requires an origin check won’t work in the “Playground” environment.
+
+So for users, that would mean that for any of those articles that have code snippets with features which require `allow-same-origin` to work as expected, the users won’t be able to have the convenience of using the Playground to test changing the code from the snippets and to see the effects.
+
+[20:25:44.0451] <sideshowbarker>
+ * incidentally, the specific context is the behavior of the “Playground” in MDN — which is a feature where you can directly edit MDN-article code snippets directly in the browser, and see the results immediately.
+
+So if you go for example to https://webdocs.dev/en-us/docs/web/api/document/cookie#example\_1\_simple\_usage and click the Play link, it opens a new tab to https://webdocs.dev/en-us/play with the content of the snippets from that MDN article. And if you inspect the source for the iframe in the right-hand side there, you’ll see this:
+
+```html
+<iframe title="runner" sandbox="allow-scripts allow-same-origin"
+  src="https://ab457e4a-7a76-49c5-ad28-d5b08e7bfbdc.mdnplay.dev/en-US/docs/Web/CSS/minmax/runner.html" ></iframe>
+```
+
+notice the URL, https://ab457e4a-7a76-49c5-ad28-d5b08e7bfbdc.mdnplay.dev/en-US/docs/Web/CSS/minmax/runner.html
+
+It’s a dynamically-generated subdomain. And if you want to try replicating the hosting for that, it requires some relatively complex DNS setup.
+
+[20:26:14.0918] <sideshowbarker>
+ * But if instead you just don’t use `allow-same-origin` in the `sandbox` value of the iframe, then you can just host the iframe from the same origin, and you don’t need to do any complex DNS setup.
+
+The tradeoff is that anything you run from that iframe that requires an origin check won’t work in the “Playground” environment.
+
+So for users, that would mean that for any of those articles that have code snippets with features which require `allow-same-origin` to work as expected, the users won’t be able to have the convenience of using the Playground to test changing the code from the snippets and to see the effects.
+
+[21:43:45.0591] <Domenic>
+Yeah, but if you allow same-origin access, then playground scripts can steal cookies and such. Not sure what MDN's security model is for the playground but it's generally best practice not to let arbitrary script run in such un-sandboxed iframes. (allow-same-origin undoes most of what we think of as sandboxing.)
+
+[22:04:42.0082] <sideshowbarker>
+> <@domenicdenicola:matrix.org> Yeah, but if you allow same-origin access, then playground scripts can steal cookies and such. Not sure what MDN's security model is for the playground but it's generally best practice not to let arbitrary script run in such un-sandboxed iframes. (allow-same-origin undoes most of what we think of as sandboxing.)
+
+OK thanks — that makes me even more convinced that it’d be much better not use `allow-same-origin` on those iframes. Given that the goal is to give developers authoritative guidance on how to use web-platform features, deploying the article code content in a way that conflicts with best practices is not a great way to model things for developers.
+
+[22:14:58.0272] <sideshowbarker>
+Domenic: I now wonder if we should a (non-normative) Note to the spec:
+> Using the `allow-same-origin` keyword undoes most of what we think of as sandboxing. In particular, it’s generally best practice not to let arbitrary scripts run in iframes that have effectively been un-sandboxed due to the `allow-same-origin` keyword being specified.
+
+[22:15:06.0215] <sideshowbarker>
+ * Domenic: I now wonder if we should a (non-normative) Note to the spec:
+
+> _Using the `allow-same-origin` keyword undoes most of what we think of as sandboxing. In particular, it’s generally best practice not to let arbitrary scripts run in iframes that have effectively been un-sandboxed due to the `allow-same-origin` keyword being specified._
+
+[22:16:05.0811] <sideshowbarker>
+ * Domenic: I now wonder if we should a (non-normative) Note to the spec:
+
+> _Using the `allow-same-origin` keyword undoes most of what we think of as sandboxing. In particular, it’s generally best practice not to let arbitrary script run in iframes that have effectively been un-sandboxed due to the `allow-same-origin` keyword being specified._
+
+[22:16:34.0964] <Domenic>
+Sorry, I think there are a lot of double-negatives that are confusing things...
+
+[22:16:56.0237] <Domenic>
+> `sandbox="allow-same-origin"`: this is insecure. This allows cookie-stealing.
+
+> `sandbox=""`: this is more secure. This prevents bad things.
+
+[22:19:43.0295] <sideshowbarker>
+OK that I understand — but I guess my (re)wording doesn’t convey that clearly
+
+[22:21:36.0343] <sideshowbarker>
+the iframes in this case would still be deployed with `sandbox="allow-scripts` — just not with `sandbox="allow-scripts allow-same-origin"` (as MDN is currently doing, and which is insecure)
+
+[22:21:49.0577] <sideshowbarker>
+ * the iframes in this case would still be deployed with `sandbox="allow-scripts`" — just not with `sandbox="allow-scripts allow-same-origin"` (as MDN is currently doing, and which is insecure)
+
+[22:22:15.0369] <sideshowbarker>
+ * the iframes in this case would still be deployed with `sandbox="allow-scripts"` — just not with `sandbox="allow-scripts allow-same-origin"` (as MDN is currently doing, and which is insecure)
+
+[22:34:53.0715] <Domenic>
+I guess MDN's setup is "insecure" in that code running on `https://ab457e4a-7a76-49c5-ad28-d5b08e7bfbdc.mdnplay.dev/` can mess with other code running on that domain. But presumably the idea is that only one piece of code ever runs on that domain? So it's probably secure enough.
+
+[22:39:22.0057] <sideshowbarker>
+Yeah, all the content at those URLs is ephemeral. If you navigate directly to https://ab457e4a-7a76-49c5-ad28-d5b08e7bfbdc.mdnplay.dev/, you’ll see there’s no `body` content there at all, and if you navigate directly to the https://webdocs.dev/en-us/play parent, it’s not populated with anything. It only gets populated when you open a Play link from any particular MDN article.
+
