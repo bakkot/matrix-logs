@@ -32,6 +32,22 @@
   <tr class="msg" id="L3"><td class="ts-cell"><a class="ts" href="#L3" alt="Tue Aug 22 2023 20:54:04 GMT-0700 (Pacific Daylight Time)">03:54</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@littledan:matrix.org">littledan</span>&gt;</div></td><td class="msg-cell">I kinda got the idea that collation keys might be better than NFD + case fold for some of these fuzzy comparison/searching cases from <a href="https://www.unicode.org/reports/tr10/#Searching">https://www.unicode.org/reports/tr10/#Searching</a> but I hear about a lot more real systems using nfd+fold</td></tr>
   <tr class="msg" id="L4"><td class="ts-cell"><a class="ts" href="#L4" alt="Tue Aug 22 2023 20:54:45 GMT-0700 (Pacific Daylight Time)">03:54</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@littledan:matrix.org">littledan</span>&gt;</div></td><td class="msg-cell">So maybe I misinterpreted that section</td></tr>
   <tr class="msg" id="L5"><td class="ts-cell"><a class="ts" href="#L5" alt="Tue Aug 22 2023 20:55:47 GMT-0700 (Pacific Daylight Time)">03:55</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@littledan:matrix.org">littledan</span>&gt;</div></td><td class="msg-cell">(The non-stability point is well noted!)</td></tr>
+  <tr class="msg" id="L6"><td class="ts-cell"><a class="ts" href="#L6" alt="Tue Aug 22 2023 23:15:56 GMT-0700 (Pacific Daylight Time)">06:15</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-12" title="@justingrant:matrix.org">justingrant</span>&gt;</div></td><td class="msg-cell"><blockquote>
+<p>if you want fuzzy searching</p>
+</blockquote>
+<p>AFAIK, many RDBMSs (like MySQL, Postgres, and SQL Server) default to case-insensitive collation for text columns. There may be per-DBMS variation in whether accent-insensitive (equivalent to <a href="https://www.unicode.org/reports/tr10/#Asymmetric_Search_Tertiary">Unicode tertiary</a>, I suspect) is the default or not.  But it's safe to assume that the majority of text data stored in relational databases is case-insensitively collated.</p>
+<p>So to an app developer, a DB query like <code>SELECT lastname FROM inventors WHERE lastname = 'De Havilland'</code> returning a result like<code>"de Haviland"</code> isn't "fuzzy" or special. It's just the default way that most non-Oracle relational databases have worked for many years.</p>
+<blockquote>
+<p>normalize your text with NFD and Case Fold and build a search db out of that</p>
+</blockquote>
+<p>Some challenges to this approach:</p>
+<ul>
+<li>It doubles the storage requirements for any text column, except in the relatively rare case that you don't need to retain the original case of the column. Database performance and cost is generally constrained by data size, so for most large-scale applications it would be a non-starter to store data twice.</li>
+<li>It requires application code (or code in the DB, like a computed column or trigger) to do the NFD + Case Fold operation when storing new rows. This adds complexity, hurts perf, and introduces failure cases like the two columns getting out of sync. The alternative of relying on the DB itself to take care of collation is easier, faster, and safer. (Assuming collation updates don't corrupt indexes!)</li>
+</ul>
+<p>So it seems unlikely that many DB app developers would want to store an extra, normalized copy of text data.  Instead, they'd probably demand that their hosting providers freeze the collation library. This is what AWS <a href="https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/PostgreSQL-Collations.html#:~:text=To%20reduce%20the%20possible%20impacts%20of%20the%20glibc%20updates%2C%20RDS%20for%20PostgreSQL%20now%20includes%20an%20independent%20default%20collation%20library.">seems to be doing, FWIW</a>.</p>
+<p>A DBMS system relying on the OS's collation library seems dangerously brittle. I'm amazed that Postgres does this. Until today, I assumed that all DBMSs statically linked their collation library, and only revved it like any other backwards-incompatible change: put in a major version release, require rebuilding indexes to pick up the change, fixup or rebuild indexes when upgrading the DBMS, etc.</p>
+</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>
