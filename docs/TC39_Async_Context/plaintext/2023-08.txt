@@ -363,3 +363,19 @@ currently that snapshot isn't stored anywhere after `unhandledPromise1` because 
 [14:11:42.0548] <Andreu Botella>
  * currently that snapshot isn't stored anywhere after `unhandledPromise1` because there are no promise jobs created inside the `.run` callback
 
+[14:17:05.0472] <Andreu Botella>
+but maybe calling `Promise.p.then` should always use the current snapshot at the time of the call, even for unhandledrejection
+
+[14:17:26.0075] <Justin Ridgewell>
+> so that when unhandledrejection is fired for unhandledPromise2, asyncVar.get() === "foo"
+
+This is incorrect. The reaction that creates `p2` has escaped the `foo` context, so it will only see `undefined`. Even with init-time `unhandledrejection` semantics, that wouldn't change. If we eliminate the promise reaction slot and instead store on the promise, `p2` would see `foo`.
+
+[14:18:05.0200] <Justin Ridgewell>
+(I'm using `p1` and `p2` because `unhandledPromise1` is too much)
+
+[14:19:25.0621] <Justin Ridgewell>
+> if that is the expected behavior, then that should also hold even if the unhandledrejection for unhandledPromise1 has already been called by the time unhandledPromise2 is created
+
+`unhandledrejection` execution is special if we use init-time rejection semantics, because it will copy the promise's snapshot slot into global storage before executing
+
