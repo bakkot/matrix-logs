@@ -336,3 +336,27 @@ I don't anticipate any issues. The snapshot must be restored to the global state
 [14:02:34.0876] <Andreu Botella>
 I'm not sure I fully understand all of the semantics that we want for `unhandledrejection`
 
+[14:05:07.0369] <Andreu Botella>
+my understanding was that the async context in which `HostPromiseRejectionTracker(promise, "reject")` should be called is the context in which the rejection of this promise was ultimately caused, even if that was in a different promise which caused the current promise to reject via reactions
+
+[14:06:19.0163] <Andreu Botella>
+```js
+const unhandledPromise1 = asyncVar.run("foo", () => Promise.reject());
+const unhandledPromise2 = unhandledPromise1.then(() => console.log("Not reached"));
+```
+
+[14:06:40.0273] <Andreu Botella>
+so when `unhandledrejection` is fired for `unhandledPromise2`, `asyncVar.get() === "foo"`
+
+[14:06:46.0122] <Andreu Botella>
+ * so that when `unhandledrejection` is fired for `unhandledPromise2`, `asyncVar.get() === "foo"`
+
+[14:07:48.0093] <Andreu Botella>
+if that is the expected behavior, then that should also hold even if the `unhandledrejection` for `unhandledPromise1` has already been called by the time `unhandledPromise2` is created
+
+[14:08:08.0171] <Andreu Botella>
+and therefore the `"foo"` snapshot must be stored somewhere
+
+[14:09:44.0219] <Andreu Botella>
+currently that snapshot isn't stored anywhere after `unhandledPromise1` because there are no promise jobs created
+
