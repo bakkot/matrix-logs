@@ -652,3 +652,86 @@ match (e) {
 }
 ```
 
+[08:57:42.0679] <rbuckton>
+I also spoke with Anders about using `x is let y` as a substitute for `let..in`, and he would rather use that then `do`, even if it is a slight abuse of the feature. If `match` itself is an expression, and each `when` match leg is an expression, and `when` patterns can have `let`, I'd be opposed to not having them in `is`. 
+
+I think the bigger question would be around scoping. I think that any `let`/`const` should be bound to the nearest block scope, but we would need to expand what introduces a block scope somewhat. For example:
+
+```js
+x is let y;
+y; // ok
+```
+
+Is essentially the same as `let y = x`, so it should have the same scope.
+
+Whereas,
+
+```js
+if (x is let y) y; // ok
+y; // not defined
+```
+
+makes sense to me from a scoping perspective, thus `if` should be an implicit block scope. It isn't currently because we don't allow a lone `let` (or `const`) declaration immediately after `if`/`else`/`do`/etc. In the same vein, `while` should also be an implicit block scope.
+
+[08:58:04.0302] <Jack Works>
+> <@rbuckton:matrix.org> I've reached out to Anders to get a better understanding of his interest and motivations in introducing variables in expressions, and will follow up when I have more information. From the short conversation we had yesterday, his primary interest has to do with functional programming. In languages like Haskell, Scheme, and ML, `let..in` expressions provide variables that are scoped to sub expressions. Python has something similar as well in the form of assignment expressions (`x := y`). C# even has this capability as well with variable patterns (much like the `let` patterns I've proposed), though it's not as ideal: https://dotnetfiddle.net/g4Zf13.
+> 
+> An example from the TypeScript compiler that Anders mentioned is this one:
+> 
+> ```ts
+> function getTypeOfPropertyOrIndexSignatureOfType(type: Type, name: __String): Type | undefined {
+>     let propType;
+>     return getTypeOfPropertyOfType(type, name) ||
+>         (propType = getApplicableIndexInfoForName(type, name)?.type) &&
+>             addOptionality(propType, /*isProperty*/ true, /*isOptional*/ true);
+> }
+> ```
+> 
+> This requires declaring a mutable variable at the statement level. He believes something like the following would be an improvement for FP-style development:
+> 
+> ```ts
+> function getTypeOfPropertyOrIndexSignatureOfType(type: Type, name: __String): Type | undefined {
+>     return getTypeOfPropertyOfType(type, name) ||
+>         (const propType = getApplicableIndexInfoForName(type, name)?.type) &&
+>             addOptionality(propType, /*isProperty*/ true, /*isOptional*/ true);
+> }
+> ```
+> 
+> Where the `propType` variable can be declared `const` and doesn't require lifting the declaration out of the expression.
+> 
+> I'm still waiting on his feedback regarding `do`-expressions, but my take is that `do` doesn't make this expression any more succinct or clear, it just introduces a confusing statement scope in the middle of an expression:
+> 
+> ```ts
+> function getTypeOfPropertyOrIndexSignatureOfType(type: Type, name: __String): Type | undefined {
+>   return getTypeOfPropertyOfType(type, name) ||
+>     do {
+>       const propType = getApplicableIndexInfoForName(type, name)?.type;
+>       propType && addOptionality(propType, /*isProperty*/ true, /*isOptional*/ true);
+>     };
+> }
+> ```
+> 
+> While `x is let y`/`x is const y` isn't necessarily an ideal solution, it remains concise and is possibly even more powerful since it's combined with pattern matching:
+> 
+> ```ts
+> function getTypeOfPropertyOrIndexSignatureOfType(type: Type, name: __String): Type | undefined {
+>     return getTypeOfPropertyOfType(type, name) ||
+>         (getApplicableIndexInfoForName(type, name) is { type: const propType } &&
+>             addOptionality(propType, /*isProperty*/ true, /*isOptional*/ true));
+> }
+> ```
+
+Oh I really miss the time I was learning ML.
+
+[08:59:51.0814] <rbuckton>
+And for scoping, `let` patterns should be visible in the `else` branch to support cases like:
+
+```
+if (x is not Foo and let y) {
+  y; // error due to TDZ: 'y' wasn't initialized
+} else {
+  y; // ok
+}
+y; // error due to scoping: 'y' isn't declared in this scope
+```
+

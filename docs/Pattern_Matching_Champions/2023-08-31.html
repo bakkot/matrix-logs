@@ -117,6 +117,61 @@ match (e) {
 }
 </code></pre>
 </td></tr>
+  <tr class="msg" id="L9"><td class="ts-cell"><a class="ts" href="#L9" alt="Thu Aug 31 2023 08:57:42 GMT-0700 (Pacific Daylight Time)">15:57</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell"><p>I also spoke with Anders about using <code>x is let y</code> as a substitute for <code>let..in</code>, and he would rather use that then <code>do</code>, even if it is a slight abuse of the feature. If <code>match</code> itself is an expression, and each <code>when</code> match leg is an expression, and <code>when</code> patterns can have <code>let</code>, I'd be opposed to not having them in <code>is</code>.</p>
+<p>I think the bigger question would be around scoping. I think that any <code>let</code>/<code>const</code> should be bound to the nearest block scope, but we would need to expand what introduces a block scope somewhat. For example:</p>
+<pre><code class="language-js">x is let y;
+y; // ok
+</code></pre>
+<p>Is essentially the same as <code>let y = x</code>, so it should have the same scope.</p>
+<p>Whereas,</p>
+<pre><code class="language-js">if (x is let y) y; // ok
+y; // not defined
+</code></pre>
+<p>makes sense to me from a scoping perspective, thus <code>if</code> should be an implicit block scope. It isn't currently because we don't allow a lone <code>let</code> (or <code>const</code>) declaration immediately after <code>if</code>/<code>else</code>/<code>do</code>/etc. In the same vein, <code>while</code> should also be an implicit block scope.</p>
+</td></tr>
+  <tr class="msg" id="L10"><td class="ts-cell"><a class="ts" href="#L10" alt="Thu Aug 31 2023 08:58:04 GMT-0700 (Pacific Daylight Time)">15:58</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@jackworks:matrix.org">Jack Works</span>&gt;</div></td><td class="msg-cell"><mx-reply><blockquote> <p>I've reached out to Anders to get a better understanding of his interest and motivations in introducing variables in expressions, and will follow up when I have more information. From the short conversation we had yesterday, his primary interest has to do with functional programming. In languages like Haskell, Scheme, and ML, <code>let..in</code> expressions provide variables that are scoped to sub expressions. Python has something similar as well in the form of assignment expressions (<code>x := y</code>). C# even has this capability as well with variable patterns (much like the <code>let</code> patterns I've proposed), though it's not as ideal: <a href="https://dotnetfiddle.net/g4Zf13">https://dotnetfiddle.net/g4Zf13</a>.</p>
+<p>An example from the TypeScript compiler that Anders mentioned is this one:</p>
+<pre><code class="language-ts">function getTypeOfPropertyOrIndexSignatureOfType(type: Type, name: __String): Type | undefined {
+    let propType;
+    return getTypeOfPropertyOfType(type, name) ||
+        (propType = getApplicableIndexInfoForName(type, name)?.type) &amp;&amp;
+            addOptionality(propType, /*isProperty*/ true, /*isOptional*/ true);
+}
+</code></pre>
+<p>This requires declaring a mutable variable at the statement level. He believes something like the following would be an improvement for FP-style development:</p>
+<pre><code class="language-ts">function getTypeOfPropertyOrIndexSignatureOfType(type: Type, name: __String): Type | undefined {
+    return getTypeOfPropertyOfType(type, name) ||
+        (const propType = getApplicableIndexInfoForName(type, name)?.type) &amp;&amp;
+            addOptionality(propType, /*isProperty*/ true, /*isOptional*/ true);
+}
+</code></pre>
+<p>Where the <code>propType</code> variable can be declared <code>const</code> and doesn't require lifting the declaration out of the expression.</p>
+<p>I'm still waiting on his feedback regarding <code>do</code>-expressions, but my take is that <code>do</code> doesn't make this expression any more succinct or clear, it just introduces a confusing statement scope in the middle of an expression:</p>
+<pre><code class="language-ts">function getTypeOfPropertyOrIndexSignatureOfType(type: Type, name: __String): Type | undefined {
+  return getTypeOfPropertyOfType(type, name) ||
+    do {
+      const propType = getApplicableIndexInfoForName(type, name)?.type;
+      propType &amp;&amp; addOptionality(propType, /*isProperty*/ true, /*isOptional*/ true);
+    };
+}
+</code></pre>
+<p>While <code>x is let y</code>/<code>x is const y</code> isn't necessarily an ideal solution, it remains concise and is possibly even more powerful since it's combined with pattern matching:</p>
+<pre><code class="language-ts">function getTypeOfPropertyOrIndexSignatureOfType(type: Type, name: __String): Type | undefined {
+    return getTypeOfPropertyOfType(type, name) ||
+        (getApplicableIndexInfoForName(type, name) is { type: const propType } &amp;&amp;
+            addOptionality(propType, /*isProperty*/ true, /*isOptional*/ true));
+}
+</code></pre>
+</blockquote></mx-reply>Oh I really miss the time I was learning ML.</td></tr>
+  <tr class="msg" id="L11"><td class="ts-cell"><a class="ts" href="#L11" alt="Thu Aug 31 2023 08:59:51 GMT-0700 (Pacific Daylight Time)">15:59</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell"><p>And for scoping, <code>let</code> patterns should be visible in the <code>else</code> branch to support cases like:</p>
+<pre><code>if (x is not Foo and let y) {
+  y; // error due to TDZ: 'y' wasn't initialized
+} else {
+  y; // ok
+}
+y; // error due to scoping: 'y' isn't declared in this scope
+</code></pre>
+</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>
