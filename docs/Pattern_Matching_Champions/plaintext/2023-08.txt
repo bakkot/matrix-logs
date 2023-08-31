@@ -405,3 +405,99 @@ x = do { let x = foo();
     [a, b]; };
 ```
 
+
+2023-08-31
+[06:54:38.0082] <rbuckton>
+I've reached out to Anders to get a better understanding of his interest and motivations in introducing variables in expressions, and will follow up when I have more information. From the short conversation we had yesterday, his primary interest has to do with functional programming. Languages like Haskell, Scheme, and ML, `let..in` expressions provide variables that are scoped to sub expressions. Python has something similar as well in the form of assignment expressions (`x := y`). C# even has this capability as well with variable patterns (much like the `let` patterns I've proposed), though it's not as ideal: https://dotnetfiddle.net/g4Zf13.
+
+An example from the TypeScript compiler that Anders mentioned is this one:
+```ts
+function getTypeOfPropertyOrIndexSignatureOfType(type: Type, name: __String): Type | undefined {
+    let propType;
+    return getTypeOfPropertyOfType(type, name) ||
+        (propType = getApplicableIndexInfoForName(type, name)?.type) &&
+        addOptionality(propType, /*isProperty*/ true, /*isOptional*/ true);
+}
+```
+This requires declaring a mutable variable at the statement level. He believes something like the following would be an improvement for FP-style development:
+
+```ts
+function getTypeOfPropertyOrIndexSignatureOfType(type: Type, name: __String): Type | undefined {
+    return getTypeOfPropertyOfType(type, name) ||
+        (const propType = getApplicableIndexInfoForName(type, name)?.type) &&
+        addOptionality(propType, /*isProperty*/ true, /*isOptional*/ true);
+}
+```
+Where the `propType` variable can be declared `const` and doesn't require lifting the declaration out of the expression.
+
+I'm still waiting on his feedback regarding `do`-expressions, but my take is that `do` doesn't make this expression any more succinct or clear, it just introduces a confusing statement scope in the middle of an expression:
+
+```ts
+function getTypeOfPropertyOrIndexSignatureOfType(type: Type, name: __String): Type | undefined {
+  return getTypeOfPropertyOfType(type, name) ||
+    do {
+      const propType = getApplicableIndexInfoForName(type, name)?.type;
+      propType && addOptionality(propType, /*isProperty*/ true, /*isOptional*/ true);
+    };
+}
+```
+
+While `x is let y`/`x is const y` isn't necessarily an ideal solution, it remains concise and is possibly even more powerful since it's combined with pattern matching:
+
+```ts
+function getTypeOfPropertyOrIndexSignatureOfType(type: Type, name: __String): Type | undefined {
+    return getTypeOfPropertyOfType(type, name) ||
+        (getApplicableIndexInfoForName(type, name) is { type: const propType } &&
+            addOptionality(propType, /*isProperty*/ true, /*isOptional*/ true));
+}
+```
+
+
+[06:55:05.0617] <rbuckton>
+ * I've reached out to Anders to get a better understanding of his interest and motivations in introducing variables in expressions, and will follow up when I have more information. From the short conversation we had yesterday, his primary interest has to do with functional programming. In languages like Haskell, Scheme, and ML, `let..in` expressions provide variables that are scoped to sub expressions. Python has something similar as well in the form of assignment expressions (`x := y`). C# even has this capability as well with variable patterns (much like the `let` patterns I've proposed), though it's not as ideal: https://dotnetfiddle.net/g4Zf13.
+
+An example from the TypeScript compiler that Anders mentioned is this one:
+
+```ts
+function getTypeOfPropertyOrIndexSignatureOfType(type: Type, name: __String): Type | undefined {
+    let propType;
+    return getTypeOfPropertyOfType(type, name) ||
+        (propType = getApplicableIndexInfoForName(type, name)?.type) &&
+        addOptionality(propType, /*isProperty*/ true, /*isOptional*/ true);
+}
+```
+
+This requires declaring a mutable variable at the statement level. He believes something like the following would be an improvement for FP-style development:
+
+```ts
+function getTypeOfPropertyOrIndexSignatureOfType(type: Type, name: __String): Type | undefined {
+    return getTypeOfPropertyOfType(type, name) ||
+        (const propType = getApplicableIndexInfoForName(type, name)?.type) &&
+        addOptionality(propType, /*isProperty*/ true, /*isOptional*/ true);
+}
+```
+
+Where the `propType` variable can be declared `const` and doesn't require lifting the declaration out of the expression.
+
+I'm still waiting on his feedback regarding `do`-expressions, but my take is that `do` doesn't make this expression any more succinct or clear, it just introduces a confusing statement scope in the middle of an expression:
+
+```ts
+function getTypeOfPropertyOrIndexSignatureOfType(type: Type, name: __String): Type | undefined {
+  return getTypeOfPropertyOfType(type, name) ||
+    do {
+      const propType = getApplicableIndexInfoForName(type, name)?.type;
+      propType && addOptionality(propType, /*isProperty*/ true, /*isOptional*/ true);
+    };
+}
+```
+
+While `x is let y`/`x is const y` isn't necessarily an ideal solution, it remains concise and is possibly even more powerful since it's combined with pattern matching:
+
+```ts
+function getTypeOfPropertyOrIndexSignatureOfType(type: Type, name: __String): Type | undefined {
+    return getTypeOfPropertyOfType(type, name) ||
+        (getApplicableIndexInfoForName(type, name) is { type: const propType } &&
+            addOptionality(propType, /*isProperty*/ true, /*isOptional*/ true));
+}
+```
+
