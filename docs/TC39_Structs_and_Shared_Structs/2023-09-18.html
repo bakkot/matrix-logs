@@ -210,6 +210,30 @@ prepareWorker({
 });
 </code></pre>
 </td></tr>
+  <tr class="msg" id="L104"><td class="ts-cell"><a class="ts" href="#L104" alt="Mon Sep 18 2023 15:15:28 GMT-0700 (Pacific Daylight Time)">22:15</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">The preload script could run at the startup of the worker thread. It would establish the relationship on the worker's side, but wouldn't be allowed to send or receive messages on the worker. That would allow you to establish the relationship all at once and avoids a mutable registry.</td></tr>
+  <tr class="msg" id="L105"><td class="ts-cell"><a class="ts" href="#L105" alt="Mon Sep 18 2023 15:16:50 GMT-0700 (Pacific Daylight Time)">22:16</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">This can then be expanded to introduce something like a built-in symbol-named method that the handshaking process could look at first, before looking for <code>{ exemplar, prototype }</code>, and a <code>shared struct</code> declaration would implement that as a static method, returning a suitable exemplar and prototype for the handshake without needing to run the constructor</td></tr>
+  <tr class="msg" id="L106"><td class="ts-cell"><a class="ts" href="#L106" alt="Mon Sep 18 2023 15:17:36 GMT-0700 (Pacific Daylight Time)">22:17</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@mhofman:matrix.org">Mathieu Hofman</span>&gt;</div></td><td class="msg-cell">only allowing init time registration somewhat concerns me, and I have to think more about this per connection registry.</td></tr>
+  <tr class="msg" id="L107"><td class="ts-cell"><a class="ts" href="#L107" alt="Mon Sep 18 2023 15:18:12 GMT-0700 (Pacific Daylight Time)">22:18</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell"><p>Thus the handshake can be simplified with <code>shared struct</code> declarations like this:</p>
+<pre><code class="language-js">// foo.js
+export shared struct Foo { 
+  ...
+}
+
+// main.js
+import { Foo } from "foo.js";
+const worker = new Worker("worker.js", {
+  preload: "preload.js",
+  structs: { Foo }
+});
+
+// preload.js
+import { Foo } from "foo.js";
+prepareWorker({ structs: { Foo } });
+
+</code></pre>
+</td></tr>
+  <tr class="msg" id="L108"><td class="ts-cell"><a class="ts" href="#L108" alt="Mon Sep 18 2023 15:18:43 GMT-0700 (Pacific Daylight Time)">22:18</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">The reason I proposed init-time registration was due to concerns you raised about data exfiltration with a mutable registry.</td></tr>
+  <tr class="msg" id="L109"><td class="ts-cell"><a class="ts" href="#L109" alt="Mon Sep 18 2023 15:19:44 GMT-0700 (Pacific Daylight Time)">22:19</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@mhofman:matrix.org">Mathieu Hofman</span>&gt;</div></td><td class="msg-cell">also this mechanism means there is technically 2 different point definitions, but since they share a prototype the type discontinuity is not observable?</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>

@@ -870,3 +870,40 @@ prepareWorker({
 });
 ```
 
+[15:15:28.0694] <rbuckton>
+The preload script could run at the startup of the worker thread. It would establish the relationship on the worker's side, but wouldn't be allowed to send or receive messages on the worker. That would allow you to establish the relationship all at once and avoids a mutable registry.
+
+[15:16:50.0247] <rbuckton>
+This can then be expanded to introduce something like a built-in symbol-named method that the handshaking process could look at first, before looking for `{ exemplar, prototype }`, and a `shared struct` declaration would implement that as a static method, returning a suitable exemplar and prototype for the handshake without needing to run the constructor
+
+[15:17:36.0385] <Mathieu Hofman>
+only allowing init time registration somewhat concerns me, and I have to think more about this per connection registry.
+
+[15:18:12.0004] <rbuckton>
+Thus the handshake can be simplified with `shared struct` declarations like this:
+
+```js
+// foo.js
+export shared struct Foo { 
+  ...
+}
+
+// main.js
+import { Foo } from "foo.js";
+const worker = new Worker("worker.js", {
+  preload: "preload.js",
+  structs: { Foo }
+});
+
+// preload.js
+import { Foo } from "foo.js";
+prepareWorker({ structs: { Foo } });
+
+```
+
+[15:18:43.0950] <rbuckton>
+The reason I proposed init-time registration was due to concerns you raised about data exfiltration with a mutable registry.
+
+[15:19:44.0413] <Mathieu Hofman>
+also this mechanism means there is technically 2 different point definitions, but since they share a prototype the type discontinuity is not observable?
+
