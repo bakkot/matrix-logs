@@ -248,6 +248,33 @@ prepareWorker({ structs: { Foo } });
 new Worker("worker.js", { ..., structs: { ...fooStructs, Bar, Baz } });
 </code></pre>
 </td></tr>
+  <tr class="msg" id="L119"><td class="ts-cell"><a class="ts" href="#L119" alt="Mon Sep 18 2023 15:30:56 GMT-0700 (Pacific Daylight Time)">22:30</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell"><p>The main issue I see with this approach is when you have 3+ threads, where two or more child threads need to communicate without having established a handshake between themselves:</p>
+<ol>
+<li>main thread M has struct <code>Foo</code> with type identity 0</li>
+<li>child thread A has a struct <code>Foo</code> with type identity 1</li>
+<li>child thread B has a struct <code>Foo</code> with type identity 2</li>
+<li>M performs handshake with A establishing that <code>Foo-0</code> on A uses A's <code>Foo</code> prototype, and <code>Foo-1</code> on M uses M's <code>Foo</code> prototype.</li>
+<li>M performs handshake with B establishing that <code>Foo-0</code> on B uses B's <code>Foo</code> prototype, and <code>Foo-2</code> on M uses M's <code>Foo</code> prototype.</li>
+<li>M creates a <code>MessagePort</code> and hands <code>port1</code> to thread A, and <code>port2</code> to thread B</li>
+<li>A creates a <code>Foo-1</code> and sends it to B over the message port.</li>
+<li>What does a <code>Foo-1</code> look like in B?</li>
+</ol>
+</td></tr>
+  <tr class="msg" id="L120"><td class="ts-cell"><a class="ts" href="#L120" alt="Mon Sep 18 2023 15:31:21 GMT-0700 (Pacific Daylight Time)">22:31</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@mhofman:matrix.org">Mathieu Hofman</span>&gt;</div></td><td class="msg-cell"><p>right, just wondering if we could still end up with something like</p>
+<pre><code>import { Point } from "./point.js";
+import { attachBehavior, parentPort } from "worker_threads";
+parentPort.on("message", data =&gt; {
+    if (data.type === 'registerPoint') {
+        attachBehavior(data.examplar, Point.prototype);
+    }
+});
+
+</code></pre>
+</td></tr>
+  <tr class="msg" id="L121"><td class="ts-cell"><a class="ts" href="#L121" alt="Mon Sep 18 2023 15:31:54 GMT-0700 (Pacific Daylight Time)">22:31</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">the goal with the API design in the doc is to abstract away as much of that scaffolding as possible.</td></tr>
+  <tr class="msg" id="L122"><td class="ts-cell"><a class="ts" href="#L122" alt="Mon Sep 18 2023 15:33:08 GMT-0700 (Pacific Daylight Time)">22:33</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">i.e., assume that the presence of a <code>structs: {}</code> property in the worker constructor will transmit a <code>'registerPoint'</code> message for you, and that a <code>prepareWorker({ structs: {} })</code> will automatically handle the <code>on("message")</code> event for you.</td></tr>
+  <tr class="msg" id="L123"><td class="ts-cell"><a class="ts" href="#L123" alt="Mon Sep 18 2023 15:33:20 GMT-0700 (Pacific Daylight Time)">22:33</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">There's no reason to have users write all of that out themselves.</td></tr>
+  <tr class="msg" id="L124"><td class="ts-cell"><a class="ts" href="#L124" alt="Mon Sep 18 2023 15:34:25 GMT-0700 (Pacific Daylight Time)">22:34</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">I also don't always want to have to depend on postMessage when I intend for most of the processing in the child thread to happen synchronously through the use of <code>Mutex</code> and other synchronization primitives.</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>

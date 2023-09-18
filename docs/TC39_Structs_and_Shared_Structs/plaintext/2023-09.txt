@@ -944,3 +944,40 @@ import { structs as fooStructs } from "foo-package";
 new Worker("worker.js", { ..., structs: { ...fooStructs, Bar, Baz } });
 ```
 
+[15:30:56.0901] <rbuckton>
+The main issue I see with this approach is when you have 3+ threads, where two or more child threads need to communicate without having established a handshake between themselves:
+
+1. main thread M has struct `Foo` with type identity 0
+2. child thread A has a struct `Foo` with type identity 1
+3. child thread B has a struct `Foo` with type identity 2
+4. M performs handshake with A establishing that `Foo-0` on A uses A's `Foo` prototype, and `Foo-1` on M uses M's `Foo` prototype.
+5. M performs handshake with B establishing that `Foo-0` on B uses B's `Foo` prototype, and `Foo-2` on M uses M's `Foo` prototype.
+6. M creates a `MessagePort` and hands `port1` to thread A, and `port2` to thread B
+7. A creates a `Foo-1` and sends it to B over the message port.
+8. What does a `Foo-1` look like in B? 
+
+[15:31:21.0293] <Mathieu Hofman>
+right, just wondering if we could still end up with something like
+```
+import { Point } from "./point.js";
+import { attachBehavior, parentPort } from "worker_threads";
+parentPort.on("message", data => {
+    if (data.type === 'registerPoint') {
+        attachBehavior(data.examplar, Point.prototype);
+    }
+});
+
+```
+
+[15:31:54.0612] <rbuckton>
+the goal with the API design in the doc is to abstract away as much of that scaffolding as possible.
+
+[15:33:08.0332] <rbuckton>
+i.e., assume that the presence of a `structs: {}` property in the worker constructor will transmit a `'registerPoint'` message for you, and that a `prepareWorker({ structs: {} })` will automatically handle the `on("message")` event for you.
+
+[15:33:20.0519] <rbuckton>
+There's no reason to have users write all of that out themselves.
+
+[15:34:25.0157] <rbuckton>
+I also don't always want to have to depend on postMessage when I intend for most of the processing in the child thread to happen synchronously through the use of `Mutex` and other synchronization primitives.
+
