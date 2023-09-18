@@ -656,3 +656,86 @@ i was thinking like `agentlocal fieldName;` or something
 [14:28:08.0330] <rbuckton>
 https://github.com/rtm/js-pick-notation for the pick notation, and I think there was some discussion in https://github.com/rbuckton/proposal-shorthand-improvements as well
 
+[14:30:37.0915] <rbuckton>
+> <@shuyuguo:matrix.org> i was thinking like `agentlocal fieldName;` or something
+
+It's not terrible, I suppose? In other contexts/languages I might call it `threadlocal`, but another option might be `nonshared`? Especially if the struct syntax is something like `struct Foo {}` and `shared struct Bar {}`, declaring something as `nonshared` seems semantically consistent without needing to bring in terms like "agent"
+
+[14:31:15.0063] <shu>
+yes, i don't love the name agent
+
+[14:31:51.0633] <shu>
+i kinda like `nonshared`, though i wonder if it glosses over the per-thread/per-realm view aspect of the semantics
+
+[14:32:29.0767] <shu>
+actually, the bigger possibility for confusion is that the modifier applies values, not the field itself
+
+[14:32:34.0040] <shu>
+kind of like the `const` confusion
+
+[14:32:47.0665] <rbuckton>
+We don't say "agent" in any of the Atomics APIs, despite those APIs having to do with memory ordering to support atomic writes across agents, so I don't think its that bad to avoid the terminology.
+
+[14:32:58.0454] <shu>
+OTOH we already have that confusion, and the use of `nonshared` is consistent with how `const` modifies the binding
+
+[14:33:19.0621] <shu>
+or maybe just `local`
+
+[14:33:23.0357] <shu>
+though that's pretty vague
+
+[14:33:50.0655] <rbuckton>
+```
+shared struct Data {
+  x;
+  y;
+  nonshared foo;
+
+  // would methods need this keyword too, or automatically be considered nonshared?
+  method() { }
+
+  nonshared method2() {}
+}
+```
+
+[14:34:19.0244] <rbuckton>
+`local` feels vague and has a different context in some other languages
+
+[14:34:46.0564] <rbuckton>
+i.e., in some languages, `local` refers to how you access shadowed variable bindings
+
+[14:35:25.0993] <shu>
+method declarations are currently just disallowed
+
+[14:35:47.0996] <shu>
+i don't know what it means to have that in a shared struct, without bringing in ideas we've talked about in the past like packaging it up as a module block that gets re-evaluated
+
+[14:36:31.0991] <rbuckton>
+> <@shuyuguo:matrix.org> method declarations are currently just disallowed
+
+Yes, but I'm imagining syntax based on what I hope we can get in the end, including an easy Developer experience for the prototype handshake for attaching behavior, as in the Gist I shared several weeks ago.
+
+[14:37:13.0326] <rbuckton>
+I'm referring to this: ```
+shared struct Point
+
+[14:37:33.0049] <rbuckton>
+ * I'm referring to this: https://gist.github.com/rbuckton/08d020fc80da308ad3a1991384d4ff62
+
+[14:37:50.0505] <shu>
+> <@rbuckton:matrix.org> Yes, but I'm imagining syntax based on what I hope we can get in the end, including an easy Developer experience for the prototype handshake for attaching behavior, as in the Gist I shared several weeks ago.
+
+then in that future i favor requiring `nonshared method() {}` and making `method() {}` a parse error, to make the semantics explicit
+
+[14:38:21.0135] <shu>
+also, just in case by divine inspiration we manage to actually share functions in the future, somehow
+
+[14:39:58.0911] <rbuckton>
+essentially, the syntax covers multiple things:
+- Declaring the fields that are shared (with a convenient place to hang type annotations off of)
+- Declaring the fields that are not shared (specific to the current thread/agent/whatnot)
+- Declaring the construction logic that is not shared (specific to the current thread/etc.)
+- Declaring the instance methods that are not shared (specific to the current thread/etc.)
+- Declaring the static methods on the non-shared constructor.
+
