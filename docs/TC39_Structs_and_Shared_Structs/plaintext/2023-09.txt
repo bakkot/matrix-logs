@@ -1021,3 +1021,53 @@ Unless you are suggesting that `on("message")` gets called synchronously the mom
 [15:44:40.0339] <rbuckton>
 To support the synchronous case I proposed above, you really have to establish the relationships *before* any work is done.
 
+[15:45:49.0750] <rbuckton>
+Maybe that means registration isn't just `struct: { ... }`. Maybe that means you have to create an instance of a `StructRegistry` object you pass to each worker you create, so that you explicitly establish the relationship between all of the workers.
+
+[15:46:09.0826] <Mathieu Hofman>
+I'm saying that in you example, between step 6 and 7, A could send a message to B with an examplar, and B could send a message to A with its examplar, and both could attach their behavior
+
+[15:46:17.0287] <Mathieu Hofman>
+ * I'm saying that in your example, between step 6 and 7, A could send a message to B with an examplar, and B could send a message to A with its examplar, and both could attach their behavior
+
+[15:46:34.0634] <rbuckton>
+Something like: 
+```js
+const structs = new StructsRegistry({ Foo, Bar });
+const worker1 = new Worker("worker.js", { structs });
+const worker2 = new Worker("worker.js", { structs });
+```
+
+
+[15:47:10.0121] <rbuckton>
+That's the asynchronous case using `MessagePort`. I'm saying that doesn't work with the synchronous case using `mutex`/`condition`
+
+[15:47:22.0724] <rbuckton>
+> <@rbuckton:matrix.org> i.e.,:
+> 1. M hands a shared struct with `{ mutex, condition, value }` to both A and B.
+> 1. B locks `mutex` and waits on `condition` (unlocking the mutex)
+> 1. A locks `mutex`, writes a `Foo-1` to `value`, and and wakes B via `condition`
+> 1. B reads `value` and gets a `Foo-1`
+
+this is the synchronous case
+
+[15:47:24.0921] <Mathieu Hofman>
+but yes it would be nice to abstract that away to avoid this manual protocol
+
+[15:48:08.0169] <Mathieu Hofman>
+oh I see, yeah I don't know how you solve that one
+
+[15:49:27.0413] <rbuckton>
+I currently see two mechanisms: either the agents communicate with each other to find a suitable mapping just using the provided `structs: {}` maps, or you explicitly hand a registry off to each worker that essentially records the per-agent mappings for each struct type in the registry.
+
+[15:49:32.0351] <Mathieu Hofman>
+you'd have to pass the behavior definition along, possibly as a module instance that can be synchronously evaluated when creating the realm, not just the local constructor / prototype
+
+[15:49:53.0304] <rbuckton>
+> <@mhofman:matrix.org> you'd have to pass the behavior definition along, possibly as a module instance that can be synchronously evaluated when creating the realm, not just the local constructor / prototype
+
+Why? The point of this is that you _don't_ pass the behavior definition along.
+
+[15:50:03.0395] <rbuckton>
+Each thread maintains its own copy of the behavior
+
