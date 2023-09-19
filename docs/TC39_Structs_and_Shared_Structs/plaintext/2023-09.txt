@@ -1130,3 +1130,51 @@ I need to break for dinner.
 [16:41:54.0423] <shu>
 oops i had meetings and now there's a lot of backlog
 
+
+2023-09-19
+[17:25:26.0717] <rbuckton>
+> <@rbuckton:matrix.org> I could possibly model this in terms of `attachBehavior` and abstract it away, assuming some other information is available. I can't emulate the thread-localness I'm describing in quite the same way, but could emulate it with a lock-free data structure
+
+I threw together a bunch of pseudocode for this to get an idea of what's needed. You couldn't support the synchronous case without some kind of synchronous notification occurring when an Agent encounters a shared struct with a previously unseen type identity, but that callback would be something like:
+
+```js
+    setFindMissingPrototypeCallback((exemplar, agentId) => {
+        const agentRegistry = agentId === 0 ? registry.root : ConcurrentList.find(registry.children, registry => registry.agentId === agentId);
+        if (!agentRegistry) {
+            return false;
+        }
+
+        const exemplarTypeIdentity = getTypeIdentity(exemplar);
+        const agentEntry = Array.prototype.find.call(agentRegistry.entries, entry => getTypeIdentity(entry.exemplar) === exemplarTypeIdentity);
+        if (!agentEntry) {
+            return false;
+        }
+
+        const thisAgentEntry = Array.prototype.find.call(perAgentRegistry.entries, entry => entry.key === agentEntry.key);
+        if (!thisAgentEntry || !thisAgentEntry.prototype) {
+            return false;
+        }
+
+        attachBehavior(exemplar, thisAgentEntry.prototype);
+        return true;
+    });
+
+```
+
+And something similar would be wired up on the main thread when constructing the `Worker`
+
+[17:27:44.0587] <rbuckton>
+Without the synchronous case, you could achieve this via `postMessage` if the worker/port checked each shared struct being sent out to see if it had already seen its type identity, and then posting a handshake message before posting the actual message.
+
+[17:28:14.0506] <Mathieu Hofman>
+right there has to be something that triggers when another agent register an examplar
+
+[17:28:52.0477] <rbuckton>
+But this is much simpler if we do all this work on the user's behalf.
+
+[17:29:01.0137] <Mathieu Hofman>
+for the async case you don't really need to check every shared struct being sent, I'll send some code later
+
+[17:29:54.0843] <rbuckton>
+An async-only case doesn't really exist though, since any thread could set data on a shared struct visible by any other thread.
+

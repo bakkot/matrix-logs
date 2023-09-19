@@ -1,0 +1,61 @@
+<!DOCTYPE html><html><head>
+  <title>TC39 Structs and Shared Structs on 2023-09-19</title>
+  <link rel="stylesheet" href="../style.css">
+  <script>window.room = "TC39 Structs and Shared Structs";</script><script src="../render-roomlist.js"></script>
+  <script src="../logs.js"></script>
+</head>
+<body><div class="wrapper">
+<div class="sidebar">
+<div class="title">TC39 Structs and Shared Structs<br>2023-09-19<br><a href="plaintext/">plaintext logs</a></div>
+<div class="nav">
+<a href="2023-09-18" class="nav-link"><span>prev</span></a>
+<span style="float:right">next</span>
+</div>
+    <div class="all-rooms"><noscript>JavaScript is required to load the channel index, but you can go to <a href="../..">the static index</a> directly.</noscript></div>
+<div class="footer"><a href="https://github.com/bakkot/matrix-archive-bot">source on github</a></div>
+</div>
+<div class="rhs">
+<div class="rhs-header">
+<span id="error" style="color: red; display:none">error</span>
+
+<input type="text" id="query" size="25" placeholder="Search TC39 Structs and Shared Structs">
+<a id="search-submit" class="button icon-link" title="Search">
+  <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path d="M505 442.7L405.3 343c-4.5-4.5-10.6-7-17-7H372c27.6-35.3 44-79.7 44-128C416 93.1 322.9 0 208 0S0 93.1 0 208s93.1 208 208 208c48.3 0 92.7-16.4 128-44v16.3c0 6.4 2.5 12.5 7 17l99.7 99.7c9.4 9.4 24.6 9.4 33.9 0l28.3-28.3c9.4-9.4 9.4-24.6.1-34zM208 336c-70.7 0-128-57.2-128-128 0-70.7 57.2-128 128-128 70.7 0 128 57.2 128 128 0 70.7-57.2 128-128 128z"></path></svg>
+</a>
+</div>
+
+<div class="log"><table id="log-table"><tbody id="log-tbody">
+
+  <tr class="msg" id="L0"><td class="ts-cell"><a class="ts" href="#L0" alt="Mon Sep 18 2023 17:25:26 GMT-0700 (Pacific Daylight Time)">00:25</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell"><mx-reply><blockquote> I could possibly model this in terms of <code>attachBehavior</code> and abstract it away, assuming some other information is available. I can't emulate the thread-localness I'm describing in quite the same way, but could emulate it with a lock-free data structure</blockquote></mx-reply><p>I threw together a bunch of pseudocode for this to get an idea of what's needed. You couldn't support the synchronous case without some kind of synchronous notification occurring when an Agent encounters a shared struct with a previously unseen type identity, but that callback would be something like:</p>
+<pre><code class="language-js">    setFindMissingPrototypeCallback((exemplar, agentId) =&gt; {
+        const agentRegistry = agentId === 0 ? registry.root : ConcurrentList.find(registry.children, registry =&gt; registry.agentId === agentId);
+        if (!agentRegistry) {
+            return false;
+        }
+
+        const exemplarTypeIdentity = getTypeIdentity(exemplar);
+        const agentEntry = Array.prototype.find.call(agentRegistry.entries, entry =&gt; getTypeIdentity(entry.exemplar) === exemplarTypeIdentity);
+        if (!agentEntry) {
+            return false;
+        }
+
+        const thisAgentEntry = Array.prototype.find.call(perAgentRegistry.entries, entry =&gt; entry.key === agentEntry.key);
+        if (!thisAgentEntry || !thisAgentEntry.prototype) {
+            return false;
+        }
+
+        attachBehavior(exemplar, thisAgentEntry.prototype);
+        return true;
+    });
+
+</code></pre>
+<p>And something similar would be wired up on the main thread when constructing the <code>Worker</code></p>
+</td></tr>
+  <tr class="msg" id="L1"><td class="ts-cell"><a class="ts" href="#L1" alt="Mon Sep 18 2023 17:27:44 GMT-0700 (Pacific Daylight Time)">00:27</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">Without the synchronous case, you could achieve this via <code>postMessage</code> if the worker/port checked each shared struct being sent out to see if it had already seen its type identity, and then posting a handshake message before posting the actual message.</td></tr>
+  <tr class="msg" id="L2"><td class="ts-cell"><a class="ts" href="#L2" alt="Mon Sep 18 2023 17:28:14 GMT-0700 (Pacific Daylight Time)">00:28</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@mhofman:matrix.org">Mathieu Hofman</span>&gt;</div></td><td class="msg-cell">right there has to be something that triggers when another agent register an examplar</td></tr>
+  <tr class="msg" id="L3"><td class="ts-cell"><a class="ts" href="#L3" alt="Mon Sep 18 2023 17:28:52 GMT-0700 (Pacific Daylight Time)">00:28</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">But this is much simpler if we do all this work on the user's behalf.</td></tr>
+  <tr class="msg" id="L4"><td class="ts-cell"><a class="ts" href="#L4" alt="Mon Sep 18 2023 17:29:01 GMT-0700 (Pacific Daylight Time)">00:29</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@mhofman:matrix.org">Mathieu Hofman</span>&gt;</div></td><td class="msg-cell">for the async case you don't really need to check every shared struct being sent, I'll send some code later</td></tr>
+  <tr class="msg" id="L5"><td class="ts-cell"><a class="ts" href="#L5" alt="Mon Sep 18 2023 17:29:54 GMT-0700 (Pacific Daylight Time)">00:29</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">An async-only case doesn't really exist though, since any thread could set data on a shared struct visible by any other thread.</td></tr>
+
+</tbody></table></div></div></div>
+</body></html>
