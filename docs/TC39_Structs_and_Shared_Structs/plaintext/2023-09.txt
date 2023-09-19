@@ -1442,3 +1442,17 @@ In that way its still useful for read/write and for sending it along to another 
 [07:53:23.0266] <rbuckton>
 In the same vein, if `main.js` starts two workers that don't share the same registry, they can't wire up behavior at all.
 
+[09:03:27.0877] <Mathieu Hofman>
+I was assuming only matching keys in the registry in the first place, but I don't think that solves the problem. For example:
+- M creates the registry
+- M creates A with the shared registry. A can block during prepare until it has attached behaviors for M's examplars, and M can block until A has shared its examplars, and M has attached behavior
+- M shares a container struct with A
+- M subsequently creates B with the same shared registry. B can block during prepare until it has attached behaviors for both M and A's examplars, and M can block until B has shared its examplars, and M has attached behavior
+- M shares the previously created container with B (possibly in the init params of the worker)
+- B adds some shared structs it creates to the container
+- A attempts to read from the container
+
+How do we make sure that A has had the opportunity to process B's examplars to attach behavior to B's types before A encounters the B struct types in the shared container. A may be doing a busy loop we cannot preempt. I can probably imagine patching all atomics operations to interleave the attachment check, but that feels gross.
+
+Or maybe there's something simply I'm overlooking
+
