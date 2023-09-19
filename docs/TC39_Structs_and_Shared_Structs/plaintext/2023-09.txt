@@ -1192,3 +1192,91 @@ but it would be abysmally slow.
 
 And this lazy operation doesn't necessarily require blocking. By the time thread A and B can communicate, they would both have already filled out their side of the shared registry.
 
+[18:06:14.0004] <Mathieu Hofman>
+I'm really not good at multi-threaded coded, but I was thinking of something along the lines of:
+```
+shared struct StructRegistryEntry {
+    name;
+    examplar;
+    next;
+}
+
+shared struct StructRegistry {
+  head;
+  names;
+
+  nonshared lastAttached;
+  nonshared prototypes;
+
+  nonshared constructor(structs = {}) {
+    const names = Object.keys(structs);
+    this.names = new SharedFixedArray(names.length);
+    for (const [i, name] of names.entries()) {
+      this.names[i] = name;
+    }
+    this.prepare(structs);
+  }
+
+  nonshared prepare(structs) {
+    const prototypes = new Map([...this.names].map(name => [name, null]));
+
+    const entries = [];
+
+    for (const [name, constructor] of Object.entries(structs)) {
+      if (!prototypes.has(name)) {
+        throw new Error(`Undeclared struct name ${name}`);
+      }
+
+      prototypes.set(name, constructor.prototype)
+      entries.push([name, new constructor()]);
+    }
+
+    this.prototypes = prototypes;
+
+    for (const [name, examplar] of entries) {
+      this.register(name, examplar);
+    }
+  }
+  
+  nonshared register(name, examplar) {
+    if (!this.prototypes.has(name)) {
+      throw new Error(`Undeclared struct name ${name}`);
+    }
+    const entry = new StructRegistryEntry()
+    entry.name = name;
+    entry.examplar = examplar;
+    entry.next = this.head;
+
+    while (true) {
+      const oldHead = Atomics.compareExchange(this, 'head', entry.next, entry)
+      if (oldHead === entry.next) {
+        break;
+      } else {
+        entry.next = oldHead;
+      }
+    }
+
+    updateRegistrations(this)
+  }
+}
+
+function updateRegistrations(structRegistry) {
+  const head = structRegistry.head;
+  let entry = head;
+  while (entry !== structRegistry.lastAttached) {
+    const behavior = structRegistry.prototypes.get(entry.name);
+    if (behavior) {
+      attachBehavior(entry.examplar, behavior);
+    }
+    entry = entry.next;
+  }
+  structRegistry.lastAttached = head;
+}
+```
+
+[18:07:29.0306] <Mathieu Hofman>
+`updateRegistrations` would have to be triggered anytime there is some unattached struct, or eagerly for every message received. I'm not sure how you trigger it in the sync case
+
+[18:08:15.0399] <Mathieu Hofman>
+anyway I need to head out, hopefully that pseudo code conveys how I thought of the StructRegistry that Ron suggested
+
