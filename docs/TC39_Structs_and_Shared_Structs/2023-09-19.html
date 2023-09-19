@@ -149,6 +149,141 @@ function updateRegistrations(structRegistry) {
 </ul>
 <p>There doesn't seem to be a good way to explain in terms of initialization and messaging the kind of preemption required by introducing a new thread's types to other connected threads that are potentially in busy loops. Maybe it demonstrates that "attach behavior" is not sufficient, and it likely means the registry mechanism has to be language specified instead, which kinda saddens me.</p>
 </td></tr>
+  <tr class="msg" id="L14"><td class="ts-cell"><a class="ts" href="#L14" alt="Tue Sep 19 2023 07:44:24 GMT-0700 (Pacific Daylight Time)">14:44</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell"><p>What if we only support wiring up exemplars between A and B that <em>only</em> have a matching key in M? The shared registry would just track the type identities of each registered exemplar in one place during preload, so you wouldn't need to process new exemplars:</p>
+<pre><code class="language-js">//
+// main.js
+//
+import { Foo, Bar, Baz } from "./structs.js";
+const structs = new StructRegistry({ Foo, Bar, Baz });
+const data = new (new SharedStructType(["mut", "cond", "ready", "value"]))();
+data.mut = new Atomics.Mutex();
+data.cond = new Atomics.Condition();
+data.ready = false;
+const A = new Worker("A.js", { preload: "preloadA.js", structs, workerData: data });
+const B = new Worker("B.js", { preload: "preloadB.js", structs, workerData: data });
+
+//
+// preloadA.js
+//
+import { Foo, Bar, Quxx } from "./structs.js";
+import { prepareWorker } from "worker_threads";
+prepareWorker({ structs: { Foo, Bar, Quxx } });
+
+//
+// preloadB.js
+//
+import { Foo, Baz, Quxx } from "./structs.js";
+import { prepareWorker } from "worker_threads";
+prepareWorker({ structs: { Foo, Baz, Quxx } });
+
+//
+// A.js
+//
+import { Foo, Bar, Baz, Quxx } from "./structs.js";
+import { workerData } from "worker_threads";
+
+Atomics.Mutex.lock(workerData.mut, () =&gt; {
+  function waitForB() {
+    while (!workerData.ready) Atomics.Condition.wait(workerData.cond, workerData.mut);
+  }
+
+  function sendToB(value) {
+    workerData.value = value;
+    workerData.ready = false;
+    Atomics.Condition.notify(workerData.cond);
+    waitForB();
+  }
+
+  function receiveFromB() {
+    waitForB();
+    return workerData.value;
+  }
+
+  waitForB();
+
+  // send our `Foo`
+  sendToB(new Foo());
+
+  // Check whether the `Foo` sent by B shares the same prototype as our `Foo`.
+  // This works because both A and B have registered a `Foo` entry that maps to `Foo` in the main thread.
+  console.log(receiveFromB() instanceof Foo); // prints: true
+
+  // send our `Bar`
+  sendToB(new Bar());
+
+  // Check whether the `Bar` sent by B shares the same prototype as our `Bar`.
+  // This does not work because preloadB.js did not register `Bar`.
+  console.log(receiveFromB() instanceof Bar); // prints: false
+
+  // send our `Baz`
+  sendToB(new Baz());
+
+  // Check whether the `Baz` sent by B shares the same prototype as our `Baz`.
+  // This does not work because preloadA.js did not register `Baz`.
+  console.log(receiveFromB() instanceof Baz); // prints: false
+
+  // send our `Quxx`
+  sendToB(new Quxx());
+
+  // Check whether the `Quxx` sent by B shares the same prototype as our `Quxx`.
+  // This does not work because main.js did not register `Quxx`.
+  console.log(receiveFromB() instanceof Quxx); // prints: false
+});
+
+// B.js
+import { Foo, Bar, Baz, Quxx } from "./structs.js";
+import { workerData } from "worker_threads";
+
+Atomics.Mutex.lock(workerData.mut, () =&gt; {
+  function waitForA() {
+    while (workerData.ready) Atomics.Condition.wait(workerData.cond, workerData.mut);
+  }
+
+  function sendToA(value) {
+    workerData.value = value;
+    workerData.ready = true;
+    Atomics.Condition.notify(workerData.cond);
+    waitForA();
+  }
+
+  function receiveFromA() {
+    waitForA();
+    return workerData.value;
+  }
+
+  // signal to A that we're ready
+  sendToA(undefined);
+
+  // Check whether the `Foo` sent by A shares the same prototype as our `Foo`.
+  // This works because both A and B have registered a `Foo` entry that maps to `Foo` in the main thread.
+  console.log(receiveFromA() instanceof Foo); // prints: true
+
+  // send our `Foo`
+  sendToA(new Foo());
+
+  // Check whether the `Bar` sent by A shares the same prototype as our `Bar`.
+  // This does not work because preloadB.js did not register `Bar`.
+  console.log(receiveFromA() instanceof Bar); // prints: false
+  
+  // send our `Bar`
+  sendToA(new Bar());
+
+  // Check whether the `Baz` sent by A shares the same prototype as our `Baz`.
+  // This does not work because preloadA.js did not register `Baz`.
+  console.log(receiveFromA() instanceof Baz); // prints: false
+
+  // send our `Baz`
+  sendToA(new Baz());
+
+  // Check whether the `Quxx` sent by B shares the same prototype as our `Quxx`.
+  // This does not work because main.js did not register `Quxx`.
+  console.log(receiveFromA() instanceof Quxx); // prints: false
+
+  // send our `Quxx`
+  sendToA(new Quxx());
+});
+</code></pre>
+</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>
