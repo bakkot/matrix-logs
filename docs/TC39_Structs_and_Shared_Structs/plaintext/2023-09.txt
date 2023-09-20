@@ -2109,3 +2109,56 @@ There are two options. One is "when we create the thread local prototype Object 
 [14:08:06.0034] <rbuckton>
 The other is lazily on `[[GetPrototypeOf]]`, but we don't need the laziness if the runtime can do all of this work for you.
 
+[14:10:20.0732] <shu>
+so here's my harebrained worse-is-better idea:
+
+_what if_ `shared struct S { }` declarations evaluated to something that has a special `packageForClone()`, which returns some object that can be reevaluated (like direct eval, but i guess safer?)
+
+```
+shared struct S {
+  static nonshared prototype;
+
+  // The static block gets packaged _as source text_.
+  static {
+    // Set up thread-local prototype
+    this.prototype.method = function() { whatever; }
+  }
+}
+
+let thing = S.packageForClone();
+thing.evaluate(); // Get a constructor back that can create instances of the same layout. The VM knows it's correlated with `S`-instances. Re-evaluates the static block _from source text_ at the point of evaluation.
+```
+
+[14:12:19.0186] <shu>
+the return value of `packageForClone()` would be special cased in the structured clone algorithm to be cloneable
+
+[14:15:38.0585] <rbuckton>
+I still don't think this works because it makes assumptions about what is reachable in the child thread.
+
+[14:16:05.0130] <shu>
+how so?
+
+[14:16:29.0868] <rbuckton>
+The child thread might be running from a bundle that doesn't include some module names, because the methods that use them were removed from the child thread bundle due to tree shaking.
+
+[14:17:16.0579] <shu>
+it's like re-evaling a function's `toString()`, no assumptions are made per se, but if things get DCE'd because the tool wasn't aware it's implicitly being used somehow, then the tool needs those exceptions annotated, yeah
+
+[14:17:48.0752] <rbuckton>
+And its likely that the child thread already has a copy of all of the necessary behavior in memory, so now we're taking up even more memory in the worker thread for duplicate code.
+
+[14:18:36.0143] <shu>
+how did it get the necessary behavior in memory, import? this idea means you never import the right structs, you gotta always postMessage them
+
+[14:18:44.0672] <shu>
+but agreed that doesn't feel great
+
+[14:19:30.0794] <rbuckton>
+I'm not a fan of that design, tbh. Its too easy for code to become entangled.
+
+[14:19:48.0905] <rbuckton>
+I'll be back in a bit, in a meeting for the next hour.
+
+[14:19:51.0103] <shu>
+the minimal version of this idea is that shared struct constructors ought to be made structured cloneable in such a way that the VM can keep the type identity correlation across agents
+
