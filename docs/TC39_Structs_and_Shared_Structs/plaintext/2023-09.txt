@@ -2168,3 +2168,98 @@ they can be safely cloned because these constructors don't call user code
 [14:21:02.0534] <shu>
 i guess that minimal version can be combined with your registry handshake. it makes the correlation of type identities automatic
 
+[15:06:26.0147] <rbuckton>
+I'm not sure I agree with that approach? I might need my shared struct constructor to access some per-thread configured object that may not be trivially serializable, such as accessing `threadId` in `import { threadId } from "node:worker_threads"` or, read from an environment variable via `sys.getEnvironmentVariable(name)`, where `sys` must be correctly initialized for within that thread. 
+
+[15:06:42.0545] <rbuckton>
+And both of these cases are present in the work I'm doing right now.
+
+[15:07:43.0451] <rbuckton>
+and I definitely want to be able to run user code so that I can appropriately set up shared struct instances, including providing suitable defaults to match the types I'
+
+[15:07:48.0563] <rbuckton>
+ * and I definitely want to be able to run user code so that I can appropriately set up shared struct instances, including providing suitable defaults to match the types I've defined.
+
+[15:08:05.0143] <shu>
+i think we're talking about 2 constructors
+
+[15:08:27.0869] <rbuckton>
+Yes and no.
+
+[15:08:29.0576] <shu>
+shared structs don't have user code constructors
+
+(i now also see that the README.md is incorrect)
+
+[15:08:38.0891] <rbuckton>
+They don't currently, correct.
+
+[15:09:00.0267] <shu>
+they just have a way to objects of the correct layout, let's call this constructor the "minter"
+
+[15:09:17.0766] <shu>
+you can wrap this in a per-thread constructor that does thread-local things
+
+[15:09:32.0261] <rbuckton>
+Sure, but you're talking about packing in the prototype members along with that, which we don't do anywhere else in JS.
+
+[15:09:45.0676] <shu>
+sorry i switched gears
+
+[15:09:50.0203] <shu>
+scratch the prototype members idea
+
+[15:10:13.0045] <shu>
+the minimal version is: the minter, and the minter alone, with no transitive properties, is a cloneable function that can be cloned across worker boundaries
+
+[15:10:19.0205] <rbuckton>
+Ok, but then I don't see why serializing the constructor is useful.
+
+[15:10:58.0003] <shu>
+ah, because the VM can keep tabs under the hood that it's correlated with shared structs of a particular type
+
+[15:11:20.0979] <shu>
+but i guess this doesn't work for your approach because you want to be able to
+
+1. import { S } from some place
+2. _then_ correlate them
+
+[15:11:35.0435] <shu>
+instead of
+
+1. receive { S } via message from some coordination thread
+2. set up S.prototype
+
+[15:11:58.0832] <rbuckton>
+Those are the same thing to me
+
+[15:12:08.0388] <rbuckton>
+Just different levels of abstraction
+
+[15:12:27.0213] <shu>
+they aren't to me, because "import { S } from some place" already evaluates and binds an S that we'd need to correlate after-the-fact
+
+[15:12:40.0675] <shu>
+where as "receive S via message" gets the right S beforehand with no addition coordination needed
+
+[15:13:13.0057] <shu>
+it's the difference between 2 copies that are correlated and 1 copy
+
+[15:13:18.0975] <rbuckton>
+Ok, fair. Then the issue I have with the 2nd approach is one of timing. 
+
+[15:13:43.0924] <shu>
+right, there is a conceptual startup barrier for all workers
+
+[15:14:17.0487] <rbuckton>
+And some workers might want to be able to create instances of a shared struct type ahead of the handshake process or message or whatever
+
+[15:14:39.0724] <rbuckton>
+Because sometimes I need to set up singleton values or run code against objects that also happen to be shared.
+
+[15:14:52.0992] <shu>
+yeah, that style is explicitly unsupported, or at least will always need to be reordered after the handshake barrier
+
+[15:15:13.0440] <rbuckton>
+With the approach I've been suggesting, it doesn't.
+
