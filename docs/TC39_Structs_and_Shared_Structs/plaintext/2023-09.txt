@@ -1974,3 +1974,92 @@ So you either need to:
 - weak privacy for shared structs
 - provide a friendship mechanism that you can somehow share in a trusted manner when handshaking with a child thread.
 
+[13:40:12.0585] <rbuckton>
+ * So you either need to:
+
+1. disallow privacy
+2. disallow access to private names from one thread in another thread
+3. weak privacy for shared structs
+4. provide a friendship mechanism that you can somehow share in a trusted manner when handshaking with a child thread.
+
+[13:41:26.0698] <rbuckton>
+I think (2) is unusable, I'm sure someone won't be happy with (3), and I don't have a solution for (4) yet.
+
+[13:41:51.0705] <rbuckton>
+nonshared private fields are definitely doable.
+
+[13:42:31.0715] <rbuckton>
+> <@shuyuguo:matrix.org> the performance will be so extremely different, yet looks the same
+
+I'd still rather have them, even if we need a different or additional scary-sounding keyword in the field declaration.
+
+[13:43:45.0071] <shu>
+yeah perhaps
+
+[13:43:50.0763] <shu>
+i agree (2) will be unusable
+
+[13:44:33.0677] <rbuckton>
+For private names, we could make you explicitly annotate them as `shared` to get the point across that their privacy is weaker.
+
+[13:44:34.0372] <shu>
+the only solution that composes i can think of is some kind of new exotic callable that's threadsafe
+
+[13:44:48.0354] <shu>
+and that this new exotic callable can close over `#` names
+
+[13:45:07.0904] <shu>
+but it can't close over normal bindings
+
+[13:45:18.0489] <shu>
+nobody liked the exotic callable idea the first time i brought it up though
+
+[13:45:29.0037] <rbuckton>
+why would we need that?
+
+[13:45:53.0773] <rbuckton>
+And I'm not even sure how you'd use that
+
+[13:46:47.0759] <shu>
+the private names thing can fall out of that, what i had in mind:
+
+```
+shared struct class S {
+  #x;
+  shared getX() { return this.#x; } // <- new exotic callable, can't close normal bindings, [[Realm]]-less, etc
+}
+```
+
+[13:47:15.0004] <rbuckton>
+In the "weaker privacy" model I was thinking about, private names are part of the type identity associated with a shared struct, and the handshake process that provides correlation between an exemplar and a prototype could be smart enough to correlate the private name as well.
+
+[13:48:02.0930] <shu>
+in the evaluation of `S` above, `#x` gets evaluated once and is closed over by this new shareable exotic callable, and you use those methods on instances and things just work
+
+[13:48:16.0278] <shu>
+we can't do this with normal functions obvoiusly because they're not shared things
+
+[13:49:18.0213] <rbuckton>
+So you do:
+```
+// structs.js
+export shared struct S {
+  shared #x; // weak shared private name
+  
+  nonshared getX() {
+    return this.#x; // private name access is correlated for foreign struct types.
+  }
+}
+
+// preload.js
+import { S } from "./structs.js";
+prepareWorker({ structs: { S } });
+```
+
+
+[13:49:41.0668] <rbuckton>
+You just have the private name itself be correlated.
+
+[13:50:09.0557] <shu>
+not sure i grasp on the correlation works
+
