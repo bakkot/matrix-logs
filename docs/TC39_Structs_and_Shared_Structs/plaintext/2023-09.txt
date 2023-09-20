@@ -2072,3 +2072,19 @@ though that is a step towards always using `shared struct` declarations for hand
 [13:50:59.0102] <rbuckton>
 I'll see if I can summarize?
 
+[13:56:17.0004] <shu>
+i have a harebarined worse-is-better idea
+
+[13:56:23.0835] <shu>
+ * i have a harebrained worse-is-better idea
+
+[14:00:06.0328] <rbuckton>
+- Each agent maintains an independent registry of the shared struct types created within the agent.
+- Each registry is linked bi-directionally to the agent that spawned the thread/agent.
+- When spinning up a new `Worker`, you provide a set of shared struct types to correlate with the worker. In previous discussions these were exemplar structs, but we only really need the type identity of the shared struct type.
+- When the worker starts up, it has a "preload" phase where it can handle its side of the handshake, and provide a set of shared struct types to correlate with the parent thread.
+- During preload, the child thread cannot otherwise communicate with the parent thread via the worker/message port (any `postMessage`/`onmessage` ends up queued until the handshake has finished).
+- In the agent registry, or in a global registry, you use this correlation information to establish how to treat any given shared struct in a foreign Agent.
+- When you look up the prototype of a non-local shared struct, you interrogate the registry for an agent-local prototype to use based on this correlation information.
+- By the time you can actually invoke `[[GetPrototypeOf]]`, all information you would need to correlate and resolve the prototype of a given shared struct should be known to the system.
+
