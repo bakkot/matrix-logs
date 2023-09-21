@@ -2771,3 +2771,154 @@ there is literally 0 reason to use Symbol.for over strings
 [13:43:56.0005] <shu>
 they are just worse strings
 
+[13:45:31.0411] <rbuckton>
+Its very frustrating that threads can't just share the same code, like almost any other language with multithreading.
+
+[13:45:47.0319] <shu>
+the original sin is we made code have identity and first-class values
+
+[13:45:51.0344] <shu>
+hard to walk that back
+
+[13:46:09.0182] <shu>
+it's also very frustrating classes have identity and are first-class values
+
+[13:46:32.0966] <shu>
+i'm happy to try to carve out a space where some things don't have identity, like layouts
+
+[13:46:37.0699] <Mathieu Hofman>
+> <@rbuckton:matrix.org> Its very frustrating that threads can't just share the same code, like almost any other language with multithreading.
+
+Moddable does it with frozen realms
+
+[13:47:00.0794] <rbuckton>
+I don't think that's so much a problem. It's a problem for sharing, sure, but would that apply to a threading model where you *don't* have to spin up a whole new copy of your application code.
+
+[13:47:14.0193] <rbuckton>
+ * I don't think that's [functions having identity] so much a problem. It's a problem for sharing, sure, but would that apply to a threading model where you _don't_ have to spin up a whole new copy of your application code.
+
+[13:47:23.0286] <Mathieu Hofman>
+https://github.com/Moddable-OpenSource/moddable/blob/public/documentation/xs/XS%20Marshalling.md#full-marshalling
+
+[13:47:23.0632] <shu>
+i think it is very much a problem
+
+[13:47:34.0512] <shu>
+everything having identity and being first-class values means by default they are not threadsafe
+
+[13:48:18.0431] <rbuckton>
+Sure, its not threadsafe. How is that bad?
+
+[13:48:55.0439] <shu>
+so... you can't just spin up a new thread without also loading a whole new copy of the world?
+
+[13:49:20.0161] <rbuckton>
+Why do you need a whole new copy of the world?
+
+[13:49:51.0894] <shu>
+i don't know what we're talkign about anymore, i was responding to your "it's frustrating" comment with my own reasons for why i find it frustrating
+
+[13:49:59.0807] <shu>
+we can drop this subthread, not a productive one
+
+[13:51:09.0836] <shu>
+back to the declarative layout idea at hand, yes, symbol-keyed names being precluded is a DX con
+
+[13:52:35.0240] <rbuckton>
+My point is more that, if we actually baked multithreading into the language, such that you don't have to spin up a copy of your application and could just use existing references, then we wouldn't have the correlation issue. We'd have other issues instead, but they are the pretty much the same issues as any other language with multithreading.
+
+[13:53:29.0734] <Mathieu Hofman>
+They are definitely the issues I don't want to see in JS
+
+[13:54:02.0698] <shu>
+> <@rbuckton:matrix.org> My point is more that, if we actually baked multithreading into the language, such that you don't have to spin up a copy of your application and could just use existing references, then we wouldn't have the correlation issue. We'd have other issues instead, but they are the pretty much the same issues as any other language with multithreading.
+
+actually agree, but that requires like a parallel SharedFunction prototype chain or whatever, and that bifurcates the world in a weird way that was a non-starter last time i tried
+
+[13:54:14.0023] <Mathieu Hofman>
+I've spent some time in golang lately, and for a language that's supposed to make threads easier to deal with, I'm sorry but it was not
+
+[13:54:34.0981] <rbuckton>
+but as you say, back to the layout idea. Would this be so bad, though:
+
+```
+shared struct S {
+  with identity "46e6d6a9-7e62-46d9-9dfc-6288740eed8c"; // <- correlation at declaration level
+  x;
+  y;
+}
+```
+
+[13:54:40.0676] <shu>
+anyway, i can live with something like:
+
+- we have `layout`s, which are declarative and static, and are pretty restrictive. but they are deduplicated up front and the correlation thing "just works". bundlers will need to learn they can't be tree-shaken as normal
+- shared struct declarations don't _have_ to use a declared layout. if they don't, then they can have computed property names. you can have a correlation thing built in userland if you go that route
+
+[13:55:17.0769] <shu>
+> <@rbuckton:matrix.org> but as you say, back to the layout idea. Would this be so bad, though:
+> 
+> ```
+> shared struct S {
+>   with identity "46e6d6a9-7e62-46d9-9dfc-6288740eed8c"; // <- correlation at declaration level
+>   x;
+>   y;
+> }
+> ```
+
+yeah i can live with it, so long as source location fallback exists
+
+[13:55:35.0813] <rbuckton>
+Sure. If that's the case, do we need the `layout` thing?
+
+[13:55:52.0901] <shu>
+why yes, because the 85% use case won't need computed property names
+
+[13:55:59.0907] <rbuckton>
+I think it adds far too much complexity.
+
+[13:56:10.0399] <shu>
+and the correlation API doesn't??
+
+[13:56:12.0597] <shu>
+i am so confused
+
+[13:56:25.0119] <shu>
+this seems vastly simpler to use as a developer than manually coordinating
+
+[13:57:29.0466] <rbuckton>
+I'm talking about the idea I suggested in the meeting:
+- no correlation api
+- no struct reevaluation (always the same instance in a given thread)
+- declarations correlated by either explicit token (i.e., `with identity "foo"`), or by source location
+
+[13:57:50.0964] <Mathieu Hofman>
+if the layouts are shareable, is it unacceptable from a DX point of view to have factories for the shared struct, so that you create the shared struct after having received the layout ?
+
+[13:58:24.0578] <shu>
+rbuckton: i'm hung up on the second bullet-point without the introduction of a static, declarative concept like `layout`
+
+[13:58:30.0303] <shu>
+i don't know what "no struct reevaluation" means
+
+[13:58:35.0668] <rbuckton>
+the struct *is* the layout
+
+[13:58:43.0606] <shu>
+but the struct isn't a static thing
+
+[13:58:46.0720] <shu>
+it can include static initializers, etc
+
+[13:58:56.0808] <shu>
+and computed property names, as we've been debating
+
+[13:59:30.0008] <rbuckton>
+My suggestion was that we *make* struct a static thing, per-thread at least.
+
+[13:59:39.0623] <shu>
+it's like a `static` variable in C/C++ or something? the first evaluation caches it to something, subsequent uses never evaluate it again? that's... really weird, given closures?
+
+[14:00:06.0832] <rbuckton>
+Yes, something like that. Yes its weird.
+
