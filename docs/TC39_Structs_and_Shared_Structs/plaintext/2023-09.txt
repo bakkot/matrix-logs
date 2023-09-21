@@ -2922,3 +2922,105 @@ it's like a `static` variable in C/C++ or something? the first evaluation caches
 [14:00:06.0832] <rbuckton>
 Yes, something like that. Yes its weird.
 
+[14:00:20.0489] <shu>
+> <@mhofman:matrix.org> if the layouts are shareable, is it unacceptable from a DX point of view to have factories for the shared struct, so that you create the shared struct after having received the layout ?
+
+no qualms from me?
+
+[14:01:06.0258] <shu>
+rbuckton: okay i guess it's possible, i just find those semantics really weird and less sensible than having a separate declarative, static concept
+
+[14:01:11.0911] <shu>
+what you're saying isn't static, it's cache-on-first-eval
+
+[14:01:20.0879] <shu>
+rather, singleton
+
+[14:01:34.0332] <shu>
+i'd prefer static semantics, you're saying singleton suffices
+
+[14:02:14.0608] <shu>
+why is singleton semantics needed if you deduplicate with an identity?
+
+[14:02:24.0428] <rbuckton>
+> <@shuyuguo:matrix.org> no qualms from me?
+
+I don't think this works. that's back to the thing1/thing2 issue. If I can write:
+
+```
+layout L { ... }
+shared struct S1 layout L { ... }
+shared struct S2 layout L { ... }
+```
+then I have _two_ or more potential prototypes to contend with in a given thread.
+
+[14:02:43.0144] <shu>
+no you have _one_ prototype
+
+[14:02:55.0828] <shu>
+L says "I have a per-thread [[Prototype]] slot"
+
+[14:03:00.0342] <shu>
+S1 and S2 refer to the same slot 
+
+[14:03:18.0233] <rbuckton>
+But S1 and S2 could define conflicting methods.
+
+[14:03:29.0214] <rbuckton>
+ * But S1 and S2 could define conflicting methods with the same names.
+
+[14:03:35.0684] <shu>
+that sounds like they have different layouts!
+
+[14:03:53.0902] <rbuckton>
+No, that sounds like a very easy to run into user error.
+
+[14:04:15.0426] <shu>
+i really do not understand what you're getting at
+
+[14:04:28.0316] <shu>
+maybe `layout` was a poor choice of words here
+
+[14:04:47.0945] <shu>
+let's just call it `nominal_shape` to be unambiguous
+
+[14:04:58.0224] <rbuckton>
+I'm having a hard time understanding what it's intending to solve.
+
+[14:05:09.0184] <shu>
+the correlation problem!
+
+[14:05:34.0582] <rbuckton>
+It sounds like it solves the "v8 internal map" problem, not the correlation problem?
+
+[14:06:18.0603] <shu>
+`S1 layout L` and `S2 layout L` is intended to behave like, _statically_, `Registry.register(L, S1)` and `Registry.register(L, S2)`, where `L` is the registry key
+
+[14:06:28.0541] <rbuckton>
+Ok.
+
+[14:06:35.0809] <shu>
+> <@rbuckton:matrix.org> It sounds like it solves the "v8 internal map" problem, not the correlation problem?
+
+those are the same problem to me
+
+[14:06:45.0610] <rbuckton>
+So I do both of those in the same thread, what happens?
+
+[14:08:42.0859] <shu>
+assuming `L` has a per-thread prototype declared, you have:
+
+- `S1` is its own constructor function
+- `S2` is its own constructor function
+- instances of S1 are indistinguishable from instances of S2
+- `S1.prototype` is the _same slot_ as `S2.prototype`, so `S1.prototype = foo` is also reflected as `S2.prototype === foo`
+
+[14:08:58.0376] <shu>
+the same semantics as if `S1` and `S2` were in different threads
+
+[14:09:36.0317] <rbuckton>
+What belongs to a `shared struct S1 layout L {}` then? the implementation?
+
+[14:09:56.0352] <shu>
+could you clarify what you mean by "belong"?
+
