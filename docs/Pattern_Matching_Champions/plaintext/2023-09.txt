@@ -1745,3 +1745,34 @@ IIRC, one of the reasons we considered `if` patterns was to provide a way to con
 [19:12:59.0450] <rbuckton>
 I personally found `${}` to be more problematic because it allowed completely arbitrary expressions, which could make patterns completely unreadable, and because it would prevent future use of `identifier{` due to `$` being a legal identifier.
 
+[19:25:14.0530] <rbuckton>
+`if` patterns, at least, provide some additional benefit. For example:
+
+```
+match ([1, "a"]) {
+  when [Number and let x, String] or [1 or "1", "a"] if (x % 2 === 0): ...; // (a)
+  when [Number and let x and if (x % 2 === 0), String] or [1 or "1", "a"]: ...;  // (b)
+}
+```
+With `if` as a clause and not a pattern (a), the first branch of the disjunction succeeds, but the `if` clause fails, even though the second branch of the disjunction would have succeeded. 
+With `if` as a pattern (b), we can perform the check locally within the subpattern. As a result, the first branch fails, but the 2nd branch succeeds.
+
+
+[19:26:39.0366] <rbuckton>
+Now consider this modified example:
+
+```
+match (["1", "a"]) {
+  when [Number and let x, String] or [1 or "1", "a"] if (x % 2 === 0): ...; // (a)
+  when [Number and let x and if (x % 2 === 0), String] or [1 or "1", "a"]: ...;  // (b)
+}
+```
+
+Here `x` is not defined in the 2nd branch of (a), so the `if` clause would result in a TDZ error. There would be no way around this aside from introducing a dummy `let x` somewhere just to ensure its valid on both sides.
+
+[19:28:24.0870] <rbuckton>
+Having two separate `when` clauses isn't necessarily an option if you don't want to repeat the expression in `...`. I can't recall whether `when` branches have fall-through for empty bodies like `case` does, but I don't imagine they do.
+
+[19:29:32.0156] <rbuckton>
+Also, `if` patterns don't preclude us from having a standalone `if` clause so that you don't need to do `when if (x): ` on its own and could just use `if(x):`
+

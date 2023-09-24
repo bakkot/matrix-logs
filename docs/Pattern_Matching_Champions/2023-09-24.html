@@ -36,6 +36,24 @@
   <tr class="msg" id="L7"><td class="ts-cell"><a class="ts" href="#L7" alt="Sat Sep 23 2023 18:44:22 GMT-0700 (Pacific Daylight Time)">01:44</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-6" title="@rkirsling:matrix.org">rkirsling</span>&gt;</div></td><td class="msg-cell">I think you're reacting to "objectively nasty", and that's super unfortunate because I said that as a "laugh together" phrase</td></tr>
   <tr class="msg" id="L8"><td class="ts-cell"><a class="ts" href="#L8" alt="Sat Sep 23 2023 19:09:25 GMT-0700 (Pacific Daylight Time)">02:09</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">IIRC, one of the reasons we considered <code>if</code> patterns was to provide a way to continue to have some ability to evaluate expressions in-situ within the pattern without needing the full <code>${}</code> syntax, which was also unique to this proposal in comparison to other pattern matching systems. <code>if</code> patterns were at least <em>close</em> to existing syntax, by expanding <code>when ... if ...</code> to be more flexible. I'm not sure if there were other reasons.</td></tr>
   <tr class="msg" id="L9"><td class="ts-cell"><a class="ts" href="#L9" alt="Sat Sep 23 2023 19:12:59 GMT-0700 (Pacific Daylight Time)">02:12</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">I personally found <code>${}</code> to be more problematic because it allowed completely arbitrary expressions, which could make patterns completely unreadable, and because it would prevent future use of <code>identifier{</code> due to <code>$</code> being a legal identifier.</td></tr>
+  <tr class="msg" id="L10"><td class="ts-cell"><a class="ts" href="#L10" alt="Sat Sep 23 2023 19:25:14 GMT-0700 (Pacific Daylight Time)">02:25</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell"><p><code>if</code> patterns, at least, provide some additional benefit. For example:</p>
+<pre><code>match ([1, "a"]) {
+  when [Number and let x, String] or [1 or "1", "a"] if (x % 2 === 0): ...; // (a)
+  when [Number and let x and if (x % 2 === 0), String] or [1 or "1", "a"]: ...;  // (b)
+}
+</code></pre>
+<p>With <code>if</code> as a clause and not a pattern (a), the first branch of the disjunction succeeds, but the <code>if</code> clause fails, even though the second branch of the disjunction would have succeeded.<br>With <code>if</code> as a pattern (b), we can perform the check locally within the subpattern. As a result, the first branch fails, but the 2nd branch succeeds.</p>
+</td></tr>
+  <tr class="msg" id="L11"><td class="ts-cell"><a class="ts" href="#L11" alt="Sat Sep 23 2023 19:26:39 GMT-0700 (Pacific Daylight Time)">02:26</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell"><p>Now consider this modified example:</p>
+<pre><code>match (["1", "a"]) {
+  when [Number and let x, String] or [1 or "1", "a"] if (x % 2 === 0): ...; // (a)
+  when [Number and let x and if (x % 2 === 0), String] or [1 or "1", "a"]: ...;  // (b)
+}
+</code></pre>
+<p>Here <code>x</code> is not defined in the 2nd branch of (a), so the <code>if</code> clause would result in a TDZ error. There would be no way around this aside from introducing a dummy <code>let x</code> somewhere just to ensure its valid on both sides.</p>
+</td></tr>
+  <tr class="msg" id="L12"><td class="ts-cell"><a class="ts" href="#L12" alt="Sat Sep 23 2023 19:28:24 GMT-0700 (Pacific Daylight Time)">02:28</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">Having two separate <code>when</code> clauses isn't necessarily an option if you don't want to repeat the expression in <code>...</code>. I can't recall whether <code>when</code> branches have fall-through for empty bodies like <code>case</code> does, but I don't imagine they do.</td></tr>
+  <tr class="msg" id="L13"><td class="ts-cell"><a class="ts" href="#L13" alt="Sat Sep 23 2023 19:29:32 GMT-0700 (Pacific Daylight Time)">02:29</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">Also, <code>if</code> patterns don't preclude us from having a standalone <code>if</code> clause so that you don't need to do <code>when if (x): </code> on its own and could just use <code>if(x):</code></td></tr>
 
 </tbody></table></div></div></div>
 </body></html>
