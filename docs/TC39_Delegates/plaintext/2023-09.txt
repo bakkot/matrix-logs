@@ -2217,3 +2217,216 @@ We override ASI via EE for OptionalChain, and we disallow expressions of certain
 [23:39:46.0290] <bakkot>
 in tdz michael said he like the "force you to always use parentheses" option
 
+[23:40:22.0303] <nicolo-ribaudo>
+Including cases like `a ?? (throw b)`?
+
+[23:40:30.0681] <bakkot>
+Michael Ficarra: ^ ?
+
+[23:40:34.0538] <Michael Ficarra>
+not only do I like it, I independently discovered it and thought it was good
+
+[23:40:43.0650] <nicolo-ribaudo>
+ * Including cases like `a ?? (throw b);`?
+
+[23:40:49.0513] <bakkot>
+If we did that and also made the RHS be a UnaryExpression, then it would be kind of the intersection subset which everyone can live with
+
+[23:40:56.0518] <bakkot>
+no new early errors, no ambiguity
+
+[23:41:02.0968] <Michael Ficarra>
+😁
+
+[23:41:04.0642] <rkirsling>
+I mean `?? throw x` really seems like _the_ core case though
+
+[23:41:12.0633] <bakkot>
+and we could, in the future, relax the restriction, if people relax their concerns
+
+[23:41:15.0190] <rbuckton>
+I'm not a huge fan of requiring the parenthesis since they wouldn't other be necessary for most cases.
+
+[23:41:24.0306] <bakkot>
+ * and using UnaryExpression as the RHS means we could, in the future, relax the restriction, if people relax their concerns
+
+[23:41:26.0530] <Michael Ficarra>
+rkirsling: and you can do that, you just need to write parentheses or you get a syntax error
+
+[23:41:28.0434] <rbuckton>
+ * I'm not a huge fan of requiring the parenthesis since they wouldn't otherwise be necessary for most cases.
+
+[23:41:46.0406] <rkirsling>
+you_cant_just.jpg
+
+[23:42:46.0283] <rbuckton>
+If `throw` is at _Expression_ precedence, then we don't need _ThrowStatement_ anymore, since it would be completely covered by _ExpressionStatement_. 
+
+[23:42:47.0344] <bakkot>
+(to be clear I would also prefer the early error route, over forcing parens everywhere, but I could live with forcing parens everywhere)
+
+[23:42:59.0791] <snek>
+is shane in here
+
+[23:43:10.0093] <rkirsling>
+I too had no idea about `?? yield x` though. does that also apply to `?? await x`? 
+
+[23:43:18.0603] <bakkot>
+> <@rbuckton:matrix.org> If `throw` is at _Expression_ precedence, then we don't need _ThrowStatement_ anymore, since it would be completely covered by _ExpressionStatement_.
+
+That's true but it would mean that we could not later switch from requiring parens everywhere to only requiring them in some cases
+
+[23:43:27.0928] <nicolo-ribaudo>
+> <@rkirsling:matrix.org> I too had no idea about `?? yield x` though. does that also apply to `?? await x`?
+
+no
+
+[23:43:29.0345] <bakkot>
+> <@rkirsling:matrix.org> I too had no idea about `?? yield x` though. does that also apply to `?? await x`?
+
+no, `await` is unary precedence
+
+[23:43:36.0475] <bakkot>
+`await` and `yield` parse very differently
+
+[23:44:32.0998] <rkirsling>
+fair enough
+
+[23:45:03.0887] <rbuckton>
+I don't think we need the EE rules for everything, just `+`, `-`, and `/`, the rest could still just be a lookahead restriction.
+
+[23:45:21.0533] <nicolo-ribaudo>
+And `/=`
+
+[23:45:26.0932] <Michael Ficarra>
+> <@rbuckton:matrix.org> If `throw` is at _Expression_ precedence, then we don't need _ThrowStatement_ anymore, since it would be completely covered by _ExpressionStatement_.
+
+I think that might change its completion value though
+
+[23:45:56.0063] <rbuckton>
+> <@michaelficarra:matrix.org> I think that might change its completion value though
+
+They both result in a throw completion?
+
+[23:46:06.0275] <Michael Ficarra>
+oh, fair lol
+
+[23:52:11.0313] <waldemar>
+> <@ljharb:matrix.org> errors are best encountered early
+
+Exactly! The earliest place to encounter errors is in the grammar.
+
+[23:52:49.0681] <bakkot>
+For a user of the language, there is no difference between "in the grammar" and "as an early error"
+
+[23:53:58.0796] <waldemar>
+The difference is complexity. In most cases, if you're using early errors, then you're doing something more complicated than what can be expressed in a grammar, and that carries a cost.
+
+[23:54:42.0487] <shu>
+where is this gist?
+
+[23:55:09.0900] <bakkot>
+The cost is fairly small. Concretely, here's the trilemma: 
+
+- no early errors, `throw` is high precedence: means that `throw a ? b : c` would throw `a`
+- no early errors, `throw` is low precedence: means that `x ?? throw y` is illegal
+- early errors: means you have a little more complexity in the grammar
+
+[23:55:24.0910] <bakkot>
+the third arm of the trilemma seems _obviously_ better than the first two, to me
+
+[23:55:37.0631] <bakkot>
+> <@shuyuguo:matrix.org> where is this gist?
+
+https://gist.github.com/bakkot/5a22c8c13ce269f6da46c7f7e56d3c3f
+
+[23:55:43.0245] <rkirsling>
+(_wow, I never actually stopped to analyze dilemma into di+lemma before..._)
+
+[23:55:44.0796] <waldemar>
+I am concerned about usability. 
+
+[23:55:48.0999] <rbuckton>
+I've created https://github.com/tc39/proposal-throw-expressions/pull/18 to show what the Early errors would look like.
+
+[23:56:27.0409] <rbuckton>
+Hmm. it didn't publish a rendered spec 
+
+[23:56:35.0768] <littledan>
+> <@bakkot:matrix.org> the third arm of the trilemma seems _obviously_ better than the first two, to me
+
+yeah I think I agree that you're kinda unlikely to hit the third one
+
+[23:56:41.0021] <littledan>
+I mean, the hazard case of the third one
+
+[23:56:42.0933] <rbuckton>
+ah, now it did
+
+[23:57:02.0627] <bakkot>
+> <@waldemarh:matrix.org> I am concerned about usability.
+
+As a user, the early errors seem like the most usable option of the three I've listed.
+
+[23:57:14.0532] <shu>
+> <@bakkot:matrix.org> https://gist.github.com/bakkot/5a22c8c13ce269f6da46c7f7e56d3c3f
+
+thanks
+
+[23:57:21.0266] <rbuckton>
+I only need to add 3 static semantics rules and remove `+`, `-`, `/`, and `/=` from the banned token list.
+
+[23:57:31.0558] <bakkot>
+I agree it is a little more complicated, but you have to weigh that against the costs of the other options, which seem a lot worse.
+
+[23:57:42.0024] <hax (HE Shi-Jun)>
+Will there be new things need to escape in the future?
+
+[23:58:06.0695] <bakkot>
+The idea is, no
+
+[00:01:16.0535] <waldemar>
+Either a throw expression can be used in a logical expression or not. Having it sometimes be usable in a logical expression and sometimes not is too confusing.
+
+[00:01:40.0809] <waldemar>
+That's what we'd get with the early errors.
+
+[00:01:41.0391] <bakkot>
+I think having it usable only as the RHS of a logical expression is completely fine.
+
+[00:01:52.0044] <bakkot>
+There is no use case for having it as the LHS of a logical expression.
+
+[00:01:58.0224] <nicolo-ribaudo>
+> <@waldemarh:matrix.org> Either a throw expression can be used in a logical expression or not. Having it sometimes be usable in a logical expression and sometimes not is too confusing.
+
+Well it's like `-1 ** 2` vs `1 ** -2`
+
+[00:02:44.0224] <Michael Ficarra>
+ryzokuken: can we get the queue cleared out?
+
+[00:02:46.0477] <waldemar>
+That analogy is not helpful.
+
+[00:03:03.0673] <nicolo-ribaudo>
+It is an expression that can be used only on one side of a binary operator and not on the other
+
+[00:03:21.0841] <ryzokuken>
+> <@michaelficarra:matrix.org> ryzokuken: can we get the queue cleared out?
+
+oops, thanks for the reminder
+
+[00:03:23.0932] <waldemar>
+How is that relevant?
+
+[00:03:24.0360] <ryzokuken>
+should be good now
+
+[00:03:55.0193] <rbuckton>
+> <@waldemarh:matrix.org> Either a throw expression can be used in a logical expression or not. Having it sometimes be usable in a logical expression and sometimes not is too confusing.
+
+I don't find the rule "`throw` has to be the right-most thing, unless you parenthesize it" to be that confusing.
+
+[00:04:45.0695] <waldemar>
+I do. It violates intuition about how operator precedence works.
+
