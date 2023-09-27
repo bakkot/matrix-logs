@@ -3300,3 +3300,3980 @@ also `flat` is problematic in ways that `concat` is not, wrt handling of non-ite
 
 it is very common in practice to have something that can either be one thing, or a list of things, and `[].concat(x)` is incredibly useful and commonplace to ensure one always has an array without having to care
 
+[19:10:39.0073] <snek>
+i don't think i've ever seen code that has `[].concat(x)`
+
+[19:10:41.0700] <bakkot>
+I have literally never seen that pattern in any code not written by you
+
+[19:10:45.0655] <snek>
+i believe you that it exists
+
+[19:10:47.0713] <ljharb>
+lol
+
+[19:10:58.0812] <Jesse (TC39)>
+OH `cons`
+
+[19:10:59.0455] <snek>
+but like, i wrote code with `chain` literally today (in rust) at work
+
+[19:11:08.0371] <ljharb>
+none the less, i didn't make it up, it's common in lots of codebases i've worked in, which is why i use it in all of mine
+
+[19:11:19.0833] <rbuckton>
+> <@bakkot:matrix.org> I have literally never seen that pattern in any code not written by you
+
+It definitely exists in transpiled emit, not sure how often it is hand-written
+
+[19:11:45.0934] <ljharb>
+i agree concatSpreadable is awful, but not because "concat takes an array or a scalar" is awful.
+
+[19:12:16.0956] <Michael Ficarra>
+two things can be awful at the same time
+
+[19:12:50.0594] <rbuckton>
+"preferred" is also a bit strong. 
+
+[19:13:09.0551] <ljharb>
+sure. i just don't agree the second one is awful, because i don't think in terms of haskelly types
+
+[19:13:52.0092] <Michael Ficarra>
+I mean even TypeScript-y types don't unify those things
+
+[19:14:18.0027] <Michael Ficarra>
+you don't need some advanced type system to be told that that is inappropriate
+
+[19:14:22.0555] <rbuckton>
+waldemar: You don't get a prototype, at least as far as we've been discussing.
+
+[19:14:39.0662] <rbuckton>
+As in, `[[Prototype]]` is `null`
+
+[19:14:48.0736] <bakkot>
+> <@bakkot:matrix.org> also `flat` is problematic in ways that `concat` is not, wrt handling of non-iterable values
+
+to elaborate on this: either it throws on non-iterable values, or it doesn't; both are problematic. throwing on non-iterable values means you can't use it like `Array.prototype.flat` to flatten a tree. not throwing on non-iterable values means that ever making anything iterable is a breaking change.
+
+[19:14:49.0756] <snek>
+imo having a variable number of things is what vectors are for, not vector or item
+
+[19:14:49.0883] <ljharb>
+typescript certainly can't handle `[].concat()` at all, it's been a long standing open issue on the repo
+
+[19:14:55.0285] <ljharb>
+ * typescript certainly can't handle `[].concat()` at all, it's been a long standing open issue on the repo. that doesn't mean it's bad.
+
+[19:15:29.0900] <ljharb>
+ * typescript certainly can't handle `[].concat()` at all, it's been a long standing open issue on the repo. that doesn't mean it's bad, it's just another gap in TS's ability to describe JS.
+
+[19:16:49.0536] <hax (HE Shi-Jun)>
+I remember the original draft don't allow prototype on shared struct values, now it's allowed but just omitted when transfer? Is my understanding correct?
+
+[19:17:12.0630] <snek>
+i'm curious why prototypes are a thing at all
+
+[19:17:16.0783] <snek>
+on shared structs
+
+[19:17:28.0808] <rbuckton>
+> <@haxjs:matrix.org> I remember the original draft don't allow prototype on shared struct values, now it's allowed but just omitted when transfer? Is my understanding correct?
+
+Not quite. If you want thread-local behavior, you must explicitly opt in and supply that behavior in each thread.
+
+[19:17:31.0391] <snek>
+i'd expect them to be an underlying implementation detail of some higher level thing
+
+[19:17:32.0972] <ljharb>
+i'm also confused why a struct would have behavior (functions) attached
+
+[19:17:43.0387] <rkirsling>
+me hearing "just an ephemeron" just now felt like like most people probably feel hearing "just a monoid object in the category of endofunctors on C"
+
+[19:17:47.0075] <Michael Ficarra>
+I don't understand this. Why is throwing on non-iterables bad?
+
+[19:17:59.0061] <rbuckton>
+> <@devsnek:matrix.org> i'd expect them to be an underlying implementation detail of some higher level thing
+
+There is a lot of complexity to this. Attaching behavior is very important.
+
+[19:18:00.0508] <Jack Works>
+maybe just reference counter...
+
+[19:18:15.0860] <ljharb>
+> <@rbuckton:matrix.org> There is a lot of complexity to this. Attaching behavior is very important.
+
+*having* behavior is. *attaching* it is just a style choice.
+
+[19:18:26.0216] <ljharb>
+> <@rbuckton:matrix.org> There is a lot of complexity to this. Attaching behavior is very important.
+
+ * _having_ behavior is. _attaching_ it is just a style choice. functions can live separate from the data they affect.
+
+[19:18:29.0958] <hax (HE Shi-Jun)>
+> <@rbuckton:matrix.org> Not quite. If you want thread-local behavior, you must explicitly opt in and supply that behavior in each thread.
+
+Not fully understand... I mean I can always use functions (not methods)?
+
+[19:19:10.0022] <bakkot>
+> <@ljharb:matrix.org> typescript certainly can't handle `[].concat()` at all, it's been a long standing open issue on the repo. that doesn't mean it's bad, it's just another gap in TS's ability to describe JS.
+
+https://github.com/microsoft/TypeScript/issues/47351 is the issue presumably
+
+[19:19:12.0072] <ljharb>
+what i read is, "because it's actually an important use case to have an X and a non-X and concatenate them"
+
+[19:19:16.0125] <rbuckton>
+> <@ljharb:matrix.org> _having_ behavior is. _attaching_ it is just a style choice. functions can live separate from the data they affect.
+
+No, attaching is necessary for many projects, this is a result of feedback from multiple sources experimenting with the origin trial. Not everyone needs it, but many do.
+
+[19:19:32.0566] <bakkot>
+> <@bakkot:matrix.org> https://github.com/microsoft/TypeScript/issues/47351 is the issue presumably
+
+(with exactly 0 +1s...)
+
+[19:19:37.0834] <ljharb>
+> <@rbuckton:matrix.org> No, attaching is necessary for many projects, this is a result of feedback from multiple sources experimenting with the origin trial. Not everyone needs it, but many do.
+
+i would love to be convinced that it's "need"
+
+[19:19:42.0616] <hax (HE Shi-Jun)>
+> <@rbuckton:matrix.org> There is a lot of complexity to this. Attaching behavior is very important.
+
+I think it might be solved by extensions proposal? Don't use prototype, always use extension methods/accessor on shared struct values.
+
+[19:19:44.0717] <snek>
+i think sharing code within a struct makes sense and is well motivated. i think the whole prototype thing is weird
+
+[19:20:08.0971] <ljharb>
+> <@rbuckton:matrix.org> No, attaching is necessary for many projects, this is a result of feedback from multiple sources experimenting with the origin trial. Not everyone needs it, but many do.
+
+ * i would love to be convinced that it's "need", but people quite often incorrectly think their wants are needs.
+
+[19:20:17.0987] <Jack Works>
+> <@rkirsling:matrix.org> me hearing "just an ephemeron" just now felt like like most people probably feel hearing "just a monoid object in the category of endofunctors on C"
+
+at least ephemeron can be explained in 2 lines and <del>you may need a math phd to know the category theory</del>
+
+[19:20:26.0999] <rbuckton>
+I've been experimenting with this in TypeScript. I absolutely cannot use it efficiently without the ability to attach behavior, unless I use Proxy or completely duplicate our AST as regular objects for the public API.
+
+[19:20:35.0634] <rbuckton>
+anything else would be a significant breaking change.
+
+[19:20:46.0940] <bakkot>
+> <@michaelficarra:matrix.org> I don't understand this. Why is throwing on non-iterables bad?
+
+did you not see the "to flatten a tree" bit
+
+[19:20:54.0858] <ljharb>
+i don't understand why `x.foo()` and `foo(x)` are meaningfully different
+
+[19:21:06.0926] <rkirsling>
+(I think garbage collection is more difficult than category theory, but that's probably an issue of motivation)
+
+[19:21:07.0090] <ljharb>
+ * i don't understand why `x.foo()` and `foo(x)` are meaningfully different in terms of capabilities
+
+[19:21:17.0564] <Michael Ficarra>
+oh you mean like with a depth and stuff?
+
+[19:21:18.0036] <littledan>
+> <@rbuckton:matrix.org> I've been experimenting with this in TypeScript. I absolutely cannot use it efficiently without the ability to attach behavior, unless I use Proxy or completely duplicate our AST as regular objects for the public API.
+
+this makes perfect sense to me. It's necessary to be able to use objects directly, without wrapping them.
+
+[19:21:18.0376] <rbuckton>
+> <@ljharb:matrix.org> i don't understand why `x.foo()` and `foo(x)` are meaningfully different in terms of capabilities
+
+If you are writing a project from scratch, sure. If you are adapting an existing project, it might not be feasible.
+
+[19:21:21.0457] <Michael Ficarra>
+nobody should be doing that
+
+[19:21:24.0836] <Michael Ficarra>
+don't do that
+
+[19:21:30.0651] <bakkot>
+I was assuming you would have the depth parameter like on arrays, yes
+
+[19:21:34.0335] <ljharb>
+> <@rbuckton:matrix.org> If you are writing a project from scratch, sure. If you are adapting an existing project, it might not be feasible.
+
+that's not a need, that's just difficulty adapting to a different style.
+
+[19:21:35.0167] <Michael Ficarra>
+flat should not take a depth, it should always be 1
+
+[19:21:35.0268] <snek>
+> <@rbuckton:matrix.org> I've been experimenting with this in TypeScript. I absolutely cannot use it efficiently without the ability to attach behavior, unless I use Proxy or completely duplicate our AST as regular objects for the public API.
+
+to be clear what i'm suggesting is like. you could have a property of a struct, which holds a sharable code value (a function of sorts). it would probably be callable like `a.b()` even.
+
+[19:21:35.0313] <bakkot>
+would the plan be to not do that?
+
+[19:21:42.0012] <Michael Ficarra>
+yeah no depth parameter
+
+[19:21:47.0073] <bakkot>
+well
+
+[19:21:47.0263] <Michael Ficarra>
+fucking gross
+
+[19:21:55.0717] <hax (HE Shi-Jun)>
+> <@ljharb:matrix.org> i don't understand why `x.foo()` and `foo(x)` are meaningfully different in terms of capabilities
+
+DX, and x.foo() could be virtual methods.
+
+[19:22:03.0723] <ljharb>
+why? `.flat(Infinity)` is great
+
+[19:22:08.0972] <rbuckton>
+> <@ljharb:matrix.org> that's not a need, that's just difficulty adapting to a different style.
+
+That's not an option for a widely used public API, without breaking an entire ecosystem of tooling.
+
+[19:22:13.0603] <Michael Ficarra>
+🤦‍♂️ please
+
+[19:22:22.0497] <bakkot>
+I am ok with this but I think if you're going to push jordan to accept an asymmetry with array methods, you should push for `.concat`, the nice normal thing
+
+[19:22:45.0908] <rbuckton>
+And I'm not talking about TS, though we would be included in that. This is feedback from other attempts to migrate other projects to use structs.
+
+[19:23:04.0151] <ljharb>
+what tooling ecosystem? certainly APIs may need breaking changes; asynchrony forces that, for example.
+
+[19:23:13.0015] <ljharb>
+it's perfectly fine if multithreading forces that too.
+
+[19:23:18.0291] <ljharb>
+ * it's perfectly fine if multithreading forces that too (even if it's ideal not to)
+
+[19:23:51.0195] <ljharb>
+ * it's perfectly fine if multithreading forces that too (even if it's ideal not to)
+
+we have semver and code refactoring tools and codemods that can make that easier.
+
+[19:23:52.0848] <rbuckton>
+I don't believe that it is, and there are solutions under discussion to make that a non-issue.
+
+[19:25:28.0330] <Justin Ridgewell>
+Need pipeline and static functions 🤞
+
+[19:25:47.0440] <ljharb>
+oof, didn't we already make this mistake with global registries with symbols?
+
+[19:26:03.0948] <ljharb>
+ * oof, didn't we already make this global registry mistake with symbols?
+
+[19:26:15.0941] <Richard Gibson>
+this is even worse than that; it links objects!
+
+[19:26:23.0803] <ljharb>
+when the solution is "universal state!" then maybe the problem's not worth solving
+
+[19:26:26.0309] <snek>
+what global registry mistake? registered symbols are super useful
+
+[19:26:48.0169] <ljharb>
+i'm not sure how, they're just fancy strings.
+
+[19:27:04.0436] <Michael Ficarra>
+yeah just use a string
+
+[19:27:31.0838] <snek>
+strings can be constructed
+
+[19:27:35.0108] <snek>
+from random places
+
+[19:27:37.0434] <rbuckton>
+> <@michaelficarra:matrix.org> yeah just use a string
+
+Then why did we add `Symbol.iterator`? It's just a fancy `__iterator__`.
+
+[19:27:40.0349] <snek>
+i don't think the domain overlap makes sense
+
+[19:27:53.0860] <hax (HE Shi-Jun)>
+yeah, I also don't fully understand the use cases of `Symbol.for()`
+
+[19:28:06.0671] <Michael Ficarra>
+snek: that's the same thing as passing the string to Symbol.for...
+
+[19:28:10.0914] <snek>
+i think a great example is `Symbol.for('nodejs.util.inspect')`
+
+[19:28:13.0968] <bakkot>
+> <@devsnek:matrix.org> what global registry mistake? registered symbols are super useful
+
+this is the first time I've heard anyone express this opinion - what are they useful for?
+
+[19:28:24.0136] <bakkot>
+what does that do that a string wouldn't do?
+
+[19:28:30.0032] <ljharb>
+> <@devsnek:matrix.org> i think a great example is `Symbol.for('nodejs.util.inspect')`
+
+not sure how that's great; node would work the same if it used a non-global symbol
+
+[19:28:31.0754] <hax (HE Shi-Jun)>
+> <@devsnek:matrix.org> i think a great example is `Symbol.for('nodejs.util.inspect')`
+
+u could also use the string directly as key...
+
+[19:28:39.0200] <snek>
+you could use a string
+
+[19:28:50.0534] <ljharb>
+> <@devsnek:matrix.org> i think a great example is `Symbol.for('nodejs.util.inspect')`
+
+ * not sure how that's great; node would work the same if it used a non-global symbol - and in fact it *did* use a non-global one prior to the change to make it global
+
+[19:28:57.0544] <snek>
+but strings can come from random places
+
+[19:29:05.0418] <ljharb>
+so can global symbols
+
+[19:29:07.0955] <snek>
+you could end up with that object by accident or maliciously 
+
+[19:29:14.0406] <ljharb>
+same with global symbols
+
+[19:29:20.0137] <Michael Ficarra>
+say something that you can't say about strings
+
+[19:29:24.0559] <snek>
+no, you have to choose to invoke Symbol.for on some random string
+
+[19:29:34.0377] <snek>
+its not the default
+
+[19:29:37.0443] <ljharb>
+maybe less likely by accident but equally likely by malice?
+
+[19:29:50.0980] <hax (HE Shi-Jun)>
+To be honest , global symbol might be a little bit safer than string, but just a very little...
+
+[19:29:52.0956] <Jack Works>
+> <@ljharb:matrix.org> same with global symbols
+
+and if you're using a symbol this way, you're deliberately trying to break things
+
+[19:29:56.0436] <ljharb>
+*using* some random string is pretty unlikely too, especially that java package style node uses
+
+[19:30:02.0762] <Michael Ficarra>
+I dunno, I randomly call Symbol.for on things all the time, just in case
+
+[19:30:44.0046] <TabAtkins>
+...i don't understand what could possibly be gross about a depth. It's just a shorthand for .flat().flat().flat()...
+
+[19:30:47.0096] <rkirsling>
+this is very amusing because I always thought there was secretly a good reason why Symbol.for is a thing and I simply never needed to know it
+
+[19:30:56.0427] <rbuckton>
+There have been several attempts to use the origin trial, which is currently data only, to adopt shared structs in existing projects. The feedback has been the same: Without the ability to attach behavior requires a complete rewrite of the project, including the public API, which is a burden that we would rather not enforce on the project maintainers, nor their consumers. That makes the feature unusable for projects that would sorely benefit from the capability.
+
+[19:30:59.0375] <snek>
+i am surprised to hear that people don't like symbol.for
+
+[19:31:02.0838] <TabAtkins>
+And personally, I use `.flat(Infinity)` more than any other value. ^_^
+
+[19:31:13.0415] <snek>
+its definitely rare use cases but i think its well motivated at least
+
+[19:31:17.0128] <rbuckton>
+ * There have been several attempts to use the origin trial, which is currently data only, to adopt shared structs in existing projects. The feedback has been the same: Without the ability to attach behavior, shared structs require a complete rewrite of the project, including the public API, which is a burden that we would rather not enforce on the project maintainers, nor their consumers. That makes the feature unusable for projects that would sorely benefit from the capability.
+
+[19:32:27.0740] <snek>
+> <@rbuckton:matrix.org> There have been several attempts to use the origin trial, which is currently data only, to adopt shared structs in existing projects. The feedback has been the same: Without the ability to attach behavior, shared structs require a complete rewrite of the project, including the public API, which is a burden that we would rather not enforce on the project maintainers, nor their consumers. That makes the feature unusable for projects that would sorely benefit from the capability.
+
+what is the difference between `thing = wrap(struct)` and `Object.setPrototypeOf(struct, ...)`?
+
+[19:32:42.0547] <rbuckton>
+> <@devsnek:matrix.org> what is the difference between `thing = wrap(struct)` and `Object.setPrototypeOf(struct, ...)`?
+
+Performance and memory consumption.
+
+[19:33:23.0519] <rbuckton>
+In TypeScript, If you have a large AST, you either double your memory consumption for the AST, or redirect through accessors which is slower.
+
+[19:33:47.0007] <snek>
+you want the entire AST to be shared structs?
+
+[19:34:09.0386] <snek>
+even in languages with proper thread apis and such i would never want to do that
+
+[19:34:11.0167] <nicolo-ribaudo>
+> <@devsnek:matrix.org> you want the entire AST to be shared structs?
+
+That's how I would see us using this proposal in Babel too
+
+[19:34:17.0323] <rbuckton>
+> <@devsnek:matrix.org> you want the entire AST to be shared structs?
+
+Yes. That is what I'm doing right now to parallelize parse in an experiment.
+
+[19:35:01.0750] <rbuckton>
+> <@devsnek:matrix.org> you want the entire AST to be shared structs?
+
+ * Yes. That is what I'm doing right now to parallelize the TypeScript parser in an experiment.
+
+[19:35:01.0781] <nicolo-ribaudo>
+And we could parallelize transform by having locks on subtrees
+
+[19:35:28.0274] <snek>
+have you looked into how projects like rslint work
+
+[19:35:36.0642] <rbuckton>
+I could also parallelize emit, so I'd prefer to use the same AST everywhere.
+
+[19:36:43.0400] <rbuckton>
+Does rslint operate on a file on a time, or does it require whole program knowledge?
+
+[19:37:10.0954] <snek>
+i'm not sure if it does whole program but i was more talking about how it operates on a shared AST
+
+[19:37:14.0226] <snek>
+ * i'm not sure if it does whole program but i was more talking about how it operates on a shared AST in parallel
+
+[19:37:26.0296] <Michael Ficarra>
+TabAtkins: an infinitely-nested iterator will not be able to yield anything
+
+[19:38:01.0057] <rbuckton>
+I am not familiar with the internals of rslint.
+
+[19:38:04.0332] <TabAtkins>
+Yeah and mapping over an infinite iterator will infinite loop too. Is this something that's easy to hit by accident?
+
+[19:38:17.0557] <snek>
+it might be good to look at how projects which operate on a "shared ast" as a concept work in other languages
+
+[19:38:26.0358] <ljharb>
+basically nobody uses infinite iterators, that's just not a problem that happens
+
+[19:38:30.0867] <snek>
+rslint is one example, but there are lots
+
+[19:38:52.0798] <snek>
+anyway i suspect i will end up losing this argument, i don't have the energy to care about typescript internals more than you
+
+[19:40:46.0711] <Justin Ridgewell>
+JS inability to paralellize and share memory is the main reason we didn't use it for Turbobpack.
+
+[19:40:59.0335] <Christian Ulbrich>
+I find the idea of _"having non-byte stuff shared"_ , quite easy to grasp, that this _"should work with functions"_ as well (bcause it is JS), seems no to be so far-fetched. Question is, whether this is really doable, not so much to me, whether someone would use it.
+
+[19:41:34.0767] <Justin Ridgewell>
+We have proper sharing in Rust, but we don't access the same AST in parallel, only split the parsing/transforming between threads
+
+[19:41:37.0920] <snek>
+if we just have shared functions of some form, we don't need the prototype hacks
+
+[19:41:43.0537] <Rob Palmer>
+So you're saying that when this goes to Stage 4, Turbopack can get rewritten in JS?
+
+[19:41:50.0382] <bakkot>
+aaaaaanyway this is why I would not recommend trying to move forward with `.flat`
+
+[19:42:14.0427] <Justin Ridgewell>
+No, Rust offers us a lot more, but this was the non-starter for TS
+
+[19:42:38.0229] <Justin Ridgewell>
+Rust macros are magic ✨
+
+[19:42:56.0772] <Michael Ficarra>
+TabAtkins: mapping over an infinite iterator works fine, it does not infinite loop
+
+[19:43:12.0729] <Christian Ulbrich>
+So you say, if we have macros in JS, that turbopack... ah sorry
+
+[19:43:13.0123] <Michael Ficarra>
+also people *do* use infinite iterators ljharb 
+
+[19:43:14.0666] <bakkot>
+`for of` over an infinite iterator will infinite loop
+
+[19:43:21.0447] <TabAtkins>
+yeah, that's what i meant
+
+[19:43:21.0977] <bakkot>
+and infinite iterators are way more common than infinitely _nested_ iterators
+
+[19:43:24.0830] <TabAtkins>
+exhausting it
+
+[19:43:47.0756] <Michael Ficarra>
+infinitely nested iterators just don't exist at all, period
+
+[19:43:58.0623] <TabAtkins>
+I mean. Strings.
+
+[19:43:59.0615] <Michael Ficarra>
+there is no (useful) code that would construct them
+
+[19:44:12.0541] <TabAtkins>
+Because we fucked up.
+
+[19:44:18.0349] <hax (HE Shi-Jun)>
+> <@jridgewell:matrix.org> Rust macros are magic ✨
+
+There is also TS macros ( https://github.com/GoogleFeud/ts-macros ),maybe not very magic 😅
+
+[19:44:41.0738] <bakkot>
+strings at least would not be a problem here
+
+[19:44:51.0845] <rbuckton>
+> <@devsnek:matrix.org> if we just have shared functions of some form, we don't need the prototype hacks
+
+Looking at rslint, it looks like they start up a bunch of threads, parse in parallel, and then transmit the files back. Does `std::sync::mpsc::channel` clone the sent data, or does it reuse the same memory?
+
+[19:44:53.0068] <bakkot>
+> <@michaelficarra:matrix.org> infinitely nested iterators just don't exist at all, period
+
+you:
+
+> an infinitely-nested iterator will not be able to yield anything
+
+
+
+[19:45:03.0543] <bakkot>
+if they don't exist, then `.flat(Infinity)` is not at problem
+
+[19:45:08.0783] <rbuckton>
+I'm not that familiar with the Rust API
+
+[19:45:09.0865] <TabAtkins>
+Outside of strings, infinitely nested iterators are indeed virtually never a thing.
+
+[19:45:16.0008] <snek>
+depends on what you're sending through it
+
+[19:45:20.0836] <Michael Ficarra>
+also they're iterable not iterator, so `.flat(Infinity)` on them wouldn't infinitely recurse
+
+[19:45:26.0231] <TabAtkins>
+So yeah, I'm also confused why they're an objection to flat(Infinity)
+
+[19:45:36.0766] <Michael Ficarra>
+> <@bakkot:matrix.org> if they don't exist, then `.flat(Infinity)` is not at problem
+
+it also has no reason to exist
+
+[19:45:41.0907] <bakkot>
+`.flat` would certainly also work on iterables, like `flatMap` does?
+
+[19:45:52.0232] <snek>
+mpsc is "single consumer" so in most cases it is a move operation
+
+[19:46:10.0970] <snek>
+ * mpsc is "single consumer" so in most cases it is a move operation (reuses the same memory)
+
+[19:46:20.0562] <Michael Ficarra>
+bakkot: except strings lol
+
+[19:46:32.0344] <bakkot>
+except strings, yes
+
+[19:46:35.0365] <bakkot>
+everyone agrees on that
+
+[19:46:48.0341] <TabAtkins>
+Why do you think it has no reason to exist? You seem to dislike infinite flat on arrays too, while I use that more than anything else, so maybe this is a mismatch in expectations?
+
+[19:46:58.0596] <rbuckton>
+The issue with using module blocks is that it means the worker has no access to the struct declarations until after they are received from the originating thread, which complicates startup.
+
+[19:47:13.0041] <Michael Ficarra>
+TabAtkins: infinitely-nested arrays don't exist because you can't even construct them
+
+[19:47:16.0555] <snek>
+i would love if we had sharable funclets or whatever
+
+[19:47:23.0724] <snek>
+we can just revive domenic's proposal
+
+[19:47:32.0884] <TabAtkins>
+Sure. But *indefinitely* nested ones do, and that's what I mean by Infinity.
+
+[19:47:35.0357] <Michael Ficarra>
+at least you can construct an infinitely-nested iterator, even if you could never iterate it
+
+[19:47:45.0049] <ljharb>
+sure you can construct them. `const a = []; a.push(a)`
+
+[19:47:54.0460] <TabAtkins>
+lol indeed
+
+[19:48:15.0221] <ljharb>
+people do *that* a bunch, actually, with objects too, which is why there's npm packages to handle describing or serializing them
+
+[19:48:30.0626] <bakkot>
+blöcks
+
+[19:48:31.0820] <rbuckton>
+> <@rbuckton:matrix.org> The issue with using module blocks is that it means the worker has no access to the struct declarations until after they are received from the originating thread, which complicates startup.
+
+the DX for that order is terrible. If I want to use a `Point` in a module in my worker, I can't import it. I have to receive the constructor as an argument.
+
+[19:48:35.0130] <ljharb>
+(but nobody would be iterating over those, i expect)
+
+[19:48:39.0709] <snek>
+yeah blöcks
+
+[19:48:49.0190] <waldemar>
+How does source location work with eval?
+
+[19:49:01.0149] <snek>
+source location won't work
+
+[19:49:03.0092] <snek>
+that has to change
+
+[19:49:03.0989] <Justin Ridgewell>
+> <@waldemarh:matrix.org> How does source location work with eval?
+
+It breaks
+
+[19:49:06.0817] <snek>
+otherwise you can't use bundlers
+
+[19:49:10.0543] <Jack Works>
+> <@waldemarh:matrix.org> How does source location work with eval?
+
+it does not I believe 
+
+[19:49:40.0827] <Jack Works>
+but eval has a inferred address right? like "vm:123"
+
+[19:49:50.0956] <Jack Works>
+that is also some kind of source text identity 
+
+[19:50:14.0497] <TabAtkins>
+And calling `.flat(Infinity)` on that array just stack overflows immediately. That's fine.
+
+[19:50:21.0581] <nicolo-ribaudo>
+Every `eval` call generates a new source location
+
+[19:50:26.0803] <nicolo-ribaudo>
+As if they were different files
+
+[19:50:27.0812] <rbuckton>
+Regarding the source location thing, I had also been working on a mechanism that didn't depend on source location, but a correlation step on the worker thread to do setup to associate a foreign struct with a local prototype. The downside to this approach is that it results in multiple "maps" that affect ICs and require fixup.
+
+[19:50:54.0831] <Chris de Almeida>
+> people do that a bunch
+
+name them; they do not deserve anonymity
+
+[19:50:57.0343] <snek>
+the easiest would just be requiring the registration to use a very qualified name
+
+[19:51:10.0175] <ljharb>
+the DOM
+
+[19:51:13.0149] <snek>
+like `struct Foo registered "snek.library.Foo" {}`
+
+[19:51:15.0030] <ljharb>
+ * the DOM, for objects :-p
+
+[19:51:19.0620] <nicolo-ribaudo>
+com.google.workspace.sheets.myStruct
+
+[19:51:27.0459] <ljharb>
+puttin the java in javascript
+
+[19:51:32.0469] <snek>
+ * like `struct Foo registered "dev.snek.library.Foo" {}`
+
+[19:51:34.0369] <waldemar>
+> <@nicolo-ribaudo:matrix.org> Every `eval` call generates a new source location
+
+So the correlation from the presentation won't work with eval'd code.
+
+[19:51:36.0068] <rbuckton>
+> <@devsnek:matrix.org> the easiest would just be requiring the registration to use a very qualified name
+
+We have also considered that. I suggested it as a mechanism to address the bundling issue.
+
+[19:51:37.0696] <snek>
+yeah, exactly like symbols
+
+[19:51:48.0888] <rbuckton>
+> <@rbuckton:matrix.org> We have also considered that. I suggested it as a mechanism to address the bundling issue.
+
+The problem is that it's potentially forgeable
+
+[19:51:57.0573] <Chris de Almeida>
+why is that text red? 🤔
+
+[19:52:04.0065] <snek>
+> <@rbuckton:matrix.org> We have also considered that. I suggested it as a mechanism to address the bundling issue.
+
+yeah if you have main_thread.js and worker_thread.js, its kind of required i think
+
+[19:52:10.0397] <snek>
+since those are different source texts
+
+[19:52:12.0881] <rbuckton>
+> <@devsnek:matrix.org> yeah, exactly like symbols
+
+There's a difference. You don't define anything about a symbol except the description.
+
+[19:52:36.0770] <snek>
+ye the ultimate key in the agent would be the name + the shape 
+
+[19:52:59.0358] <rbuckton>
+> <@devsnek:matrix.org> yeah if you have main_thread.js and worker_thread.js, its kind of required i think
+
+Not necessarily, many bundlers support splitting out common code shared between different entrypoints.
+
+[19:53:41.0088] <rbuckton>
+> <@devsnek:matrix.org> ye the ultimate key in the agent would be the name + the shape
+
+That's interesting.
+
+[19:54:03.0166] <rbuckton>
+I'm not sure if its still not forgeable and thus usable as a communications channel.
+
+[19:54:24.0851] <Michael Ficarra>
+it probably contains one of your mention words
+
+[19:54:36.0500] <nicolo-ribaudo>
+> <@waldemarh:matrix.org> So the correlation from the presentation won't work with eval'd code.
+
+Yes, it wouldn't
+
+[19:54:52.0216] <nicolo-ribaudo>
+> <@waldemarh:matrix.org> So the correlation from the presentation won't work with eval'd code.
+
+ * Exactlt, it wouldn't
+
+[19:54:57.0039] <snek>
+yeah that's another thing, if you use fast dev mode (eval) your project will break lol
+
+[19:54:58.0506] <nicolo-ribaudo>
+ * Exactly, it wouldn't
+
+[19:55:13.0421] <rbuckton>
+The mechanism I'd been investigating was to correlate struct types between a worker and main thread: https://gist.github.com/rbuckton/08d020fc80da308ad3a1991384d4ff62
+
+[19:55:33.0145] <nicolo-ribaudo>
+> <@devsnek:matrix.org> yeah that's another thing, if you use fast dev mode (eval) your project will break lol
+
+Well in webpack all those eval calls happen just once per file right? So it's ok if they have their own source location
+
+[19:55:50.0476] <littledan>
+> <@devsnek:matrix.org> we can just revive domenic's proposal
+
+how did that solve any of the problems we're discussing here?
+
+[19:56:12.0025] <snek>
+> <@littledan:matrix.org> how did that solve any of the problems we're discussing here?
+
+it solves sharable functions, not other things
+
+[19:56:17.0986] <snek>
+> <@littledan:matrix.org> how did that solve any of the problems we're discussing here?
+
+ * it solves sharable code, not other things
+
+[19:56:42.0785] <rbuckton>
+> <@devsnek:matrix.org> it solves sharable code, not other things
+
+Isn't that proposal essentially what module expressions/module blocks is?
+
+[19:56:50.0884] <snek>
+it is quite similar yes
+
+[19:56:54.0573] <Chris de Almeida>
+hmmm I have zero keywords
+
+[19:56:59.0283] <littledan>
+> <@rbuckton:matrix.org> Isn't that proposal essentially what module expressions/module blocks is?
+
+yeah that plus closing over things and structured cloning them
+
+[19:57:06.0198] <snek>
+i think both could exist
+
+[19:57:07.0104] <rbuckton>
+It also didn't solve the shared code issue with respect to the developer experience.
+
+[19:57:18.0307] <snek>
+the main thing is whether you are sharing a module or a callable
+
+[19:57:30.0673] <snek>
+i think callables are a lot nicer to work with in many cases
+
+[19:57:38.0495] <snek>
+this could be my bias from working with erlang/elixir though
+
+[19:59:18.0854] <nicolo-ribaudo>
+I agree that `f()` is much better than `await import(mod).then(m => m.f())`, and module expressions are only a viable solution if "prototype calls" don't look like that
+
+[19:59:35.0534] <nicolo-ribaudo>
+(specifically, I wouldn't want a`await`)
+
+[19:59:51.0191] <snek>
+yeah i can definitely see both existing 
+
+[20:03:46.0761] <snek>
+ah this is my jam
+
+[20:09:32.0418] <rbuckton>
+> <@devsnek:matrix.org> mpsc is "single consumer" so in most cases it is a move operation (reuses the same memory)
+
+Then that is essentially what I'm already doing. I parse the file in a thread pool thread, which produces a shared AST node that I send back to the main thread. If I had used normal objects sent via `postMessage`, I'd end up producing an entire copy of the AST in the main thread while the worker ends up holding on to the local copy until some point in the future when GC runs, which increases memory pressure and triggers GC more often, and that's would be a huge problem in some very large codebases (it already is, to a degree, so that would just makle it worse).
+
+[20:14:04.0010] <rbuckton>
+But since I can't attach behavior to a struct, I still end up having to rebuild the AST as normal objects to hand off to the rest of the compiler. Unfortunately, rewriting the entire compiler just to use a data-only AST isn't something feasible in the time I've spent on it so far. And the TSC compiler is mostly written using the FP style. There are too many bits of code that still expect to be able to call `.map`, `.filter`, etc. on a `NodeArray` that wouldn't otherwise be present in a data-only world. And it's not just arrays. We regularly use `Map` and `Set` as well. 
+
+[20:17:04.0686] <rbuckton>
+Switching back to a purely functional approach even for working with arrays is not a reasonable ask, as there is far too much to reasonably change, and would have an oversized impact on TypeScript API consumers. Maybe we pay the cost to speed up `tsc` command line compilation, but API consumers wouldn't get that benefit.
+
+[20:17:20.0804] <Chris de Almeida>
+hmm.. ok, when I view source, I'm in the mentions block:
+
+```
+    "m.new_content": {
+      "body": "the DOM, for objects :-p",
+      "format": "org.matrix.custom.html",
+      "formatted_body": "the DOM, for objects :-p",
+      "m.mentions": {
+        "user_ids": [
+          "@softwarechris:matrix.org"
+        ]
+      },
+```
+
+[20:21:21.0771] <snek>
+i understand what tsc wants to do i just explicitly don't consider it when thinking about how things should be designed, as it is a very "special" codebase. 
+
+[20:21:49.0073] <rbuckton>
+Just using `f(data)` glosses over the fact that `f` isn't going to be that short in the majority of cases. I have too many places where I've had to write something like `concurrentMap_set(map, key, value)` when it could have been `map.set(key, value)`. I'd much rather we not turn JS into C to use this feature.
+
+[20:22:02.0792] <snek>
+like i'd rather have microsoft toil over rewriting tsc than make the design of a feature work
+
+[20:22:09.0946] <snek>
+ * like i'd rather have microsoft toil over rewriting tsc than make the design of a feature worse
+
+[20:22:36.0795] <snek>
+it is subjective of course
+
+[20:22:44.0484] <rbuckton>
+I would consider the inability to attach behavior to a struct a worse outcome, especially because I believe that are reasonable ways to achieve this.
+
+[20:23:24.0114] <snek>
+i'm cool with attaching behavior to structs, i just don't like the unshared prototype or whatever its called
+
+[20:23:37.0294] <rbuckton>
+What about that is problematic?
+
+[20:23:49.0595] <snek>
+the aesthetics 
+
+[20:24:20.0449] <rbuckton>
+Do you mean the `with nonshared prototype;`? That's nowhere near final syntax.
+
+[20:25:09.0918] <rbuckton>
+That comes from trying to require explicit opt-in for some things so that we leave room for the potential for _actual_ shared code in the future, and not paint ourselves into a corner.
+
+[20:25:33.0696] <snek>
+no not the syntax, i'd rather just skip to having actual shared code
+
+[20:26:03.0801] <rbuckton>
+We haven't found a workable solution for that.
+
+[20:26:46.0126] <rbuckton>
+JS is not threadsafe, and the way functions work today makes them not threadsafe either.
+
+[20:28:24.0947] <snek>
+ye i'm aware of the history there, i was around for blocks and such. i just want to spend more brainpower on that instead of the temporary solution
+
+[20:28:48.0378] <rbuckton>
+Neither that proposal nor module expressions are actually shared code.
+
+[20:29:07.0586] <rbuckton>
+They are essentially just shared source text.
+
+[20:29:27.0431] <snek>
+i'm not sure what you mean by shared code then
+
+[20:30:08.0690] <rbuckton>
+If you are talking about just having the same method declarations evaluated in two threads, that's exactly what was being proposed.
+
+[20:30:17.0776] <snek>
+i am not talking about that
+
+[20:31:00.0709] <snek>
+in v8 terminology i'm thinking of something like bytecode being shared between isolates
+
+[20:31:03.0057] <rbuckton>
+If you're talking about the main thread sending the declaration to the child thread, that ends up being a terrible developer experience.
+
+[20:31:21.0040] <rbuckton>
+bytecode for the function?
+
+[20:31:31.0486] <snek>
+for some given source text
+
+[20:31:51.0478] <snek>
+it could also include closed over references
+
+[20:32:16.0045] <snek>
+maybe another example would be functions in erlang/elixir, though its hard to say exactly what "closed over" means there because everything is COW
+
+[20:32:39.0947] <rbuckton>
+I'm not sure how feasible that would be. If you're just talking about untyped, unoptimized code, maybe, but not optimized representations or every deopt and recompile would stop the world.
+
+[20:32:54.0595] <rbuckton>
+And if its just untyped, unoptimized code, that could be achieved with what was discussed as well.
+
+[20:33:02.0193] <snek>
+yeah i mean its possible it might have to split apart
+
+[20:33:16.0366] <snek>
+these are sort of the two states though
+
+[20:34:41.0531] <snek>
+like you write `let add = magicCodeContainerSyntax(a, b){a + b}` and you expect that sending add to other threads and using it is generally a very cheap operation as long as you don't do anything too weird
+
+[20:35:56.0774] <rbuckton>
+What was presented was having a single `shared struct` declaration that was addressable by source location, in which case v8 or another engine could leverage the statically known shape of the declaration to generate the same hidden class for a struct in multiple threads. It could potentially even generate shared function information for all of the methods, and let each thread refine those on a per-thread basis.
+
+[20:36:53.0357] <snek>
+yeah that sounds like a reasonable application
+
+[20:38:21.0839] <rbuckton>
+This has issues with bundling and tree shaking, which I've talked about with shu and others in  #shared-structs:matrix.org, though there is an argument to be made that bundlers could work around this by splitting out structs into a separate file reused by multiple entrypoints, which is something many bundlers can already do.
+
+[20:39:03.0340] <snek>
+yeah the addressing needs to be... addressed
+
+[20:39:08.0826] <snek>
+but the overall concept is sound i think
+
+[20:39:16.0345] <snek>
+both in terms of theory and in terms of implementation
+
+[20:40:01.0356] <rbuckton>
+My concern with trying to use something like module blocks to encapsulate shared code in the main thread and send it to the worker is that it becomes difficult to use in the worker. You can't just `import` your declarations now, you have to receive them as arguments if you want to create new instances of a struct type to send back to the main thread. That wouldn't work for TypeScript, we have too many different AST nodes.
+
+[20:40:32.0926] <rbuckton>
+So I would prefer a DX that allows me to use `import`.
+
+[20:41:17.0183] <snek>
+this is similar to elixir. you can send `fn() -> MyModule.foo() end` to another process (or even another physical computer) but that doesn't mean `MyModule` is properly imported for you to use it there.
+
+[20:41:44.0836] <danielrosenwasser>
+Have people run into issues with bunders duplicating declarations of classes with private fields?
+
+[20:42:18.0080] <snek>
+the issue with bundlers is.... say you have shared_util.js that is imported by both main_thread.js and worker_thread.js
+
+[20:42:35.0191] <snek>
+if shared_util is bundled into those two other files, it will have a different source location for each one
+
+[20:42:39.0344] <snek>
+which will break the struct addressing
+
+[20:42:51.0997] <snek>
+you can leave it split out to fix that
+
+[20:43:00.0148] <snek>
+though i'm not personally a fan of that
+
+[20:43:07.0911] <rbuckton>
+There is also an argument to be made that I *don't* want to share bytecode between functions in different threads. One of the biggest issues with worker threads today is that you must essentially duplicate large portions of your application code in memory in the worker. One solution to that would be to use tree shaking to remove unused code, but now anything used by a shared struct method cannot be dropped so I have to pay the cost for unused code.
+
+[20:44:45.0595] <snek>
+not sure i'm following what you're saying there
+
+[20:46:36.0431] <rbuckton>
+anything duplicated in main_thread.js and worker_thread.js results in that much additional memory taken up by the worker, as it constructs its own copies of every function and object as it evaluates the duplicate code.
+
+[20:47:23.0502] <snek>
+i feel like you're saying you want things to be shared but then saying that you don't want things to be shared
+
+[20:47:47.0874] <rbuckton>
+If main_thread.js and worker_thread.js both depend on shared_util.js, but each only uses part of that file, tree shaking would elide the unused functionality to remove overhead per-thread.
+
+[20:48:23.0881] <snek>
+oh i see, you're saying you don't want the pointer from shared_util to the shared bytecode to hang around if you're not using it
+
+[20:48:41.0948] <snek>
+yeah definitely something worth thinking about
+
+[20:48:57.0246] <rbuckton>
+That is at odds with what shu presented, and what we've discussed, but is also something I've been considering with the various alternatives we've been working through.
+
+[20:49:09.0625] <snek>
+if addressing is not based on source location i think that "just works" with tree shaking
+
+[20:49:29.0030] <danielrosenwasser>
+I mean, the downside of this all is polymorphic usage sites, right?
+
+[20:49:33.0719] <danielrosenwasser>
+It does not make your code crash
+
+[20:50:30.0694] <snek>
+i think the worst case is that the engine has to make a full copy for each thread of whatever the backing representation is (which is just the status quo today)
+
+[20:50:42.0821] <rbuckton>
+> <@danielrosenwasser:matrix.org> I mean, the downside of this all is polymorphic usage sites, right?
+
+Yes, the version of the proposal presented today was heavily motivated by reducing polymorphism, but that is at the cost of the potential for increased overhead since tree-shaking becomes limited.
+
+[20:52:03.0535] <rbuckton>
+I've suggested a registration mechanism that would be bundler/tree-shaking friendly, but it imposes other limitations to avoid side-channel communication issues related to a shared registry that are also a concern.
+
+[20:52:04.0338] <danielrosenwasser>
+So just bundle split?
+
+[20:52:20.0603] <rbuckton>
+> <@danielrosenwasser:matrix.org> So just bundle split?
+
+that is what was presented, yes.
+
+[20:52:22.0969] <danielrosenwasser>
+this all feels like non-problems
+
+[20:53:03.0858] <snek>
+bundle split can be problematic in some cases based on network conditions
+
+[20:53:25.0637] <snek>
+as much as we wish everything was http2+ everywhere
+
+[20:53:40.0951] <snek>
+its definitely not *that* bad
+
+[20:53:55.0973] <danielrosenwasser>
+but creating a worker off of a separate `.js` file isn't?
+
+[20:54:57.0608] <snek>
+i more just don't like that the feature strongly informs how code can be processed. 
+
+[20:55:03.0119] <shu>
+> <@danielrosenwasser:matrix.org> this all feels like non-problems
+
+that's my feeling too?
+
+[20:55:08.0333] <rbuckton>
+One way to overcome the bundling issue is with a lexical keyword to introduce a shared identity, i.e.:
+
+```
+shared struct S {
+  with registration 'e9c1cfb0-e9d6-469c-8fba-99f641e4b64e';
+  ...
+}
+```
+
+[20:55:25.0158] <rbuckton>
+Or a URN, or whatever you like.
+
+[20:55:25.0535] <snek>
+yeah that's what i suggested above, except my example was more human-readable lol
+
+[20:56:13.0579] <rbuckton>
+We'd discussed it being an API, or just a decorator as well. The problem with an API or a decorator is that it provides a way to communicate between otherwise isolated code.
+
+[20:56:46.0935] <snek>
+i'm curious what that communication channel is
+
+[20:57:51.0912] <rbuckton>
+If you have a global registry, in which you can insert a keyed element, which throws if the element already existed, then it can be used to communicate.
+
+[20:58:01.0354] <snek>
+oh, don't throw 
+
+[20:58:09.0705] <rbuckton>
+How do you catch developer mistakes?
+
+[20:58:40.0819] <snek>
+like if you write out the same definition in two separate files?
+
+[20:58:45.0277] <snek>
+and then they fall out of sync?
+
+[20:58:50.0714] <rbuckton>
+`"use strict"` was partly about not silently allowing things that didn't work.
+
+[20:58:53.0764] <snek>
+i would consider you to be on your own at that point lol
+
+[20:59:46.0165] <rbuckton>
+I'm personally fine with not throwing, but that's also because I work on a type system that could warn you ahead of time about that kind of conflict.
+
+[21:00:07.0551] <snek>
+yeah i mean i don't think that's an inherently new problem to structs
+
+[21:00:33.0759] <snek>
+we have solutions for it
+
+[21:00:37.0742] <snek>
+orthogonal imo
+
+[21:03:35.0611] <rbuckton>
+So as not to continue to flood the chat about the `shared struct` proposal, I'd suggest anyone who is interested in discussing further join #shared-structs:matrix.org or one of the working session meetings in the TC39 calendar.
+
+[21:04:20.0709] <shu>
+please do!
+
+[21:05:10.0521] <Rob Palmer>
+Type Annotations community call minutes are here:  https://github.com/tc39/proposal-type-annotations/issues/184
+
+[21:07:07.0530] <Rob Palmer>
+(Specifically [the link to the Google Doc](https://docs.google.com/document/d/1ecYpaEj5XObkOCUzZ_Y6GlYTTydjPjb1urg09MGYAG4/edit?usp=sharing))
+
+[21:10:09.0939] <snek>
+i like token soup
+
+[21:12:10.0797] <snek>
+would be nice to see a future proposal which allows getting the token soup in some way, probably just as a string
+
+[21:13:57.0828] <rkirsling>
+when I was skimming the slides before, I assumed "token soup" was intended as an insulting phrase 😅
+
+[21:14:42.0484] <rkirsling>
+like maybe like a Perl-y thing
+
+[21:15:38.0739] <bakkot>
+what if we made this proposal console-only
+
+[21:15:46.0734] <bakkot>
+there was a discussion about having a REPL goal
+
+[21:15:50.0681] <snek>
+lmao
+
+[21:15:52.0060] <bakkot>
+chrome could just strip TS types in the console
+
+[21:15:54.0321] <rkirsling>
+ * (like a Perl-y sort of image)
+
+[21:16:00.0515] <bakkot>
+I would like that better...
+
+[21:16:03.0019] <snek>
+i like repl goal
+
+[21:17:03.0284] <Jack Works>
+> <@bakkot:matrix.org> chrome could just strip TS types in the console
+
+I said the same when it went stage 1
+
+[21:18:06.0887] <snek>
+repl goal needs
+- sloppy by default
+- supports redeclarable static import
+- supports redeclarable let/const
+- supports type stripping
+- top level await
+
+[21:18:10.0204] <snek>
+ * repl goal needs
+
+- sloppy by default
+- supports redeclarable static import
+- supports redeclarable let/const
+- supports type stripping
+- top level await
+- ???
+
+[21:18:27.0364] <Chris de Almeida>
+gentle reminder, please add yourself to the attendee list at the top of the notes if you have not done so.  thank you 🙏
+
+[21:18:58.0856] <Jack Works>
+> <@devsnek:matrix.org> repl goal needs
+> 
+> - sloppy by default
+> - supports redeclarable static import
+> - supports redeclarable let/const
+> - supports type stripping
+> - top level await
+> - ???
+
+annex J: Repl tool modification of the 262
+
+[21:19:03.0556] <ljharb>
+a repl goal that ignores types would be very interesting, and avoids many of the downsides of the current annotations proposal
+
+[21:19:11.0324] <bakkot>
+I do not understand the analogy to JSON at all
+
+[21:19:37.0363] <snek>
+i feel very undecided about this
+
+[21:19:47.0766] <snek>
+i want reflective type annotations so i can write cool things
+
+[21:20:01.0736] <shu>
+which champions just said is out of scope
+
+[21:20:05.0497] <danielrosenwasser>
+You don't want to send extra bytes for JSON comments over the wire, but it sure would be nice if you had them for configuration readability
+
+[21:20:06.0232] <shu>
+the reflection part
+
+[21:20:09.0179] <bakkot>
+I think this proposal will impede any reflective type annotations
+
+[21:20:15.0836] <shu>
+agreed
+
+[21:20:27.0009] <snek>
+i feel like it could come later as like "get the annotation strings"
+
+[21:20:40.0703] <bakkot>
+> <@danielrosenwasser:matrix.org> You don't want to send extra bytes for JSON comments over the wire, but it sure would be nice if you had them for configuration readability
+
+right, but MLS's point was that TS is _only_ useful if you have another tool. that's not true of comments in JSON.
+
+[21:20:41.0937] <snek>
+but i also feel like it could make trying to rely on that more hazardous if things are used to stripping them out
+
+[21:20:45.0773] <shu>
+i... don't think i can ship that
+
+[21:20:47.0969] <bakkot>
+> <@danielrosenwasser:matrix.org> You don't want to send extra bytes for JSON comments over the wire, but it sure would be nice if you had them for configuration readability
+
+ * right, but MLS's point was that TS is _only_ useful if you have another tool (which can then do the stripping). that's not true of comments in JSON.
+
+[21:21:31.0661] <Luca Casonato>
+msaboff: total strawman, but could your concern be mitigated by also standardizing the semantics of these type annotations, even if JS engines do not enforce these?
+
+[21:21:33.0338] <bakkot>
+have people who are talking about the convenience of not having to strip types used esbuild's watch mode
+
+[21:21:35.0177] <bakkot>
+it is so fast
+
+[21:21:38.0364] <bakkot>
+you literally do not notice
+
+[21:22:17.0506] <snek>
+> <@shuyuguo:matrix.org> i... don't think i can ship that
+
+i think it would be fine with lazy re-parsing? but i can imagine it would be annoying
+
+[21:22:40.0420] <shu>
+we have different definitions of "fine" i think
+
+[21:22:45.0633] <shu>
+it is implementable with re-parsing
+
+[21:22:55.0920] <bakkot>
+ok but this proposal does not move to a world where tooling is optional
+
+[21:22:58.0325] <bakkot>
+like, at all
+
+[21:23:02.0709] <snek>
+i mean v8 already has a reparser for errors, its just a question of how fast do you want your annotations
+
+[21:23:03.0388] <msaboff>
+> <@lucacasonato:matrix.org> msaboff: total strawman, but could your concern be mitigated by also standardizing the semantics of these type annotations, even if JS engines do not enforce these?
+
+No.  There is nothing I see an implementation using TA's.
+
+[21:23:04.0357] <bakkot>
+types do nothing for you without additional tools
+
+[21:23:06.0491] <bakkot>
+that is the whole proposal
+
+[21:23:17.0742] <Jack Works>
+let's have annex J developer mode to contain all of those things
+
+[21:23:20.0755] <shu>
+bakkot: perhaps you should express that on the queue
+
+[21:23:23.0491] <bakkot>
+ * re: littledan's comment, ok but this proposal does not move to a world where tooling is optional
+
+[21:23:26.0692] <bakkot>
+the queue is so full
+
+[21:23:40.0483] <shu>
+i think it would be valuable to demonstrate that there are skeptics who are not just implementers
+
+[21:23:48.0039] <msaboff>
+> <@bakkot:matrix.org> the queue is so full
+
+There is a 60 minute timebox.
+
+[21:23:50.0019] <bakkot>
+bleh
+
+[21:23:51.0465] <bakkot>
+ok
+
+[21:25:56.0188] <TabAtkins>
+(I do have concerns with the current syntax proposal, and think it needs to be more generic/soupy rather than invasive into the grammar, but it's still absolutely the case that *some* syntax that's valid (and erased) at runtime is useful.)
+
+[21:26:12.0359] <Luca Casonato>
+> <@msaboff:matrix.org> No.  There is nothing I see an implementation using TA's.
+
+I don't understand what you mean. I am not suggesting runtime implementations of ECMA262 do anything other with TA's than strip them. But we could standardize how tooling itself is meant to interpret the grammar and perform the type checking (so there would be type checking implementations such as TypeScript, and runtime implementations such as JSC / V8 / SM)
+
+[21:27:08.0254] <Christian Ulbrich>
+The impact is quite high, if we follow this route, we are effectively defining the grammar for types for JavaScript once and for all.
+
+[21:27:35.0212] <snek>
+i mean if we have token soup we aren't defining any grammar for types
+
+[21:27:38.0847] <snek>
+other than `:`
+
+[21:27:46.0935] <ljharb>
+> <@christianulbrich:matrix.org> The impact is quite high, if we follow this route, we are effectively defining the grammar for types for JavaScript once and for all.
+
+which is a pretty permanent thing to do when there isn't even a type system existing that can accurately describe the entire language.
+
+[21:27:49.0249] <rkirsling>
+I think I've gotten a bit confused here as to whether this information is meant to be used _statically_ by engines
+
+[21:27:58.0984] <bakkot>
+> <@devsnek:matrix.org> i mean if we have token soup we aren't defining any grammar for types
+
+well, assuming we also don't have `interface` and etc...
+
+[21:28:02.0159] <bakkot>
+and `type`
+
+[21:28:05.0019] <msaboff>
+> <@lucacasonato:matrix.org> I don't understand what you mean. I am not suggesting runtime implementations of ECMA262 do anything other with TA's than strip them. But we could standardize how tooling itself is meant to interpret the grammar and perform the type checking (so there would be type checking implementations such as TypeScript, and runtime implementations such as JSC / V8 / SM)
+
+So what do you expect an implementation doing with TA's besides throwing them away.
+
+[21:28:07.0267] <bakkot>
+and all the other TS keywords
+
+[21:28:14.0876] <msaboff>
+> <@lucacasonato:matrix.org> I don't understand what you mean. I am not suggesting runtime implementations of ECMA262 do anything other with TA's than strip them. But we could standardize how tooling itself is meant to interpret the grammar and perform the type checking (so there would be type checking implementations such as TypeScript, and runtime implementations such as JSC / V8 / SM)
+
+ * So what do you expect an implementation doing with TA's besides throwing them away?
+
+[21:28:19.0362] <bakkot>
+but of course if we don't have all the other TS keywords, it does not accomplish the goal of letting people ship TS at runtime
+
+[21:28:21.0593] <rkirsling>
+because I thought the answer was an obvious "yes" but maybe it's actually "no" and we're just demarcating a section to be ignored by an engine's parser?
+
+[21:28:27.0396] <TabAtkins>
+> <@msaboff:matrix.org> So what do you expect an implementation doing with TA's besides throwing them away?
+
+That *is* the expectation, yes.
+
+[21:28:31.0092] <Luca Casonato>
+> <@msaboff:matrix.org> So what do you expect an implementation doing with TA's besides throwing them away?
+
+A runtime implementation should do nothing other than to throw them away.
+
+[21:28:51.0454] <Christian Ulbrich>
+> <@ljharb:matrix.org> which is a pretty permanent thing to do when there isn't even a type system existing that can accurately describe the entire language.
+
+I am with you, I have the same feeling, that finding a type system, that can actually define all of JavaScript's types might be difficult. Although there surely would be some kind of `any` wouldn't it? :)
+
+[21:29:01.0254] <msaboff>
+> <@lucacasonato:matrix.org> A runtime implementation should do nothing other than to throw them away.
+
+So I think you agree with the comment I made that started this thread.
+
+[21:29:05.0953] <bakkot>
+> <@rkirsling:matrix.org> because I thought the answer was an obvious "yes" but maybe it's actually "no" and we're just demarcating a section to be ignored by an engine's parser?
+
+it's the second thing definitely
+
+[21:29:13.0436] <bakkot>
+engines cannot use TS types for several reasons
+
+[21:29:32.0864] <ljharb>
+> <@christianulbrich:matrix.org> I am with you, I have the same feeling, that finding a type system, that can actually define all of JavaScript's types might be difficult. Although there surely would be some kind of `any` wouldn't it? :)
+
+nope, but `unknown`, yes. maybe there is no such system, but until there is, why would we want to lock ourselves in
+
+[21:30:03.0282] <rkirsling>
+> <@bakkot:matrix.org> it's the second thing definitely
+
+that at least clarifies for me why "token soup" is meant as a neutral-sentiment phrase
+
+[21:33:25.0693] <bakkot>
+ok I also want to know the answer to WH's question though
+
+[21:33:30.0954] <Luca Casonato>
+> <@msaboff:matrix.org> So I think you agree with the comment I made that started this thread.
+
+Ok, let me rephrase the original strawman then:
+
+- You do not like that a specific tool or set of tools is picked as the "blessed" syntax, I assume (please tell me if I am wrong) because we (TC39) as the body standardising the grammar, do not have control over how tools interpret this syntax, effectively delegating a large amount of syntax semantics to a different body (TypeScript / flow / whoever we "bless")
+- I am suggesting this may be mitigated by moving the semantics that a static checker should interpret the syntax with into the scope of TC39, possibly into ECMA262. This way TC39 keeps this control
+- Runtime implementations of ECMA262 will totally ignore these type annotations. The semantics, if we define them, would only be enforced by other ahead of time static analysis tools
+
+[21:33:44.0860] <bakkot>
+_is_ the goal that in 10 years every TS user will write only the subset of TS which is legal ES?
+
+[21:34:11.0870] <TabAtkins>
+I suppose that's up to TS and its users, but probably yes.
+
+[21:34:46.0921] <TabAtkins>
+I don't understand what you mean, shu.
+
+[21:34:49.0077] <Jack Works>
+> <@bakkot:matrix.org> _is_ the goal that in 10 years every TS user will write only the subset of TS which is legal ES?
+
+JSX:
+
+[21:35:04.0569] <bakkot>
+yeah JSX seems like that makes it obviously not-gonna-happen
+
+[21:35:18.0035] <shu>
+TabAtkins: maybe i misread what bakkot said, let me re-read
+
+[21:35:29.0005] <TabAtkins>
+Python's type syntax is also (a) completely meaningless/erased at runtime, and (b) different tools use different type syntaxes for their purposes, and (c) they all stick within the broad constraints of valid Python annotations, tho.
+
+[21:35:35.0967] <bakkot>
+shu: sorry, there was an implicit "in ten years, assuming we do this proposal as standard ES"
+
+[21:35:38.0881] <TabAtkins>
+Don't see why that doesn't apply just as well to JS.
+
+[21:35:40.0946] <shu>
+TabAtkins: ha indeed i did, i read "10 years every" as "every 10 years"
+
+[21:35:48.0470] <TabAtkins>
+ahaha
+
+[21:35:59.0067] <msaboff>
+> <@lucacasonato:matrix.org> Ok, let me rephrase the original strawman then:
+> 
+> - You do not like that a specific tool or set of tools is picked as the "blessed" syntax, I assume (please tell me if I am wrong) because we (TC39) as the body standardising the grammar, do not have control over how tools interpret this syntax, effectively delegating a large amount of syntax semantics to a different body (TypeScript / flow / whoever we "bless")
+> - I am suggesting this may be mitigated by moving the semantics that a static checker should interpret the syntax with into the scope of TC39, possibly into ECMA262. This way TC39 keeps this control
+> - Runtime implementations of ECMA262 will totally ignore these type annotations. The semantics, if we define them, would only be enforced by other ahead of time static analysis tools
+
+Luca, I was only making the last point in my comment here.
+I do have other concerns related to the first two points you list.
+
+[21:36:43.0694] <TabAtkins>
+I, for example, *almost certainly would not* use typed Python if I had to run a build step that produced my actual Python files. The fact that my code is runtime-valid is important.
+
+[21:37:07.0358] <shu>
+that seems empirically just not borne out by the vast majority of JS authors
+
+[21:37:08.0943] <TabAtkins>
+(JS devs appear to have way more appetite for build pain that I do, on average. But still.)
+
+[21:37:12.0379] <shu>
+like, everyone uses toolchains
+
+[21:37:30.0460] <bakkot>
+this proposal is predicated on the assumption that you are using a toolchain!!!
+
+[21:37:32.0299] <shu>
+and, as kevin said, this proposal itself presupposes you already use TS
+
+[21:37:42.0209] <Luca Casonato>
+> <@msaboff:matrix.org> Luca, I was only making the last point in my comment here.
+> I do have other concerns related to the first two points you list.
+
+Ok, thank you - I'd be interested to learn more about your reasoning for not liking that a specific tool or set of tools is picked as the "blessed" syntax, as that may help find alternative solutions
+
+[21:37:56.0773] <TabAtkins>
+That you use a toolchain *for production*. Not that you use a toolchain *to make your code run at all*, necessarily.
+
+[21:38:06.0285] <shu>
+let me be frank
+
+[21:38:09.0386] <bakkot>
+you do typechecks at devtime
+
+[21:38:15.0838] <bakkot>
+all of the benefit of typechecks is at devtime
+
+[21:38:18.0697] <TabAtkins>
+Like I said, it's the same as minifying being a good thing to do *for production*, but we don't require you to write minified code to execute locally.
+
+[21:38:22.0079] <Luca Casonato>
+> <@bakkot:matrix.org> you do typechecks at devtime
+
+No, you have your editor do this
+
+[21:38:32.0822] <bakkot>
+that is a tool
+
+[21:38:33.0326] <Luca Casonato>
+You do not run `tsc` during dev mode
+
+[21:38:33.0463] <bakkot>
+that
+
+[21:38:34.0565] <bakkot>
+you are using
+
+[21:38:36.0714] <bakkot>
+at devtime
+
+[21:38:41.0782] <shu>
+this proposal is asking for engines to ship everything, to everyone, all the time, for a thing that is purportedly not done in production, on the promise that users will also manually strip stuff away at production
+
+[21:38:43.0653] <ljharb>
+you should definitely be running tsc in CI before you merge in code
+
+[21:38:48.0704] <shu>
+what's in it for me? why would i support this?
+
+[21:38:52.0738] <msaboff>
+> <@lucacasonato:matrix.org> Ok, thank you - I'd be interested to learn more about your reasoning for not liking that a specific tool or set of tools is picked as the "blessed" syntax, as that may help find alternative solutions
+
+I don't like that TC39, an open standard, is blessing possibly one syntax when there are several other possible syntax options.
+
+[21:38:56.0895] <rbuckton>
+i.e., if Type Annotations advances to Stage 3/4, TypeScript would also adopt `f::<T>()` for type argument lists. We likely would not ban `f<T>()` in a .ts file, but imagine the community would migrate to the new syntax just as they did for `as` when we added it to avoid conflicts with JSX.
+
+[21:38:57.0641] <TabAtkins>
+Yes, I do typechecks at devtime. But typechecking is different than executing. Being able to execute my code directly, and then typecheck at some convenient point, is nice.
+
+[21:39:10.0744] <shu>
+all other things being equal, i agree it is nice
+
+[21:39:13.0427] <shu>
+there are real costs here
+
+[21:39:57.0127] <nicolo-ribaudo>
+Right now on the Babel codebase we use ESLint to lint, TSC to type-check, Babel to strip away types, and Rollup to bundle.
+
+ESLint and TSC are run transaprently by my editor and on CI, Rollup only happens on CI, and the only step between me writing the code and testing it in Node.js is to compile away types
+
+[21:40:01.0928] <Luca Casonato>
+> <@msaboff:matrix.org> I don't like that TC39, an open standard, is blessing possibly one syntax when there are several other possible syntax options.
+
+Ok, thank you - but isn't this something we always do when adding new syntax? We bless one syntax that we decide aligns best with the needs of the ecosystem and the direction we want to take the language? How is this syntax specifically different?
+
+[21:40:21.0137] <shu>
+no, we usually invent new syntax from whole cloth
+
+[21:40:27.0770] <bakkot>
+> <@nicolo-ribaudo:matrix.org> Right now on the Babel codebase we use ESLint to lint, TSC to type-check, Babel to strip away types, and Rollup to bundle.
+> 
+> ESLint and TSC are run transaprently by my editor and on CI, Rollup only happens on CI, and the only step between me writing the code and testing it in Node.js is to compile away types
+
+node can strip types? but also, `esbuild --watch` is like
+
+[21:40:30.0846] <shu>
+we look at prior art, but not literally pick existing syntax
+
+[21:40:32.0473] <bakkot>
+not a big burden, given that existing stack
+
+[21:40:38.0353] <bakkot>
+ * node could choose to strip types? but also, `esbuild --watch` is like
+
+[21:40:49.0988] <nicolo-ribaudo>
+> <@bakkot:matrix.org> node could choose to strip types? but also, `esbuild --watch` is like
+
+Well, browsers can strip types too
+
+[21:40:53.0057] <rkirsling>
+wait that was just "token soup" as a negative phrase
+
+[21:41:03.0006] <rkirsling>
+ * wait that was just "token soup" as a negative phrase from Eemeli just now
+
+[21:41:04.0101] <shu>
+> <@nicolo-ribaudo:matrix.org> Well, browsers can strip types too
+
+by slowing down parsing for **everyone**
+
+[21:41:33.0841] <nicolo-ribaudo>
+> <@shuyuguo:matrix.org> by slowing down parsing for **everyone**
+
+Would it also slow down parsing for code not using type annotations?
+
+[21:41:43.0291] <shu>
+yes!
+
+[21:41:48.0516] <TabAtkins>
+shu: Yeah, I think the final syntax needs to be something super cheap to parse. The current proposal isn't it imo.
+
+[21:41:52.0874] <msaboff>
+> <@nicolo-ribaudo:matrix.org> Would it also slow down parsing for code not using type annotations?
+
+Likely YES
+
+[21:42:16.0827] <shu>
+*especially* likely if there's cover grammar-like shenanigans involved
+
+[21:42:23.0572] <TabAtkins>
+yup
+
+[21:42:42.0990] <Luca Casonato>
+> <@shuyuguo:matrix.org> we look at prior art, but not literally pick existing syntax
+
+Well but that is what we are doing here too? We don't literally pick TS syntax, we pick syntax that is similar to TypeScript to ease migration (we did this before with decorators), but ultimately it's a subset that is easier to parse and unambiguous. I don't see this as standardising TypeScript, I see this as standardising a syntax space for types that looks similar to TypeScript (inspiration), because it's what folks in the ecosystem are familiar with 
+
+[21:42:43.0957] <rbuckton>
+The advantage of "token soup" is that typed languages can continue to innovate within that space without requiring advancing a proposal through TC39 for what is otherwise just a comment.
+
+[21:42:44.0663] <nicolo-ribaudo>
+I wonder if there is some perf goal we could aim at. Such as "no cover grammar needed unless there is a token clearly introducing a type context"
+
+[21:42:59.0561] <snek>
+the slow part of the annotations is single-char stepping. the slow part of the not-annotations is the other weird complexity layered on top.
+
+[21:43:01.0098] <bakkot>
+> <@rbuckton:matrix.org> The advantage of "token soup" is that typed languages can continue to innovate within that space without requiring advancing a proposal through TC39 for what is otherwise just a comment.
+
+but it would not let them do stuff like `satisfies`, etc
+
+[21:43:06.0696] <bakkot>
+TS introduces new keywords... pretty often
+
+[21:43:16.0732] <ljharb>
+> <@rbuckton:matrix.org> The advantage of "token soup" is that typed languages can continue to innovate within that space without requiring advancing a proposal through TC39 for what is otherwise just a comment.
+
+there are very few things in this space that wouldn't benefit from going through tc39
+
+[21:43:40.0303] <nicolo-ribaudo>
+> <@nicolo-ribaudo:matrix.org> I wonder if there is some perf goal we could aim at. Such as "no cover grammar needed unless there is a token clearly introducing a type context"
+
+Or if we managed to entirely avoid new cover grammars, so that the check is just "is the enxt token a `::<`/`:`?"
+
+[21:43:42.0895] <shu>
+> <@nicolo-ribaudo:matrix.org> I wonder if there is some perf goal we could aim at. Such as "no cover grammar needed unless there is a token clearly introducing a type context"
+
+i think that assumes that you've already convinced engines that it's worthwhile to add *anything* here, and i think we are not yet convinced. at least not myself and michael
+
+[21:43:45.0401] <nicolo-ribaudo>
+> <@nicolo-ribaudo:matrix.org> I wonder if there is some perf goal we could aim at. Such as "no cover grammar needed unless there is a token clearly introducing a type context"
+
+ * Or if we managed to entirely avoid new cover grammars, so that the check is just "is the next token a `::<`/`:`?"
+
+[21:44:16.0244] <rbuckton>
+> <@bakkot:matrix.org> but it would not let them do stuff like `satisfies`, etc
+
+True, but I think that's an acceptable tradeoff.
+
+[21:45:02.0605] <shu>
+though to be clear i do not share msaboff's concerns about picking winners as strongly
+
+[21:46:07.0832] <snek>
+i think where i am ending up here is that if we can't get any runtime benefit here, runtimes shouldn't deal with this, and it shouldn't move forward
+
+[21:46:24.0476] <snek>
+and its pretty clear at this point that there will be no runtime benefit 
+
+[21:46:28.0693] <rkirsling>
+I just think there's a lot of terribly misleading verbiage surrounding "runtime" and erasure
+
+[21:46:52.0138] <rkirsling>
+every engine has a parser for early errors
+
+[21:47:19.0848] <snek>
+"runtime benefit" in my sentence is anything from engines using the type annotations to make code faster to simple string reflection
+
+[21:47:42.0180] <rkirsling>
+if you just read this presentation you would think that engines will be using this information statically and _then_ throw it away at runtime
+
+[21:48:27.0085] <rkirsling>
+and if that's impossible (which it seems like it is?) then this seems just bad...?
+
+[21:49:03.0879] <TabAtkins>
+Again, these arguments generally would argue against Python's type annotations as well.
+
+[21:49:04.0516] <rkirsling>
+but mostly I'm just concerned about how confused I've felt.
+
+[21:49:13.0790] <TabAtkins>
+Make sure you actually *mean* for your counterargument to be that strong.
+
+[21:49:21.0526] <snek>
+> <@tabatkins:matrix.org> Again, these arguments generally would argue against Python's type annotations as well.
+
+python type annotations are reflectable
+
+[21:49:32.0702] <snek>
+and this property is used to huge advantage in the ecosystem
+
+[21:49:36.0280] <msaboff>
+> <@devsnek:matrix.org> "runtime benefit" in my sentence is anything from engines using the type annotations to make code faster to simple string reflection
+
+So what should an implementation do if the type is violated while processing?  Throw?
+
+[21:49:36.0679] <TabAtkins>
+Mehhhhh the reflection barely matters if at all.
+
+[21:49:38.0906] <ljharb>
+also python is categorically different than JS
+
+[21:50:05.0269] <ljharb>
+ * also python is categorically different than JS, because The Web
+
+[21:50:09.0500] <Rob Palmer>
+> <@ljharb:matrix.org> there are very few things in this space that wouldn't benefit from going through tc39
+
+Zooming out (and ignoring the specifics of soup vs concrete grammar), one of the whole motivations of this proposal is to ensure coordination of real-life type syntax with tc39.  By default, if we do nothing type syntax will iterate outside tc39 which brings coordination risk.
+
+[21:50:11.0099] <TabAtkins>
+mypy doesn't execute python and inspect the reflection, it parses itself
+
+[21:50:19.0066] <snek>
+> <@msaboff:matrix.org> So what should an implementation do if the type is violated while processing?  Throw?
+
+i don't think implementations should try to do it. i'm just saying, if everything we can possibly imagine is off the table, then i don't think its worth it
+
+[21:50:23.0907] <Michael Ficarra>
+Python also isn't shipped to me over the network every time I want to run it?
+
+[21:50:45.0161] <TabAtkins>
+sure, i run a build step on my python when i ship a new version to pypi
+
+[21:50:45.0659] <snek>
+> <@michaelficarra:matrix.org> Python also isn't shipped to me over the network every time I want to run it?
+
+one would hope
+
+[21:50:57.0042] <danielrosenwasser>
+just wait
+
+[21:53:52.0523] <snek>
+> <@tabatkins:matrix.org> Mehhhhh the reflection barely matters if at all.
+
+there are several major libraries that make use of it. some of them are for dependency injection, which i find distasteful, but its still a thing. there are other cool examples like discord.py which uses annotations to build string parsing. i'm talking about packages with hundreds of thousands of downloads per day *minimum* here.
+
+[21:54:47.0327] <TabAtkins>
+ok sure, annotations for non-type-checking reasons i guess. I've never used these *because* i use the annotations for types instead.
+
+[21:54:56.0607] <TabAtkins>
+(you can only do one or the other, I believe)
+
+[21:55:06.0945] <snek>
+yeah i agree there
+
+[21:56:26.0030] <bakkot>
+to be clear, I don't claim that there are _zero_ projects which are both complex and would benefit from this 
+
+[21:56:43.0585] <waldemar>
+> <@rbuckton:matrix.org> The advantage of "token soup" is that typed languages can continue to innovate within that space without requiring advancing a proposal through TC39 for what is otherwise just a comment.
+
+As I showed in the presentation earlier in the year, that doesn't actually work. For example, you can't even do something as trivial as using existing ECMAScript expression syntax to calculate a constant inside a token soup.
+
+[21:56:53.0610] <Jack Works>
+so, is it really impossible to bring JSX into the language?
+
+[21:57:32.0969] <ljharb>
+i think one of the main challenges is how you can lexically indicate what the syntax is equivalent to - ie `React.createElement`, `h`, etc
+
+[21:58:07.0886] <ljharb>
+otherwise it'd just need to be hardcoded to make an object literal of some kind
+
+[21:58:16.0919] <snek>
+yeah it would have to be pojo
+
+[21:58:22.0026] <Jack Works>
+> <@ljharb:matrix.org> i think one of the main challenges is how you can lexically indicate what the syntax is equivalent to - ie `React.createElement`, `h`, etc
+
+of course our own representation and ui library comes to support us
+
+[21:58:41.0346] <snek>
+> <@devsnek:matrix.org> yeah it would have to be pojo
+
+or curried
+
+[21:58:59.0547] <snek>
+`(<p>hi</p>)(h)`
+
+[21:59:51.0644] <snek>
+is bloomberg going to get rid of tools?
+
+[22:00:20.0535] <Jack Works>
+run code in the void
+
+[22:00:46.0434] <shu>
+i got bad news for you if you think JS is directly executed by the metal
+
+[22:00:50.0208] <ljharb>
+one of the stated goals tho is "unfork the ecosystem"; "unfork" means 0 fork, not "less forked"
+
+[22:01:04.0221] <ljharb>
+"spork the ecosystem" doesn't have the same ring to it
+
+[22:01:04.0262] <shu>
+ljharb: this is actually a *new* fork!
+
+[22:01:16.0120] <snek>
+critical fork
+
+[22:01:25.0334] <danielrosenwasser>
+> <@shuyuguo:matrix.org> i got bad news for you if you think JS is directly executed by the metal
+
+even the array accesses? 🥺 /s
+
+[22:01:42.0185] <snek>
+*especially* the array accesses
+
+[22:01:55.0074] <shu>
+👉️🥺👈️
+
+[22:02:06.0111] <snek>
+is that you putting your fingers in your ears
+
+[22:02:15.0727] <danielrosenwasser>
+it can be that too
+
+[22:02:17.0269] <shu>
+no i wanted to make that meme where the fingers are together
+
+[22:02:24.0679] <snek>
+lol
+
+[22:02:25.0852] <shu>
+dunno how to make that on one line
+
+[22:02:32.0206] <ljharb>
+A+ reference
+
+[22:02:34.0296] <Jack Works>
+> <@ljharb:matrix.org> one of the stated goals tho is "unfork the ecosystem"; "unfork" means 0 fork, not "less forked"
+
+let's bring JSX in!
+
+[22:02:42.0321] <Rob Palmer>
+> <@devsnek:matrix.org> is bloomberg going to get rid of tools?
+
+I hope not or I'll be out of a job.
+
+[22:02:49.0852] <Luca Casonato>
+danielrosenwasser: we're very interested in more devtools collaboration with TypeScript :)
+
+[22:02:50.0311] <danielrosenwasser>
+i am a little bit disappointed that we didn't get to discuss topics around in-browser devtools more
+
+[22:03:10.0532] <shu>
+> <@danielrosenwasser:matrix.org> i am a little bit disappointed that we didn't get to discuss topics around in-browser devtools more
+
+i remain of the opinion the most highly impactful thing is that, exactly
+
+[22:03:12.0470] <danielrosenwasser>
+That was something that flew by the queue a few times
+
+[22:03:14.0894] <shu>
+not changing the standard
+
+[22:03:28.0830] <danielrosenwasser>
+Then I'd love to talk about that too
+
+[22:03:39.0937] <snek>
+the coolest thing about devtools changes is that you can just pr them
+
+[22:03:42.0381] <shu>
+(i say that as a non-devtools representative)
+
+[22:03:45.0517] <snek>
+you don't need plenary approval
+
+[22:04:15.0239] <shu>
+> <@shuyuguo:matrix.org> (i say that as a non-devtools representative)
+
+but i have talked with them about it!
+
+[22:04:57.0170] <snek>
+bradley and i talking to v8 about devtools improvements in node is where the "repl goal" stuff came from
+
+[22:05:09.0055] <snek>
+it goes full circle
+
+[22:05:11.0678] <bakkot>
+so let me try to summarize my thoughts:
+
+- I agree there is would be some benefit for at least some projects, including both beginners and complex projects
+- I am not convinced that in fact most people will be able to skip the build step: this proposal does not cover all of TS as-is, and _definitely_ won't cover JSX
+- and this proposal will constrain the growth of TS, e.g. no new `satisfies`-like keywords, which TS has wanted to add lots of historically
+- the thing where you want to copy-paste code from your editor to the browser console is very real, but could be solved just in the browser console
+- the grammar in this proposal is massive, which will be a lot of work (and runtime cost) to implement, reason about, and maintain
+
+- given all that, the costs do not seem worth the benefits, to me.
+
+[22:05:37.0344] <littledan>
+BTW we worked on presenting the motivation in this presentation: https://onedrive.live.com/view.aspx?resid=5D3264BDC1CB4F5B!5615&authkey=!ADFHxW4BxojKreE
+
+[22:05:59.0036] <Chris de Almeida>
+I probably don't need to say it, buuuut: for the type annotations proposal, our meeting notes, including summary+conclusion get referenced quite a lot, so we should collectively take extra care to clean them up, ensure accuracy, etc
+
+[22:06:37.0631] <rkirsling>
+also like, "runtime" as a count noun is one of the worst words our industry has ever devised
+
+[22:06:44.0527] <littledan>
+> <@devsnek:matrix.org> bradley and i talking to v8 about devtools improvements in node is where the "repl goal" stuff came from
+
+right, I still hope we can get back around to the repl goal proposal...
+
+[22:07:07.0342] <littledan>
+and it's disappointing that people seem to be imagining that we'd never have alignment at that level
+
+[22:07:38.0237] <snek>
+yeah i think we can define some minimum behavior pretty easily. just need people who want to spend time on it
+
+[22:07:47.0656] <snek>
+....and also have time to spend on it
+
+[22:08:33.0424] <Jack Works>
+> <@bakkot:matrix.org> so let me try to summarize my thoughts:
+> 
+> - I agree there is would be some benefit for at least some projects, including both beginners and complex projects
+> - I am not convinced that in fact most people will be able to skip the build step: this proposal does not cover all of TS as-is, and _definitely_ won't cover JSX
+> - and this proposal will constrain the growth of TS, e.g. no new `satisfies`-like keywords, which TS has wanted to add lots of historically
+> - the thing where you want to copy-paste code from your editor to the browser console is very real, but could be solved just in the browser console
+> - the grammar in this proposal is massive, which will be a lot of work (and runtime cost) to implement, reason about, and maintain
+> 
+> - given all that, the costs do not seem worth the benefits, to me.
+
+this captures my main concerns
+
+[22:09:21.0084] <snek>
+yeah same
+
+[22:09:38.0782] <snek>
+ * yeah same, modulo reflection
+
+[22:12:16.0696] <Mathieu Hofman>
+Why don't we just define a binary AST and require all code to be compiled to that?
+
+[22:12:26.0389] <snek>
+lol
+
+[22:12:57.0671] <shu>
+i'd like that
+
+[22:13:11.0726] <shu>
+are you saying that'd be a bad world
+
+[22:13:29.0915] <snek>
+did facebook give up on binast
+
+[22:13:35.0199] <snek>
+i haven't heard anything about it in years
+
+[22:13:43.0684] <rbuckton>
+Wasn't there already an attempt to propose a binary AST?
+
+[22:13:51.0259] <shu>
+yes, that was me
+
+[22:14:05.0828] <ljharb>
+https://github.com/tc39/proposal-binary-ast
+
+[22:14:27.0903] <msaboff>
+Some people were against it 😉
+
+[22:14:59.0803] <snek>
+what if the binast was s expressions, and it had 4 primitive types and a small memory buffer, and used a harvard architecture...
+
+[22:15:58.0394] <nicolo-ribaudo>
+> <@devsnek:matrix.org> what if the binast was s expressions, and it had 4 primitive types and a small memory buffer, and used a harvard architecture...
+
+What if we got rid of dynamic types
+
+[22:16:17.0879] <TabAtkins>
+The moment I used Decimal seriously, the first thing I'd do is write a template function that just does numeric parsing.
+
+[22:16:53.0826] <Mathieu Hofman>
+My point is if we expect all code authored to go through some tool, just go all the way and make the output of that tool something completely different than what was authored. I believe all proposals around that have never considered making that a requirement. Aka that if the author wrote valid JavaScript, it can still be executed as is 
+
+[22:16:57.0678] <TabAtkins>
+decmath`${price} + ${tax}`
+
+[22:16:58.0928] <littledan>
+> and this proposal will constrain the growth of TS, e.g. no new satisfies-like keywords, which TS has wanted to add lots of historically
+
+This part is definitely on the champions' radar. One path, at least at first, is that TS could add `satisfies` without it becoming JS, just they would initially have a worse developer experience (working only in .ts and not in .js) until a version of that feature (possibly with tweaked syntax) got added to JS grammar. But hopefully we can figure out how to reserve a larger space of grammar such that new features can fit into it. We haven't figured out what that space should be yet, though.
+
+[22:16:59.0744] <Michael Ficarra>
+we should just have primitive decimals, this makes no sense
+
+[22:17:22.0929] <snek>
+> <@tabatkins:matrix.org> decmath`${price} + ${tax}`
+
+it would get a lot of downloads
+
+[22:17:39.0000] <ljharb>
+no sense at all
+
+[22:17:49.0460] <littledan>
+> <@michaelficarra:matrix.org> we should just have primitive decimals, this makes no sense
+
+This is something we can discuss in more detail if we get around to "operator overloading withdrawal"; let's focus on other parts of this presentation for now.
+
+[22:18:17.0518] <ljharb>
+it's pretty important to focus on this part now, i think
+
+[22:18:20.0835] <msaboff>
+> <@nicolo-ribaudo:matrix.org> What if we got rid of dynamic types
+
+Then we would have ES262.
+
+[22:19:00.0412] <littledan>
+> <@ljharb:matrix.org> it's pretty important to focus on this part now, i think
+
+well, this isn't going for advancement... I agree it's an important topic but I wanted to give space for other people to give their presentations.
+
+[22:19:03.0109] <msaboff>
+> <@nicolo-ribaudo:matrix.org> What if we got rid of dynamic types
+
+ * Then we wouldn't have ES262.
+
+[22:19:15.0934] <littledan>
+Lots of the stuff in this presentation is just orthogonal from whether it's a primitive
+
+[22:19:30.0311] <ljharb>
+my sense is that that stuff is irrelevant if it's not a primitive.
+
+[22:19:39.0888] <nicolo-ribaudo>
+> <@msaboff:matrix.org> Then we wouldn't have ES262.
+
+(it was more fun before editing, because the ES262 _spec_ is statically typed 😛)
+
+[22:19:42.0080] <Michael Ficarra>
+yes and lots of it doesn't matter at all if nobody is going to use it because it's so unergonomic
+
+[22:20:15.0306] <msaboff>
+> <@nicolo-ribaudo:matrix.org> (it was more fun before editing, because the ES262 _spec_ is statically typed 😛)
+
+Happy to make you laugh.
+
+[22:20:44.0177] <Chris de Almeida>
+IIRC there are still concerns about using IEEE 754 at all
+
+[22:21:04.0467] <Michael Ficarra>
+IEEE-754 Decimal128 is the obviously correct choice here
+
+[22:21:13.0185] <littledan>
+> <@softwarechris:matrix.org> IIRC there are still concerns about using IEEE 754 at all
+
+yeah, this is an example of something interesting to discuss which isn't about whether it's a primitive
+
+[22:21:31.0079] <Michael Ficarra>
+/me points to the sign: https://speleotrove.com/decimal/decifaq4.html#signif
+
+[22:21:46.0073] <Jack Works>
+> <@tabatkins:matrix.org> The moment I used Decimal seriously, the first thing I'd do is write a template function that just does numeric parsing.
+
+``D`1```
+
+[22:21:50.0579] <snek>
+if its not a primitive is there any benefit to it existing in the language itself
+
+[22:22:01.0203] <ljharb>
+that's my queue item
+
+[22:22:01.0246] <snek>
+just perf optimization?
+
+[22:22:03.0436] <Jack Works>
+> <@tabatkins:matrix.org> The moment I used Decimal seriously, the first thing I'd do is write a template function that just does numeric parsing.
+
+ * ``D\`1\```
+
+[22:22:06.0747] <bakkot>
+> <@bakkot:matrix.org> so let me try to summarize my thoughts:
+> 
+> - I agree there is would be some benefit for at least some projects, including both beginners and complex projects
+> - I am not convinced that in fact most people will be able to skip the build step: this proposal does not cover all of TS as-is, and _definitely_ won't cover JSX
+> - and this proposal will constrain the growth of TS, e.g. no new `satisfies`-like keywords, which TS has wanted to add lots of historically
+> - the thing where you want to copy-paste code from your editor to the browser console is very real, but could be solved just in the browser console
+> - the grammar in this proposal is massive, which will be a lot of work (and runtime cost) to implement, reason about, and maintain
+> 
+> - given all that, the costs do not seem worth the benefits, to me.
+
+also, it has been my experience that many of the reported problems with "having to compile typescript" are actually different problems than "I have to run another tool". they're things like "I want to dual-emit CJS and ESM" or "the module resolution in my version of typescript is different from in node" or "module interop is broken" or things like that. and to the extent that this proposal helps those problems, it does so only because it forces you to make TS's resolution-and-etc match your other tools. but that is a tooling problem, not a fundamental problem with having a strip-types step in your build process, and TS has lately been making some improvements in that area already
+
+[22:22:10.0039] <Jack Works>
+ * D`1`
+
+[22:22:11.0668] <TabAtkins>
+(Matrix does not correctly handle multi-ticks, don't even bother trying.)
+
+[22:22:21.0987] <ljharb>
+TabAtkins: ``` `yes it does` ```
+
+[22:22:24.0889] <snek>
+like i think performance can be a valid reason
+
+[22:22:28.0929] <snek>
+even if its not a primitive 
+
+[22:22:33.0510] <snek>
+but i'd wanna see very very good performance
+
+[22:22:34.0877] <ljharb>
+ * TabAtkins: ```yes it does``` but you may have to "hold it correctly" tbf
+
+[22:22:45.0312] <ljharb>
+ * TabAtkins: ``` `yes it does` ``` but you may have to "hold it correctly" tbf
+
+[22:22:55.0451] <TabAtkins>
+correctness is the main reason (but i agree that ergonomics is p important)
+
+[22:23:07.0285] <bakkot>
+so I worry that a lot of people are experience "compiling with typescript is painful" and assuming that types-as-comments will fix their problems, when those are in fact different problems
+
+[22:23:22.0735] <TabAtkins>
+Like the "lossless division with fixed precision" isn't trivial to write yourself.
+
+[22:23:34.0172] <ljharb>
+luckily there's packages that implement it already
+
+[22:23:36.0436] <ljharb>
+ * luckily there's packages that implement it already, right
+
+[22:23:37.0348] <ljharb>
+ * luckily there's packages that implement it already, right?
+
+[22:23:51.0749] <Michael Ficarra>
+it would have perf footguns though, like I'd have to do manual interning to avoid repeated string parsing snek 
+
+[22:24:00.0429] <TabAtkins>
+To the best of my knowledge, not really.
+
+[22:24:01.0101] <Chris de Almeida>
+> <@bakkot:matrix.org> so I worry that a lot of people are experience "compiling with typescript is painful" and assuming that types-as-comments will fix their problems, when those are in fact different problems
+
+has this been a common refrain?
+
+[22:24:27.0862] <bakkot>
+"compiling with typescript is painful" is common, definitely
+
+[22:24:49.0421] <bakkot>
+and upon investigating that turning out to be down to moduleResolution differences or CJS/ESM or whatever is also common IME
+
+[22:24:51.0048] <Chris de Almeida>
+I mean the idea that types as comments is the panacea
+
+[22:24:51.0650] <Christian Ulbrich>
+Me as the poor guy, writing software, I do not care about performance, but about having something, that is so often needed, simply being built into the language, so I do not have to rely on third-party implementations. I think that is also the reason, way everyone is waiting for Temporal.
+
+[22:24:55.0224] <TabAtkins>
+I will say, even if we didn't get operator overloading, a literal syntax would be *super* helpful without invoking perf issues.
+
+[22:25:02.0277] <Chris de Almeida>
+ * I mean the idea that types annotations is the panacea
+
+[22:25:14.0797] <TabAtkins>
+Christian Ulbrich: YES. More batteries included please.
+
+[22:25:22.0617] <ljharb>
+temporal is about dates/times tho, not *numbers*
+
+[22:25:39.0578] <TabAtkins>
+`Decimal("1.2")` is so obnoxious vs `1.2n`
+
+[22:25:46.0430] <TabAtkins>
+ * `Decimal("1.2")` is so obnoxious vs `1.2m`
+
+[22:25:52.0817] <bakkot>
+> <@softwarechris:matrix.org> I mean the idea that types annotations is the panacea
+
+ah, I don't know for sure. I _expect_ that many of the random developers who are excited about the proposal are excited because they think it will fix their problems, but their problems are in fact other things like ESM or whatever..
+
+[22:26:09.0909] <snek>
+`1.2m` is pretty motivating i think
+
+[22:28:02.0446] <Christian Ulbrich>
+ljharb: Temporal is about giving JS proper date handling. There are other libraries out there, that at least could do theoretically the same, yet we do Temporal.
+
+[22:28:06.0819] <Jack Works>
+> <@tabatkins:matrix.org> `Decimal("1.2")` is so obnoxious vs `1.2m`
+
+you forgot `new`, it's `new Decimal("1.2")`
+
+[22:28:23.0117] <nicolo-ribaudo>
+How do you feel about syntax for decimals but not primitives? Like regexs
+
+[22:28:30.0635] <TabAtkins>
+Jack Works: I mean, it doesn't *need* to be. We *can* define it to not require the `new`. ^_^
+
+[22:28:53.0491] <bakkot>
+> <@nicolo-ribaudo:matrix.org> How do you feel about syntax for decimals but not primitives? Like regexs
+
+`1.2m !== 1.2m` will trip everyone up forever
+
+[22:29:01.0808] <TabAtkins>
+While I *really want* operator overloading, I'd accept it without. And ignoring that, I don't care about primitive vs object.
+
+[22:29:02.0974] <bakkot>
+regexps you don't do arithmetic / comparisons / etc on
+
+[22:29:06.0764] <Jack Works>
+> <@tabatkins:matrix.org> Jack Works: I mean, it doesn't *need* to be. We *can* define it to not require the `new`. ^_^
+
+I want to keep the no `new` version for primitives. browsers don't want it for now, but I want to keep the hope
+
+[22:29:26.0559] <Jack Works>
+> <@bakkot:matrix.org> `1.2m !== 1.2m` will trip everyone up forever
+
+for the same reason, I also require `1.2m` not a thing before primitive happens
+
+[22:30:56.0563] <Jack Works>
+if we have primitives in the future, what we have today becomes boxed primitive, and it will not create a breaking change
+
+[22:31:19.0254] <TabAtkins>
+`1.2m !== 1.2m` clearly just make `valueOf` throw, can't do it then.
+
+[22:31:24.0964] <snek>
+because temporal pulls in like 70mb of data
+
+[22:31:27.0959] <Jack Works>
+like we don't have number, but `new Number('1').add(new Number('2'))`
+
+[22:31:52.0545] <bakkot>
+> <@tabatkins:matrix.org> `1.2m !== 1.2m` clearly just make `valueOf` throw, can't do it then.
+
+`!==` does not use `valueOf`, thank goodness
+
+[22:32:00.0288] <TabAtkins>
+gosh dang it
+
+[22:32:15.0435] <Jack Works>
+> <@tabatkins:matrix.org> `1.2m !== 1.2m` clearly just make `valueOf` throw, can't do it then.
+
+a previously throwing code no longer throws is not a breaking change in tc39 IMO
+
+[22:32:29.0187] <TabAtkins>
+Right!
+
+[22:32:59.0055] <TabAtkins>
+I was just half-jokingly saying that having the equality test throw would avoid people accidentally relying on it being always-false.
+
+[22:33:49.0277] <shu>
+my brother are you asking me to add a typeswitch to === for certain types and to add a *throw*
+
+[22:33:55.0417] <shu>
+ * my brother are you asking me to add a typeswitch to === for certain object types and to add a _throw_
+
+[22:33:58.0291] <nicolo-ribaudo>
+> <@tabatkins:matrix.org> I was just half-jokingly saying that having the equality test throw would avoid people accidentally relying on it being always-false.
+
+Making `===` throw has the same perf impact as making it work properly: you have in both cases exactly one more branch
+
+[22:34:09.0379] <snek>
+is this proposing that we would use d128
+
+[22:34:22.0532] <TabAtkins>
+d128 vs bigdec is still an open question
+
+[22:34:23.0257] <Jack Works>
+(`new Number(1) === new Number(1)` also false today so I'm very optimistic that Decimal can add boxed primitive first then if the engine see it is widely used they can add primitives later)
+
+[22:34:45.0409] <bakkot>
+> <@nicolo-ribaudo:matrix.org> Making `===` throw has the same perf impact as making it work properly: you have in both cases exactly one more branch
+
+it's actually worse I think - throwing operators are special, can't be optimized the same as non-throwing operations
+
+[22:35:02.0843] <ljharb>
+`===` must never, ever throw
+
+[22:35:19.0017] <ljharb>
+IE 8 or 9 did that on one thing and it's very very bad
+
+[22:35:29.0561] <TabAtkins>
+Ah, if it's cheaper to just do the comparison right then that's easy, ship is shu 
+
+[22:35:37.0260] <TabAtkins>
+ * Ah, if it's cheaper to just do the comparison right then that's easy, ship it shu
+
+[22:35:41.0798] <snek>
+throwing doesn't really make surrounding code slower anymore. there are certainly some weird cases but in general everyone is on the unwinding train these days i think
+
+[22:35:41.0926] <ljharb>
+ * `===` must never, ever throw, that's a hill i will gladly die on
+
+[22:35:55.0268] <shu>
+they constrain optimizability
+
+[22:36:06.0215] <Michael Ficarra>
+anyone questioning Decimal128, *please* read https://speleotrove.com/decimal/decifaq4.html#signif
+
+[22:36:14.0252] <shu>
+you can't DCE stuff that might throw as easily
+
+[22:36:22.0426] <rkirsling>
+consider https://en.cppreference.com/w/cpp/language/noexcept_spec
+
+[22:36:25.0615] <shu>
+(or do other analysis)
+
+[22:36:48.0928] <Jack Works>
+> <@rkirsling:matrix.org> consider https://en.cppreference.com/w/cpp/language/noexcept_spec
+
+how is noexcept in C++ be enforced?
+
+[22:36:58.0777] <bakkot>
+panic
+
+[22:36:59.0543] <rkirsling>
+?
+
+[22:37:03.0083] <snek>
+noexcept is enforced because unwinding is part of the spec
+
+[22:37:12.0819] <Jack Works>
+oh
+
+[22:37:18.0153] <bakkot>
+if a noexcept method throws, it panics the whole program
+
+[22:37:19.0785] <Jack Works>
+`window.onerror = () => window.close()`
+
+[22:37:24.0681] <bakkot>
+:D
+
+[22:37:40.0193] <shu>
+sick
+
+[22:37:56.0728] <snek>
+`window.onerror = () => ud2`
+
+[22:37:59.0415] <shu>
+this is the kind of performance trick i would like to subscribe to in a newsletter
+
+[22:38:59.0172] <Mathieu Hofman>
+> <@bakkot:matrix.org> ah, I don't know for sure. I _expect_ that many of the random developers who are excited about the proposal are excited because they think it will fix their problems, but their problems are in fact other things like ESM or whatever..
+
+Our problem is none of that. It's simply that writing JSDoc is terrible DX, but for our case is still preferable to dealing with generated code. And from what I've seen, we're not the only project with that experience.
+
+[22:39:18.0813] <bakkot>
+I agree that at least some projects would in fact benefit, yes
+
+[22:39:41.0326] <bakkot>
+I certainly do not claim that _all_ of the random developers who are excited about the proposal in fact have a different problem
+
+[22:39:48.0650] <bakkot>
+just that I expect many of them do
+
+[22:39:52.0296] <Jack Works>
+try ts-node, ts-node can configured to skip type checking and even use swc for transpile 
+
+[22:40:39.0007] <snek>
+i should poll at my company about this type annotation thing
+
+[22:40:58.0802] <snek>
+i don't think i've ever had the stated problem 
+
+[22:41:05.0487] <snek>
+pasting typescript into devtools or whatever
+
+[22:41:10.0570] <snek>
+or maybe i'm so used to it i don't notice
+
+[22:41:17.0393] <ljharb>
+ts-node has a repl
+
+[22:41:41.0058] <Michael Ficarra>
+I agree, the correctness win here is the higher-order bit
+
+[22:41:56.0711] <snek>
+we did just switch to rspack, so tool time is definitely a thing some people are thinking about
+
+[22:42:28.0192] <snek>
+ * we did just switch to rspack this morning, so tool time is definitely a thing some people are thinking about
+
+[22:43:57.0467] <Mathieu Hofman>
+> <@jackworks:matrix.org> try ts-node, ts-node can configured to skip type checking and even use swc for transpile 
+
+Not all our code runs on node ;) there are other JS engines and environments!
+
+[22:44:01.0556] <Michael Ficarra>
+littledan: please don't jump the queue like that
+
+[22:44:04.0564] <snek>
+tschromium
+
+[22:45:56.0965] <ljharb>
+> <@mhofman:matrix.org> Not all our code runs on node ;) there are other JS engines and environments!
+
+which other ones can't transpile TS on the fly?
+
+[22:46:03.0114] <ljharb>
+> <@mhofman:matrix.org> Not all our code runs on node ;) there are other JS engines and environments!
+
+ * which other ones can't be made to transpile TS on the fly somehow?
+
+[22:46:18.0449] <Michael Ficarra>
+sffc: PLEASE, I beg you, read https://speleotrove.com/decimal/decifaq4.html#signif
+
+[22:46:23.0265] <Mathieu Hofman>
+Also saying use deno and tsnode is basically making the argument that the expected DX is for the JS environment to strip / ignore types. I'm just asking for that behavior to be standardized 
+
+[22:46:43.0791] <ljharb>
+that's only expected DX tho *in a repl*
+
+[22:46:53.0937] <ljharb>
+ * that's only widely expected DX tho _in a repl_
+
+[22:47:04.0807] <Mathieu Hofman>
+No those environments are used to run production code
+
+[22:50:51.0643] <ljharb>
+dminor: did adding bigint slow down every JS program?
+
+[22:51:01.0390] <bakkot>
+> <@mhofman:matrix.org> Also saying use deno and tsnode is basically making the argument that the expected DX is for the JS environment to strip / ignore types. I'm just asking for that behavior to be standardized
+
+so I think a big disconnect here is the purported benefit is node users, but the cost is imposed on browser vendors and users of webpages
+
+[22:51:11.0758] <sffc>
+> <@michaelficarra:matrix.org> sffc: PLEASE, I beg you, read https://speleotrove.com/decimal/decifaq4.html#signif
+
+Trailing zeros are important as part of the representation / interchange format. `new Decimal("1.0").toLocaleString()` and `new Intl.PluralRules().select(new Decimal("1.0"))` should just work. I don't have a position regarding the impact on arithmetic of these values.
+
+[22:51:12.0619] <bakkot>
+and node can at least make breaking changes, sometimes, like typescript does
+
+[22:51:16.0597] <ljharb>
+(imo the reason bigint doesn't get used is because it doesn't interop with Number, which is a mistake Decimal needn't repeat)
+
+[22:51:16.0761] <bakkot>
+so it's just a very... very different space
+
+[22:51:21.0467] <ljharb>
+ * (imo the reason bigint doesn't get used is because it doesn't interop cleanly with Number, which is a mistake Decimal needn't repeat)
+
+[22:52:19.0074] <bakkot>
+> <@ljharb:matrix.org> (imo the reason bigint doesn't get used is because it doesn't interop cleanly with Number, which is a mistake Decimal needn't repeat)
+
+Decimal would need to repeat that
+
+[22:52:30.0428] <Michael Ficarra>
+sffc: So you're expecting that `new Decimal("1.0")` and `new Decimal("1.0000")` would produce the same results when participating in any arithmetic expression?
+
+[22:52:30.0905] <bakkot>
+decimal interoperating with number would be insane
+
+[22:52:54.0977] <ljharb>
+why?
+
+[22:53:03.0435] <ljharb>
+number → decimal at least, even if not the other way
+
+[22:53:13.0590] <bakkot>
+1.3 + 1.3m === ?
+
+[22:53:19.0286] <bakkot>
+there is no sensible answer to that question
+
+[22:53:26.0205] <ljharb>
+2.6m?
+
+[22:53:35.0463] <msaboff>
+> <@ljharb:matrix.org> number → decimal at least, even if not the other way
+
+Either Number -> Decimal or Decimal -> Number are inexact.
+
+[22:53:41.0472] <ljharb>
+ * 2.6m? or whatever number 1.3 actually is, converted to decimal, added to 1.3m
+
+[22:53:41.0793] <bakkot>
+> <@ljharb:matrix.org> 2.6m?
+
+yeah that's impossible
+
+[22:53:45.0106] <bakkot>
+which is why they can't interop
+
+[22:54:21.0982] <bakkot>
+(might be possible in simple cases, not possible in general)
+
+[22:54:22.0825] <ryzokuken>
+the implicit conversion would have to go number -> mathematical value -> decimal
+
+[22:54:35.0495] <dminor>
+> <@ljharb:matrix.org> dminor: did adding bigint slow down every JS program?
+
+Adding a new primitive meanings adding a new branch for dynamic dispatch based upon type, so it will slow things down, I can't say whether it was a measurable difference for BigInt or not, but adding a primitive has the potential to slow down existing programs, not just things that use the new primitive.
+
+[22:54:36.0212] <sffc>
+> <@michaelficarra:matrix.org> sffc: So you're expecting that `new Decimal("1.0")` and `new Decimal("1.0000")` would produce the same results when participating in any arithmetic expression?
+
+That's not something I said. I assume that spec authors who have gone into the weeds have defined what happens with trailing zeros when arithmetic is performed. The Temporal champions went into the weeds on similar types of problems in datetime arithmetic. All I'm saying is that `new Decimal("1")` and `new Decimal("1.0")` are absolutely distinct values for the purposes of internationalization and therefore from the Intl point of view it is important that the distinction be retained.
+
+[22:54:44.0508] <ljharb>
+so we've got 1) they're not primitives and operators don't Just Work, 2) it can't be made reasonable to interop with Number… i'm having a lot of trouble understanding the remaining value
+
+[22:55:06.0159] <Michael Ficarra>
+sffc: then you don't want decimal
+
+[22:55:06.0671] <bakkot>
+no use case of decimal known to me calls for them to inteorp with Number
+
+[22:55:07.0961] <ljharb>
+> <@dminor:mozilla.org> Adding a new primitive meanings adding a new branch for dynamic dispatch based upon type, so it will slow things down, I can't say whether it was a measurable difference for BigInt or not, but adding a primitive has the potential to slow down existing programs, not just things that use the new primitive.
+
+sure. but this concern wasn't brought up for BigInt, so how is Decimal any different?
+
+[22:55:13.0304] <bakkot>
+so I don't know why interop with Number would matter
+
+[22:55:34.0310] <dminor>
+> <@ljharb:matrix.org> sure. but this concern wasn't brought up for BigInt, so how is Decimal any different?
+
+Because we learned from the experience of implementing BigInt :)
+
+[22:55:36.0925] <msaboff>
+> <@usharma:igalia.com> the implicit conversion would have to go number -> mathematical value -> decimal
+
+How would you represent the intermediate mathematical value?
+
+[22:55:49.0343] <Michael Ficarra>
+ljharb: perf improvement is still possibly significant
+
+[22:56:05.0237] <snek>
+> <@ljharb:matrix.org> 2.6m? or whatever number 1.3 actually is, converted to decimal, added to 1.3m
+
+2.60000000000000004...
+
+[22:56:06.0632] <ryzokuken>
+within an engine? we have a way to represent mathematical values in the spec
+
+[22:56:16.0969] <shu>
+are you...kidding
+
+[22:56:19.0815] <ljharb>
+> <@devsnek:matrix.org> 2.60000000000000004...
+
+fine with me, as long as i can round decimals :-)
+
+[22:56:22.0793] <dminor>
+Well BigInt, and looking at implementing records and tuples
+
+[22:56:26.0199] <shu>
+you think we have a way to represent, in memory, mathematical reals?
+
+[22:56:30.0113] <ljharb>
+> <@devsnek:matrix.org> 2.60000000000000004...
+
+ * fine with me, as long as i can round/ceil/floor decimals :-)
+
+[22:56:41.0327] <shu>
+like, as intermediate values?
+
+[22:57:13.0967] <ryzokuken>
+we definitely use mathematical values all over the spec
+
+[22:57:22.0987] <Christian Ulbrich>
+(potentially TDZ): I suggested trading `undefined` _primitive_ for `Decimal` one. I guess no one will notice!
+
+[22:57:28.0026] <ryzokuken>
+I assume there's something corresponding to that within engines
+
+[22:57:34.0305] <shu>
+> <@usharma:igalia.com> we definitely use mathematical values all over the spec
+
+because we don't want to accidentally spec error accumulation in our internal arithmetic
+
+[22:57:41.0297] <bakkot>
+> <@usharma:igalia.com> I assume there's something corresponding to that within engines
+
+nope
+
+[22:57:44.0365] <bakkot>
+it just does IEEE arithmetic
+
+[22:57:49.0377] <Michael Ficarra>
+ryzokuken: they're a fiction
+
+[22:57:50.0768] <bakkot>
+and IEEE arithmetic corresponds to the right thing
+
+[22:57:55.0291] <snek>
+say 1/3rd to scare a js engine implementor
+
+[22:57:57.0628] <ryzokuken>
+welp, nvm then
+
+[22:58:08.0367] <bakkot>
+the use of reals in the spec is just a way to not write down IEEE semantics in the spec
+
+[22:58:14.0028] <ljharb>
+ps those occasional groups in the kitchen are quite loud, is there a polite way to address that?
+
+[22:58:21.0294] <Luca Casonato>
+re: string.prototype.decimalAdd()
+
+this sounds like coloring strings in some way? especially for typescript, you'd have to have some sort of colored string to make this not suck
+
+[22:58:38.0118] <Michael Ficarra>
+Luca Casonato: phantom types!
+
+[22:58:45.0371] <msaboff>
+> <@usharma:igalia.com> within an engine? we have a way to represent mathematical values in the spec
+
+What would be the proposed representation of such an intermediate mathematical value.  Number and Decimal have different significant digits and exponent ranges.  Number is inexact for decimal values.  If we had such an exact mathematical value, we'd use that for Number.
+
+[22:58:59.0022] <Michael Ficarra>
+`String<Decimal>`
+
+[22:59:16.0111] <nicolo-ribaudo>
+We could color them by wrapping then in an object as a "marker"
+
+[22:59:33.0177] <Luca Casonato>
+> <@nicolo-ribaudo:matrix.org> We could color them by wrapping then in an object as a "marker"
+
+`new Decimal(str)`~
+
+[22:59:35.0406] <Luca Casonato>
+> <@nicolo-ribaudo:matrix.org> We could color them by wrapping then in an object as a "marker"
+
+ * `new Decimal(str)`!
+
+[22:59:36.0140] <bakkot>
+> <@lucacasonato:matrix.org> re: string.prototype.decimalAdd()
+> 
+> this sounds like coloring strings in some way? especially for typescript, you'd have to have some sort of colored string to make this not suck
+
+if this proposal means TS makes it easier to color strings, I'm all for it!
+
+[22:59:57.0623] <msaboff>
+> <@usharma:igalia.com> within an engine? we have a way to represent mathematical values in the spec
+
+ * What would be the proposed representation of such an intermediate mathematical value?  Number and Decimal have different significant digits and exponent ranges.  Number is inexact for decimal values.  If we had such an exact mathematical value, we'd use that for Number.
+
+[23:00:01.0842] <ryzokuken>
+> <@msaboff:matrix.org> What would be the proposed representation of such an intermediate mathematical value?  Number and Decimal have different significant digits and exponent ranges.  Number is inexact for decimal values.  If we had such an exact mathematical value, we'd use that for Number.
+
+right. Sorry I was mistaken in assuming that engines might have some way to represent mathematical values within the spec but I now realize that they're pure fiction 😕 
+
+[23:00:06.0169] <shu>
+hell yeah love mauve strings
+
+[23:00:09.0532] <Luca Casonato>
+> <@bakkot:matrix.org> if this proposal means TS makes it easier to color strings, I'm all for it!
+
+actually yeah me too :D
+
+[23:00:19.0849] <Jack Works>
+> <@bakkot:matrix.org> if this proposal means TS makes it easier to color strings, I'm all for it!
+
+`'a'.blink()` color strings?
+
+[23:00:38.0845] <snek>
+if you store it as a fraction of bigints and reduce after each step you get something that is both horribly slow and semantically bad
+
+[23:00:46.0541] <Mathieu Hofman>
+> <@bakkot:matrix.org> so I think a big disconnect here is the purported benefit is node users, but the cost is imposed on browser vendors and users of webpages
+
+Our programs should be able to run on a multitude of environments, including browsers and non node/deno based "server" environments. That's the benefit of standardizing this in the language.
+
+[23:01:37.0911] <bakkot>
+> <@mhofman:matrix.org> Our programs should be able to run on a multitude of environments, including browsers and non node/deno based "server" environments. That's the benefit of standardizing this in the language.
+
+I agree that is a benefit. I do not think the costs are commensurate with the benefits.
+
+[23:02:19.0229] <bakkot>
+I think that, in this case, having a variant of node which strips TS types has fewer costs in general, even though it does have that one additional cost.
+
+[23:02:32.0951] <bakkot>
+not least of which that it would allow breaking changes ever
+
+[23:02:39.0255] <bakkot>
+and JSX, and so on
+
+[23:03:03.0090] <bakkot>
+but also, more significantly, that it would not impose costs on users of webpages
+
+[23:03:16.0790] <bakkot>
+(by making parsing JS slower/more expensive)
+
+[23:06:02.0819] <Mathieu Hofman>
+I'll go back to my argument, why do browsers not ask that code they execute be in the form of binary AST.
+
+[23:06:20.0747] <Mathieu Hofman>
+* I'll go back to my argument, why do browsers not require that code they execute be in the form of binary AST.
+
+[23:07:05.0909] <ljharb>
+how could they?
+
+[23:08:10.0240] <ljharb>
+if thats a hypothetical it requires too many "suppose"s for me to comprehend
+
+[23:09:37.0434] <snek>
+is this a serious question
+
+[23:09:42.0319] <Mathieu Hofman>
+I'm just trying to understand exactly how important the tradeoff between parsing performance and readability of executed code is
+
+[23:09:43.0222] <Bradford Smith>
+I'd love it if browsers could accept a binary AST format. I'm sure it would be much faster to execute.
+
+[23:09:47.0398] <snek>
+cuz there can be serious answers
+
+[23:10:32.0134] <Bradford Smith>
+and it could serve as a standard interchange format to move code from one environment to another whose source was different
+
+[23:10:40.0831] <snek>
+like if we could cut off legacy and restart from the ground up would js even exist? probably not... wasm is significantly better 
+
+[23:11:02.0633] <Mathieu Hofman>
+And if there is actually a large cost to parsing if the type annotations are not present in the executed code.
+
+[23:12:12.0777] <Mathieu Hofman>
+Or if there are other avenues we could explore to mitigate the impact of engines being able to parse and ignore type annotations 
+
+[23:12:32.0437] <Mathieu Hofman>
+In production scenarios where performance matters
+
+[23:20:31.0639] <bakkot>
+> <@mhofman:matrix.org> I'll go back to my argument, why do browsers not require that code they execute be in the form of binary AST.
+
+we almost certainly would if the option existed
+
+[23:20:34.0426] <bakkot>
+that would be a better world
+
+[23:20:38.0906] <bakkot>
+but the option does not exist
+
+[23:20:51.0899] <bakkot>
+however, do note that when adding a _new_ thing, wasm, we _do_ require it to be compiled rather than accepting WAT
+
+[23:21:05.0425] <msaboff>
+snek: How do you version a BinaryAST?  Many proposals add new node to an implementation's AST.  How do you handle where the spec needs the source of an expression, e.g. RegExp or a stack trace?  There are many more issues.
+
+[23:21:43.0004] <shu>
+recall that we went with binary ast as an option because we thought bytecode would be DOA
+
+[23:21:55.0139] <shu>
+binary ast is a worse option than bytecode in every way for shipping compiled code
+
+[23:21:59.0999] <shu>
+(not for tools, obviously)
+
+[23:22:21.0377] <shu>
+perhaps with wasm and the lessons there maybe we can think harder about a bytecode again
+
+[23:22:41.0760] <snek>
+if you go through and try to answer every question here you eventually end up at wasm or something similar to wasm... the point of *everything* is that we have an existing ecosystem here
+
+[23:23:07.0202] <shu>
+why would i end up at wasm? i'm talking about a JS bytecode that has 1:1 expressivity with source JS
+
+[23:23:32.0261] <snek>
+i mean mathieu's and msaboff's questions
+
+[23:23:36.0975] <shu>
+ah
+
+[23:23:52.0370] <bakkot>
+can we advance the queue
+
+[23:23:58.0664] <msaboff>
+But Wasm has issues as well.  Dev tooling, HTML interop, standard library...
+
+[23:23:59.0857] <ljharb>
+> <@msaboff:matrix.org> snek: How do you version a BinaryAST?  Many proposals add new node to an implementation's AST.  How do you handle where the spec needs the source of an expression, e.g. RegExp or a stack trace?  There are many more issues.
+
+i'd assume with semver
+
+[23:24:10.0071] <ljharb>
+> <@msaboff:matrix.org> snek: How do you version a BinaryAST?  Many proposals add new node to an implementation's AST.  How do you handle where the spec needs the source of an expression, e.g. RegExp or a stack trace?  There are many more issues.
+
+ * i'd assume with semver, but maybe i'm missing something
+
+[23:24:10.0283] <snek>
+why does that ping me lol
+
+[23:24:29.0437] <rkirsling>
+because element
+
+[23:25:22.0711] <snek>
+anyway the reason i mentioned it was because wasm adds new bytecode ops without versioning at all (wasm is still on version 0x1 mvp). it just takes some time to plan everything out.
+
+[23:25:37.0170] <snek>
+ * anyway the reason i mentioned it was because wasm adds new bytecode ops without versioning at all (wasm is still on version 0x1 "mvp"). it just takes some time to plan everything out.
+
+[23:26:18.0363] <nicolo-ribaudo>
+Is it different from JS adding new syntax?
+
+[23:26:40.0463] <snek>
+at a theoretical level no it is not
+
+[23:26:49.0673] <snek>
+but humans find it easier to namespace words than numbers 
+
+[23:27:00.0168] <snek>
+ * but humans find it easier to namespace words and symbols than numbers 
+
+[23:28:58.0019] <Mathieu Hofman>
+> <@devsnek:matrix.org> i mean mathieu's and msaboff's questions
+
+No I don't think compiling js programs to wasm makes sense. But instead of minifying and to allow making uncompiled JavaScript more useful, I would entertain an efficient source transform of JS that can be efficiently parsed by engines.
+
+[23:29:19.0560] <ljharb>
+i fail to see how "an infinite iterator of empty tuples" is a logical option but k
+
+[23:29:43.0427] <littledan>
+> <@ljharb:matrix.org> i fail to see how "an infinite iterator of empty tuples" is a logical option but k
+
+I guess that'd have to be the tail of everything if it's what would happen for zero things
+
+[23:29:46.0001] <bakkot>
+it would be empty
+
+[23:29:46.0595] <littledan>
+not all that useful...
+
+[23:30:39.0453] <ljharb>
+producing an infinite iterator anywhere seems pretty harmful to me
+
+[23:30:59.0970] <snek>
+network streams are infinite iterators
+
+[23:31:07.0380] <snek>
+ * network streams are infinite async iterators
+
+[23:31:12.0259] <msaboff>
+I think the current version of Wasm lacks some of what is needed to cleanly compile JS to Wasm.  Its Turing complete, but not optimal.  Also you'd need to include your own garbage collector, etc.
+
+[23:31:27.0939] <snek>
+you should not compile js to wasm
+
+[23:32:38.0624] <TabAtkins>
+Yeah, I prefer `Iterator.zip([...], mapper?)` (omitted mapping just produces an array of the items)
+
+[23:33:03.0518] <snek>
+i got distracted, why does zip have a mapper
+
+[23:33:12.0031] <Michael Ficarra>
+snek: it's a combiner
+
+[23:33:14.0298] <Michael Ficarra>
+zipWith
+
+[23:33:16.0021] <ljharb>
+i don't like the idea of being forced to wrap multiple iterators in an iterator just to zip them
+
+[23:33:25.0708] <TabAtkins>
+I mean, it's a temp array
+
+[23:33:35.0859] <ljharb>
+ * i don't like the idea of being forced to wrap multiple iterators in an iterator just to zip them, which is why i want varargs or an object
+
+[23:33:43.0233] <ljharb>
+yes, and forcing that imo is not a great design
+
+[23:33:47.0301] <snek>
+i don't understand what zipWith means, i should have paid better attention i'm sorry
+
+[23:33:52.0756] <bakkot>
+> <@ljharb:matrix.org> i don't like the idea of being forced to wrap multiple iterators in an iterator just to zip them, which is why i want varargs or an object
+
+do you also not like the idea of being forced to wrap multiple promises in an iterable just to await all of them?
+
+[23:34:07.0233] <Luca Casonato>
+> <@devsnek:matrix.org> i don't understand what zipWith means, i should have paid better attention i'm sorry
+
+Iterator.zipWith(Math.max, a, b, c)
+
+[23:34:07.0604] <ljharb>
+> <@bakkot:matrix.org> do you also not like the idea of being forced to wrap multiple promises in an iterable just to await all of them?
+
+correct, i do not like that and do want a form that takes an object literal
+
+[23:34:30.0022] <bakkot>
+what is the difference between an object literal and an array here?
+
+[23:34:45.0000] <bakkot>
+the thing you asked for was the varargs version, which is not like an object literal
+
+[23:34:46.0210] <snek>
+> <@lucacasonato:matrix.org> Iterator.zipWith(Math.max, a, b, c)
+
+i don't understand what this does
+
+[23:34:49.0728] <TabAtkins>
+I think it's easiest to understand zip as transposing an array of arrays, fwiw.
+
+[23:34:59.0585] <ljharb>
+> <@bakkot:matrix.org> the thing you asked for was the varargs version, which is not like an object literal
+
+sure, `Promise.all(a, b, c)` would be fine too
+
+[23:35:13.0903] <snek>
+i am familiar with zip in other languages, i've never seen it paired with a function
+
+[23:35:14.0114] <ljharb>
+> <@tabatkins:matrix.org> I think it's easiest to understand zip as transposing an array of arrays, fwiw.
+
+nothing about that sentence reads "easy" to me ¯\\\_(ツ)_/¯ 
+
+[23:35:15.0202] <littledan>
+> <@tabatkins:matrix.org> I think it's easiest to understand zip as transposing an array of arrays, fwiw.
+
+Yeah, the variadic map thing can be called map
+
+[23:35:26.0792] <littledan>
+(just my intuition)
+
+[23:35:27.0800] <rhysd>
+I wonder how about using methods like it1.zip(it2).zip(it3) instead of function like Rust does.
+
+[23:35:30.0600] <snek>
+i don't understand what the function does
+
+[23:35:44.0386] <bakkot>
+> <@devsnek:matrix.org> i don't understand what this does
+
+`Iterator.zipWith([a, b], mapper)` is the same as `Iterator.zip([a, b]).map(vs => mapper(...vs))`
+
+[23:35:57.0928] <bakkot>
+it just lets you skip making an intermediate array for results and instead immediately passes them to a function
+
+[23:36:00.0566] <bakkot>
+that's all
+
+[23:36:03.0482] <snek>
+> <@rhysd:matrix.org> I wonder how about using methods like it1.zip(it2).zip(it3) instead of function like Rust does.
+
+rust has this, and it is used commonly
+
+[23:36:10.0755] <ljharb>
+in this case there is no intermediate array tho, because of iterator helpers?
+
+[23:36:12.0714] <snek>
+> <@rhysd:matrix.org> I wonder how about using methods like it1.zip(it2).zip(it3) instead of function like Rust does.
+
+ * rust has this, and it is used commonly, i think the separate func is less common tbh
+
+[23:36:16.0149] <ljharb>
+ * in this case there is no intermediate array tho, because of iterator helpers? it's not like Array.from
+
+[23:36:24.0323] <bakkot>
+> <@ljharb:matrix.org> in this case there is no intermediate array tho, because of iterator helpers? it's not like Array.from
+
+there is an intermediate array? `zip` produces arrays
+
+[23:36:28.0163] <bakkot>
+an iterator of arrays
+
+[23:36:34.0499] <snek>
+> <@bakkot:matrix.org> it just lets you skip making an intermediate array for results and instead immediately passes them to a function
+
+got it, ty
+
+[23:36:47.0173] <rbuckton>
+> <@rhysd:matrix.org> I wonder how about using methods like it1.zip(it2).zip(it3) instead of function like Rust does.
+
+.NET-based languages like C# make this available as an extension method, so it can be used both as a static method and like an instance method: https://learn.microsoft.com/en-us/dotnet/api/system.linq.enumerable.zip?view=net-7.0
+
+[23:36:47.0738] <ljharb>
+> <@bakkot:matrix.org> there is an intermediate array? `zip` produces arrays
+
+ahhh right, so the mapper lets you skip that step, fair point.
+
+[23:36:55.0009] <ljharb>
+> <@bakkot:matrix.org> there is an intermediate array? `zip` produces arrays
+
+ * ahhh right, so the mapper lets you skip that step, fair point. that is like Array.from then
+
+[23:36:58.0901] <ljharb>
+ * ahhh right, so the mapper lets you skip that step, fair point. that is like Array.from then (in a good way)
+
+[23:37:04.0299] <snek>
+idk how convinced i am of zipWith existing but 🤷
+
+[23:37:08.0782] <TabAtkins>
+Yup, the mapper is exactly the same reasoning as Array.from
+
+[23:37:19.0351] <littledan>
+> <@bakkot:matrix.org> it just lets you skip making an intermediate array for results and instead immediately passes them to a function
+
+Yeah this sounds useful but is zip the right name, or map? maybe zip should just take the iterators, and not a function, and you use map if you have a function
+
+[23:37:24.0135] <TabAtkins>
+Could be omitted but it's a common case (in my experience, at least)
+
+[23:37:45.0328] <snek>
+either way as long as prototype.zip exists and does the normal thing i'm fine
+
+[23:37:54.0407] <bakkot>
+> <@littledan:matrix.org> Yeah this sounds useful but is zip the right name, or map? maybe zip should just take the iterators, and not a function, and you use map if you have a function
+
+I am fine with that outcome personally
+
+[23:37:58.0942] <rkirsling>
+it is kind of wild that self-hosted JS in JSC (and presumably not just JSC) uses `var` exclusively to avoid the perf implications of TDZ
+
+[23:38:11.0826] <bakkot>
+the battle against intermediate objects is already hopelessly lost when using iterators
+
+[23:38:30.0966] <bakkot>
+so it may not be worth having a new method solely to allow you to skip some intermediate objects...
+
+[23:38:35.0460] <rbuckton>
+`zip` is a useful name because its what many people reach for in many languages, as well as many existing js libraries.
+
+[23:38:51.0557] <Luca Casonato>
+ryzokuken: can you move the queue to shu's topic?
+
+[23:39:06.0917] <ryzokuken>
+done
+
+[23:39:09.0755] <ryzokuken>
+apologies I missed it
+
+[23:39:11.0850] <Luca Casonato>
+thanks!
+
+[23:39:13.0767] <TabAtkins>
+Yeah, def shouldn't be named something other than `zip` imo
+
+[23:39:20.0813] <littledan>
+> <@bakkot:matrix.org> so it may not be worth having a new method solely to allow you to skip some intermediate objects...
+
+sure but variadic map is probably also ergonomically motivated (just it'd be a weird name for zip itself)
+
+[23:39:24.0694] <TabAtkins>
+(or some variant like `zipLongest`
+
+[23:39:27.0542] <TabAtkins>
+ * (or some variant like `zipLongest`)
+
+[23:39:57.0558] <littledan>
+or... no, it'd look weird as an iterator method... zip will just read better
+
+[23:40:05.0869] <bakkot>
+> <@littledan:matrix.org> sure but variadic map is probably also ergonomically motivated (just it'd be a weird name for zip itself)
+
+variadic map doesn't make as much sense in JS because map is a prototype method rather than being `map(fn, iter)`
+
+[23:41:09.0964] <Jack Works>
+anyone know website that chrome publish their telemetry data of language features?
+
+[23:41:25.0638] <littledan>
+https://chromestatus.com/metrics/feature/popularity
+
+[23:41:35.0713] <littledan>
+well, not everything has a telemetry thing
+
+[23:41:41.0568] <bakkot>
+> <@devsnek:matrix.org> either way as long as prototype.zip exists and does the normal thing i'm fine
+
+would you also be OK with a static method?
+
+[23:41:50.0237] <bakkot>
+static method seems a little more natural to me...
+
+[23:42:20.0488] <TabAtkins>
+I think static n-iterator version, and prototype 2-iterator version, make sense together.
+
+[23:42:32.0029] <snek>
+as long as i can do zipping without ever running into the one that has the function
+
+[23:42:35.0211] <TabAtkins>
+arr1.zip(arr2, mapper)
+
+[23:42:35.0545] <snek>
+ * as long as i can do zipping without ever running into the one that has the map arg
+
+[23:42:50.0801] <TabAtkins>
+and Iterator.zip([arr1, arr2, arr3], mapper)
+
+[23:42:52.0895] <snek>
+what if you have an iterable function object
+
+[23:43:05.0311] <TabAtkins>
+what about it
+
+[23:43:14.0668] <TabAtkins>
+that example wasn't variadic
+
+[23:43:19.0716] <TabAtkins>
+either of them
+
+[23:43:33.0458] <snek>
+i think having to write zip([a, b]) instead of zip(a, b) would be unfortunate
+
+[23:43:33.0614] <littledan>
+yeah I'd prefer to keep this simple
+
+[23:43:45.0532] <snek>
+like not worth the mapper func
+
+[23:44:08.0891] <TabAtkins>
+I am fine without the mapper, especially since we *do* want an options bag.
+
+[23:44:09.0368] <bakkot>
+there are other options you'd want beyond the mapper function
+
+[23:44:17.0325] <bakkot>
+like "use this value to fill out the shorter one"
+
+[23:44:25.0576] <TabAtkins>
+Bc longest *is* necessary in my experience.
+
+[23:44:47.0445] <bakkot>
+though of course we could just have a bunch of different methods, instead of an options bag
+
+[23:44:50.0292] <littledan>
+isn't that what we designed array holes for?
+
+[23:44:50.0442] <snek>
+> <@bakkot:matrix.org> like "use this value to fill out the shorter one"
+
+isn't that `zip(a, chain(b, repeat(v)))`
+
+[23:44:55.0334] <snek>
+you don't need an options bag for that
+
+[23:45:02.0232] <bakkot>
+only if you know which one is longer up front
+
+[23:45:02.0508] <TabAtkins>
+ugh tho
+
+[23:45:07.0735] <TabAtkins>
+also that, yes
+
+[23:45:12.0949] <bakkot>
+if you don't know which one, you can't do it with `zip`
+
+[23:45:16.0901] <bakkot>
+or like you can but it's really really hard
+
+[23:45:18.0535] <snek>
+fair
+
+[23:45:26.0254] <snek>
+things to think about i guess
+
+[23:45:45.0561] <bakkot>
+previous discussion at https://matrixlogs.bakkot.com/TC39_General/2021-09-11#L3
+
+[23:46:47.0960] <snek>
+zip(a, b) and zipAdvanced([a, b], options, mapper)
+
+[23:47:32.0537] <bakkot>
+I think just making the wrapper array is better
+
+[23:47:34.0810] <bakkot>
+to match Promise.all
+
+[23:47:38.0046] <ljharb>
+`zip(a, b)` and `knit([a, b], options, mapper)` :-p
+
+[23:47:47.0286] <ljharb>
+the wrapper array is "fine" but super annoying to have to write
+
+[23:47:51.0379] <snek>
+velcro 
+
+[23:47:54.0659] <littledan>
+what do other languages do about this options thing?
+
+[23:47:59.0067] <snek>
+yeah i'm not gonna die on this hill but its unfortunate
+
+[23:48:09.0149] <snek>
+python has kwargs
+
+[23:48:13.0450] <snek>
+i wish js had kwargs
+
+[23:48:26.0254] <TabAtkins>
+littledan: Python just has several variant functions, with each taking extra args as necessary.
+
+[23:48:32.0829] <TabAtkins>
+and yeah, kwargs man
+
+[23:48:34.0769] <TabAtkins>
+kwargs
+
+[23:48:46.0216] <Jack Works>
+in sujitech we ship es2022 to users
+
+[23:49:04.0660] <snek>
+if we had a variant of js
+
+[23:49:06.0537] <snek>
+without hoisting
+
+[23:49:15.0315] <snek>
+would that fix this tdz stuff
+
+[23:49:16.0103] <rbuckton>
+> <@tabatkins:matrix.org> kwargs
+
+we just need real named arguments in JS, that's all
+
+[23:49:16.0806] <bakkot>
+we only this year stopped supporting IE9...
+
+[23:49:40.0834] <snek>
+same!
+
+[23:50:40.0023] <msaboff>
+Is @shu saying we should have stopped with ES5 😉
+
+[23:51:22.0178] <rkirsling>
+can't become unmodern if the definition of modern never changes :rollsafe:
+
+[23:57:37.0097] <snek>
+why does the bytecode not rewrite itself into a direct lookup once it observes that the slot is initialized
+
+[23:57:54.0614] <Rob Palmer>
+For Bloomberg Terminal we ship ESnext (Stage 4) to users as much as possible, which is also capped by the min-support of each piece of the toolchain that needs to transform that code, because relatively modern Chromium gets embedded.
+
+[23:59:44.0784] <rbuckton>
+> <@devsnek:matrix.org> why does the bytecode not rewrite itself into a direct lookup once it observes that the slot is initialized
+
+Isn't that overhead part of the problem?
+
+[00:00:02.0281] <snek>
+which overhead
+
+[00:00:15.0816] <rbuckton>
+You're not patching one place. You're patching every place the variable is referenced.
+
+[00:00:30.0830] <bakkot>
+> <@devsnek:matrix.org> why does the bytecode not rewrite itself into a direct lookup once it observes that the slot is initialized
+
+you have a bunch of different versions of the function also
+
+[00:00:36.0250] <bakkot>
+it's not like functions only get compiled once
+
+[00:00:45.0407] <rbuckton>
+And that involves GC as well
+
+[00:01:10.0649] <snek>
+ah yeah same underlying sfi 🥲
+
+[00:08:19.0060] <bakkot>
+danielrosenwasser: re: "we assume the runtime will catch it" - does that mean your type analysis treats `let` and `var` differently?
+
+[00:11:02.0438] <rbuckton>
+depending on transpilers to inform engines about eliding TDZ checks doesn't benefit developers not using transpilers.
+
+[00:13:30.0115] <danielrosenwasser>
+> <@bakkot:matrix.org> danielrosenwasser: re: "we assume the runtime will catch it" - does that mean your type analysis treats `let` and `var` differently?
+
+*well* I certainly thought so
+
+[00:14:28.0095] <danielrosenwasser>
+But no, we just take the optimistic path on that
+
+[00:14:49.0310] <danielrosenwasser>
+you can observe an `undefined`-initialized `var` or `let` in downlevel emit
+
+[00:15:02.0829] <bakkot>
+ok cool, that's what I thought
+
+[00:15:26.0240] <bakkot>
+it would make using `var` super annoying if it were treated differently
+
+[00:17:47.0454] <snek>
+interestingly v8 implements tdz checks as two separate bytecodes
+
+[00:18:06.0400] <snek>
+load variable and then throw reference error if loaded value is uninitialized
+
+[00:18:19.0306] <bakkot>
+the_hole
+
+[00:18:24.0267] <snek>
+yeah that one
+
+[00:18:26.0252] <bakkot>
+or whatever it's called
+
+[00:18:33.0515] <bakkot>
+love to have another kind of `null`
+
+[00:18:45.0504] <snek>
+i'm feeling like, if this was a single bytecode, it would be a single branch instruction instead of an entire bytecode clock cycle, which is significantly cheaper?
+
+[00:18:58.0877] <snek>
+but idk maybe i'm missing something obvious
+
+[00:19:17.0617] <bakkot>
+surely most of the cost is the branch, not the bytecode clock cycle?
+
+[00:19:23.0106] <bakkot>
+branches are expensive
+
+[00:19:49.0372] <rbuckton>
+What Mark is suggesting (moving `let` above all of its uses), is exactly what we had in our codebase when we discovered this regression.
+
+[00:20:22.0037] <snek>
+the branch exists either way, the bytecode dispatch is a jmp+lea+maybe smth else idr
+
+[00:20:47.0914] <bakkot>
+rbuckton: you should say that out loud, mark doesn't read chat
+
+[00:21:15.0518] <rbuckton>
+Mark's point is that the engines need to optimize for that, which they don't.
+
+[00:21:55.0193] <Bradford Smith>
+So, Mark is saying "lets encourage people to rewrite their JS into something that will force engines to do TDZ checks", right?
+
+[00:22:23.0397] <Bradford Smith>
+ * So, Mark is saying "lets encourage people to rewrite their JS into something that will **not force** engines to do TDZ checks", right?
+
+[00:22:23.0947] <Christian Ulbrich>
+Hold it the right way!™
+
+[00:22:32.0531] <rkirsling>
+it really sounds like "if engines never have to encounter a `let`, then `let` won't be unperformant" 
+
+[00:22:45.0912] <bakkot>
+right, and also suggesting the engine do more/smarter checks than they currently do
+
+[00:22:54.0830] <bakkot>
+but of course more/smarter checks are also expensive...
+
+[00:23:06.0080] <bakkot>
+at the very least this sounds like it would take at least two passes
+
+[00:23:07.0395] <Bradford Smith>
+I cannot imagine a developer who wants `const` being willing to rewrite it as a `let` with no assignment and a later assignment.
+
+[00:23:08.0988] <rbuckton>
+I think Mark is saying "fix this one case, and depend on linters to suggest you use that case", which doesn't help for `const` since it may depend on calculations and can't be hoisted.
+
+[00:24:49.0287] <rbuckton>
+Linters also generally don't do inter-procedural analysis either, so this sounds like a big ask.
+
+[00:25:11.0401] <ljharb>
+is it difficult to figure out that a variable is *not* referenced inside a closure, and also not referenced prior to the declaration?
+
+[00:25:25.0208] <Richard Gibson>
+more like "encourage everyone, particularly transpilers, to emit code in which `let`/`const` binding references are dominated (i.e., their TDZ is empty), and encourage implementations to statically detect such dominated bindings and eliminate any corresponding runtime penalty for them"
+
+[00:25:33.0642] <rbuckton>
+> <@ljharb:matrix.org> is it difficult to figure out that a variable is *not* referenced inside a closure, and also not referenced prior to the declaration?
+
+I think those are the cases that *are* optimized today.
+
+[00:25:53.0412] <rbuckton>
+At least, when they are run in a hot code path such that they get optimized.
+
+[00:26:01.0148] <ljharb>
+what about if it's a function statement vs a declaration?
+
+[00:26:02.0855] <rbuckton>
+As Shu said, not all code gets optimized.
+
+[00:26:06.0688] <bakkot>
+I am almost certain that gets checked literally during parsing
+
+[00:26:09.0643] <ljharb>
+like can the perf issue be avoided simply by not using function declarations
+
+[00:26:11.0823] <ljharb>
+ * like can the perf issue be avoided simply by not using function declarations?
+
+[00:26:14.0493] <danielrosenwasser>
+slight correction, the closed-over bindings are generally not top-level
+
+[00:26:23.0607] <ljharb>
+ * like can the perf issue be avoided simply by not using function declarations? (which many linter configs discourage anyways due to exposure to hoisting)
+
+[00:26:31.0564] <danielrosenwasser>
+they act as state intentionally captured by closures for major components
+
+[00:26:32.0742] <ljharb>
+ * like can the perf issue be avoided simply by not using function declarations? (which many linter configs discourage anyways due to it adding exposure to hoisting and use-before-define)
+
+[00:27:15.0029] <rkirsling>
+yeah I think this discussion is basically centered (or at least, can be centered) on code which is _not_ reaching top-tier JIT
+
+[00:27:18.0736] <bakkot>
+ * I am almost certain the not-closed-over bit gets checked literally during parsing
+
+[00:27:45.0353] <ljharb>
+so like, in the example on the screen, if the function is written as an expression and not a declaration, then the resulting reorganization it would force seems like it'd avoid this perf hit?
+
+[00:27:46.0682] <bakkot>
+in the simple cases engines skip the TDZ checks even in the lowest tier
+
+[00:27:55.0630] <bakkot>
+because the simplest cases can be checked during parsing, in a single pass
+
+[00:28:07.0945] <rkirsling>
+right. simple cases are fine
+
+[00:28:14.0447] <ljharb>
+if the only codebases suffering are ones that use function decls and rely on hoisting i'm much less interested in trying to address a problem
+
+[00:28:22.0598] <waldemar>
+The main reason we have this mess is that function definitions *can* hoist, even if most of them may not be used that way.
+If one turns a function statement into a const binding initialized with a function expression, that is known never to hoist, and thus the implementation can trivially see that it's dominated by any prior bindings in the scope.
+
+[00:28:39.0995] <ljharb>
+^ that suggests to me another reason to avoid using declarations
+
+[00:28:43.0364] <ljharb>
+ * ^ that suggests to me another reason to just avoid using declarations
+
+[00:28:59.0471] <waldemar>
+Lint rules can do that, or transpilers might be able to do that.
+
+[00:29:14.0117] <snek>
+this is why i asked above if adding a no-hosting mode would help. ultimately i'd like to look at a lower level investigation of this problem space from v8, assuming they've written something up somewhere
+
+[00:30:24.0290] <nicolo-ribaudo>
+no-hoisting means that `let x = 1; { x; let x = 2 }` sees 1?
+
+[00:30:32.0658] <bakkot>
+Unfortunately a lot of people are attached to a style which relies heavily on hoisting, so I think it is unlikely we'll convince people to move away from that 
+
+[00:30:41.0630] <ljharb>
+i agree, it's very unfortunate
+
+[00:30:53.0705] <bakkot>
+> <@nicolo-ribaudo:matrix.org> no-hoisting means that `let x = 1; { x; let x = 2 }` sees 1?
+
+it's only hoisting _of function declarations_ which we're talking about I believe
+
+[00:31:06.0781] <snek>
+> <@nicolo-ribaudo:matrix.org> no-hoisting means that `let x = 1; { x; let x = 2 }` sees 1?
+
+no i mean a mode where you can't call functions before their declaration
+
+[00:31:14.0821] <rkirsling>
+oh no, dminor, you removed your topic from the queue?
+
+[00:31:15.0131] <snek>
+it would also let us have good decorators
+
+[00:31:21.0471] <rkirsling>
+ * oh no, dminor, you removed your topic from the queue? I was gonna + 1it
+
+[00:31:22.0549] <nicolo-ribaudo>
+Oh ok I got confused by the previous discussion about manually hoisting let
+
+[00:31:25.0047] <rkirsling>
+ * oh no, dminor, you removed your topic from the queue? I was gonna +1 it
+
+[00:32:23.0618] <bakkot>
+> <@devsnek:matrix.org> it would also let us have good decorators
+
+using `const x = function(){}` also lets you have good decorators
+
+[00:32:27.0204] <rbuckton>
+> <@devsnek:matrix.org> no i mean a mode where you can't call functions before their declaration
+
+Function decorators would also require a non-hoisting mechanism, even if that mechanism is "a decorated function doesn't hoist"
+
+[00:32:53.0763] <bakkot>
+where "good decorators" of course means _normal function calls_ instead of a special syntactic form for calling functions in a different way
+
+[00:33:20.0897] <snek>
+> <@bakkot:matrix.org> where "good decorators" of course means _normal function calls_ instead of a special syntactic form for calling functions in a different way
+
+*snek will remember this*
+
+[00:33:23.0023] <rkirsling>
+shu: this sounds like a fun investigation, one way or another
+
+[00:34:08.0530] <ljharb>
+ryzokuken:  advance queue?
+
+[00:34:15.0924] <snek>
+queue is advanced for me
+
+[00:34:23.0713] <ryzokuken>
+I think TCQ got stuck for me
+
+[00:34:28.0618] <ljharb>
+oh, i see the topic changed but the queue isn't empty
+
+[00:34:30.0543] <rbuckton>
+> <@bakkot:matrix.org> where "good decorators" of course means _normal function calls_ instead of a special syntactic form for calling functions in a different way
+
+That would conflict with the feedback I received that function decorators had to exist for parameter decorators to advance beyond stage 1, and is the reason that parameter decorators currently only covers class methods.
+
+[00:34:31.0649] <Michael Ficarra>
+TCQ is down :-(
+
+[00:34:43.0227] <ryzokuken>
+> <@ljharb:matrix.org> oh, i see the topic changed but the queue isn't empty
+
+that is another weird TCQ bug
+
+[00:35:12.0312] <snek>
+shu: is there a doc from v8 that explores tdz at a lower level? i'd be interested in seeing analysis of the bytecode and assembly and such without profiling it myself if such a thing already exists.
+
+[00:35:15.0327] <dminor>
+I removed myself from the queue, but I'll say it here, SpiderMonkey is cautiously interested in removing TDZ and we've started investigating the impact on our engine.
+
+[00:35:33.0077] <shu>
+> <@devsnek:matrix.org> why does the bytecode not rewrite itself into a direct lookup once it observes that the slot is initialized
+
+you're patching bytecode of a function that can be called multiple times?
+
+[00:35:38.0951] <shu>
+a closure that can be allocated multiple times?
+
+[00:35:51.0047] <snek>
+yeah i forgot that bytecode is shared
+
+[00:35:53.0230] <bakkot>
+> <@rbuckton:matrix.org> That would conflict with the feedback I received that function decorators had to exist for parameter decorators to advance beyond stage 1, and is the reason that parameter decorators currently only covers class methods.
+
+correct, I personally do not think there is a viable path for function decorators or parameter decorators to exist
+
+[00:36:20.0497] <shu>
+> <@devsnek:matrix.org> shu: is there a doc from v8 that explores tdz at a lower level? i'd be interested in seeing analysis of the bytecode and assembly and such without profiling it myself if such a thing already exists.
+
+alas no, lower level like at the cycle-counting level?
+
+[00:36:31.0167] <snek>
+yeah
+
+[00:37:03.0895] <nicolo-ribaudo>
+> <@shuyuguo:matrix.org> you're patching bytecode of a function that can be called multiple times?
+
+Uhm, if the TDZ check does not trigger the first time it will never throw
+
+[00:37:19.0311] <shu>
+for any particular activation of a function
+
+[00:37:28.0183] <shu>
+but not for subsequent activations, especially if it's a newly allocated closure
+
+[00:37:31.0070] <shu>
+so you can't patch the bytecode
+
+[00:37:37.0914] <nicolo-ribaudo>
+Oh right
+
+[00:37:50.0559] <snek>
+if bytecode was not shared it would work but then you'd have big memory usage
+
+[00:37:56.0592] <shu>
+i want to have a general gripe
+
+[00:38:09.0080] <shu>
+when engines complain about something, it is not before we do a lot of work to try to make it a non-problem
+
+[00:38:18.0390] <shu>
+i am not a fan of being told, "have you tried being smarter"
+
+[00:38:44.0436] <nicolo-ribaudo>
+Yep sorry
+
+[00:38:56.0551] <shu>
+it wasn't towards you per se
+
+[00:39:03.0713] <shu>
+more towards mark
+
+[00:39:08.0502] <rbuckton>
+> <@bakkot:matrix.org> correct, I personally do not think there is a viable path for function decorators or parameter decorators to exist
+
+I'm not sure why parameter decorators are not viable, at least for class elements. They're extremely valuable, and we have plenty of evidence for that in the TypeScript ecosystem.
+
+[00:39:13.0147] <rkirsling>
+right, that tone really surprised me
+
+[00:39:25.0765] <Bradford Smith>
+As engineers, we mostly can't help ourselves. We see a problem and immediately think "I bet I could fix that..."
+
+[00:39:34.0976] <Michael Ficarra>
+shu: you could try complaining about things before you do such work
+
+[00:39:35.0818] <shu>
+> <@dminor:mozilla.org> I removed myself from the queue, but I'll say it here, SpiderMonkey is cautiously interested in removing TDZ and we've started investigating the impact on our engine.
+
+has the analysis i wrote been improved upon?
+
+[00:39:48.0508] <snek>
+i bet i could fix that with the "javascript load and branch if the hole" instruction
+
+[00:39:49.0029] <Christian Ulbrich>
+In all fairness, one might add, that YOU, might not mean YOU, personally. :)
+
+[00:39:50.0053] <shu>
+> <@michaelficarra:matrix.org> shu: you could try complaining about things before you do such work
+
+but then "have you tried being smarter" would be a valid criticism!
+
+[00:40:05.0521] <Michael Ficarra>
+exactly, I've fixed it
+
+[00:40:08.0275] <bakkot>
+> <@rbuckton:matrix.org> I'm not sure why parameter decorators are not viable, at least for class elements. They're extremely valuable, and we have plenty of evidence for that in the TypeScript ecosystem.
+
+I do not think parameter-decorators-but-only-for-class-elements is an reasonable outcome, as I believe I said when they were presented
+
+[00:40:39.0449] <bakkot>
+also I do not think function decorators make sense, though it is possible I could be convinced of that
+
+[00:41:01.0148] <bakkot>
+if in addition someone believes parameter decorators cannot advance without function decorators, then there is no option which satisfies all of these constraints
+
+[00:41:01.0288] <littledan>
+> <@bakkot:matrix.org> correct, I personally do not think there is a viable path for function decorators or parameter decorators to exist
+
+aww, I really want function decorators... they aren't viable because of hoisting?
+
+[00:41:14.0237] <snek>
+i get so annoyed that js doesn't have decorators on functions whenever i come back to it from python
+
+[00:41:40.0469] <Christian Ulbrich>
+bakkot: Couldn't we achieve some poor woman's function composition with function decorators and isn't this, what everyone wants in lie of pipeline operator?
+
+[00:42:29.0753] <rbuckton>
+We could easily have function decorators for function expressions and arrow functions, if we wanted them.
+
+[00:42:45.0464] <rbuckton>
+We've always been stuck on the hoisting behavior of function declarations.
+
+[00:42:59.0084] <snek>
+i don't think either of those should have decorators on them :P
+
+[00:43:55.0337] <ljharb>
+any use case to decorate any kind of function applies to decorate any other kind of function.
+
+[00:44:31.0757] <ljharb>
+ * surely any use case to decorate any kind of function applies to decorate any other kind of function.
+
+[00:44:39.0584] <rbuckton>
+> <@devsnek:matrix.org> i don't think either of those should have decorators on them :P
+
+I'm confused by this and your previous statement, they seem to be in conflict.
+
+[00:45:08.0182] <snek>
+i think function declarations should have decorators. i don't think function expressions or arrow arrow functions should have decorators
+
+[00:45:08.0490] <bakkot>
+> <@devsnek:matrix.org> i don't think either of those should have decorators on them :P
+
+"You don't believe in 2,999 gods. And I don't believe in just one more"
+
+[00:45:25.0717] <snek>
+well maybe function expressions that are not in a variable declaration are ok
+
+[00:45:50.0888] <rbuckton>
+> <@devsnek:matrix.org> i think function declarations should have decorators. i don't think function expressions or arrow arrow functions should have decorators
+
+It may be that function expressions are the _only_ way to have function decorators, unless we are willing to disable hoisting of decorated function declarations.
+
+[00:46:03.0187] <snek>
+yeah i'm aware
+
+[00:46:17.0256] <ljharb>
+didn't we just lightly establish that function declarations are bad because hoisting
+
+[00:46:29.0447] <rbuckton>
+I would be fine with having this mean the function doesn't hoist:
+```js
+@dec
+function f() {}
+```
+
+
+[00:46:33.0263] <shu>
+in this particular lens, but i actually don't think they're bad
+
+[00:46:35.0702] <ljharb>
+ * didn't we just lightly establish that function declarations are bad because hoisting (altho a non-hosting function declaration sounds great!)
+
+[00:46:46.0021] <shu>
+i think implicit function declaration hoisting behavior is actually much better than TDZ
+
+[00:46:51.0995] <shu>
+implicit letrec without special syntax is great
+
+[00:46:52.0989] <snek>
+i am also very ok with decorators making functions not hoisted
+
+[00:47:03.0084] <ljharb>
+can i just do `@ function f() {}` to have a non-hoisting function declaration without any decorator? i'm all on board with that
+
+[00:47:07.0470] <snek>
+most of my code is actually written with a rule that prevents using hoisting anyway
+
+[00:47:44.0811] <rbuckton>
+At one point I was considering something like this:
+
+```
+let function f() {}
+const function g() {}
+```
+
+[00:47:54.0893] <snek>
+`fn`
+
+[00:47:54.0927] <ljharb>
+i smell more tdz
+
+[00:47:57.0144] <snek>
+`def`
+
+[00:47:59.0720] <rbuckton>
+Please no.
+
+[00:48:20.0947] <snek>
+PROCEDURE
+
+[00:48:31.0598] <rbuckton>
+Yes, `function` is long, but `fn`, `impl`, `def` are not friendly to the reader.
+
+[00:48:48.0557] <snek>
+i do wish everything was just `function`. i always mix them up when switching languages
+
+[00:49:11.0255] <ljharb>
+`good function f() {}`
+
+[00:49:25.0229] <rkirsling>
+`'use good;`
+
+[00:49:29.0248] <rkirsling>
+ * `'use good';`
+
+[00:49:51.0569] <rbuckton>
+But, `let function f() {}` seemed like a good alternative to `let f = function () {}` when it came to decorators.
+
+[00:50:15.0006] <snek>
+`l'function f() {}`
+
+[00:50:18.0344] <rkirsling>
+`@let`
+
+[00:50:25.0829] <rbuckton>
+Especially since decorators expose the name of a thing, thus `let f = @dec function() {}` seems like it wouldn't get the name.
+
+[00:54:29.0149] <littledan>
+> <@devsnek:matrix.org> i am also very ok with decorators making functions not hoisted
+
+yes, this is what I was hoping would happen. Of course, then we need to decide whether they get tdz...
+
+[00:54:57.0706] <snek>
+i'll let shu decide
+
+[00:55:46.0803] <rbuckton>
+```
+var function f() {}
+```
+hoist the name, like a 'var', but not the value :)
+
+[00:56:44.0523] <ljharb>
+why not all three, var functions have no tdz, let functions are reassignable and have tdz, const functions aren't reassignable :-p
+
+[00:57:08.0910] <rbuckton>
+> <@ljharb:matrix.org> why not all three, var functions have no tdz, let functions are reassignable and have tdz, const functions aren't reassignable :-p
+
+I mean, that's what I'm suggesting, mostly unironically.
+
+[00:57:10.0010] <snek>
+const functions can be used in constexprs
+
+[00:57:17.0096] <littledan>
+> <@rbuckton:matrix.org> Especially since decorators expose the name of a thing, thus `let f = @dec function() {}` seems like it wouldn't get the name.
+
+well, class decorators can find themselves in the same position, and get undefined
+
+[00:57:54.0892] <rbuckton>
+> <@littledan:matrix.org> well, class decorators can find themselves in the same position, and get undefined
+
+And that's exactly why I would want to be able to decorate function declarations as well.
+
+[00:58:30.0396] <littledan>
+yes, I think we should focus on decorating function declarations, and live with the non-hoisting (and presumably starting at undefined, given Shu's presentation)
+
+[00:59:15.0217] <rbuckton>
+> <@littledan:matrix.org> yes, I think we should focus on decorating function declarations, and live with the non-hoisting (and presumably starting at undefined, given Shu's presentation)
+
+I would be happy with this. The function hoisting issue held up decorators for years, and was why it was split off from the original proposal, IIRC.
+
+[01:00:31.0582] <Michael Ficarra>
+Luca Casonato: I'm not convinced by snapshotting, just dump everything you care about yourself
+
+[01:03:54.0871] <Michael Ficarra>
+eemeli: I just wanted to make sure you have understood that a solution here would look more like "give me the ISO-8601 representation of this" or "sort this according to some defined non-locale-specific Unicode operation", etc, not a "give me the stable string repr of this"
+
+[01:04:15.0699] <Michael Ficarra>
+that's the thing I was trying to say that I couldn't put to words in the moment
+
+[01:04:29.0826] <Michael Ficarra>
+but it was basically what bakkot had said
+
+[01:04:38.0777] <ryzokuken>
+> <@michaelficarra:matrix.org> Luca Casonato: I'm not convinced by snapshotting, just dump everything you care about yourself
+
+but if your app has localization features that are subject to change, you cannot do snapshot testing unless you make some kind of Intl stub 
+
+[01:04:55.0471] <ryzokuken>
+in this case you could just test with the `zxx` locale and get it working
+
+[01:05:25.0594] <bakkot>
+> <@usharma:igalia.com> but if your app has localization features that are subject to change, you cannot do snapshot testing unless you make some kind of Intl stub
+
+why can't you just read all of the properties you care about?
+
+[01:05:32.0768] <Michael Ficarra>
+ryzokuken: I think that is an unrelated problem
+
+[01:05:33.0235] <bakkot>
+if the answer is "they are not exposed", we should fix that
+
+[01:05:56.0731] <ryzokuken>
+> <@michaelficarra:matrix.org> eemeli: I just wanted to make sure you have understood that a solution here would look more like "give me the ISO-8601 representation of this" or "sort this according to some defined non-locale-specific Unicode operation", etc, not a "give me the stable string repr of this"
+
+this is how I understood the motivation myself (not the latter case I mean)
+
+[01:06:59.0861] <ryzokuken>
+> <@bakkot:matrix.org> why can't you just read all of the properties you care about?
+
+no I literally mean if you have a website that is rendered localized, you cannot do snapshot testing unless you have some sort of null locale to use in the testing environment
+
+[01:07:16.0419] <ryzokuken>
+or work on engines without Intl support
+
+[01:07:42.0089] <bakkot>
+say more about why?
+
+[01:07:55.0787] <snek>
+why can't you stub intl.whatever to just return "AAAAA"
+
+[01:07:56.0426] <bakkot>
+why can you not do your own serialization, of all of the properties you care about?
+
+[01:08:06.0511] <ryzokuken>
+> <@devsnek:matrix.org> why can't you stub intl.whatever to just return "AAAAA"
+
+yeah, that's one solution I mentioned
+
+[01:08:42.0763] <bakkot>
+oh you mean snapshotting _the entire website_
+
+[01:08:48.0407] <ryzokuken>
+yeah
+
+[01:08:58.0524] <bakkot>
+yeah I am not convinced that use case is worth solving, stubbing out intl seems fine for that case
+
+[01:09:04.0069] <bakkot>
+you also need to stub `Math.random` and so on
+
+[01:09:09.0333] <bakkot>
+`new Date`
+
+[01:09:10.0717] <bakkot>
+lots of stuff
+
+[01:09:10.0730] <ryzokuken>
+right, true
+
+[01:09:19.0670] <bakkot>
+(off to dinner, back later)
+
+[01:09:22.0494] <ryzokuken>
+but there's other cases apart from that
+
+[01:09:29.0605] <ryzokuken>
+I was just elaborating on the one Luca mentioned
+
+[01:09:31.0311] <snek>
+like i see this the same way as if we said "we need a special deterministic url for using fetch() in snapshot tests"
+
+[01:09:40.0668] <ryzokuken>
+same, talk to you all after lunch!
+
+[01:09:58.0417] <ryzokuken>
+> <@devsnek:matrix.org> like i see this the same way as if we said "we need a special deterministic url for using fetch() in snapshot tests"
+
+what about engines without Intl support
+
+[01:10:58.0280] <snek>
+not sure what you mean
+
+[01:10:59.0475] <ryzokuken>
+if you design localized interfaces that use Intl, you need to guard every call or again, use an Intl stub
+
+[01:11:24.0606] <ryzokuken>
+but if there were a null locale that was supported on all implementations, you would have a clean fallback
+
+[01:11:35.0965] <ryzokuken>
+like how the `iso8601` calendar works in Temporal.
+
+[01:11:51.0618] <snek>
+i think a null locale would be an explicitly bad thing
+
+[01:12:09.0760] <ryzokuken>
+Ideally you'd want to use `gregory` for many real use cases, but in the absence of any of these Intl calendars, you can always use the programmatic one
+
+[01:12:15.0652] <snek>
+we used to have something similar in nodejs
+
+[01:12:23.0204] <snek>
+and it caused so much pain that we now ship node with full locale data by default now
+
+[01:12:48.0034] <snek>
+ * and it caused so much pain that we now ship node with full locale data by default
+
+[01:12:48.0760] <ryzokuken>
+well, except we shipped an awkward stripped down locale data
+
+[01:12:59.0273] <ryzokuken>
+that was like en-US or something IIRC
+
+[01:13:26.0857] <snek>
+no matter what you put in you got out en-US but it wasn't real en-US because there wasn't even cldr data for en-US bundled
+
+[01:13:40.0793] <ryzokuken>
+damn
+
+[01:13:46.0400] <ryzokuken>
+but that's not what is being proposed here
+
+[01:14:03.0200] <ryzokuken>
+although I guess motivations could be similar 
+
+[01:14:59.0037] <snek>
+i think my intuition is still that this is not a good thing and i'd rather code polyfilled intl in some way that makes sense to them 
+
+[01:15:02.0392] <ryzokuken>
+anyway, I don't want to cause any damage and will let Eemeli explain the merits of the proposal, I was hoping to add a supportive voice but I'm not involved yet
+
+[01:43:00.0246] <Luca Casonato>
+> <@michaelficarra:matrix.org> Luca Casonato: I'm not convinced by snapshotting, just dump everything you care about yourself
+
+If it’s a simple, stable, easy to read, string base representation of the value, I’d prefer to use that over a structured representation for debugging & snapshot testing 
+
+[01:43:54.0174] <Luca Casonato>
+> <@bakkot:matrix.org> you also need to stub `Math.random` and so on
+
+Not unless your runtime provides a way for you to run tests deterministically at a fixed fake time (which many test runners do)
+
+[01:45:35.0350] <Luca Casonato>
+> <@devsnek:matrix.org> like i see this the same way as if we said "we need a special deterministic url for using fetch() in snapshot tests"
+
+Why, url already has a simple and stable human readable serialization of the contained properties? Dates for example, may not 
+
+[07:03:20.0992] <Jesse (TC39)>
+92 unread messages in a thread (or threads?) I cannot identify. Thanks, Matrix.
+
+[07:41:26.0743] <eemeli>
+I think one necessary next step for Stable Formatting is to enumerate the cases where Intl APIs are currently being used badly or dangerously because they're providing the most ergonomic solutions to developer problems.
+
