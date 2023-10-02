@@ -23,3 +23,48 @@ that means i don't need to worry about making this more efficient in another pro
 [16:00:47.0833] <bakkot>
 for this reason you will sometimes see people doing `let {0: x, 1: y} = array`, because it skips the iterator protocol
 
+[16:13:53.0558] <Richard Gibson>
+aw crud, it looks like every implementation diverges from the spec for `const [] = …`
+```
+$ eshost -sx '
+  "use strict"; 
+  const arr = ["a", "b", "c"];
+  Object.defineProperty(Array.prototype, Symbol.iterator, {
+    get() {
+      print("get Symbol.iterator", this);
+      return function*() { 
+        print("@@iterator", this, ...arguments);
+        for (let i = 0; i < this.length; i++) { 
+          const v = this[i];
+          print("yield", v); 
+          yield v; 
+        } return; 
+      }; 
+    }, 
+  }); 
+  print("\n# read all"); const [...all] = arr; 
+  print("\n# read one"); const [first] = arr; 
+  print("\n# read none"); const [] = arr; 
+  print("\n" + JSON.stringify({ first, all }));
+'
+#### ChakraCore, engine262, GraalJS, Hermes, JavaScriptCore, Moddable XS, QuickJS, SpiderMonkey, V8
+# read all
+get Symbol.iterator a,b,c
+@@iterator a,b,c
+yield a
+yield b
+yield c
+
+# read one
+get Symbol.iterator a,b,c
+@@iterator a,b,c
+yield a
+
+# read none
+get Symbol.iterator a,b,c
+
+{"first":"a","all":["a","b","c"]}
+```
+
+(_all three should invoke `@@iterator` and get `next` in [GetIteratorFromMethod](https://tc39.es/ecma262/multipage/abstract-operations.html#sec-getiteratorfrommethod) via [GetIterator](https://tc39.es/ecma262/multipage/abstract-operations.html#sec-getiterator)_)
+
