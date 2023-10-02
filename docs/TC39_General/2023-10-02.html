@@ -74,6 +74,45 @@ get Symbol.iterator a,b,c
 <p>(<em>all three should invoke <code>@@iterator</code> and get <code>next</code> in <a href="https://tc39.es/ecma262/multipage/abstract-operations.html#sec-getiteratorfrommethod">GetIteratorFromMethod</a> via <a href="https://tc39.es/ecma262/multipage/abstract-operations.html#sec-getiterator">GetIterator</a></em>)</p>
 </td></tr>
   <tr class="msg" id="L6"><td class="ts-cell"><a class="ts" href="#L6" alt="Mon Oct 02 2023 16:34:11 GMT-0700 (Pacific Daylight Time)">23:34</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell">I suspect that's due to implementing the spec as it was prior to <a href="https://github.com/tc39/ecma262/pull/1021">https://github.com/tc39/ecma262/pull/1021</a>, and then only doing the update necessary to make <a href="https://github.com/tc39/test262/pull/1248">https://github.com/tc39/test262/pull/1248</a> pass</td></tr>
+  <tr class="msg" id="L7"><td class="ts-cell"><a class="ts" href="#L7" alt="Mon Oct 02 2023 16:40:47 GMT-0700 (Pacific Daylight Time)">23:40</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell">wait, no</td></tr>
+  <tr class="msg" id="L8"><td class="ts-cell"><a class="ts" href="#L8" alt="Mon Oct 02 2023 16:40:53 GMT-0700 (Pacific Daylight Time)">23:40</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell"><span class="nick-11">Richard Gibson</span> your test is just wrong</td></tr>
+  <tr class="msg" id="L9"><td class="ts-cell"><a class="ts" href="#L9" alt="Mon Oct 02 2023 16:40:56 GMT-0700 (Pacific Daylight Time)">23:40</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell">generators don't do anything when invoked</td></tr>
+  <tr class="msg" id="L10"><td class="ts-cell"><a class="ts" href="#L10" alt="Mon Oct 02 2023 16:41:15 GMT-0700 (Pacific Daylight Time)">23:41</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell">(except evaluate parameter defaults IIRC)</td></tr>
+  <tr class="msg" id="L11"><td class="ts-cell"><a class="ts" href="#L11" alt="Mon Oct 02 2023 16:41:18 GMT-0700 (Pacific Daylight Time)">23:41</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell">they only do something when you first call <code>next</code></td></tr>
+  <tr class="msg" id="L12"><td class="ts-cell"><a class="ts" href="#L12" alt="Mon Oct 02 2023 16:41:56 GMT-0700 (Pacific Daylight Time)">23:41</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell"><pre><code>"use strict";
+const arr = ["a", "b", "c"];
+Object.defineProperty(Array.prototype, Symbol.iterator, {
+  get() {
+    print("get Symbol.iterator", this);
+    let thiz = this;
+    return function() {
+      print("@@iterator", this, ...arguments);
+      let i = 0;
+      return {
+        get next() {
+          print("get next");
+          return () =&gt; {
+            return i &gt;= thiz.length ? { done: true } : { done: false, value: thiz[i++] };
+          };
+        },
+      };
+    };
+  },
+});
+print("\n# read all"); const [...all] = arr;
+print("\n# read one"); const [first] = arr;
+print("\n# read none"); const [] = arr;
+print("\n" + JSON.stringify({ first, all }));
+</code></pre>
+<p>gives</p>
+<pre><code># read none
+get Symbol.iterator a,b,c
+@@iterator a,b,c
+get next
+</code></pre>
+<p>in all engines, just as it should</p>
+</td></tr>
+  <tr class="msg" id="L13"><td class="ts-cell"><a class="ts" href="#L13" alt="Mon Oct 02 2023 16:44:46 GMT-0700 (Pacific Daylight Time)">23:44</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-11" title="@gibson042:matrix.org">Richard Gibson</span>&gt;</div></td><td class="msg-cell">phew</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>

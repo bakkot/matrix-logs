@@ -71,3 +71,57 @@ get Symbol.iterator a,b,c
 [16:34:11.0847] <bakkot>
 I suspect that's due to implementing the spec as it was prior to https://github.com/tc39/ecma262/pull/1021, and then only doing the update necessary to make https://github.com/tc39/test262/pull/1248 pass
 
+[16:40:47.0959] <bakkot>
+wait, no
+
+[16:40:53.0463] <bakkot>
+Richard Gibson your test is just wrong
+
+[16:40:56.0733] <bakkot>
+generators don't do anything when invoked
+
+[16:41:15.0727] <bakkot>
+(except evaluate parameter defaults IIRC)
+
+[16:41:18.0019] <bakkot>
+they only do something when you first call `next`
+
+[16:41:56.0160] <bakkot>
+```
+"use strict";
+const arr = ["a", "b", "c"];
+Object.defineProperty(Array.prototype, Symbol.iterator, {
+  get() {
+    print("get Symbol.iterator", this);
+    let thiz = this;
+    return function() {
+      print("@@iterator", this, ...arguments);
+      let i = 0;
+      return {
+        get next() {
+          print("get next");
+          return () => {
+            return i >= thiz.length ? { done: true } : { done: false, value: thiz[i++] };
+          };
+        },
+      };
+    };
+  },
+});
+print("\n# read all"); const [...all] = arr;
+print("\n# read one"); const [first] = arr;
+print("\n# read none"); const [] = arr;
+print("\n" + JSON.stringify({ first, all }));
+```
+gives
+```
+# read none
+get Symbol.iterator a,b,c
+@@iterator a,b,c
+get next
+```
+in all engines, just as it should
+
+[16:44:46.0653] <Richard Gibson>
+phew
+
