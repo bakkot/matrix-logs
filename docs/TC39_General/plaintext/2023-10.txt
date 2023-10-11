@@ -394,3 +394,90 @@ Yeah that's basically my question, is there any use cases requiring observing th
 
 Btw, it was the exact same experience of stitching together smaller chunks that led me to wanting CoW and an internally optimized concat.
 
+
+2023-10-09
+[02:33:10.0632] <nicolo-ribaudo>
+RegExp syntax spec question: https://tc39.es/ecma262/#prod-annexB-Assertion
+
+Why does the current grammar for Annex B `Assertion` need to explicitly check the `UnicodeMode` flag?
+```
+Assertion[UnicodeMode, UnicodeSetsMode, NamedCaptureGroups] ::
+  `^`
+  `$`
+  `\b`
+  `\B`
+  [+UnicodeMode] `(?=` Disjunction[+UnicodeMode, ?UnicodeSetsMode, ?NamedCaptureGroups] `)`
+  [+UnicodeMode] `(?!` Disjunction[+UnicodeMode, ?UnicodeSetsMode, ?NamedCaptureGroups] `)`
+  [~UnicodeMode] QuantifiableAssertion[?NamedCaptureGroups]
+  `(?<=` Disjunction[?UnicodeMode, ?UnicodeSetsMode, ?NamedCaptureGroups] `)`
+  `(?<!` Disjunction[?UnicodeMode, ?UnicodeSetsMode, ?NamedCaptureGroups] `)`
+
+QuantifiableAssertion[NamedCaptureGroups] ::
+  `(?=` Disjunction[~UnicodeMode, ~UnicodeSetsMode, ?NamedCaptureGroups] `)`
+  `(?!` Disjunction[~UnicodeMode, ~UnicodeSetsMode, ?NamedCaptureGroups] `)`
+```
+
+Could it be simplified to this?
+```
+Assertion[UnicodeMode, UnicodeSetsMode, NamedCaptureGroups] ::
+  `^`
+  `$`
+  `\b`
+  `\B`
+  `(?=` Disjunction[?UnicodeMode, ?UnicodeSetsMode, ?NamedCaptureGroups] `)`
+  `(?!` Disjunction[?UnicodeMode, ?UnicodeSetsMode, ?NamedCaptureGroups] `)`
+  `(?<=` Disjunction[?UnicodeMode, ?UnicodeSetsMode, ?NamedCaptureGroups] `)`
+  `(?<!` Disjunction[?UnicodeMode, ?UnicodeSetsMode, ?NamedCaptureGroups] `)`
+```
+
+[04:36:35.0991] <jmdyck>
+Are you suggesting eliminating the nonterminal `QuantifiableAssertion` (which would require changing the `Term` production too), or just eliminating its use from the `Assertion` production?
+
+[04:49:01.0640] <jmdyck>
+The difference between your two snippets happens under `[~UnicodeMode, +UnicodeSetsMode]`, but since I don't think that can happen, I think the substitution would be valid.
+
+
+2023-10-10
+[23:59:21.0785] <annevk>
+FYI: we're considering using "flatten" as a term-of-art for replace a node with its children in the Sanitizer API (and potentially more widely in the DOM at some future point).
+
+[00:44:36.0315] <rkirsling>
+I guess it makes sense if you think of it from the perspective of _that_ node's parent?
+
+[00:45:30.0691] <Domenic>
+Hmm I would prefer replaceWithChildren, to mirror the existing replaceWith and replaceChildren
+
+[00:48:01.0258] <rkirsling>
+right. I guess what I'm saying is that I'd expect flatten to turn grandchildren into children
+
+[00:52:33.0701] <annevk>
+Domenic: that's a bit too long for a Sanitizer API configuration option, needs to be `somethingElements`
+
+[00:53:28.0852] <annevk>
+With the sanitizer the perspective is that of the parent I think, hmm
+
+[01:36:35.0177] <rkirsling>
+I want to suggest `disintegrate` but I think it's a bit too playful :p
+
+[02:27:15.0565] <Domenic>
+> <@annevk:matrix.org> Domenic: that's a bit too long for a Sanitizer API configuration option, needs to be `somethingElements`
+
+I think you could omit the elements? Attributes don't have children, so, it's implied.
+
+[02:48:48.0726] <annevk>
+Domenic: I'm not sure what you mean
+
+[02:50:00.0036] <annevk>
+Domenic: currently the top-level entries of the configuration dictionary are `elements`, `removeElements`, `attributes` (for global attributes), `removeAttributes` (for global attributes), and `flattenElements`
+
+[04:21:56.0129] <jmdyck>
+> <@annevk:matrix.org> FYI: we're considering using "flatten" as a term-of-art for replace a node with its children in the Sanitizer API (and potentially more widely in the DOM at some future point).
+
+Personally, I call that `dissolving` the node. But `replaceWithChildren` would be clearer if it fits.
+
+[05:56:52.0492] <Domenic>
+annevk: I mean you could use replaceWithChildren as a name instead of replaceWithChildrenElements. It's unambiguous because replaceWithChildrenAttributes makes no sense.
+
+[06:04:05.0937] <annevk>
+I see, I like the symmetry of the existing names better, but worth seeing what others think I suppose
+

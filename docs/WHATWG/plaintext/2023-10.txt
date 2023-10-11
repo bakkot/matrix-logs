@@ -666,3 +666,336 @@ In WebKit, there’s actually an assert at https://github.com/sideshowbarker/Web
 [15:06:13.0555] <sideshowbarker>
  * In WebKit, there’s actually an assert at https://github.com/WebKit/WebKit/blob/main/Source/WebCore/dom/Node.cpp#L2461 which will get hit unless we introduce some flag for skipping it (which means, skipping the dispatch of the `DOMSubtreeModified` mutation event)
 
+
+2023-10-08
+[10:07:56.0431] <Debadree Chatterjee>
+ * hello to all the members here! hope you are doing well! i had a question in regards to the implementation of https://github.com/whatwg/streams/commit/007d729f1476f7f1ea34731ba9bd2becb702117e for nodejs I am encountering a case of what seems like a race conditions between promises this can better explained with an example consider this following code: const { TransformStream } = require('stream/web');
+const assert = require('node:assert/strict');
+
+(async () => {
+  let controller;
+  const ts = new TransformStream({
+    start(c) {
+      controller = c;
+    }
+  });
+  const cancelReason = { name: 'cancelReason' };
+  const cancelPromise = ts.readable.cancel(cancelReason);
+  controller.terminate();
+  return Promise.all([
+    cancelPromise,
+    assert.rejects(ts.writable.getWriter().closed)
+  ]);
+})();
+
+[10:22:58.0539] <Debadree Chatterjee>
+Hello everyone! hope you are doing well! I had one question in regards to the implementation of https://github.com/whatwg/streams/commit/007d729f1476f7f1ea34731ba9bd2becb702117e, i have been trying to implement this in nodejs and i am bumping into what seems like a race condition between promises its better explained with code consider the code here https://gist.github.com/debadree25/c54931a99e493baaf9314a903cd52e12 now when we create a transform stream we have one promise created on the writable side the "startPromise" as noted in https://streams.spec.whatwg.org/#set-up-writable-stream-default-controller and when we called the cancel method on the readable we get a cancellation promise as noted in https://streams.spec.whatwg.org/#transform-stream-default-source-cancel now in the code after this we call on controller.terminate which causes the writable side to go into the "erroring" stage, now comes the interesting part the "startPromise" gets resolved and causes the writable part to go into "errored" mode after which the close promise resolves rejecting the cancellation promise we received I think this is expected behaviour? since promises are executed in a queue manner? strangely this issue doesnt seem to affect the reference implementation here https://github.com/whatwg/streams and the promises get executed in the order: -created start promise
+-cancel promise created
+-cancel promise resolving
+-start promise resolving. I dont think this could be a problem with the spec maybe there is something i am missing? if anyone has any insight it would be great!! Thank you for reading! :-)
+
+
+2023-10-09
+[21:31:11.0070] <sideshowbarker>
+ * jarhar: The _“A CSS Animation running on an element within a \<details> element is canceled after the \<details> element is closed”_ test at https://wpt.fyi/results/css/css-animations/animation-canceled-by-parent-details-element-being-closed.html times out in Chrome, while passing in Firefox and current Safari.
+
+But the patch in https://github.com/WebKit/WebKit/pull/18785 for implementing auto-expanding `<details>` makes it now time out in Safari too.
+
+The reason it times out (both in Blink and patched WebKit) is that the `cancel` event never fires.
+
+I’m going to make time to investigate it more, but it’s not immediately clear to me why the changes made for auto-expanding `<details>` would cause that test to fail.
+
+[22:04:59.0219] <sideshowbarker>
+ * jarhar: The _“A CSS Animation running on an element within a \<details> element is canceled after the \<details> element is closed”_ test at https://wpt.fyi/results/css/css-animations/animation-canceled-by-parent-details-element-being-closed.html times out in Chrome, while passing in Firefox and current Safari.
+
+But the patch in https://github.com/WebKit/WebKit/pull/18785 for implementing auto-expanding `<details>` makes it now time out in Safari too.
+
+The reason it times out (both in Blink and patched WebKit) is that the `cancel` event never fires.
+
+I’m going to make time to investigate it more, but it’s not immediately clear to me why the changes made for auto-expanding `<details>` would cause that `cancel` event to stop firing.
+
+[02:52:49.0044] <axo10tl>
+Hi! Can I request some historical information here? 😅
+I was wondering what kind of arguments were raised for the current CSS custom property syntax, more specifically; was the SASS-like dollar syntax considered, and why didn't custom properties adopt something similar to that?
+
+[02:54:17.0601] <axo10tl>
+Tried searching the whatwg github issues, but couldn't find any discussion related to this. Apparently some discussions are held in IRC/Matrix, so there would not be public logs if that's the case?
+
+[03:05:18.0520] <Noam Rosenthal>
+> <@axo10tl:matrix.org> Hi! Can I request some historical information here? 😅
+> I was wondering what kind of arguments were raised for the current CSS custom property syntax, more specifically; was the SASS-like dollar syntax considered, and why didn't custom properties adopt something similar to that?
+
+ CSS is specified in W3C, not in WHATWG
+
+[03:06:14.0556] <axo10tl>
+oof, thanks (and sorry).. :D
+
+[03:21:07.0573] <annevk>
+Panos Astithas: I don't have the Oct 19 WHATNOT meeting in my calendar. I was going to add RitamDas30. Could it be that I'm not on the invite list or did I mess up somehow?
+
+[06:09:05.0867] <sideshowbarker>
+jarhar: The _“A CSS Animation running on an element within a \<details> element is canceled after the \<details> element is closed”_ test at https://wpt.fyi/results/css/css-animations/animation-canceled-by-parent-details-element-being-closed.html times out in Chrome, and in Safari built from https://github.com/WebKit/WebKit/pull/18785 — apparently because, with the switch to using `content-visibility: hidden` to close the `details` element (rather than removing the element from the DOM), the `cancel` event never fires.
+
+Per-spec _is_ the `cancel` event actually supposed to fire at an element when `content-visibility: hidden` is set on an ancestor?
+
+If it’s not supposed to fire, then I guess that test needs to be changed.
+
+But if it _is_ actually supposed to fire, then I guess that’d mean both Blink and WebKit have a bug in their content-visibility implementations that needs to be fixed?
+
+[07:11:43.0570] <freddy>
+shower thought: Wouldn't it be nice to have a "sameoriginmessage" (name to be bikeshedded) counterpart of the "message" Event type which code could consider implicitly trusted (or not)?
+
+[07:20:05.0015] <annevk>
+freddy: possibly, or some kind of event listener filter option
+
+[07:27:44.0373] <freddy>
+The options bag for addEventListener doesn't seem like a great pattern to support specific options only for certain event types. But sure, I don't have strong feelings. This started off as a shower thought ;)
+
+[08:33:48.0989] <zcorpan>
+> <@annevk:matrix.org> zcorpan: did you want to give feedback on https://github.com/whatwg/html/pull/9689? I think Jonathan Kew agrees with it so probably have enough in terms of implementer interest, but always nice to get more review
+
+reviewed, thx for the ping
+
+[08:54:30.0057] <annevk>
+zcorpan: hah, so I just found a flaw, only submit buttons participate in form submission
+
+[08:54:47.0929] <annevk>
+So maybe `dirname` needs to be more limited than `dir=auto` is after all
+
+[08:55:33.0776] <zcorpan>
+annevk: good catch. but it's "only" dead code, then, for `dirname`
+
+[08:55:54.0044] <annevk>
+Ah I guess the form submission algorithm is still fine as the buttons are filtered early on, indeed
+
+[08:56:14.0847] <annevk>
+So it's just a matter of whether `dirname` applies and is conforming, which it should not be
+
+[08:56:23.0259] <annevk>
+I'll change that
+
+[08:57:11.0811] <zcorpan>
+right
+
+[08:58:20.0060] <annevk>
+I was trying to implement this and the BaseButtonInputType class in WebKit was just like no, we don't handle form data here
+
+[09:39:09.0527] <jarhar>
+i think that animations are supposed to "pause", so it probably makes sense that cancel doesnt fire
+
+[09:39:12.0879] <jarhar>
+https://drafts.csswg.org/css-contain-2/#:~:text=While%20an%20element%20is%20skipped%2C%20CSS%20transitions%20and%20animations%20on%20the%20element%20do%20not%20update
+
+[09:39:52.0969] <jarhar>
+i didnt implement any of the interactions between content-visibility and animations though, so i'm not the most knowledgable
+
+[09:50:27.0944] <Panos Astithas>
+I see your personal email is on the invite. Perhaps I shall add your work email, too?
+
+[09:53:04.0439] <Panos Astithas>
+I just removed and re-added you, hopefully that generated a useful notification.
+
+[10:23:32.0581] <annevk>
+It didn't. Not sure what's going on. It's not in Trash. I can find it using the Google Calendar web interface search, but then it can't open it. It's also not a declined invitation.
+
+[10:36:28.0139] <Panos Astithas>
+That's weird. Shall I add your work email to see if it helps you debug this further?
+
+[11:05:51.0235] <annevk>
+Could you add annevk@annevk.nl perhaps?
+
+[11:06:33.0803] <annevk>
+I don't think my Apple address will help, but I could be mistaken...
+
+[11:27:46.0306] <Panos Astithas>
+That address was already there, but I removed it, saved the event, and then added it again. Maybe you'll get a notification this time
+
+[12:53:59.0312] <TabAtkins>
+Hiya, editor of CSS Variables here. Yes, $foo was an early proposed syntax. It started as `var-foo: blue; color: var(foo);`, then we discussed using $ and using the same name consistently in <https://lists.w3.org/Archives/Public/www-style/2012May/0744.html>, and then we explored a bunch of options that wouldn't require parsing changes (for a bit it was an underscore, then eventually the --, see <https://lists.w3.org/Archives/Public/www-style/2014Mar/0261.html>)
+
+[13:00:06.0059] <bkardell>
+The - was basically keeping it consistent with what we'd already done with vendor prefixes, and we just did that for all the custom things  https://lists.w3.org/Archives/Public/www-style/2014Mar/0269.html
+
+
+2023-10-10
+[23:59:43.0721] <annevk>
+Yeah, that seems to have worked. Thanks!
+
+[00:01:11.0847] <annevk>
+Note that OP had already left the channel.
+
+[01:07:00.0577] <annevk>
+Domenic: https://github.com/whatwg/html/pull/9538#discussion_r1328593134 still seems concerning with the unsafe parser methods
+
+[01:07:28.0443] <annevk>
+Domenic: is there test coverage for that state? In particular because implementations also are not aligned on HTMLDocument vs XMLDocument vs Document and such
+
+[01:07:39.0394] <Domenic>
+annevk: I agree with Joey here that everything is initialized and all spec code that can be shared, is shared.
+
+[01:07:50.0867] <annevk>
+Domenic: so you're saying type should be "xml"?
+
+[01:07:51.0439] <Domenic>
+There is test coverage for that state.
+
+[01:07:59.0757] <Domenic>
+No, type gets set to xml elsewhere
+
+[01:08:23.0509] <annevk>
+Domenic: note that type and content type are distinct
+
+[01:08:32.0006] <Domenic>
+https://whatpr.org/html/9538/dynamic-markup-insertion.html#parse-html-from-a-string
+
+[01:08:45.0325] <Domenic>
+ * No, type gets set to html elsewhere
+
+[01:10:20.0589] <annevk>
+Domenic: I see, so URL will be about:blank meaning relative URLs will break?
+
+[01:10:28.0911] <Domenic>
+Yes, this is intentional.
+
+[01:10:34.0659] <Domenic>
+We discussed it upthread in the PR
+
+[01:10:46.0122] <Domenic>
+If people want URL inheritance we can add a { url } option in the future.
+
+[01:13:17.0164] <annevk>
+https://github.com/whatwg/html/pull/9538#discussion_r1293136059 is hard to find and the commit message doesn't describe it, but okay.
+
+[01:15:22.0324] <annevk>
+Anyway, I guess that's fine. Though `new Document()` does inherit the origin. Hmm.
+
+[01:15:38.0974] <annevk>
+ * Anyway, I guess that's fine. Though `new Document()` does inherit the origin. Hmm. Maybe it shouldn't have?
+
+[02:24:25.0462] <Domenic>
+Yeah the inheritance seems all very magic to me, I say, if you want it, we should make that the non-default.
+
+[02:26:24.0233] <Domenic>
+I recorded that we need tests for document.origin in Joey's CL, I missed that one, thanks.
+
+[02:51:12.0622] <annevk>
+Domenic: not sure what I want, but I can imagine web developers wanting it for URL at least, having `<img>` not work has been an issue of sorts before I vaguely recall
+
+[02:51:40.0785] <annevk>
+(work in the sense of `.href` not returning something useful)
+
+[02:52:29.0366] <annevk>
+zcorpan: https://github.com/whatwg/html/pull/9689 should be good now, but happy to wait a bit to see if more people want to chime in
+
+[04:54:30.0815] <sideshowbarker>
+annevk: about https://bugs.webkit.org/show_bug.cgi?id=192000, would a patch that conforms WebKit to the `Content-Type` parsing requirements in the Fetch spec actually be accepted? Or instead not — because it would break on too many existing sites?
+
+[05:58:17.0538] <Domenic>
+> <@annevk:matrix.org> Domenic: not sure what I want, but I can imagine web developers wanting it for URL at least, having `<img>` not work has been an issue of sorts before I vaguely recall
+
+The simplest workaround is for them to inject a <base> element. But yeah, we could add something if we hear a request.
+
+[05:58:58.0777] <Domenic>
+* In reply to @annevk:matrix.org
+Domenic: not sure what I want, but I can imagine web developers wanting it for URL at least, having <img> not work has been an issue of sorts before I vaguely recall
+
+The simplest workaround is for them to inject a `<base>` element. But yeah, we could add something to configure the URL and/or base URL out of band, if we hear a request.
+
+[06:03:05.0907] <annevk>
+sideshowbarker: not sure all of it can be fixed in WebKit, but I think it's an area we'd be willing to clean up, might need some kind of preference so it's easy to revert for select sites?
+
+[06:05:27.0069] <annevk>
+Domenic: I guess Google should know since iirc Google mainly pushed for this method?
+
+[06:07:44.0731] <Domenic>
+Yeah we haven't heard any, that's why I promoted the simpler option.
+
+[07:02:11.0320] <annevk>
+I wonder if it's too late to change `new Document()`, but I also don't really want to work on it myself
+
+
+2023-10-11
+[02:08:11.0082] <annevk>
+Domenic: is https://github.com/whatwg/html/pull/8467 in your queue?
+
+[02:10:27.0638] <Domenic>
+> <@annevk:matrix.org> Domenic: is https://github.com/whatwg/html/pull/8467 in your queue?
+
+No.
+
+[02:10:47.0699] <annevk>
+Domenic: let me rephrase that, do you want to look at it before it lands?
+
+[02:10:53.0184] <annevk>
+Since you reviewed it before.
+
+[02:12:13.0755] <Domenic>
+Nah, seems fine. Although I'm not sure it actually has Chrome support at the moment.
+
+[02:15:47.0802] <annevk>
+Chrome engineers drove the change with the CSS WG. If you want to double check on that I can hold off on landing this. Let me know.
+
+[02:18:17.0306] <Domenic>
+Yeah we should hold off. They're failing to get signoff on blink-dev last I saw.
+
+[04:58:31.0132] <annevk>
+keithamus: I'm gonna wait with another round of review for EventTarget until it's a bit more established what the API shape should be. One thing that did seem to be missing is the parent setter/getter definition.
+
+[04:59:34.0373] <keithamus>
+annevk: within `EventTarget`? or `EventTargetInternals`?
+
+[05:08:04.0304] <keithamus>
+I've updated which hopefully clarifies the steps for get/set on `EventTargetInternals` `parent`.
+
+[06:16:07.0532] <annevk>
+Jake Archibald: I cannot reply to https://twitter.com/jaffathecake/status/1711872418434654419 but isn't the problem Chromium here, perhaps? I wonder what happens in the non-Chromium URLPattern implementation. Custom URL schemes are supported pretty well in URL and the idea is that they are too in URLPattern, provided you have a compliant URL parser.
+
+[06:18:38.0139] <Jake Archibald>
+annevk: ohhh, my understanding was that if you use a non http(s) scheme then the rest of the URL won't be parsed by HTTP rules 
+
+[06:22:19.0767] <annevk>
+Jake Archibald: see https://jsdom.github.io/whatwg-url/ as an easy way to test specific inputs; generally when people complain about this they are talking about a long-standing Chromium and Gecko bug
+
+[06:22:39.0659] <annevk>
+I was hoping that Interop 2023 would fix it, but it seems like it will be at least another year
+
+[06:39:15.0621] <annevk>
+Domenic: is https://github.com/whatwg/fetch/issues/1715 in your queue?
+
+[06:41:53.0277] <Domenic>
+> <@annevk:matrix.org> Domenic: is https://github.com/whatwg/fetch/issues/1715 in your queue?
+
+Nope, that one is way too large to touch
+
+[06:49:54.0364] <annevk>
+Domenic: in particular I asked feedback on the name, not the whole API
+
+[06:50:16.0070] <annevk>
+Domenic: are you no longer reading GitHub pings?
+
+[10:51:45.0509] <jub0bs>
+ * The guy (who has a huge audience on Twitter and YouTube) wants to talk about
+
+> how CORS was a mistake.
+
+https://twitter.com/t3dotgg/status/1712027342556864952
+
+[10:51:51.0309] <jub0bs>
+ * The guy (who has a huge audience on Twitter and YouTube) wants to talk about
+> how CORS was a mistake.
+
+https://twitter.com/t3dotgg/status/1712027342556864952
+
+[11:08:48.0106] <jub0bs>
+ * The guy (who has a huge audience on Twitter and YouTube) purports to explain
+
+> how CORS was a mistake.
+
+https://twitter.com/t3dotgg/status/1712027342556864952
+
+[13:00:46.0763] <jub0bs>
+ * Nothing but pointless drivel so far...
+
+[13:59:28.0489] <Dominic Farolino>
+If a request from a document goes through a service worker, what's the `client` set to of the request that finally makes it to the "HTTP-network-or-cache fetch" algorithm (assuming the service worker did a `respondWith(fetch(e.request))`? Is it the original document's ESO, or the service worker's? After reading https://w3c.github.io/ServiceWorker/#on-fetch-request-algorithm I'm almost positive the answer is "the original document global".
+
