@@ -1,0 +1,48 @@
+2023-11-16
+[13:32:59.0632] <rbuckton>
+shu: I spoke with Luis and we both concur that `using` is preferred in the long term. For context, these are my primary concerns regarding a callback-based API:
+
+- Since the addition of `async`/`await`, many JS programmers seem to be moving away from CPS for asynchronous code in new projects.
+- Callback based APIs violate Tennent's Correspondence Principle, requiring complex rewrites of statements to introduce the callback when refactoring existing code and making things like `for` loops harder to reason over.
+- An auto-locking callback API assumes no composition of locking mechanisms, such as building a SharedMutex that supports lock promotion, or holding a lock on a mutex longer than the scope of a single function call. 
+- While its feasible to build a rudimentary non-callback wrapper for the callback API, such a wrapper will not release its lock if the worker thread terminates abruptly, such as due to an exception or a call to `worker.terminate()`. With an object-based lock, it is feasible to write a callback-based wrapper that does not suffer from this limitation.
+- Object-based locks are more flexible in terms of advanced scenarios, such as implementing a "scoped lock" that can lock multiple mutexes at once with a deadlock prevention algorithm (callback-based API is far more complicated and produces an arbitrarily deep call stack), or locks that are only conditionally taken (i.e., to avoid re-acquiring a lock in a recursive algorithm).
+
+[13:33:56.0343] <rbuckton>
+Regarding the TCP issue, consider something as simple as a for loop with continue, break, and return:
+ 
+```js
+// non-locking code
+outer: for (const back of queues) {
+  for (const msg of queue.getMessages()) {
+    if (msg.stop) return msg.result;
+    if (msg.exitQueue) break outer; 
+    if (!msg.accept()) continue;
+    processMessage(msg);
+  }
+}
+// add lock using callback-based API
+outer: for (const back of queues) {
+  for (const msg of queue.getMessages()) {
+    const result = Mutex.lock(mut, () => {
+      if (msg.stop) return { op: "return", value: msg.result };
+      if (msg.exitQueue) return { op: "break_outer" }; 
+      if (!msg.accept()) return;
+      processMessage(msg);
+    });
+    if (result?.op === "return") return result.return;
+    if (result?.op === "break_outer") break outer;
+  }
+}
+// add lock via `using`:
+outer: for (const back of queues) {
+  for (const msg of queue.getMessages()) {
+    using lck = new UniqueLock(mut);
+    if (msg.stop) return msg.result;
+    if (msg.exitQueue) break outer; 
+    if (!msg.accept()) continue;
+    processMessage(msg);
+  }
+}
+```
+
