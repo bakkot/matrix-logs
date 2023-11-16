@@ -46,3 +46,42 @@ outer: for (const back of queues) {
 }
 ```
 
+[13:35:28.0870] <rbuckton>
+And a rough sketch of a `UniqueLock` API might look like:
+
+```js
+class UniqueLock {
+  constructor(mutex?: Atomics.Mutex, t?: "lock" | "defer-lock" | "try-to-lock" | "adopt-lock");
+  static lockAsync(mutex: Atomics.Mutex): Promise<UniqueLock>;
+  get mutex(): Atomics.Mutex | undefined;
+  get ownsLock(): boolean;
+  tryLock(timeout?: number): boolean;
+  lock(): void;
+  lockAsync(): Promise<boolean>;
+  unlock(): void;
+  release(): void;
+  [Symbol.dispose](): void;
+}
+```
+
+with usage like
+```js
+// sync lock
+{
+  using lck = new UniqueLock(mut);
+  ...
+}
+
+// async lock (option 1)
+{
+  using lck = await UniqueLock.lockAsync(mut);
+  ...
+}
+ 
+// async lock (option 2)
+{
+  using lck = new UniqueLock(mut, "defer-lock");
+  await lck.lockAsync();
+}
+```
+
