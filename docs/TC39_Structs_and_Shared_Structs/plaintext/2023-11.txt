@@ -209,3 +209,37 @@ if we aspire to do the same, that means keeping a list, ugh
 [15:25:39.0534] <shu>
 i guess each execution context can keep a stack of currently held mutexes, that, upon termination execution, get unlocked
 
+
+2023-11-17
+[12:30:16.0726] <rbuckton>
+@shu: We've been having a discussion on the enum proposal that Jack Works presented awhile back, and one of my goals for enums is that enum values will be shareable in some form. The basic premise is that an `enum` could have enum members that are either Number, BigInt, String, Symbol, or an immutable tagged data structure (for ADT enums). Numbers and strings won't be problematic, since those can already be stored in a shared struct, and I plan to ensure that the data structure for ADT enums will be shareable in some way (possibly defined internally as a shared struct).
+Do you expect that shared structs will also be able to store BigInt and Symbol values? If not all BigInt values, would limiting it to only 64-bit integers be viable? If not all Symbol values, would it be feasible to support only Symbols originateing from an `enum` (or a `shared enum`)?
+
+For additional context, enums might look something like:
+```
+enum Color of Number { Red, Blue, Green }
+Color.Red; // 0
+Color.Blue; // 1
+
+enum Flags of BigInt {
+  None = 0n,
+  Flag0 = 1n << 0,
+  // ...
+  Flag63 = 1n << 63,
+}
+Flags.Flag0; // 1n
+
+enum Result of String { Ok, BadInput }
+Result.Ok; // "Ok"
+
+enum Choices of Symbol { None, First, Second }
+Choices.First; // Symbol("Choices.First")
+
+enum Option of ADT {
+  Some(value),
+  None
+}
+Option.Some(1); // an Option.Some object with a 'value' property of '1'
+Option.None; // TBD: either a Symbol or a special object like Option.Some
+```
+
