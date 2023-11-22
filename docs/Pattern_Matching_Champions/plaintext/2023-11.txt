@@ -297,3 +297,52 @@ For (2), you look at anything that can _contain_ a RelationalExpression on the l
 
 
 
+[17:00:20.0571] <rbuckton>
+ * there are two ways to think about "to the right":
+
+1. When parsing a _RelationalExpression_, what can be parsed for any given production on the right of a relational operator. For example, in ``RelationalExpression `<` ShiftExpression``, what kind of things can be parsed if you only look at _ShiftExpression_.
+2. When parsing productions top-down, if a production contains a _RelationalExpression_, what kind of things can you parse after the RelationalExpression itself is finished.
+
+For (1), given `A < B`, `B` can be anything that can be parsed in a _ShiftExpression_:
+
+- ShiftExpression: `<<`, `>>`, `>>>` (i.e., `A < B << C` is parsed as `A < (B << C)`)
+- AdditiveExpression: `+`, `-` (i.e., `A < B + C` is parsed as `A < (B + C)`)
+- MultiplicativeExpression: `*`, `/`, `%` (i.e., `A < B * C` is parsed as `A < (B * C)`)
+- UpdateExpression: postfix `++`, `--`
+- LeftHandSideExpression/OptionalExpression/MemberExpression/CallExpression: `?.`, `[`, `.`, `````
+
+For (2), you look at anything that can _contain_ a RelationalExpression on the left of some other terminal/nonterminal:
+
+- RelationalExpression: `<`, `<=`, `>`, `>=`, `instanceof`, `in` (i.e., in `A < B`, `A` can be a RelationalExpression, so it can be followed by `<`, etc.)
+- EqualityExpression: `==`, `===`, `!=`, `!==`
+- BitwiseANDExpression: `&`
+- BitwiseXORExpression: `^`
+- BitwiseORExpression: `|`
+- LogicalANDExpression: `&&`
+- LogicalORExpression: `||`
+- CoalesceExpression: `??`
+- ConditionalExpression: `?`, `:`
+- AssignmentExpression: `=`, `+=`, `-=`, etc.
+- Expression: `,`
+- Anything that follows where Expression can be used
+
+[17:00:35.0392] <rbuckton>
+So in `A < B`, if `B` is just an identifier, the following tokens could legally follow it:
+- From (1): `<<`, `>>`, `>>>`, `+`, `-`, `*`, `/`, `%`, `++`, `--`, `?.`, `[`, `.`, `(`, `` ` ``
+- From (2): `<`, `<=`, `>`, `>=`, `==`, `===`, `!=`, `!==`, `&`, `^`, `|`, `&&`, `||`, `??`, `?`, `:`, `=`, `+=` (and other compound ops), `,`, plus anything that can follow _Expression_ in the grammar.
+
+[17:01:34.0267] <rbuckton>
+Everything that comes from (1) is only legal because it is specifically part of the grammar defined for _RelationalExpression_. Everything that comes from (2) is legal because some other production defines it as following a _RelationalExpression_.
+
+[17:03:27.0212] <rbuckton>
+So for an `is` pattern, you will always contend with (2), but the grammar you supply for MatchPattern will define (1). The caveat, of course, being ASI and how it applies to ambiguous tokens like `+`, `-`, `(`, and `[` that can start a new statement.
+
+[17:04:03.0029] <Jack Works>
+thanks, this is very helpful
+
+[17:04:14.0122] <rbuckton>
+Since `.` is defined in (1) for a given RelationalExpression, it only really has the meaning we ascribe to it given the syntax we define.
+
+[17:04:44.0156] <Jack Works>
+for is expression, the only valid set is from (2)
+
