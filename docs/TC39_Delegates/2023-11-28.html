@@ -205,6 +205,39 @@
   <tr class="msg" id="L151"><td class="ts-cell"><a class="ts" href="#L151" alt="Tue Nov 28 2023 13:19:01 GMT-0800 (Pacific Standard Time)">21:19</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-6" title="@ljharb:matrix.org">ljharb</span>&gt;</div></td><td class="msg-cell">if someone would otherwise write <code>iterator.constructor === Iterator</code>, i mean</td></tr>
   <tr class="msg" id="L152"><td class="ts-cell"><a class="ts" href="#L152" alt="Tue Nov 28 2023 13:19:48 GMT-0800 (Pacific Standard Time)">21:19</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell">someone could write <code>if (val.constructor !== Iterator) val = Iterator.from(val)</code>, and that would start going down a different code path when <code>Iterator.constructor</code> was added, and that could easily break something</td></tr>
   <tr class="msg" id="L153"><td class="ts-cell"><a class="ts" href="#L153" alt="Tue Nov 28 2023 13:20:02 GMT-0800 (Pacific Standard Time)">21:20</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell">I agree that people <em>shouldn't</em> write that code but I think it's reasonably likely someone <em>will</em></td></tr>
+  <tr class="msg" id="L154"><td class="ts-cell"><a class="ts" href="#L154" alt="Tue Nov 28 2023 13:20:35 GMT-0800 (Pacific Standard Time)">21:20</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-6" title="@ljharb:matrix.org">ljharb</span>&gt;</div></td><td class="msg-cell">i'm skeptical it's likely they would think about that optimization</td></tr>
+  <tr class="msg" id="L155"><td class="ts-cell"><a class="ts" href="#L155" alt="Tue Nov 28 2023 13:20:49 GMT-0800 (Pacific Standard Time)">21:20</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-6" title="@ljharb:matrix.org">ljharb</span>&gt;</div></td><td class="msg-cell">people don't do that with <code>Promise.resolve</code> now</td></tr>
+  <tr class="msg" id="L156"><td class="ts-cell"><a class="ts" href="#L156" alt="Tue Nov 28 2023 13:21:00 GMT-0800 (Pacific Standard Time)">21:21</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell">uhhh lots of people do that</td></tr>
+  <tr class="msg" id="L157"><td class="ts-cell"><a class="ts" href="#L157" alt="Tue Nov 28 2023 13:21:08 GMT-0800 (Pacific Standard Time)">21:21</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell">or <code>if (!Array.isArray(x)) x = Array.from(x)</code> or whatever</td></tr>
+  <tr class="msg" id="L158"><td class="ts-cell"><a class="ts" href="#L158" alt="Tue Nov 28 2023 13:21:11 GMT-0800 (Pacific Standard Time)">21:21</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell">that is very common</td></tr>
+  <tr class="msg" id="L159"><td class="ts-cell"><a class="ts" href="#L159" alt="Tue Nov 28 2023 13:21:17 GMT-0800 (Pacific Standard Time)">21:21</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-6" title="@ljharb:matrix.org">ljharb</span>&gt;</div></td><td class="msg-cell">for arrays yes</td></tr>
+  <tr class="msg" id="L160"><td class="ts-cell"><a class="ts" href="#L160" alt="Tue Nov 28 2023 13:21:24 GMT-0800 (Pacific Standard Time)">21:21</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-6" title="@ljharb:matrix.org">ljharb</span>&gt;</div></td><td class="msg-cell">but for anything else? arrays are a bit unique imo</td></tr>
+  <tr class="msg" id="L161"><td class="ts-cell"><a class="ts" href="#L161" alt="Tue Nov 28 2023 13:21:32 GMT-0800 (Pacific Standard Time)">21:21</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell">iterators are more like arrays than promises</td></tr>
+  <tr class="msg" id="L162"><td class="ts-cell"><a class="ts" href="#L162" alt="Tue Nov 28 2023 13:25:04 GMT-0800 (Pacific Standard Time)">21:25</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell"><p><span class="nick-10">waldemar</span>: can you elaborate on "always try to add in arguments with the opposite sign from your running total first"? at what point during the algorithm do you mean? there's a basic Python implementation given at <a href="https://code.activestate.com/recipes/393090/">https://code.activestate.com/recipes/393090/</a> ; can you suggest the change you're proposing as a diff to this algorithm? (This algorithm is bugged, on the last line, but otherwise correct I believe)</p>
+<pre><code class="language-py">def msum(iterable):
+    "Full precision summation using multiple floats for intermediate values"
+    # Rounded x+y stored in hi with the round-off stored in lo.  Together
+    # hi+lo are exactly equal to x+y.  The inner loop applies hi/lo summation
+    # to each partial so that the list of partial sums remains exact.
+    # Depends on IEEE-754 arithmetic guarantees.  See proof of correctness at:
+    # www-2.cs.cmu.edu/afs/cs/project/quake/public/papers/robust-arithmetic.ps
+
+    partials = []               # sorted, non-overlapping partial sums
+    for x in iterable:
+        i = 0
+        for y in partials:
+            if abs(x) &lt; abs(y):
+                x, y = y, x
+            hi = x + y
+            lo = y - (hi - x)
+            if lo:
+                partials[i] = lo
+                i += 1
+            x = hi
+        partials[i:] = [x]
+    return sum(partials, 0.0)
+</code></pre>
+</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>

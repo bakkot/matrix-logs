@@ -2129,3 +2129,55 @@ someone could write `if (val.constructor !== Iterator) val = Iterator.from(val)`
 [13:20:02.0121] <bakkot>
 I agree that people _shouldn't_ write that code but I think it's reasonably likely someone _will_
 
+[13:20:35.0420] <ljharb>
+i'm skeptical it's likely they would think about that optimization
+
+[13:20:49.0595] <ljharb>
+people don't do that with `Promise.resolve` now
+
+[13:21:00.0563] <bakkot>
+uhhh lots of people do that
+
+[13:21:08.0620] <bakkot>
+or `if (!Array.isArray(x)) x = Array.from(x)` or whatever
+
+[13:21:11.0577] <bakkot>
+that is very common
+
+[13:21:17.0651] <ljharb>
+for arrays yes
+
+[13:21:24.0500] <ljharb>
+but for anything else? arrays are a bit unique imo
+
+[13:21:32.0045] <bakkot>
+iterators are more like arrays than promises
+
+[13:25:04.0697] <bakkot>
+waldemar: can you elaborate on "always try to add in arguments with the opposite sign from your running total first"? at what point during the algorithm do you mean? there's a basic Python implementation given at https://code.activestate.com/recipes/393090/ ; can you suggest the change you're proposing as a diff to this algorithm? (This algorithm is bugged, on the last line, but otherwise correct I believe)
+
+```py
+def msum(iterable):
+    "Full precision summation using multiple floats for intermediate values"
+    # Rounded x+y stored in hi with the round-off stored in lo.  Together
+    # hi+lo are exactly equal to x+y.  The inner loop applies hi/lo summation
+    # to each partial so that the list of partial sums remains exact.
+    # Depends on IEEE-754 arithmetic guarantees.  See proof of correctness at:
+    # www-2.cs.cmu.edu/afs/cs/project/quake/public/papers/robust-arithmetic.ps
+
+    partials = []               # sorted, non-overlapping partial sums
+    for x in iterable:
+        i = 0
+        for y in partials:
+            if abs(x) < abs(y):
+                x, y = y, x
+            hi = x + y
+            lo = y - (hi - x)
+            if lo:
+                partials[i] = lo
+                i += 1
+            x = hi
+        partials[i:] = [x]
+    return sum(partials, 0.0)
+```
+
