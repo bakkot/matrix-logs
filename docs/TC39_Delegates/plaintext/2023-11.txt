@@ -2276,3 +2276,46 @@ waldemar: OK, great. Thanks for the writeup. I'm going to have to try implementi
 [15:04:15.0729] <bakkot>
 I'm hoping the performance is good enough for engines to be comfortable shipping it as Math.sum. If they're not, I may suggest naming this `Math.fsum` or something, to make it clear that this is special i.e. potentially much slower than naive summation.
 
+[15:31:51.0134] <Michael Ficarra>
+ljharb: here's the relevant notes from the last meeting and why I thought that this was not possible
+
+> NRO: If you don’t want to wait too long to ship this, could we ship it without the constructor property until when we know it’s safe to do so? Because, like, I know that that’s burden of polyfill containers and people that care about compat matters, but, like, in practice, would this be an okay way to, like, avoid this hack, if we cannot solve the problem quick enough?
+> 
+> JWK: I think it’s not possible because the iterator prototype is already reachable via Array#values. The iterator prototype is already existed and this proposal just exposes it on the global. You cannot really move a thing from it.
+> 
+> CDA: Okay, last on the queue is Jordan. Plus one to drop constructor and toStringTag temporarily in the meantime. End of message.
+> 
+> JHD: I did just want to add to Jack’s comment, the hidden iterator intrinsic does not have a iterator property. It tries to add it. It will fall back to object.prototype.
+> 
+> JWK: Oh, I don’t know that, if that’s the case, maybe we can do it.
+
+[15:32:21.0665] <Michael Ficarra>
+but after reading this conversation and thinking about it more, I still prefer the weird accessors over omitting the properties
+
+[15:32:30.0722] <Michael Ficarra>
+I'm not sure how to resolve this since they both solve the immediate issue
+
+[15:32:49.0192] <ljharb>
+`Reflect.ownKeys([].keys().__proto__.__proto__)` has only Symbol.iterator on it
+
+[15:32:55.0557] <ljharb>
+so it'd be omission, not removal
+
+[15:33:18.0596] <Michael Ficarra>
+yes, that was clarified
+
+[15:33:24.0363] <ljharb>
+it seems very likely that *eventually* those websites will get updated, and whatever workaround we use will be something that we want to undo
+
+[15:33:31.0354] <ljharb>
+omission is a much easier mistake to unmake than the accessors
+
+[15:33:55.0562] <Michael Ficarra>
+I don't see why anyone would ever go out of their way to observe that they are accessos
+
+[15:34:02.0185] <Michael Ficarra>
+ * I don't see why anyone would ever go out of their way to observe that they are accessors
+
+[15:34:44.0170] <ljharb>
+https://npmjs.com/get-intrinsic does, because it's using getOwnPropertyDescriptor
+
