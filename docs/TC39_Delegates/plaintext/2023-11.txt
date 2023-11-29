@@ -3596,3 +3596,31 @@ The way I am suggesting they implement that is, they define a `Symbol.get` metho
 [15:24:42.0056] <rbuckton>
 If I have a `Slice` and use it on an array via `a[@x]`, I get a slice. If I used it on a Map via `a[@x]`, it might just act as a key, thus it's not interpreted as a slice. That means that `a[@x:y]` would do something strange on a Map.
 
+[15:25:37.0892] <bakkot>
+Yes, if you use a key with a type of collection which does not know how to interpret that key, you're going to have a bad time. But this is also true in your inverted world if you use a key with a type of collection where the key does not know how to interpret that type of collection.
+
+[15:26:26.0918] <rbuckton>
+Ignoring the `@` for a second, `a[x:y]` and `a[^x]` should always be interpreted as "take a slice from `a`" and "get the element from `a` relative from its end". 
+
+[15:27:24.0000] <rbuckton>
+> <@bakkot:matrix.org> Yes, if you use a key with a type of collection which does not know how to interpret that key, you're going to have a bad time. But this is also true in your inverted world if you use a key with a type of collection where the key does not know how to interpret that type of collection.
+
+That's why I'm not proposing a general indexing hook. I'm proposing a very specific indexing hook.
+
+[15:28:12.0494] <bakkot>
+> <@rbuckton:matrix.org> Ignoring the `@` for a second, `a[x:y]` and `a[^x]` should always be interpreted as "take a slice from `a`" and "get the element from `a` relative from its end".
+
+I am proposing not to have either `a[x:y]` or negative-indexing `a[^x]`. I think that having only a general `a[@x]` hook would solve the use cases for both `a[x:y]` and `a[^x]`.
+
+[15:28:52.0957] <rbuckton>
+With `geti`, `Slice` has a very specific and well-defined interaction with something like `Array`:
+
+```js
+Slice.prototype[Symbol.geti] = function (value) {
+  return value[Symbol.slice](this.start.getIndex(value), this.end.getIndex(value));
+}
+Array.prototype[Symbol.slice] = function (start, end) {
+  return this.slice(start, end);
+}
+```
+
