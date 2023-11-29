@@ -3624,3 +3624,55 @@ Array.prototype[Symbol.slice] = function (start, end) {
 }
 ```
 
+[15:30:56.0313] <rbuckton>
+The same goes for `Index`:
+```js
+Index.prototype[Symbol.geti] = function (value) {
+  return value[Symbol.indexGet](this.getIndex(value));
+}
+Array.prototype[Symbol.indexGet] = function (index) {
+  return this[index];
+}
+```
+
+[15:31:03.0179] <rbuckton>
+(or something to that effect)
+
+[15:31:36.0107] <bakkot>
+With my proposal also: `Array.prototype[Symbol.get] = function(v) { if (Slice.isSlice(v)) return this.slice(v.start, v.end); /*...*/ }`
+
+[15:31:50.0065] <bakkot>
+And it only requires a single protocol, not two.
+
+[15:33:01.0310] <rbuckton>
+But a `WeakMap` could do:
+```js
+WeakMap.prototype[Symbol.geti] = function (value) {
+  return this.get(value);
+}
+```
+and a `Pick` might look like:
+```js
+class Pick {
+  keys;
+  constructor(...keys) {
+    this.keys = keys;
+  }
+  [Symbol.geti](value) {
+    var obj = {};
+    for (var p of Reflect.ownKeys(value)) {
+     if (this.keys.includes(p)) obj[p] = value;
+    }
+    return obj;
+  }
+}
+```
+
+[15:34:18.0294] <bakkot>
+(I really do not think it makes sense for keys to define how they interact with collections, rather than collections defining how they interact with keys.)
+
+[15:34:25.0394] <rbuckton>
+> <@bakkot:matrix.org> With my proposal also: `Array.prototype[Symbol.get] = function(v) { if (Slice.isSlice(v)) return this.slice(v.start, v.end); /*...*/ }`
+
+That doesn't solve `a[@x:y]` potentially not returning a Slice and maybe doing something else instead of erroring in the case of a `Map`.
+
