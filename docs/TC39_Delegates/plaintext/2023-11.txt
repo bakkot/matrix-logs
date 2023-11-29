@@ -3548,3 +3548,51 @@ My suggestion is, introduce a new `obj[@x]` syntax which invokes a symbol-named 
 
 so it gives you a lot of stuff!
 
+[15:20:20.0973] <rbuckton>
+It solves reified `Slice`, reified `Index`, `WeakMap` as a scoped private name, plus a number of other approaches such as a "pick" object, i.e.:
+
+```js
+const obj = { x: 1, y: 2, z: 3, w: 4 };
+const obj2 = obj[new Pick("x", "y", "z")];
+obj2; // { x: 1, y: 2, z: 3 }
+```
+
+[15:21:22.0787] <bakkot>
+Your suggestion only solves reified `Index` if either there is also an "indexing" protocol collection types can opt into, or the `Index` type knows about every single kind of collection
+
+[15:21:26.0726] <rbuckton>
+I was also considering `geti` as an approach to handling concurrent reads/writes in multithreaded javascript with Worker and shared structs, though I'm also looking into `.{` notation as a solution
+
+[15:21:51.0205] <bakkot>
+Ditto `pick`, etc
+
+[15:21:54.0820] <rbuckton>
+Yes, I expected there would also be an indexing protocol, just like slice notation added a slice protocol.
+
+[15:21:55.0923] <bakkot>
+and `slice`
+
+[15:22:02.0568] <rbuckton>
+Pick, not so much.
+
+[15:22:12.0813] <rbuckton>
+Slice depends on knowing something about the size of a collection. Pick does not.
+
+[15:22:45.0125] <bakkot>
+OK, so, my proposal does not require having an indexing protocol, or a slice protocol. If there is a `slice` type, and a `pick` type, then collections can define for themselves what to do when asked to "slice" or "pick" something. That seems better.
+
+[15:22:57.0172] <bakkot>
+ * OK, so, my proposal does not require having an indexing protocol, or a slice protocol. If there is a `slice` type, and a `pick` type, then collections can define for themselves what to do when asked to "slice" or "pick" something, without needing a protocol. That seems better.
+
+[15:23:13.0997] <rbuckton>
+I don't agree that it's better.
+
+[15:23:46.0007] <rbuckton>
+Slice and index-from-end have a well-defined protocol that multiple different objects could implement.
+
+[15:24:30.0182] <bakkot>
+The way I am suggesting they implement that is, they define a `Symbol.get` method which has specific behavior for the reified `slice` values.
+
+[15:24:42.0056] <rbuckton>
+If I have a `Slice` and use it on an array via `a[@x]`, I get a slice. If I used it on a Map via `a[@x]`, it might just act as a key, thus it's not interpreted as a slice. That means that `a[@x:y]` would do something strange on a Map.
+
