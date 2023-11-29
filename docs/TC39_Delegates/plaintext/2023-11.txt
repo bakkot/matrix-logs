@@ -3009,3 +3009,51 @@ obj[key] = 1; // key[Symbol.geti](obj);
 [13:34:54.0466] <ljharb>
 making an actual thing vs just typing `x => x[a, b](y)` doesn't seem worth adding
 
+[13:36:02.0968] <bakkot>
+I would definitely not want that to work with normal `obj[key]` access, but could see using the `obj[^key]` syntax or something
+
+[13:36:05.0827] <rbuckton>
+That can't be unwrapped though
+
+[13:36:09.0448] <ljharb>
+and while i see ron's point that making a special kind of value and a special protocol to go with it would be a logical generalization, that's a ton of complexity that it'd be a hard sell to justify
+
+[13:36:37.0366] <bakkot>
+though I don't see why you want to do it in this inverted way - it seems like usually containers know how to use an index, rather than an index knowing how to use a container?
+
+[13:36:46.0154] <rbuckton>
+i.e., `x => x[a, b]` doesn't let you extract `a` and `b` as there's no associated data model.
+
+[13:37:08.0569] <ljharb>
+so would we also have a PropertyKey that represents a property, takes an object, and does an inverted lookup?
+
+[13:37:22.0708] <ljharb>
+> <@rbuckton:matrix.org> i.e., `x => x[a, b]` doesn't let you extract `a` and `b` as there's no associated data model.
+
+oh lol yeah sorry `x.slice(a, b)` in this case, i mistyped
+
+[13:37:44.0112] <ljharb>
+> <@rbuckton:matrix.org> i.e., `x => x[a, b]` doesn't let you extract `a` and `b` as there's no associated data model.
+
+ * oh lol yeah sorry `x.slice(a, b)` in this case, i mistyped. but yes it doesn't let you get at the a and b, which seems like a benefit? (to make it an opaque lens)
+
+[13:38:46.0854] <bakkot>
+I think my preference here would be to leave `obj[x]` alone, and to add a new `obj[^x]` which invokes a symbol-named method on `obj` passing it `x` (uncoerced). there could then be a `slice(a, b)` function which returns a reified Slice, and the symbol-named method on Array could know how to deal with that
+
+[13:39:00.0937] <bakkot>
+also you could have the symbol-named method on Map be an alias for `get`, and that sort of thing
+
+[13:39:09.0154] <rbuckton>
+> <@bakkot:matrix.org> though I don't see why you want to do it in this inverted way - it seems like usually containers know how to use an index, rather than an index knowing how to use a container?
+
+Except `[]` is only useful for strings and symbols (i.e., via toPrimitive). You can't put anything else meaningful in there that isn't either. 
+
+[13:39:13.0110] <bakkot>
+and of course have a similarly named method to be invoked when doing `obj[^x] = y`
+
+[13:39:20.0172] <Michael Ficarra>
+yeah I would also not want `a[b]` delegating to a protocol
+
+[13:40:07.0722] <rbuckton>
+I'm surprised the `WeakMap` example isn't a stronger motivator?
+
