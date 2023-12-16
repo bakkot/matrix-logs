@@ -143,3 +143,53 @@ This is the definition of `-->`: https://tc39.es/ecma262/#prod-annexB-SingleLine
 [11:35:37.0059] <littledan>
 Huh, I always thought the legacy HTML comments weren't supported in eval, but I don't see that represented in the spec
 
+
+2023-12-16
+[08:46:05.0018] <Richard Gibson>
+> <@nicolo-ribaudo:matrix.org> Uhm, does the spec (+ AnnexB) disallow `-->` as the first line in a script? It seems so (`-->` must be preceded by a line terminator), but all browsers accept `eval("-->")`
+
+my reading of https://tc39.es/ecma262/multipage/additional-ecmascript-features-for-web-browsers.html#sec-html-like-comments agrees with this; |HTMLCloseComment| is the only nonterminal that can start with `-->` and is only valid after a |LineTerminatorSequence| (possibly wrapped in `/*…*/`). And [PerformEval](https://tc39.es/ecma262/multipage/global-object.html#sec-performeval) step 11 does ParseText(StringToCodePoints(x), |Script|), which per [ParseText](https://tc39.es/ecma262/multipage/ecmascript-language-source-code.html#sec-parsetext) and [The Syntactic Grammar](https://tc39.es/ecma262/multipage/notational-conventions.html#sec-syntactic-grammar) and [The Lexical and RegExp Grammars](https://tc39.es/ecma262/multipage/notational-conventions.html#sec-lexical-and-regexp-grammars) begins with application of the [lexical grammar](https://tc39.es/ecma262/multipage/ecmascript-language-lexical-grammar.html#sec-ecmascript-language-lexical-grammar) and should fail in the case of text starting with "-->".
+
+All implementations that I tested reject a script starting with "-->", but JSC and SM and V8 incorrectly fail to reject `eval` input that does so:
+```
+$ eshost -si htmlcomment.js 
+## Source
+print("HTML-like comments supported");
+-->
+eval("/*\n*/-->\nprint('eval with leading `/*<LineTerminator>*/-->` supported')");
+eval("-->\nprint('eval with leading `-->` supported')");
+
+
+#### ChakraCore
+HTML-like comments supported
+eval with leading `/*<LineTerminator>*/-->` supported
+SyntaxError: Syntax error
+
+#### engine262
+
+SyntaxError: Unexpected token
+
+#### GraalJS
+HTML-like comments supported
+eval with leading `/*<LineTerminator>*/-->` supported
+SyntaxError: <eval>:1:2 Expected an operand but found >
+
+#### Hermes
+
+SyntaxError: invalid expression
+
+#### JavaScriptCore, SpiderMonkey, V8
+HTML-like comments supported
+eval with leading `/*<LineTerminator>*/-->` supported
+eval with leading `-->` supported
+
+#### Moddable XS
+
+SyntaxError: missing expression
+
+#### QuickJS
+HTML-like comments supported
+eval with leading `/*<LineTerminator>*/-->` supported
+SyntaxError: unexpected token in expression: '>'
+```
+
