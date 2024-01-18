@@ -60,6 +60,54 @@
   <tr class="msg" id="L19"><td class="ts-cell"><a class="ts" href="#L19" alt="Thu Jan 18 2024 11:17:48 GMT-0800 (Pacific Standard Time)">19:17</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">In a <code>struct</code> constructor, <code>super()</code> could be designed such that it doesn't support return override tricks, since the layout is already wired up.</td></tr>
   <tr class="msg" id="L20"><td class="ts-cell"><a class="ts" href="#L20" alt="Thu Jan 18 2024 11:19:02 GMT-0800 (Pacific Standard Time)">19:19</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">And we could just assume methods are non-shared by default, and if shared functions ever becomes a thing you have to opt-in on a method-by-method basis. That seems like a good idea anyways, since you'd want to explicitly indicate that you'd thought about thread safety for a given "shared" method anyways.</td></tr>
   <tr class="msg" id="L21"><td class="ts-cell"><a class="ts" href="#L21" alt="Thu Jan 18 2024 11:19:11 GMT-0800 (Pacific Standard Time)">19:19</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">All of that makes the syntax fairly simple.</td></tr>
+  <tr class="msg" id="L22"><td class="ts-cell"><a class="ts" href="#L22" alt="Thu Jan 18 2024 11:25:25 GMT-0800 (Pacific Standard Time)">19:25</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell"><p>Basically:</p>
+<pre><code>// non-shared struct
+struct S1 {
+  foo; // fixed-layout, non-shared field
+
+  constructor() { } // realm-local constructor
+
+  bar() { } // attached to realm-local prototype
+  get baz() { } // attached to realm-local prototype
+  set baz(value) { } // attached to realm-local prototype
+}
+
+// shared struct
+shared struct S2 {
+  foo; // fixed-layout, shared field
+
+  constructor() { } // realm-local constructor
+
+  bar() { } // attached to realm-local prototype
+  get baz() { } // attached to realm-local prototype
+  set baz(value) { } // attached to realm-local prototype
+}
+
+// null prototypes
+struct S3 extends null {
+  foo; // fixed-layout, non-shared field
+
+  constructor() { } // realm-local constructor
+
+  // cannot have methods/getters/setters
+}
+
+shared struct S4 extends null {
+  foo; // fixed-layout, shared field
+
+  constructor() { } // realm-local constructor
+
+  // cannot have methods/getters/setters
+}
+
+// subclassing
+struct S5 extends S1 {} // ok
+struct S6 extends S2 {} // ok? S6 would be non-shared, even though S2 is declared as shared
+shared struct S7 extends S1 {} // ok? S7 would be shared, even though S1 is declared as non-shared
+shared struct S8 extends S2 {} // ok
+</code></pre>
+</td></tr>
+  <tr class="msg" id="L23"><td class="ts-cell"><a class="ts" href="#L23" alt="Thu Jan 18 2024 11:27:20 GMT-0800 (Pacific Standard Time)">19:27</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">Ideally, we could find some way of supporting private names and <code>accessor</code>, as I'd also like to support decorators long term. The private names bit is tricky for shared structs, though, as you wouldn't be able to guarantee "hard privacy" if it were supported, but private names are necessary to support <code>accessor</code> for decorators.</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>
