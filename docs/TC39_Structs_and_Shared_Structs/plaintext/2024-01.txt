@@ -132,3 +132,54 @@ shared struct S8 extends S2 {} // ok
 [11:27:20.0289] <rbuckton>
 Ideally, we could find some way of supporting private names and `accessor`, as I'd also like to support decorators long term. The private names bit is tricky for shared structs, though, as you wouldn't be able to guarantee "hard privacy" if it were supported, but private names are necessary to support `accessor` for decorators.
 
+[11:30:59.0864] <Mathieu Hofman>
+> The private names bit is tricky for shared structs, though, as you wouldn't be able to guarantee "hard privacy" if it were supported
+Couldn't private declarations help?
+
+[11:31:02.0994] <rbuckton>
+IMO, private names should be viable and are just part of the field layout. Wiring up identical `struct` definitions between two workers would verify they have identical layouts. It might not be true "hard privacy" though, if you are able to create a new worker with an altered `struct` definition that can still be correlated, but has a prototype method that exposes the private field. Maybe its not actually an issue, though, if we are planning to have `struct` layout identity based on file path/line number/etc.
+
+[11:31:07.0848] <Mathieu Hofman>
+ * > The private names bit is tricky for shared structs, though, as you wouldn't be able to guarantee "hard privacy" if it were supported
+
+Couldn't private declarations help?
+
+[11:31:22.0024] <rbuckton>
+Not unless private declarations are also shareable, and that seems even less safe.
+
+[11:32:32.0244] <Mathieu Hofman>
+> Wiring up identical struct definitions between two workers would verify they have identical layouts. 
+
+I suspect if you had to explicitly register your classes, you could guarantee true privacy for private fields ;)
+
+[11:32:47.0447] <Mathieu Hofman>
+ * > Wiring up identical struct definitions between two workers would verify they have identical layouts.
+
+I suspect if you had to explicitly register your structs, you could guarantee true privacy for private fields ;)
+
+[11:33:18.0681] <rbuckton>
+If the correlation mechanism is still file+position based, as we've discussed previously, then hard privacy isn't as much of an issue because the declarations have the same code.
+
+[11:33:29.0308] <Mathieu Hofman>
+Correct
+
+[11:33:39.0460] <rbuckton>
+If you had to use an API to explicitly register, you have even less privacy.
+
+[11:33:54.0022] <Mathieu Hofman>
+it's only a problem if you can forge the class definition
+
+[11:34:00.0305] <Mathieu Hofman>
+ * it's only a problem if you can forge the struct definition
+
+[11:34:17.0789] <rbuckton>
+Since I could spin up a Worker that registers its own version of the class that just replaces its methods with `return this.#whatever` and programmatically wire them up.
+
+[11:34:52.0986] <rbuckton>
+To prevent forging the `struct` definition, it would likely need to be path+position based
+
+[11:34:59.0603] <Mathieu Hofman>
+> <@rbuckton:matrix.org> If you had to use an API to explicitly register, you have even less privacy.
+
+Not if you have to use a type object that is itself sharable to hook the local behavior
+
