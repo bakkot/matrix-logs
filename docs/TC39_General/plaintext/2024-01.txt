@@ -1,0 +1,133 @@
+2024-01-15
+[09:24:29.0827] <nicolo-ribaudo>
+I'm trying to use `using` declarations in a real project -- I like the feature but oh I hate so much that we decided to require a binding name
+
+[09:24:42.0299] <nicolo-ribaudo>
+https://github.com/nicolo-ribaudo/babel/pull/10/files?w=1
+
+[09:25:13.0709] <nicolo-ribaudo>
+```js
+        using _1 = this.withState("inType", true);
+        // Temporarily remove a JSX parsing context, which makes us scan different tokens.
+        using _2 = this.withState("context", this.state.context.slice(0, 1));
+```
+
+[09:25:22.0231] <nicolo-ribaudo>
+I haven't had to use `using _3` yet :)
+
+[09:27:40.0637] <nicolo-ribaudo>
+ * I have not used `using _3` yet :)
+
+[09:27:46.0272] <nicolo-ribaudo>
+ * I did not used `using _3` yet :)
+
+[09:27:49.0995] <nicolo-ribaudo>
+ * I did not use `using _3` yet :)
+
+[10:02:20.0969] <nicolo-ribaudo>
+ * <del>I did not use `using _3` yet :)</del> EDIT: spoke too son
+
+[10:08:37.0674] <nicolo-ribaudo>
+ * <del>I did not use `using _3` yet :)</del> EDIT: spoke too son, I'm at `_4` now
+
+[10:30:59.0735] <Ashley Claymore>
+You could `using stack = new DisposableStack();` and then `stack.use` multiple times without needing to name them  
+
+[10:32:49.0357] <Ashley Claymore>
+did the proposal have anonymous `using` before and the we removed it? Or am I hallucinating that like a LLM
+
+[10:36:21.0963] <Ashley Claymore>
+https://github.com/tc39/proposal-explicit-resource-management/issues/65
+
+[15:45:18.0123] <littledan>
+> <@aclaymore:matrix.org> did the proposal have anonymous `using` before and the we removed it? Or am I hallucinating that like a LLM
+
+Yes, it had using void
+
+[15:45:53.0781] <littledan>
+IMO we should figure out how to make _ work well for this purpose. Nicolo had some good ideas about semantics.
+
+
+2024-01-16
+[12:27:42.0516] <TabAtkins>
+We've been considering `void` as a no-binding matcher in Pattern Matching; that might work here? `using void = ...;`
+
+[12:27:55.0667] <TabAtkins>
+Oh lol littledan just said that
+
+[12:42:41.0691] <littledan>
+I am anti-void for this purpose for the record
+
+[12:42:54.0124] <littledan>
+And anti making it pattern matching only
+
+[12:43:31.0978] <littledan>
+* I think void would be a little funny for this purpose given that it’s an operator
+
+[12:43:52.0806] <littledan>
+* And this case shows it would be nice to be accessible outside of pattern matching 
+
+[13:07:01.0605] <bakkot>
+crazy thought: `_` as an identifier can be redeclared as long as it's never referred to (and there's no direct `eval`s in scope, I guess?)
+
+[15:09:50.0182] <littledan>
+> <@bakkot:matrix.org> crazy thought: `_` as an identifier can be redeclared as long as it's never referred to (and there's no direct `eval`s in scope, I guess?)
+
+That was Nicolo’s idea, except that if you do refer to it, you get a runtime error 
+
+[15:10:20.0545] <littledan>
+And I guess we don’t enforce in the old sloppy constructs 
+
+[15:10:22.0795] <bakkot>
+don't love the idea of a local binding which throws when referenced
+
+[15:10:33.0404] <bakkot>
+reading local bindings should not be side-effecting
+
+[15:10:37.0774] <littledan>
+Why? We already have TDZ
+
+[15:10:43.0378] <bakkot>
+hm, I guess
+
+[15:10:47.0570] <littledan>
+It would literally be in TDZ 
+
+[15:10:49.0137] <bakkot>
+for now, anyway
+
+[15:11:01.0429] <littledan>
+Ah!
+
+[15:11:14.0826] <bakkot>
+I would prefer a static error but runtime is also ok I guess
+
+
+2024-01-17
+[23:14:07.0777] <ljharb>
+are you suggesting your crazy thought be a change in the lang, making `_` special?
+
+[23:28:54.0698] <Andreu Botella>
+I wonder if having an optional form without an identifier would be possible, from a parsing standpoint
+```js
+using ident = expression(1);
+using expression(2);
+```
+
+[06:29:23.0352] <littledan>
+> <@ljharb:matrix.org> are you suggesting your crazy thought be a change in the lang, making `_` special?
+
+yes
+
+[06:30:05.0029] <littledan>
+> <@abotella:igalia.com> I wonder if having an optional form without an identifier would be possible, from a parsing standpoint
+> ```js
+> using ident = expression(1);
+> using expression(2);
+> ```
+
+Aside from not solving the more general problem, this faces the syntactic misfortune of not working if the expression that you're using begins with (
+
+[08:04:24.0272] <ljharb>
+ah, well that's certainly a nonstarter then
+
