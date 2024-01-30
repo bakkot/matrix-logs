@@ -230,3 +230,41 @@ t.throws(
 
 is it possible that there's an issue in the algorithm where it's missing a detachedness check?
 
+[16:37:10.0094] <ljharb>
+ * shu: separately, i'm implementing the changes to SetTypedArrayFromArrayLike in ES2024, and only one of my tests is starting to fail - it's basically this:
+
+```
+var ta = new Uint8Array([1, 2, 3]);
+var obj = { length: 1 };
+Object.defineProperty(obj, '0', { get: function () { ES.DetachArrayBuffer(ta.buffer); return 10; } });
+
+t.throws(
+	function () { ES.SetTypedArrayFromArrayLike(ta, 1, obj); },
+	TypeError,
+	'when a Get detaches the buffer, it throws'
+);
+```
+
+is it possible that there's an issue in the algorithm where it's missing a detachedness check? (obv, there's always a chance the bug is in my impl, but it's pretty 1:1 with the spec text)
+
+[16:38:19.0557] <shu>
+why do you think it should throw?
+
+[16:38:29.0167] <shu>
+like, which step do you think should be throwing
+
+[16:38:36.0491] <ljharb>
+because it threw with the previous spec text
+
+[16:38:46.0206] <shu>
+ah
+
+[16:38:52.0526] <ljharb>
+so maybe it's just a spec bug that's now fixed, i haven't compared it to real TA code yet
+
+[16:39:47.0351] <ljharb>
+i mean i do see that SetTAFAL calls Get (which in this case detaches), and then it calls TypedArraySetElement, which then calls SetValueInBuffer, which then checks IsDetachedBuffer, which would throw
+
+[16:40:02.0686] <shu>
+i don't really know why it would throw previously
+
