@@ -1,0 +1,176 @@
+2024-02-06
+[11:46:56.0429] <ethanarrowood>
+Are there any updates for this proposal? I don't think we've had a meeting in a few weeks (or I missed it), and I don't see it on the agenda 
+
+[11:47:48.0290] <littledan>
+there were going to be some API updates, e.g., adding AsyncContext.snapshot.wrap. I guess we didn't make a presentation this meeting, but we should have one next meeting.
+
+[11:48:03.0702] <littledan>
+There is a lot to do in terms of benchmarking, advancing implementations, design documents, etc.
+
+[11:49:04.0408] <ethanarrowood>
+Great! Happy to help with some of that if you need; though, I'm inexperienced so happy to continue being a fly-on-the-wall and keep learning.
+
+[11:50:36.0013] <littledan>
+Chengzhong Wu and Andreu Botella are working on those benchmarking/implementing/design doc parts; maybe they can share the relevant links with you if you want to get involved?
+
+[11:52:25.0193] <Andreu Botella>
+oh, I forgot to mention this, but I talked over with Shu, and it looks like they're concerned about memory usage, so I'm currently investigating a linked list implementation of the AsyncContext snapshot
+
+[11:52:38.0158] <Andreu Botella>
+ * oh, I forgot to mention this here, but I talked over with Shu, and it looks like they're concerned about memory usage, so I'm currently investigating a linked list implementation of the AsyncContext snapshot
+
+[11:52:56.0588] <littledan>
+did you consider the data structure that I was suggesting, which also avoids quadratic memory usage?
+
+[11:53:13.0365] <Andreu Botella>
+I'm going to build implementations of both and compare
+
+[11:53:27.0622] <Andreu Botella>
+and continue with the design doc afterwards
+
+[11:53:32.0235] <littledan>
+I'm pretty confident that linked list is incomplete, and that we need something that gets the benefits of both
+
+[11:53:49.0594] <littledan>
+maybe a design doc would be a good place to discuss various data structures?
+
+[11:53:55.0984] <littledan>
+I guess maybe I don't know what you mean by linked list
+
+[11:54:22.0053] <littledan>
+(I definitely agree with V8 people that the clone-a-map-all-the-time implementation is not great)
+
+[11:54:24.0164] <shu>
+we were thinking of a LIFO stack
+
+[11:54:27.0323] <shu>
+which you could use a linked list for
+
+[11:54:47.0488] <shu>
+but the point is that you'd have a cursor into the LIFO stack to propagate instead of a map clone
+
+[11:54:53.0085] <shu>
+anyway design doc would be great
+
+[11:55:11.0191] <Andreu Botella>
+and that could get flattened when the lookup cost becomes big enough
+
+[11:55:19.0189] <Andreu Botella>
+ * and that could get flattened into a map when the lookup cost becomes big enough
+
+[11:55:20.0691] <littledan>
+yeah, this seems pretty simplistic and would perform poorly if you need to read or .run on something that's further down in the stack (.run because I assume you'd deduplicate)
+
+[11:56:32.0152] <Andreu Botella>
+as far as I can tell, a map lookup in my map implementation is O(N) in the map's capacity, and the stack could be flattened into a map if the lookup for any variable would be greater than O(N)
+
+[11:56:42.0242] <littledan>
+and poor performance would limit the applicability of the mechanism (e.g., for incumbent realms, or priorities, or task attribution, or other things in the browser)
+
+[11:57:19.0050] <Andreu Botella>
+ * as far as I can tell, a map lookup in my map implementation is worst-case O(N) in the map's capacity, and the stack could be flattened into a map if the lookup for any variable would be greater than O(N)
+
+[11:57:46.0114] <littledan>
+I think you'd want, at a minimum, to have a segment which is just an array of a fixed maximum size, which is just copied, and then some purely functional mechanism on top (maybe linked list up to a size maximum, but then become a persistent map beyond a certain size?)
+
+[11:57:55.0912] <shu>
+i don't understand that yet
+
+[11:58:02.0954] <littledan>
+which part?
+
+[11:58:04.0932] <shu>
+but all the more reason for a design doc i guess
+
+[11:58:30.0267] <shu>
+> <@littledan:matrix.org> yeah, this seems pretty simplistic and would perform poorly if you need to read or .run on something that's further down in the stack (.run because I assume you'd deduplicate)
+
+this thing
+
+[11:58:49.0484] <shu>
+you think the on-demand flattening is what would perform badly?
+
+[11:59:01.0811] <shu>
+(because at that point you lose the ability to just propagate a pointer into the stack?)
+
+[11:59:14.0072] <littledan>
+oh I didn't understand the flattening part
+
+[11:59:41.0005] <Andreu Botella>
+I wasn't even thinking of flattening on demand, I was thinking of flattening when pushing onto the stack
+
+[11:59:49.0157] <Andreu Botella>
+ * I wasn't even thinking of flattening on demand on lookup, I was thinking of flattening when pushing onto the stack
+
+[12:00:05.0122] <shu>
+yeah let's not confuse each other further and let's get a doc started
+
+[12:00:14.0056] <shu>
+our assumption was flattening on demand
+
+[12:00:24.0448] <shu>
+where that "demand" is may be art
+
+[12:00:49.0819] <littledan>
+do you imagine de-duplicating only during that flattening operation? then this could have GC implications
+
+[12:02:29.0093] <shu>
+good question, dunno
+
+[12:05:17.0683] <Andreu Botella>
+the way I was thinking about it, `.get()` needs to be a fast operation, and if you flatten there, with amortization it can't be faster than a map lookup
+
+[12:05:42.0254] <Andreu Botella>
+whereas `AsyncContext.Variable.p.run()` is not necessarily expected to be fast
+
+[12:15:04.0473] <Andreu Botella>
+but yeah, I hadn't considered those GC implications
+
+[12:24:33.0501] <Justin Ridgewell>
+I think `.get()` should be fast, and we can slow down `.run()`
+
+[12:25:29.0497] <Justin Ridgewell>
+What does a LIFO stack really give us for memory?
+
+[12:25:41.0317] <Justin Ridgewell>
+Is it just the `.run()` operation being faster?
+
+[12:26:17.0491] <Justin Ridgewell>
+(There's a suggested impl in the https://github.com/tc39/proposal-async-context/tree/master/src which doesn't perform a clone unless necessary)
+
+[12:30:57.0077] <Justin Ridgewell>
+* (There's a demo impl in the https://github.com/tc39/proposal-async-context/tree/master/src which doesn't perform a clone unless necessary)
+
+[13:00:30.0370] <littledan>
+> <@jridgewell:matrix.org> I think `.get()` should be fast, and we can slow down `.run()`
+
+I think both of these should be somewhat fast and memory-efficient, and you're imagining an either-or tradeoff where we can really do well in both ways
+
+[13:01:19.0695] <littledan>
+task attribution involves lots of .run's. I think we'll run into more cases like this over time. I understand that your case doesn't involve .run as frequently, though.
+
+[13:03:58.0830] <Justin Ridgewell>
+Doesn’t attribution involve at least one get for every run?
+
+[13:15:12.0232] <littledan>
+yes, so if .get is fast and .run is really slow, the result is really slow...
+
+[13:26:26.0026] <Andreu Botella>
+> <@littledan:matrix.org> task attribution involves lots of .run's. I think we'll run into more cases like this over time. I understand that your case doesn't involve .run as frequently, though.
+
+they're working to not require that many run's
+
+[13:27:24.0849] <Andreu Botella>
+https://docs.google.com/document/d/1hZ1FdFtHoPk7h9mwTPJSlF83T7YnTpmfa0CEQbPn8Ks/edit#heading=h.h6xaqbodqfo3
+
+
+2024-02-07
+[05:53:08.0999] <Chengzhong Wu>
+> <@ethanarrowood:matrix.org> Are there any updates for this proposal? I don't think we've had a meeting in a few weeks (or I missed it), and I don't see it on the agenda
+
+You can find the notes at https://docs.google.com/document/d/1WJpNPg9j7h9CKSd3NmlNmivOHDtQ-LGP7mJcwDvNLa8/edit. The meeting is biweekly and we cancelled the call this week for conflicting with the TC39 planery.
+
+[05:58:10.0966] <Chengzhong Wu>
+Please feel free to submit an idea for a benchmark case at https://github.com/legendecas/Speedometer-asynccontext, like using WebAPI that captures async context in a web app. I'm integrating an OpenTelemetry Web app into the suite. Since the speedometer was not designed for asynchronous test steps, this specific derivation of the speedometer was adapted to run async benchmarks.
+

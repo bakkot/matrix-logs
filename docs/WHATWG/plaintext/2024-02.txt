@@ -288,3 +288,308 @@ annevk: the guidance in the html spec suggests  that new stuff should use "parse
 [08:45:00.0882] <Noam Rosenthal>
 Ah it's for new APIS rather than elements 
 
+
+2024-02-07
+[17:01:30.0376] <Domenic>
+> <@noamr:matrix.org> HTML spec local build question: is there a way to make it fail on HTML parsing issues? I often get success on local build and then a failure on PR preview build (e.g. missing end-tags)
+
+This is a regression since the Rust build tools since they autocorrect bad tags. Jeremy Roman might have ideas. Ideally the Rust parser we're using would have a validating mode, but I'm not sure it does...
+
+Filing a tracking issue on html-build would be helpful.
+
+[17:02:50.0004] <Domenic>
+> <@annevk:matrix.org> Domenic: minor [SecureContext] mess: https://github.com/w3c/webref/issues/1142#issuecomment-1930188979. Thoughts?
+
+No particular thoughts from me...
+
+[22:37:36.0404] <Noam Rosenthal>
+> <@domenicdenicola:matrix.org> This is a regression since the Rust build tools since they autocorrect bad tags. Jeremy Roman might have ideas. Ideally the Rust parser we're using would have a validating mode, but I'm not sure it does...
+> 
+> Filing a tracking issue on html-build would be helpful.
+
+OK will file a bug there, thanks!
+
+[01:53:48.0297] <hsivonen>
+annevk: Not sure what to think of the lab9.be link at the bottom on https://util.unicode.org/UnicodeJsps/idna.jsp . The page says that Firefox resolves the link, but Firefox no longer does (because Firefox calls into ICU4C on a per-label basis and has incorrect special-case code for CJK characters that normalize to period). That is, Firefox, Chrome, and Safari fail to implement the spec mutually consistently. This raises the question if we should change the specs or the browsers. I can see arguments both ways.
+
+[01:54:17.0364] <hsivonen>
+ * annevk: Not sure what to think of the lab9.be link at the bottom on https://util.unicode.org/UnicodeJsps/idna.jsp . The page says that Firefox resolves the link, but Firefox no longer does (because Firefox calls into ICU4C on a per-label basis and has incorrect special-case code for CJK characters that normalize to period). That is, Firefox, Chrome, and Safari mutually consistently fail to implement the spec. This raises the question if we should change the specs or the browsers. I can see arguments both ways.
+
+[02:09:27.0613] <hsivonen>
+I'm on track to writing code that would make the link resolve in Firefox again. Making it _not_ resolve takes its own kind of special effort.
+
+[02:13:56.0134] <mathiasbynens>
+looks like we had some data loss here https://blog.whatwg.org/implementation-progress-on-the-html5-ruby-element
+
+[02:17:05.0242] <mathiasbynens>
+the “???” in the examples are real U+003F QUESTION MARK characters instead of the intended non-ASCII characters
+
+[02:17:13.0620] <mathiasbynens>
+https://web.archive.org/web/20120522110923/https://blog.whatwg.org/implementation-progress-on-the-html5-ruby-element is what it used to be
+
+[02:36:41.0007] <annevk>
+hsivonen: that should not resolve I think. Not sure what U+2490 gets mapped to though.
+
+[02:38:12.0850] <hsivonen>
+> <@annevk:matrix.org> hsivonen: that should not resolve I think. Not sure what U+2490 gets mapped to though.
+
+Ooh. Indeed. It's disallowed. Nevermind then. Sorry.
+
+[02:39:13.0570] <hsivonen>
+Well, at least I do also find actual bugs: https://unicode-org.atlassian.net/browse/ICU-22658
+
+[11:01:41.0561] <TabAtkins>
+> <@tabatkins:matrix.org> All right, https://github.com/w3c/htmldiff-ui/pull/10 filed
+
+And merged! HTMLDiff should hopefully be generating good diff colors now.
+
+[11:09:25.0819] <akaster>
+Does that fix help at all with <https://github.com/whatwg/html/issues/10072>? 🙏
+
+[11:25:33.0103] <TabAtkins>
+> <@akaster:serenityos.org> Does that fix help at all with <https://github.com/whatwg/html/issues/10072>? 🙏
+
+No, but let me go fix that now.
+
+[12:50:49.0873] <sefeng>
+Domenic: I have another case for sequential focus which I am not sure which behaviour is correct. https://jsfiddle.net/qyuc0otf/ If you focus the first input and then press <TAB>, firefox moves the focus to the "second" input, Chrome and Safari moves to the <area> element
+
+[13:05:38.0045] <sefeng>
+I think we should do DOM orders here, so that's what Chrome and Safari do. 
+
+
+2024-02-08
+[10:24:00.0353] <annevk>
+Pfff. <select> thread with Open UI is so weird.
+
+[10:24:12.0221] <annevk>
+ * Pfff. That \<select> thread with Open UI folks is so weird.
+
+[13:54:14.0059] <smaug>
+keithamus: I can't comment on lines which haven't been changed when reviewing a pr?
+
+[13:54:36.0984] <smaug>
+keithamus: I'm looking at the  open attribute removal
+
+[13:56:56.0474] <smaug>
+keithamus: don't the focusing steps possibly trigger events synchronously ? Maybe I'm missing something
+
+[13:57:15.0073] <smaug>
+jarhar: ^
+
+[14:00:45.0322] <keithamus>
+Which PR is this in question?
+
+[14:03:35.0278] <jarhar>
+oh yeah i thought about that too
+
+[14:03:49.0046] <jarhar>
+when closing the dialog we focus another element synchronously
+
+[14:04:09.0398] <jarhar>
+and it might be a bad idea to fire an event while removing an attribute
+
+[14:04:15.0226] <jarhar>
+not sure whats best
+
+[14:04:32.0767] <smaug>
+keithamus: https://github.com/whatwg/html/pull/10124
+
+[14:04:33.0470] <jarhar>
+we could skip that step for attribute removal if needed
+
+[14:07:10.0529] <keithamus>
+smaug: oh I see what you mean about github not letting you add a comment. We've got that feature in the backlog 🫠
+
+[14:07:40.0229] <smaug>
+good good 🙂 
+
+[14:11:51.0160] <smaug>
+But about the behavior, I think it would be nice to have similar behavior as what calling close has. Are there other cases when removing an attribute triggers events this way? (not talking about mutation events)
+
+[14:12:05.0275] <smaug>
+Looks like DOM spec wouldn't like sync events
+
+[14:22:02.0622] <keithamus>
+`<details>` 
+
+[14:22:23.0702] <keithamus>
+ * `<details>`? Removing the attribute closes but I don't recall if it triggers events
+
+[14:25:21.0316] <keithamus>
+https://searchfox.org/mozilla-central/source/dom/html/HTMLDetailsElement.cpp#45-67 looks like it dispatches the toggle event if you remove the `open` attribute, but that's done in a task.
+
+[14:25:40.0068] <smaug>
+right, also per spec
+
+[14:27:51.0312] <keithamus>
+I'd love to chat more about this. I'm trying to understand the constraints and get a way for all groups to progress. It feels like something is getting lost in the comments.
+
+[14:28:26.0586] <smaug>
+(oh, details has some rather unusual mutation events flag usage in the spec)
+
+[14:31:37.0060] <smaug>
+hmm, doesn't popover removal have a bug
+
+
+2024-02-09
+[17:40:29.0179] <oliver>
+I have some problems keeping the Websocket connection alive in Apache since they deprecated mod_proxy_wstunnel. Now it’s disconnecting after the ProxyTimeout or Timeout is reached.
+
+If I understand the spec correctly the ping mechanism is the right way to keep the connection alive. Is it by means of the specification correct to disconnect the websocket if it was idle for only a short time like the timeout interval? It seems inefficient to me to send ping and pong below such an interval from many clients for keepalive purposes.
+
+[17:43:52.0818] <oliver>
+* I have some problems keeping the Websocket connection alive in Apache since they deprecated mod_proxy_wstunnel. Now it’s disconnecting after the ProxyTimeout or Timeout is reached.
+If I understand the spec correctly the ping mechanism is the right way to keep the connection alive. Is it by means of the websocket specification correct to disconnect the websocket if it was idle for only a short time like the timeout interval? It seems inefficient to me to send ping and pong below such an interval from many clients for keepalive purposes.
+
+[17:52:27.0790] <Domenic>
+smaug: jarhar: I think the DOM spec is fine with sync events, but I agree this does seem counter to our goals of removing mutation events.
+
+[17:54:21.0860] <Domenic>
+annevk: keithamus: I agree that OpenUI thread is very weird. It got even weirder if you read their minutes on a related issue. https://github.com/openui/open-ui/issues/532#issuecomment-1934844026 . My current hypothesis is that OpenUI has decided to conflate the four separate things: parser behavior, styling, shadow DOM structure, and changed keyboard/a11y behavior, and so whenever annevk talks about one of those, they go "what about the other?", and confusion follows.
+
+[17:54:55.0823] <smaug>
+removeNamedItem starts to behave a bit oddly if removing attribute may have already executed js. (I'm excluding custom elements here)
+
+[17:56:00.0666] <Domenic>
+I guess odd is in the eye of the beholder; seems fine to me.
+
+[17:57:36.0707] <smaug>
+and CEReaction happens after attribute change steps, so it doesn't play nicely with that either
+
+[18:06:21.0883] <sideshowbarker>
+> <@smaug:mozilla.org> (oh, details has some rather unusual mutation events flag usage in the spec)
+
+Yeah I don’t know the background on the decision to include that suppress-firing-of-mutation-events behavior in the requirements for details@name; but I can say that in the case of the WebKit at least, without suppressing mutation events in that way — even if it weren’t required by the spec — the WebKit implementation would otherwise run into existing security asserts in the code that’d prevent firing mutation events in that case anyway.
+
+And implementing `details` auto-expand (for find-in-page and fragment navigation) in WebKit will require that same suppress-firing-of-mutation-events behavior — even though the spec doesn’t (yet) require it in that case.
+
+Anyway, I wish we all could all just go ahead and disable mutations-events support in all engines in the very near future. I know Chrome at least is scheduled to do so later this year. I don’t know if other engines have it scheduled yet.
+
+Otherwise, it seems like we’re letting the overhead of needing to deal with mutation events when implementing new features (and in the spec) just keep on being an ongoing PITA indefinitely.
+
+[18:08:36.0510] <smaug>
+It was agreed already 2011 or 2012 to remove mutation events and FF has warned about them being deprecated since 2012 😉 
+
+[18:15:57.0098] <sideshowbarker>
+Yeah, definitely not a case where developers haven’t got plenty of warning.
+
+Maybe once (if) Chrome actually manages to drop support this year, then other engines will finally be able to go ahead with dropping support too.
+
+I mean, once they’re not supported in Chrome any longer, you’d have to wonder what kind of existing apps/code with mutation events that developers would have running that weren’t already now broken in Chrome.
+
+I guess at that point it would be apps that intentionally targeted only to Firefox or Safari users. Some extensions maybe, I dunno
+
+[18:16:20.0319] <sideshowbarker>
+ * Yeah, definitely not a case where developers haven’t got plenty of warning.
+
+Maybe once (if) Chrome actually manages to drop support this year, then other engines will finally be able to go ahead with dropping support too.
+
+I mean, once they’re not supported in Chrome any longer, you’d have to wonder what kind of existing apps/code with mutation events that developers would have running that weren’t already now broken in Chrome.
+
+I guess at that point it would be apps intentionally targeted only to Firefox or Safari users. Some extensions maybe, I dunno
+
+[18:17:25.0588] <sideshowbarker>
+So anyway, fingers crossed on Chrome actually being able to successfully drop support for mutation-events this year
+
+[23:36:31.0639] <annevk>
+smaug: what will be weird for removeNamedItem that's not weird for removeAttribute?
+
+[23:47:14.0762] <annevk>
+Domenic: should https://html.spec.whatwg.org/multipage/nav-history-apis.html#dom-navigation-cangoforward be size - 1?
+
+[23:47:29.0946] <annevk>
+(Via https://github.com/WebKit/WebKit/pull/23578.)
+
+[23:48:04.0256] <Domenic>
+annevk: I don't understand the question
+
+[23:48:25.0750] <Domenic>
+Oh, size minus 1, not size negative 1
+
+[23:48:35.0673] <annevk>
+Domenic: since. the index is 0-based, how can it ever match size?
+
+[23:48:42.0971] <annevk>
+ * Domenic: since the index is 0-based, how can it ever match size?
+
+[23:49:05.0210] <Domenic>
+Yes, that seems clearly like a bug... let me double-check Chromium to confirm there's not something galaxy-brained going on
+
+[23:49:23.0936] <Domenic>
+Yes indeed, Chromium has it correct
+
+[23:49:30.0482] <Domenic>
+I'll fix
+
+[23:51:33.0937] <Domenic>
+https://github.com/whatwg/html/pull/10130
+
+[00:27:20.0665] <annevk>
+Domenic: keithamus: https://github.com/whatwg/html/issues/9799#issuecomment-1935512376
+
+[00:27:40.0321] <annevk>
+keithamus: happy to chat further if you think that'd be useful. I have time today.
+
+[00:47:35.0504] <keithamus>
+annevk Domenic name the time and I’ll do my best. I’d love to figure out the path forward for both. 
+
+[00:48:08.0596] <keithamus>
+I’m free in about 15 mins 
+
+[01:06:16.0177] <Domenic>
+It's 6pm Friday for me :)
+
+[01:06:32.0884] <Domenic>
+I don't think I'm that necessary though
+
+[02:24:26.0286] <smaug>
+annevk: removeAttribute doesn't return the removed attribute, removeNamedItem does
+
+[02:27:52.0714] <annevk>
+smaug: is the weirdness that you get an attribute back that might still be attached?
+
+[02:29:05.0644] <smaug>
+the weirdness is that when you get the attribute back, scrips may have already run and added another attribute there
+
+[02:29:14.0390] <smaug>
+or basically anything may have happened
+
+[02:29:42.0821] <smaug>
+well, that anything may have happened is of course an issue with removeAttribute too
+
+[02:30:19.0495] <smaug>
+But  the issue is more obvious with removeNamedItem
+
+[02:32:26.0816] <annevk>
+I see, I guess that's fair. But this does not rise to the level of mutation event issues, I think.
+
+[02:32:44.0340] <smaug>
+right, because it is after attribute removal
+
+[02:32:52.0314] <annevk>
+Note that Trusted Types also allows for this.
+
+[02:33:04.0036] <annevk>
+Hmm, I think Trusted Types is before removal?
+
+[02:33:29.0241] <annevk>
+smaug: review https://github.com/whatwg/dom/pull/1247 please?
+
+[02:38:21.0936] <smaug>
+Though, DOMAttrModified isn't the particularly bad mutation event. The bad one is DOMNodeRemoved
+
+[02:38:31.0185] <smaug>
+But looking at that TT issue
+
+[02:38:38.0295] <smaug>
+ * But looking at that TT PR
+
+[10:19:39.0155] <annevk>
+https://portal.gitnation.org/contents/yous-the-platform talk about adding the submitter argument to the `FormData` constructor
+
+
+2024-02-10
+[00:27:17.0440] <Franco Rougier>
+Hi
+
