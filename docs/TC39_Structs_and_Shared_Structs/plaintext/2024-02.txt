@@ -159,3 +159,79 @@ ok but the question is whether a spec compliant implementation must offer them t
 [14:44:50.0456] <shu>
 there was a use case from the wasm side iirc that wanted to not share different binaries depending on whether SABs are actually available
 
+[14:45:12.0358] <shu>
+so, when they are not, they will use ABs, use no multithreading, but still ship the same Atomics calls
+
+[14:45:18.0905] <shu>
+"graceful degration" or whatever
+
+[14:45:27.0053] <shu>
+ * "graceful degradation" or whatever
+
+[14:45:43.0876] <ljharb>
+then in that case Atomics probably can't be optional, but would be entirely useless in an env without SABs. any reason why they work with ABs in the first place?
+
+[14:45:54.0274] <shu>
+that says to me that Atomics ought to always be offered as part of a spec compliant implementation
+
+[14:46:09.0003] <shu>
+> <@ljharb:matrix.org> then in that case Atomics probably can't be optional, but would be entirely useless in an env without SABs. any reason why they work with ABs in the first place?
+
+for the reason i just said above about not wanting to ship different binaries
+
+[14:46:16.0573] <shu>
+ * there was a use case from the wasm side iirc that wanted to not ship different binaries depending on whether SABs are actually available
+
+[14:46:20.0297] <ljharb>
+ahhh k
+
+[14:46:52.0549] <ljharb>
+i mean it'd basically just be a conditional `delete Atomics` call before allowing any user code to run, right? not sure why it'd require a new binary
+
+[14:47:05.0222] <shu>
+i'm confused
+
+[14:47:53.0703] <ljharb>
+so like, i would expect one binary. if it makes SABs available, there's a global property and also Atomics. if it doesn't, there's no global property and also no Atomics
+
+[14:48:10.0243] <ljharb>
+ * so like, i would expect one binary. if it makes SABs available, there's a global property and also Atomics. if it doesn't, there's no global property and also no Atomics. both of which are deleteable with a line or two of JS that can be invoked before running user code
+
+[14:48:25.0239] <ljharb>
+ * so like, i would expect one binary. if it makes SABs available, there's a global property and also Atomics. if it doesn't, there's no global property and also no Atomics. both of which are deleteable with a line or two of JS that can be invoked inside a realm before running user code (like how node has "realm bootstrap" JS that runs)
+
+[14:48:40.0132] <shu>
+the use case is like, you have a bunch of carefully written lockfree mumbo jumbo that uses SABs and `Atomics`. you don't want to write a whole different version, and you're also not too bothered about running it single-threaded when SABs are not available, even if Atomics are more expensive. in that case, you can check if SABs are available, you construct a SAB and TAs that view that. if you SABs are not available, you construct an AB and TAs that view that. the library code that does Atomics operations on the TAs is agnostic to whether the underlying buffer is an SAB or AB
+
+[14:48:43.0909] <ljharb>
+ * so like, i would expect one binary. if it makes SABs available, there's a global property and also Atomics. if it doesn't, there's no global property and also no Atomics. both of which are deleteable with a line or two of JS that can be invoked inside a realm before running user code (like how node has "realm bootstrap" JS that runs)
+
+entirely possible i'm missing something
+
+[14:48:54.0770] <shu>
+the one wrinkle is that `wait` never works if the underlying buffer is an AB
+
+[14:49:00.0795] <shu>
+but other than wait, all the other Atomics operations work
+
+[14:49:01.0478] <Mathieu Hofman>
+ok I buy the use case for Atomics being present. I think SAB being normative optional is still an option. And it's solve the `waitAsync` issue, since that throws on non SAB backed views
+
+[14:49:06.0406] <ljharb>
+ok but that's the library - so it could easily have a branch
+
+[14:49:16.0244] <shu>
+that constitutes writing 2 libraries
+
+[14:49:16.0376] <ljharb>
+ * ok but that's the library - so it could easily have a branch, and not be agnostic
+
+[14:49:36.0029] <ljharb>
+i count one library that branches based on whether SAB was present initially or not
+
+[14:49:56.0476] <ljharb>
+ * i count one library that branches based on whether SAB was present initially or not. obv the machinery to handle SABs/Atomics would have to be present regardless
+
+[14:50:01.0387] <shu>
+one that uses, like `a[i] + 42` and one that uses `Atomics.add(a, i, 42)`
+
