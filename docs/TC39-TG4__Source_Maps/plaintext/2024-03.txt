@@ -42,3 +42,16 @@ I have a couple of questions/comments on the Scopes proposal:
     - [Side note: the note telling you that `line` is relative is in the `column` list item]
 
 
+[01:27:20.0043] <Simon Zünd>
+Thanks for the ideas/feedback! Yeah there are couple of rough edges in the current proposal.
+
+* Original files are formatted normally, so I'd imagine that most of the columns are absolute anyway given that not many scopes will start on the same line.
+* Encoding start/end items separately gives us the tree structure of scopes immediately and you don't have to nest the scopes manually based on position alone (which could be ambiguous if 2 scopes have the same start, not sure if that occurs in practice though).
+* No, call-site is specifically for inlining. So for a generated range that represents an inlined function the `originalScope` points to the original inlined function scope and call-site points to where that inlined function was actually called in the original code. This is required to get stack traces right.
+* Bindings are a bit tricky, maybe we went overboard with trying to encode it efficiently.
+  * We basically distinguish between 2 cases:
+     1) The variable is available for the full range with the same expression, in that case we only need a single offset into the names array.
+     2) The variable requires different expressions for parts of the generated range. In this case the first DATA is again a single offset into the names array. This is the expression from the range start. Then we encode another data `M`, to denote how many more live ranges we have. We encode it negated, so decoders can distinguish between case 1) and 2).
+  * Holger filed a bug about how to encode unavailable here. https://github.com/tc39/source-map-rfc/issues/70. I like your suggestion as well and will add it to the list.
+
+
