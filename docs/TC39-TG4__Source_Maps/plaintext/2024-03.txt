@@ -149,3 +149,47 @@ I guess a stack will work, I can pop from it and assign the end line/col when I 
 [02:09:53.0941] <Simon Zünd>
 FWIW here is how I implemented it in DevTools for now: https://crrev.com/c/5307620
 
+[02:10:57.0498] <Simon Zünd>
+It's split into a generator producing the start/end items from VLQ and a for-loop + stack that builds the tree
+
+[02:12:53.0352] <Simon Zünd>
+If you are only interested in producing SMI arrays as fast as possible you can simplify the generator to read VLQs until it sees a `,` and you distinguish start/end items by the length of the produced array
+
+[02:13:02.0918] <Justin Ridgewell>
+Yah, you maintained a stack and assigned the end-index aftewards: https://source.chromium.org/chromium/chromium/src/+/main:third_party/devtools-frontend/src/front_end/core/sdk/SourceMapScopes.ts;l=88-92;drc=80a32637bfe732b657407430464d5b81b6bdf5ea
+
+[02:13:15.0833] <Simon Zünd>
+yep
+
+[02:13:46.0667] <Simon Zünd>
+basically exactly what you said
+
+[02:13:59.0094] <Simon Zünd>
+ * basically what you said
+
+[02:15:24.0776] <Simon Zünd>
+The problem is if you encode scopes fully, then you have to sort them afterwards based on source position. That saves you the stack during decoding, but it's expensive to build
+
+[02:16:00.0311] <Simon Zünd>
+Since scopes could occur in any order. So you have to sort them first, and then nest them
+
+[02:16:29.0744] <Justin Ridgewell>
+I think it's a line/col stack check to see if you're in a nested scope?
+
+[02:16:41.0683] <Justin Ridgewell>
+It's basically the same both ways
+
+[02:17:18.0973] <Justin Ridgewell>
+> Since scopes could occur in any order. So you have to sort them first, and then nest them
+
+:straight-to-jail:
+
+[02:17:54.0686] <Justin Ridgewell>
+Keep them monotonically increasing, like the informal `sections` note in sectioned maps
+
+[02:19:59.0879] <Simon Zünd>
+Sure, I'm also a bit afraid if tools spit out with identical start/end, so you'd also need the convention that the first entry is the parent of the second
+
+[02:20:00.0084] <Simon Zünd>
+ * Sure, I'm also a bit afraid if tools spit out scopes with identical start/end, so you'd also need the convention that the first entry is the parent of the second
+
