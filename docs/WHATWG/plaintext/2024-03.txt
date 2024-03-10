@@ -496,3 +496,41 @@ So, yeah: you should not follow RFC-5322, but you should follow RFC-5321.
 [23:40:55.0276] <annevk>
 dean.highpower: there's a long discussion in https://github.com/whatwg/html/issues/4562 without much progress, though someone from the i18n WG might make another attempt this year.
 
+[04:27:18.0288] <judekeyser>
+Hello, I badly apologize if the question does not fit this room, but I'm having trouble understanding a piece of JavaScript code and no one could help me in regular javascript servers. The code I'm concerned with is the following (ready to use):
+```js
+(async () => {
+    const stream = (function* chunks(json) {
+        const jsonString = JSON.stringify(json);
+        const jsonBytes = new TextEncoder().encode(jsonString);
+    
+        let index = 0;
+        while(index < jsonBytes.length) {
+            const i = index;
+            const j = Math.min(jsonBytes.length, i + 10);
+    
+            const slice = jsonBytes.slice(i, j);    // LINE (A)
+            index = j;
+            yield slice;
+        }
+    })({"Hello!": [2023, 2024 ]});
+    
+    const jsonBack = await new Response(new ReadableStream({
+        type: "bytes",
+        start: function(controller) {
+            for(const chunk of stream) {
+                controller.enqueue(chunk);
+            }
+            controller.close();
+        }
+    })).json();
+    
+    console.log(jsonBack);
+})()
+```
+this code works as expected (google chrome, firefox; latest versions). However, when I replace in line A, `.slice` with `.subarray`, I get different kind of issues, telling me the JSON ends abnormally (in both browsers). I've crawled the official specification of the different API's, and I couldn't find a single clue about whether or not the version with `.subarray` violates the specification. 
+
+For what is worth, turning `.json()` to `.text()` confirms that in the `.subarray` case, only the first chunk seems to be taken into account. I assume (but not sure about it) the same happens for `.json()`.
+
+My question, to make it clear, is: is the current code with `.slice` already violating a point of the specification; and is the version with `.subarray` violates it and how? Could it be a browser bug, common to both Firefox and Google Chrome? Many thanks in advance! This issue puzzles me a lot for some days now
+
