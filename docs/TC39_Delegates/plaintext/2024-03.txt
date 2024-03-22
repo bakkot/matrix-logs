@@ -200,3 +200,941 @@ that should always be yes to advance to stage 3
 [20:24:54.0781] <littledan>
 Right, so we definitely agree that DOM integration is needed before Stage 3; the question was whether it was needed before 2.7 (and sounds like a yes from dminor, and I am happy to accept that answer)
 
+
+2024-03-18
+[05:37:40.0642] <dminor>
+My understanding of 2.7 is that it means the specification is complete, I realize whether that also includes host / DOM integration is a bit of a grey area, but after the experience with ShadowRealm, I'm leaning towards saying that it should include host integration, even if we don't expect the host integration to affect the specification text being written for TC39.
+
+[08:04:11.0869] <littledan>
+(I guess we were also ambiguous about whether the tests on the host side are needed before Stage 3)
+
+[08:52:58.0204] <bakkot>
+relevant to Jack Works's "Module sync assert" proposal, Node is introducing experimental support for `require`ing ESM modules which do not have a top-level await in their graph https://github.com/nodejs/node/pull/51977
+
+[09:00:55.0289] <littledan>
+The reason that I thought that we had considered host integration just a Stage 3 requirement and not 2.7 is because we just re-promoted it to Stage 2.7 last meeting despite not having its web integration done
+
+[09:01:22.0690] <littledan>
+ * The reason that I thought that we had considered host integration just a Stage 3 requirement and not 2.7 is because we just re-promoted ShadowRealms to Stage 2.7 last meeting despite not having its web integration done
+
+[09:01:27.0881] <littledan>
+so I hope we can find a common policy on this that we apply the same way to ShadowRealms as to AsyncContext
+
+[09:02:11.0506] <littledan>
+(I had expressed before the meeting that to the champions that I didn't think 2.7 was appropriate given the lack of web integration being done, but I didn't want to upset everything if everyone else was OK with that, as long as we worked it out by Stage 3.)
+
+
+2024-03-19
+[22:35:45.0220] <snek>
+> <@bakkot:matrix.org> relevant to Jack Works's "Module sync assert" proposal, Node is introducing experimental support for `require`ing ESM modules which do not have a top-level await in their graph https://github.com/nodejs/node/pull/51977
+
+does anyone else ever get this like deep sense of depression that all the cool things about esm that took so much time and effort to build have ended up being thrown away for it to just be CJS in a different syntax
+
+[09:26:18.0245] <Michael Ficarra>
+snek: worse, I started thinking about all of the esm things we could have had but missed out on by rushing to get something palatable shipped with ES2015
+
+[09:27:43.0868] <snek>
+😭
+
+[09:38:43.0906] <Michael Ficarra>
+maybe deferred evaluation could be a path toward an integrated capabilities system.... one can only hope
+
+[10:23:35.0224] <nicolo-ribaudo>
+How do you see deferred evaluation helping with this?
+
+[10:23:45.0674] <nicolo-ribaudo>
+* How do you envision deferred evaluation helping with this?
+
+[12:40:19.0722] <Chris de Almeida>
+hopefully everyone has already reviewed the notes when they were in the google doc form, but the PR for making them public is now up:  https://github.com/tc39/notes/pull/314
+
+it's best if we can get any changes in prior to merge, so please review if you have not done so already
+
+[13:29:32.0452] <Michael Ficarra>
+well I imagine the first step toward only executing code that has no ambient authority is to be able to import code without it running with ambient authority
+
+[13:29:47.0958] <Michael Ficarra>
+haven't thought deeply about the full path there yet
+
+[15:04:29.0257] <bakkot>
+java is using `_` for void bindings: https://openjdk.org/jeps/456
+
+[15:35:47.0348] <nicolo-ribaudo>
+Java making the right choice!
+
+[16:29:29.0083] <ljharb>
+> <@michaelficarra:matrix.org> snek: worse, I started thinking about all of the esm things we could have had but missed out on by rushing to get something palatable shipped with ES2015
+
+so much this, ESM shipping in ES2015 was a huge mistake
+
+
+2024-03-20
+[18:08:27.0256] <Justin Ridgewell>
+> A single underscore character is the lightest reasonable syntax for signifying the absence of a name. It is commonly used in other languages, such as Scala and Python, for this purpose. A single underscore was, originally, a valid identifier in Java 1.0, but we later reclaimed it for unnamed variables and patterns
+
+[18:09:41.0181] <Justin Ridgewell>
+I very much prefer we use `_`, I think refactoring hazards are pretty simple to fix since it's a lexically scoped name.
+
+[21:03:06.0421] <rbuckton>
+> <@bakkot:matrix.org> java is using `_` for void bindings: https://openjdk.org/jeps/456
+
+Everybody uses `_` for void bindings. I'd prefer we use it too, but unless ljharb relaxes his position, it's not an option. 
+
+[21:04:34.0271] <rbuckton>
+> <@jridgewell:matrix.org> I very much prefer we use `_`, I think refactoring hazards are pretty simple to fix since it's a lexically scoped name.
+
+Agreed, I also wish we could use it for pipeline. We could have even used it for both, since they wouldn't conflict
+
+[21:06:25.0456] <rkirsling>
+while I'm typically opposed to chaos, this would _the_ chaotic move that I'd support
+
+[21:06:29.0783] <rkirsling>
+ * while I'm typically opposed to chaos, this would be _the_ chaotic move that I'd support
+
+[23:32:36.0671] <ljharb>
+i'm pretty sure i'm not the only one who objects to violating TCP
+
+[23:34:35.0054] <ljharb>
+https://fanf.livejournal.com/118421.html and https://esdiscuss.org/topic/regarding-tennent-s-language-design-based-on-semantic-principles are good reading on the topic
+
+[23:37:32.0609] <bakkot>
+I think you might be the only one who objects in this case
+
+[23:40:31.0976] <ljharb>
+sometimes one person objecting means other objectors don't speak up. not violating TCP came up a *ton* around ES6 and i'd be surprised if in fact nobody else cares about preserving that property.
+
+[23:41:22.0809] <bakkot>
+I do not immediately see how using `_` for void bindings would violate TCP
+
+[23:42:23.0088] <ljharb>
+tbf for TCP i was thinking about pipeline. it's possible that doesn't apply for void bindings, i'll have to take another look
+
+[23:43:37.0530] <ljharb>
+so would `const { _ } = whatever` be a discarded binding but `const _ = whatever._` wouldn't?
+
+[23:44:26.0453] <ljharb>
+for example, https://www.npmjs.com/package/minimist (57M weekly downloads) produces an object with a `_` property, would you still be able to destructure it as you can now?
+
+[23:46:04.0603] <ljharb>
+ * so would `const { _, ...kept } = whatever` make `_` be a discarded binding but `const _ = whatever._` wouldn't?
+
+[23:47:34.0883] <bakkot>
+so there are a variety of ways this could work. the simplest backwards-compatible way would be, no changes to any current programs, but it becomes legal to re-declare `_` in the same scope; if you do, any references to `_` within that scope are an error (possibly at parse time).
+
+[23:48:25.0459] <bakkot>
+this would not distinguish between `const { _, ...kept } = whatever` and `const _ = whatever._` in any way
+
+[23:49:00.0307] <ljharb>
+ok so like, `const { _ } = whatever; console.log(_)` would continue to work, and if i added `const { x: _ } = foo`, it would discard the binding but also poison use of `_` after that?
+
+[23:49:10.0615] <ljharb>
+ * ok so like, `const { _ } = whatever; console.log(_)` would continue to work, and if i added `const { x: _ } = foo` after it, it would discard the binding but also poison use of `_` after that?
+
+[23:49:14.0394] <ljharb>
+ * ok so like, `const { _ } = whatever; console.log(_)` would continue to work, and if i added `const { x: _ } = foo` after it, it would discard the new binding but also poison use of `_` after that?
+
+[23:49:31.0313] <ljharb>
+so if i wanted to discard a binding i'd have to rename my existing binding?
+
+[23:50:08.0915] <bakkot>
+I would want it to poison all uses anywhere in the scope. so you could write
+
+```
+const { _ } = whatever;
+console.log(_)
+```
+and
+```
+const { _ } = whatever;
+const { x: _ } = foo;
+```
+but not
+```
+const { _ } = whatever;
+console.log(_)
+const { x: _ } = foo;
+```
+
+[23:50:28.0059] <bakkot>
+and yes, it would mean that if you want to use discard bindings, you would need to not name a thing `_` in that scope
+
+[23:50:34.0779] <ljharb>
+ok so in that last example, adding line 3 would create an error where it previously worked
+
+[23:50:41.0177] <bakkot>
+correct
+
+[23:50:54.0866] <ljharb>
+and why is that better than `const { x: void } = foo` which doesn't have that downside?
+
+[23:51:22.0105] <bakkot>
+because `void` is so many more characters, and means a different thing
+
+[23:51:33.0630] <bakkot>
+whereas `_` is the convention across many programming languages
+
+[23:51:44.0772] <ljharb>
+ok, but most JS devs won't have ever used another language.
+
+[23:51:57.0557] <ljharb>
+and 4 chars isn't that many more than 1, but sure, technically 4 > 1
+
+[23:52:05.0139] <bakkot>
+I dispute that claim and also I think we should still care about consistency with other languages even if it were true
+
+[23:52:11.0282] <ljharb>
+and `void` already means "ignore this thing"
+
+[23:52:57.0185] <ljharb>
+ * and `void` already means "ignore this thing". it's just that existing uses in JS also mean "… and produce `undefined`". in TS it literally means "you can't use this thing".
+
+[23:54:11.0247] <ljharb>
+iow i totally accept the argument of "_ is what most other langs use", that's empirical; as is "4 chars is less than 1". but i find the latter a weightless argument, and the former an argument only when looking at similar alternatives.
+
+[23:54:32.0474] <ljharb>
+ * iow i totally accept the argument of "\_ is what most other langs use", that's empirical; as is "4 chars is more than 1". but i find the latter a weightless argument, and the former an argument only when looking at similar alternatives.
+
+[23:55:14.0789] <rkirsling>
+I don't think the average JS app developer is using `void 0` so I would say any JS devs who have an association with `void` as a keyword would be thinking of it as a return type
+
+[23:55:19.0355] <ljharb>
+`_` is a perfectly reasonable thing to use in a language where it's not a valid identifier, to be clear - precisely because it's short and connotes "nothing"
+
+[23:55:40.0096] <ljharb>
+> <@rkirsling:matrix.org> I don't think the average JS app developer is using `void 0` so I would say any JS devs who have an association with `void` as a keyword would be thinking of it as a return type
+
+i agree! in which case (for TS) it means "ignore this thing", and fits even better than the JS usage.
+
+[00:10:00.0224] <rbuckton>
+> <@ljharb:matrix.org> `_` is a perfectly reasonable thing to use in a language where it's not a valid identifier, to be clear - precisely because it's short and connotes "nothing"
+
+In almost every language that added discards, `_` was already a legal identifier. 
+
+[00:11:20.0028] <ljharb>
+my experience with scala tells me that conflating what "_" means, specifically, is a bad idea - i think there's 18 meanings of it depending on context?
+
+[00:12:27.0484] <ljharb>
+ * my experience with scala tells me that conflating what "\_" means, specifically, is a bad idea - i think there's 18 meanings of it depending on context? (update: https://stackoverflow.com/a/8001065/632724 has 16)
+
+[00:12:51.0125] <rbuckton>
+If we held the "don't repurpose identifiers" position back in es2015, we would not have `yield` or `await`. Those are valid because you had to opt in to the new syntax. Every case where we've proposed coopting `_` has also been new syntax. 
+
+[00:13:30.0336] <ljharb>
+i think for those it was because the entire containing function had to use new syntax. this is just adding a line.
+
+[00:18:34.0396] <rbuckton>
+For pipeline, it's fairly obvious that the boundary is the `|>` expression. For discards, it's a little less clear, but we could even go so far as to issue early errors if you reference a `_` declared in a scope with more than one declaration of `_`. It would be immediately obvious and indicate a need to refactor instead of silently picking a `_` declared in an outer scope.
+
+[01:35:14.0242] <nicolo-ribaudo>
+> <@bakkot:matrix.org> I would want it to poison all uses anywhere in the scope. so you could write
+> 
+> ```
+> const { _ } = whatever;
+> console.log(_)
+> ```
+> and
+> ```
+> const { _ } = whatever;
+> const { x: _ } = foo;
+> ```
+> but not
+> ```
+> const { _ } = whatever;
+> console.log(_)
+> const { x: _ } = foo;
+> ```
+
+Also note that already today adding the third line here makes the code an error, it's not something new
+
+[03:41:41.0648] <rbuckton>
+> <@nicolo-ribaudo:matrix.org> Also note that already today adding the third line here makes the code an error, it's not something new
+
+Not when you use `var`
+
+[04:46:43.0737] <nicolo-ribaudo>
+I would assume we don't change the behaviour of var
+
+[04:46:54.0887] <nicolo-ribaudo>
+var already allows assigning to `_` as much as I want
+
+[04:47:09.0389] <nicolo-ribaudo>
+The problems are let/const and strict function parameters
+
+[05:43:18.0764] <rbuckton>
+Using `_` as a discard in `var` would not be a discard. It would not have the safety guarantees we're discussing. If you have existing code that uses a `var _` and a reference to `_`, adding new code with `_` as a discard would not result in an early error and would cause that code to reference the wrong value. 
+
+[07:40:40.0166] <shu>
+https://arxiv.org/pdf/2403.11919.pdf
+
+[09:11:49.0067] <TabAtkins>
+From the Java proposal:
+> We assume that little if any actively-maintained code uses underscore as a variable name.
+
+lol that doesn't apply to JS
+
+[09:15:01.0350] <Jesse>
+＿ should be safe
+
+[09:16:54.0328] <TabAtkins>
+How is _ safe in a page that uses underscore.js?
+
+[09:27:14.0785] <Chris de Almeida>
+and lodash, for anyone unfamiliar with underscore
+
+[09:27:14.0906] <TabAtkins>
+Ah, and it looks like Java has done the Work to make it safe - Java 8 issued warnings for using _ as an identifier, and 9 made it an error. So the pain is just people who had previously compiled only on Java 7 trying to upgrade to a modern Java.
+
+[09:29:41.0631] <nicolo-ribaudo>
+Well Java introduced it through a breaking change — we wouldn't change the meaning of existing valid code, but just relax some errors 
+
+[09:42:42.0404] <rbuckton>
+> <@jesse:igalia.com> ＿ should be safe
+
+IMO, `__` is worse than `void`. `_` makes sense as it's a single character and has precedence in many languages. `__` feels way more arbitrary
+
+[09:43:00.0102] <littledan>
+I'm pretty sure `__` was joking...
+
+[09:43:13.0241] <rbuckton>
+* IMO, ` __ ` is worse than `void`. `_` makes sense as it's a single character and has precedence in many languages.  feels way more arbitrary
+
+[09:50:08.0319] <Jesse>
+it's a single non-ASCII character
+
+[09:51:37.0391] <ptomato>
+`…`
+
+[09:54:28.0957] <Justin Ridgewell>
+> <@tabatkins:matrix.org> How is _ safe in a page that uses underscore.js?
+
+Because existing code would still work.
+
+[09:55:04.0034] <Justin Ridgewell>
+We don’t need to make `_` invalid, we just need to allow reassignments in _new code_.
+
+[09:55:32.0087] <littledan>
+sure, I guess the principle is that new features should work nicely, when mixed together with existing code
+
+[09:55:41.0940] <littledan>
+(when possible)
+
+[09:56:26.0176] <nicolo-ribaudo>
+We can allow reassigning to all identifiers, moving existing redeclaration errors to errors on reference access
+
+[09:56:46.0056] <nicolo-ribaudo>
+And underscore.js users can use $
+
+[09:56:55.0413] <nicolo-ribaudo>
+And jQuery+underscore can use _$_$_$
+
+[09:57:00.0744] <Justin Ridgewell>
+@bakkot’s idea would work for that. And in cases where it doesn’t renaming a local, lexically-scoped variable is trivial and automatable.
+
+[09:57:49.0819] <Justin Ridgewell>
+* @bakkot’s idea would work for that. And in cases where it causes a conflict, renaming a local, lexically-scoped variable is trivial and automatable.
+
+[09:59:06.0200] <Anthony Bullard>
+Why not something novel like *?  I’m sure there’s a good reason 
+
+[09:59:20.0730] <littledan>
+> <@bakkot:matrix.org> so there are a variety of ways this could work. the simplest backwards-compatible way would be, no changes to any current programs, but it becomes legal to re-declare `_` in the same scope; if you do, any references to `_` within that scope are an error (possibly at parse time).
+
+I believe this is what nicolo-ribaudo has been advocating for
+
+[09:59:33.0501] <nicolo-ribaudo>
+Yes
+
+[09:59:42.0492] <Anthony Bullard>
+I mean `*`
+
+[09:59:59.0043] <nicolo-ribaudo>
+let *= a is already valid
+
+[10:00:14.0636] <Anthony Bullard>
+nicolo-ribaudo: ?
+
+[10:00:37.0151] <nicolo-ribaudo>
+You are multiplying the `let` variable by `a`
+
+[10:00:59.0704] <Anthony Bullard>
+Let is a keyword
+
+[10:02:16.0361] <Anthony Bullard>
+Am I missing something obvious?
+
+[10:02:32.0233] <iain>
+Let is only reserved in strict mode
+
+[10:02:32.0657] <littledan>
+sloppy mode
+
+[10:02:44.0879] <littledan>
+let didn't used to be a keyword; you can still use it as a variable sometimes
+
+[10:03:01.0433] <littledan>
+you can switch into this mode with `eval()`
+
+[10:06:03.0184] <Anthony Bullard>
+I really don’t love void bindings in bare assignments, ie not destructuring 
+
+[10:06:16.0825] <littledan>
+wouldn't it be weird to distinguish them, though?
+
+[10:07:12.0839] <Anthony Bullard>
+Yes but a throwaway binding is meant to throw something away that you have to reference but don’t want to bind in the scope.
+
+[10:07:40.0510] <Anthony Bullard>
+But I’ll concede it’s messy
+
+[10:08:47.0687] <TabAtkins>
+> <@jesse:igalia.com> ＿ should be safe
+
+Man you really gotta make it obvious when you're doing unicode shenanigans (U+ff3f FULLWIDTH LOW LINE, not ASCII underscore) ^_^
+
+[10:10:48.0584] <Anthony Bullard>
+> <@tabatkins:matrix.org> Man you really gotta make it obvious when you're doing unicode shenanigans (U+ff3f FULLWIDTH LOW LINE, not ASCII underscore) ^_^
+
+JavaScript now will begin its APL arc
+
+[10:12:28.0533] <TabAtkins>
+This is why CSS took a (technically non-binding) resolution on itself to limit its built-in syntax to the ASCII range, like a decade ago.
+
+[10:12:42.0970] <TabAtkins>
+(Non-binding because we can always reverse our own resolutions.)
+
+[10:17:41.0879] <Anthony Bullard>
+Honest question:  would it be change the binding rules for an existing (and widely used) identifier, or using a new piece of syntax for this that only works in strict mode?  Is there any precedent for the latter?
+
+[10:18:38.0891] <Anthony Bullard>
+* Honest question: would it be better to change the binding rules for an existing (and widely used) identifier, or using a new piece of syntax for this that only works in strict mode? Is there any precedent for the latter?
+
+[10:27:58.0970] <ljharb>
+My preference is still to use a new piece of syntax. `void` satisfies that and works in sloppy mode too. there's certainly precedent for strict-only syntax as well.
+
+[10:29:08.0020] <bakkot>
+> <@anthonybullard:matrix.org> Honest question: would it be better to change the binding rules for an existing (and widely used) identifier, or using a new piece of syntax for this that only works in strict mode? Is there any precedent for the latter?
+
+that's a matter of opinion, but given that the former would allow us to be consistent what ~every other language does, it seems like the better option by far
+
+[10:32:56.0548] <Anthony Bullard>
+> <@bakkot:matrix.org> that's a matter of opinion, but given that the former would allow us to be consistent what ~every other language does, it seems like the better option by far
+
+I agree with you, and with ljharb as well, somehow at the same time. I think it depends on what our values here are. Consistency with other languages or minimal impact to existing language semantics
+
+[10:54:02.0963] <bakkot>
+I suppose `_` has some awkward interactions when used in assignment position
+
+[10:56:10.0518] <Anthony Bullard>
+I don’t love the keyword void, but that’s just aesthetic mostly. I’d love to have some piece of syntax that could be used with no ambiguity in strict mode
+
+[11:00:40.0079] <nicolo-ribaudo>
+Even in strict mode, `*` (or other operators) don't work in using declarations
+
+[11:00:46.0713] <nicolo-ribaudo>
+`using *= x`
+
+[11:05:24.0200] <Anthony Bullard>
+> <@nicolo-ribaudo:matrix.org> Even in strict mode, `*` (or other operators) don't work in using declarations
+
+Damn you’re right. Is there any symbol that would work?
+
+[11:09:40.0896] <rbuckton>
+> <@anthonybullard:matrix.org> Damn you’re right. Is there any symbol that would work?
+
+Not really. `@` and `#` have alternative semantic meanings (decorators and private names) that make them a bad fit, plus `@` and `#` have already been considered for infix operations in the past, and I'd rather not close off that syntax space just for discards.
+
+[11:10:17.0544] <Anthony Bullard>
+What about ?
+
+[11:11:22.0869] <rbuckton>
+`?` is proposed as a special token for partial application, and had already had feedback bout "too much `?`" considering conditionals, optional chaining, null coalesce, and null coalesce assignment.
+
+[11:12:01.0963] <Anthony Bullard>
+It’s use in partial application is what made my think of it
+
+[11:12:57.0820] <rbuckton>
+I've also proposed using `~` as part of partial application since one of the other concerns was the need for a token to opt-in to the behavior, so `foo~(1, ?, 2)` as a partial application of `foo` that supplies the first and third argument with a placeholder for the 2nd argument.
+
+[11:14:13.0974] <Anthony Bullard>
+> <@rbuckton:matrix.org> I've also proposed using `~` as part of partial application since one of the other concerns was the need for a token to opt-in to the behavior, so `foo~(1, ?, 2)` as a partial application of `foo` that supplies the first and third argument with a placeholder for the 2nd argument.
+
+This example showed me maybe partial application is a bad idea in JS, as much as I love it in FP languages
+
+[11:14:18.0567] <rbuckton>
+I don't think any other ASCII symbols that are generally available on most keyboards match the semantic behavior of a discard.
+
+[11:15:08.0672] <rbuckton>
+> <@anthonybullard:matrix.org> This example showed me maybe partial application is a bad idea in JS, as much as I love it in FP languages
+
+That's a fairly weak example. Considering how often it's used in Ramda and other FP libraries, I think its extremely valuable.
+
+[11:15:10.0820] <Anthony Bullard>
+We are just running out of concise syntax 
+
+[11:15:42.0674] <rbuckton>
+We've already run out of concise syntax. One of the blockers for pipeline has been picking a topic token.
+
+[11:16:40.0134] <Anthony Bullard>
+> <@rbuckton:matrix.org> We've already run out of concise syntax. One of the blockers for pipeline has been picking a topic token.
+
+Pipeline works best when a language grows around the semantics of either data first or data last matching the operator semantics
+
+[11:16:44.0244] <rbuckton>
+I'll admit, I'm still partial to F#-style pipes and papp without the `~`, regardless the direction the pipeline proposal took.
+
+[11:18:16.0713] <Anthony Bullard>
+? Being a operator that in an expression context meaning “something referred to but not bound” is somewhat elegant on its own
+
+[11:18:17.0905] <rbuckton>
+Two of biggest FP-ish libraries use opposite positions (lodash and underscore are data-first, Ramda is data-last). The benefit of papp was that you didn't have to "pick a winner"
+
+[11:18:52.0170] <Anthony Bullard>
+Not operator, but syntactic construct
+
+[11:19:10.0609] <rbuckton>
+You can't have `?` stand on its own in a given expression without some kind of boundary. For papp, I wanted that boundary to be _Arguments_
+
+[11:20:05.0673] <rbuckton>
+So, `add(1, ?)` would have been fine, but `add(1, { option: ? })` would not, because it goes from being an _Argument placeholder t
+
+[11:20:18.0317] <rbuckton>
+ * So, `add(1, ?)` would have been fine, but `add(1, { option: ? })` would not, because it goes from being an _Argument_ placeholder to being an arbitrary expression.
+
+[11:20:45.0027] <Anthony Bullard>
+The boundaries could be:
+- assignment
+- array element in destructuring 
+- object value in destructuring 
+- arguments in Papp
+
+[11:21:08.0999] <rbuckton>
+I'm not sure I understand what you mean by the first three.
+
+[11:21:15.0707] <Anthony Bullard>
+Lhs
+
+[11:21:31.0211] <rbuckton>
+I mean, what would `? = x` even mean?
+
+[11:22:16.0024] <Anthony Bullard>
+I’m not sure, but above it was communicated that there is a desire to have a discard token be the same in destructuring and bare assignment 
+
+[11:22:47.0198] <Anthony Bullard>
+The use case for the latter is unclear to me
+
+[11:24:04.0459] <rbuckton>
+For discards, `void = x` is currently disallowed because it is meaningless.
+
+[11:24:22.0312] <Anthony Bullard>
+`let ? = X` is weird for sure
+
+[11:24:33.0620] <Anthony Bullard>
+So drop that
+
+[11:25:00.0089] <Anthony Bullard>
+And leave it to array and object destructuring and Papp arguments
+
+[11:25:53.0478] <Anthony Bullard>
+Maybe I should be having this discussion in public on the proposal?
+
+[11:26:15.0228] <rbuckton>
+Also true. In the proposal it is only present for two reasons:
+1. consistency with `using`
+2. avoiding comma expressions in cases like `const a = x(), b = (y(), z())` (more of a benefit for transpilers than developers)
+
+Both are very weak reasons.
+
+[11:26:20.0067] <rbuckton>
+This was discussed in the last plenary.
+
+[11:26:37.0795] <rbuckton>
+I just haven't had time to update the proposal explainer with those outcomes yet.
+
+[11:27:09.0224] <rbuckton>
+It's also already mentioned here: https://github.com/tc39/proposal-discard-binding/issues/1
+
+[11:27:22.0501] <Anthony Bullard>
+> <@rbuckton:matrix.org> This was discussed in the last plenary.
+
+Unfortunately, despite my company hosting it I didn’t have budget to make the last plenary so I’m a little behind 
+
+[11:33:57.0432] <Jack Works>
+some language repurpose identifiers as special things. that's good, but I don't think we have that tradition in js.
+by "repurpose identifiers as special things" I mean new things are using slightly different visual feelings in the common use cases. e.g. "var yield = f()" and "yield x + y" don't feel the same. (I know there are cases that are valid in both interpretations like yield[expr] so it's up to syntax parameters)
+
+repurposing _ is not what we do to the yield and await. The new use case of _ looks very similar to the old one (old "_.add()" new "_ = x") so I don't think it's a good addition 
+
+[11:36:14.0097] <rbuckton>
+On the papp/pipeline side, I still think F# pipes and papp would have been far more likely to get to stage 2 as they were general purpose capabilities that dovetailed. F#'s style biggest drawbacks were how to handle `yield` and `await`, and a push to allow you to do general operations against the topic (i.e., `x |> _ + _`). For F#-style `await` was solvable, and I don't think `yield` was all that important (i.e., you could still write `(yield x |> F) |> G`). I also think the overwhelming majority case for pipelining was writing expressions in arrow functions, not immediately on the right side of the pipe:
+```
+// most likely use
+ar |> filter(?, x => x > 1)
+   |> map(?, x => x * 2)
+```
+I just don't see `y = x |> _ + _` as all that valuable, especially since you can already use `,` for that today with no new syntax.
+```js
+var _;
+y = (_ = x,
+    _ = _ + _);
+```
+
+[11:36:28.0212] <Anthony Bullard>
+Definitely, but if we can find a symbol that’s not used in identifiers that in a context would be unambiguous and could be used for discard AND Papp topic token that would be a win in my eyes
+
+[11:37:41.0303] <Anthony Bullard>
+> <@rbuckton:matrix.org> On the papp/pipeline side, I still think F# pipes and papp would have been far more likely to get to stage 2 as they were general purpose capabilities that dovetailed. F#'s style biggest drawbacks were how to handle `yield` and `await`, and a push to allow you to do general operations against the topic (i.e., `x |> _ + _`). For F#-style `await` was solvable, and I don't think `yield` was all that important (i.e., you could still write `(yield x |> F) |> G`). I also think the overwhelming majority case for pipelining was writing expressions in arrow functions, not immediately on the right side of the pipe:
+> ```
+> // most likely use
+> ar |> filter(?, x => x > 1)
+>    |> map(?, x => x * 2)
+> ```
+> I just don't see `y = x |> _ + _` as all that valuable, especially since you can already use `,` for that today with no new syntax.
+> ```js
+> var _;
+> y = (_ = x,
+>     _ = _ + _);
+> ```
+
+You have not encountered enough point free F# people 😂
+
+[11:38:45.0301] <Anthony Bullard>
+Though they also are creating their own operators too
+
+[11:40:09.0694] <rbuckton>
+I don't think using the same token for discard and papp is a good idea. In the pattern matching space, I've been considering how partial application could allow you to supply arguments to a custom matcher:
+
+```
+match (x) {
+  when NodeMatcher~(SyntaxKind.Identifier, ?)({ let pos, let end }): ...;
+}
+```
+as a way to synthesize an extractor in-place as opposed to
+```
+const identifierMatcher = _ => NodeMatcher(SyntaxKind.Identifier, _);
+match x {
+  when identifierMatcher({ let pos, let end }): ... ;
+}
+```
+
+[11:41:33.0149] <rbuckton>
+> <@anthonybullard:matrix.org> You have not encountered enough point free F# people 😂
+
+There was a tremendous amount of very vocal frustration in the RxJS community that pipeline did not use F# style.
+
+[11:42:13.0470] <rbuckton>
+> <@rbuckton:matrix.org> I don't think using the same token for discard and papp is a good idea. In the pattern matching space, I've been considering how partial application could allow you to supply arguments to a custom matcher:
+> 
+> ```
+> match (x) {
+>   when NodeMatcher~(SyntaxKind.Identifier, ?)({ let pos, let end }): ...;
+> }
+> ```
+> as a way to synthesize an extractor in-place as opposed to
+> ```
+> const identifierMatcher = _ => NodeMatcher(SyntaxKind.Identifier, _);
+> match x {
+>   when identifierMatcher({ let pos, let end }): ... ;
+> }
+> ```
+
+Yes, it's not pretty, but I'm still thinking about how they would work together.
+
+[11:42:26.0194] <Anthony Bullard>
+> <@rbuckton:matrix.org> There was a tremendous amount of very vocal frustration in the RxJS community that pipeline did not use F# style.
+
+Today I learned that RxJS community still exists.  No shade, just didn't realize that
+
+[11:43:39.0422] <rbuckton>
+It's still very popular and heavily used in React projects. Rx's Observable has already been a proposal to TC39 (which stalled), and is now a proposal in WHATWG
+
+[11:44:19.0726] <bakkot>
+(though the WHATWG one is substantially pared down, which is good)
+
+[11:44:31.0335] <Anthony Bullard>
+> <@rbuckton:matrix.org> I don't think using the same token for discard and papp is a good idea. In the pattern matching space, I've been considering how partial application could allow you to supply arguments to a custom matcher:
+> 
+> ```
+> match (x) {
+>   when NodeMatcher~(SyntaxKind.Identifier, ?)({ let pos, let end }): ...;
+> }
+> ```
+> as a way to synthesize an extractor in-place as opposed to
+> ```
+> const identifierMatcher = _ => NodeMatcher(SyntaxKind.Identifier, _);
+> match x {
+>   when identifierMatcher({ let pos, let end }): ... ;
+> }
+> ```
+
+These are done different, so I don't know if this is a good comparison.  I really don't see the difference :
+
+```
+const identifierMatcher = _ => NodeMatcher(SyntaxKind.Identifier, ?);
+match x {
+  when identifierMatcher({ let pos, let end }): ... ;
+}
+```
+
+[11:45:00.0215] <rbuckton>
+That would have been `const identifierMatcher = NodeMatcher(SyntaxKind.Identifier, ?)`
+
+[11:45:29.0087] <Anthony Bullard>
+> <@rbuckton:matrix.org> It's still very popular and heavily used in React projects. Rx's Observable has already been a proposal to TC39 (which stalled), and is now a proposal in WHATWG
+
+Give me a standard library before Observables.  I'm actually going to start saying that in reference to every new API at this point
+
+[11:45:44.0673] <rbuckton>
+the issue is that if `?` is both a placeholder and a discard, parsing `when F(?)` isn't obvious to either the spec or the reader of code.
+
+[11:45:50.0953] <Anthony Bullard>
+> <@rbuckton:matrix.org> That would have been `const identifierMatcher = NodeMatcher(SyntaxKind.Identifier, ?)`
+
+Oh yeah, sure
+
+[11:47:00.0493] <rbuckton>
+`when F(?)(?):` would be a partial application to a destructured void binding. But you don't need to destructure a match, so `when F(?)` is now ambiguous as to whether I'm matching the subject against a partial application of `F` or against `F`'s custom matcher.
+
+[11:47:29.0627] <Anthony Bullard>
+Yeah, with the expanded destructuring proposals, it does have problems
+
+[11:47:49.0487] <rbuckton>
+So discards and papp cannot share a sigil
+
+[11:48:30.0699] <Anthony Bullard>
+And papp cannot use _ right, since that is a valid identifier
+
+[11:48:43.0030] <rbuckton>
+Yes. Papp definitely can't use `_`.
+
+[11:48:47.0716] <Anthony Bullard>
+In case I want to supply lodash to my partially applied function
+
+[11:48:55.0633] <rbuckton>
+`a(_)` is legal JS, we can't change it's meaning.
+
+[11:50:01.0828] <rbuckton>
+whereas `const [_, _, x] = ar` is not legal thus we are not changing its meaning. 
+
+[11:53:16.0008] <rbuckton>
+The only place using `_` as a discard would change the meaning of legal JS is if it is used with `var`. 
+
+[11:53:41.0105] <Anthony Bullard>
+So just to recap this long convo, is ? as a replacement for void in your proposal (and that alone) a live option?
+
+
+[11:53:52.0145] <rbuckton>
+No, I don't believe it is.
+
+[11:54:18.0237] <Anthony Bullard>
+> <@rbuckton:matrix.org> No, I don't believe it is.
+
+In the sense of it hasn't been formally proposed, it won't work, or you don't like it ;-)
+
+[11:54:24.0400] <rbuckton>
+I also don't believe `@`, `#`, or `~` are viable options a well.
+
+[11:55:25.0863] <rbuckton>
+It would seriously conflict with an existing proposal at stage 1 and leave that proposal with no viable way forward, whereas we could choose to continue with `void` or find a way to make `_` work and not conflict.
+
+[11:55:50.0346] <Anthony Bullard>
+Sorry, what proposal?
+
+[11:55:57.0367] <rbuckton>
+Partial application.
+
+[11:56:17.0277] <rbuckton>
+I am still planning to come back to partial application, it has just been far down on my list of priorities.
+
+[11:58:25.0084] <rbuckton>
+I also don't think `?` has a semantic meaning of "discarding something". It generally has a semantic meaning of "asking something": "what do I do if `x` is truthy?" (conditional), "is this value null or undefined?" (optional chaining, null coalesce), or "what else do you need to tell me?" (partial application)
+
+[11:58:49.0090] <bakkot>
+> <@anthonybullard:matrix.org> Give me a standard library before Observables.  I'm actually going to start saying that in reference to every new API at this point
+
+I don't know what this means. Observables would be part of a standard library.
+
+[11:59:04.0856] <rbuckton>
+Discarding things in JS is either through `void` (as a syntactic feature of the language), or through `_` (on its own or as a prefix, by convention).
+
+[12:02:00.0716] <rbuckton>
+Observables and cancellation really should have stayed in TC39. They're core language capabilities that are not specific to the web platform, and it's unfortunate the ecosystem had to adopt whole chunks of the DOM into non-DOM runtimes just to support code sharing and interop.
+
+[12:03:30.0105] <rbuckton>
+Observables/signals/events/etc. JS could really use a standardized event subscription mechanism, and the closest we got was `Promise`.
+
+[12:04:10.0391] <Anthony Bullard>
+> <@rbuckton:matrix.org> Discarding things in JS is either through `void` (as a syntactic feature of the language), or through `_` (on its own or as a prefix, by convention).
+
+Cool, thanks for the conversation.  I learned a lot
+
+[12:04:17.0806] <rbuckton>
+And we were quick enough to adopt it before the DOM moved ahead with `Future`, otherwise we would not have anywhere near the flexibility of `async`/`await` in the language.
+
+[12:04:33.0697] <rbuckton>
+ * And we were quick enough to adopt it before WHATWG moved ahead with `Future`, otherwise we would not have anywhere near the flexibility of `async`/`await` in the language.
+
+
+2024-03-22
+[04:00:56.0355] <ryzokuken>
+something i know might help a bunch of folks here: https://github.com/element-hq/element-meta/issues/1090#issuecomment-2010330567
+
+[04:01:26.0729] <ryzokuken>
+plus the latest version of element nightly put in (atleast a) minor redesign so it looks and feels better too
+
+[08:38:18.0270] <dminor>
+Just a quick reminder for anyone interested in speaking at the standards session at Future Frontend the day after the Helsinki TC39, that if you haven't already, please get in touch with me with your proposed topic so I can pass them along to the conference organizers. I'll be speaking with them again next week.
+
+[10:15:27.0474] <bakkot>
+one week to get topics on the agenda
+
+[10:15:30.0684] <bakkot>
+it is extremely light so far
+
+[10:18:45.0440] <Michael Ficarra>
+one week to get *stage advancement* topics on the agenda
+
+[10:19:10.0118] <Michael Ficarra>
+other topics can still be added any time up until the agenda approval at the start of the meeting
+
+[10:55:15.0366] <rbuckton>
+Does esmeta not report line/column information for errors? It's awfully hard to determine where the error is located in such a large file.
+
+[11:37:34.0776] <bakkot>
+it reports the algorithm and step number, I believe
+
+[11:37:39.0195] <bakkot>
+but it can be confusing sometimes
+
+[11:37:46.0880] <bakkot>
+also sometimes it has bugs
+
+[11:37:56.0255] <bakkot>
+feel free to ignore it for now if you'd like and the editors can look into it
+
+[11:59:55.0623] <Justin Ridgewell>
+> <@usharma:igalia.com> something i know might help a bunch of folks here: https://github.com/element-hq/element-meta/issues/1090#issuecomment-2010330567
+
+I gave up and tried [Cinny app](https://github.com/cinnyapp/cinny-desktop) instead, and it’s pretty good
+
+[12:00:44.0174] <ryzokuken>
+Tauri based!? I had missed it somehow, will try it out soon, thanks!
+
+[12:04:55.0671] <nicolo-ribaudo>
+I wish it had a screenshot in the readme
+
+[12:06:11.0654] <nicolo-ribaudo>
+Ohh it's nice
+
+[12:07:01.0587] <nicolo-ribaudo>
+And it also has a web client https://app.cinny.in/
+
+[12:07:05.0965] <nicolo-ribaudo>
+It's very nice
+
+[13:08:18.0901] <ljharb>
+trying it now; so many things are still marked unread :-/
+
+[13:09:25.0572] <ljharb>
+ * trying it now; so many things are still marked unread :-/ seems nice to far tho
+
+[13:38:56.0257] <Michael Ficarra>
+cool technology we've got here
+
+[13:49:36.0606] <ljharb>
+for that you have to open your session on element and find sessions in settings, and start verification, so you can sync your keys to the new client
+
+[13:49:47.0359] <ljharb>
+see, isn't this so much more user-friendly than irc?
+
+[13:56:07.0769] <Anthony Bullard>
+Why didn’t we just use an open source normal chat client like Mattermost?  I wasn’t here when the move to Matrix happened.  I really want to like Matrix, but all of the clients have many problems.
+
+[14:29:56.0599] <Justin Ridgewell>
+> <@ljharb:matrix.org> for that you have to open your session on element and find sessions in settings, and start verification, so you can sync your keys to the new client
+
+Matrix’s key syncing is crap
+
+[14:33:14.0452] <ljharb>
+it's very important we all encrypt our super secret spec discussions
+
+[14:33:26.0257] <ljharb>
+wouldn't want anyone hacking us and finding out about proposals
+
+[14:35:41.0281] <bakkot>
+I have literally never heard of mattermost so probably that's why
+
+[14:37:14.0218] <Anthony Bullard>
+> <@bakkot:matrix.org> I have literally never heard of mattermost so probably that's why
+
+Oh it’s pretty nice. Just a single Go binary and a Postgres database and you are good to go. Web, Desktop, and Mobile apps
+
+[14:37:26.0300] <bakkot>
+oh we'd have to host it ourselves?
+
+[14:37:29.0141] <bakkot>
+presumably that's why then
+
+[14:37:37.0802] <Anthony Bullard>
+> <@bakkot:matrix.org> oh we'd have to host it ourselves?
+
+They have cloud hosted
+
+[14:38:40.0027] <Anthony Bullard>
+Figured ownership might be a benefit to us, but they have options. Might even be open to a discount for an open source / standards org (I don’t speak for them in anyway)
+
+[14:38:43.0314] <bakkot>
+looks like it's $10/user/month? that's also not gonna be feasible
+
+[14:39:26.0017] <Anthony Bullard>
+That’s commercial rate, but hey it’s just another option to consider exploring
+
+[14:42:11.0803] <Chris de Almeida>
+> <@anthonybullard:matrix.org> Why didn’t we just use an open source normal chat client like Mattermost?  I wasn’t here when the move to Matrix happened.  I really want to like Matrix, but all of the clients have many problems.
+
+aside from the stuck notifications (which has largely improved), what other problems have you observed with Element?
+
+[14:42:43.0527] <bakkot>
+the "unable to decrypt message" thing Michael shows above has happened to me a few times also
+
+[14:44:06.0933] <Chris de Almeida>
+> <@bakkot:matrix.org> the "unable to decrypt message" thing Michael shows above has happened to me a few times also
+
+I've run into this as well, but can't remember if it happened to me except on new clients/logins
+
+[14:44:30.0347] <Anthony Bullard>
+> <@softwarechris:matrix.org> aside from the stuck notifications (which has largely improved), what other problems have you observed with Element?
+
+I get crazy sync issues. Sometimes entire parts of the channel history disappear completely
+
+[14:44:49.0740] <Chris de Almeida>
+> <@anthonybullard:matrix.org> I get crazy sync issues. Sometimes entire parts of the channel history disappear completely
+
+which client are you using?
+
+[14:45:19.0345] <Chris de Almeida>
+web, desktop, os, etc
+
+[14:45:25.0595] <Anthony Bullard>
+Case in point
+
+[14:45:43.0026] <Chris de Almeida>
+whoa
+
+[14:45:49.0349] <Anthony Bullard>
+Mobile is the worst, and the one I use the most
+
+[14:46:36.0479] <Anthony Bullard>
+I don’t know if I’ll ever see that convo I had with @bakkot again
+
+[14:46:51.0915] <Chris de Almeida>
+well I haven't seen that, but WOMM is a scarcely a comfort
+
+[14:48:17.0916] <Anthony Bullard>
+I’d show you my new state, but the mobile app won’t let me give it access to the new screenshot
+
+[14:49:19.0161] <Anthony Bullard>
+Not the biggest deal, but definitely is concerning if this happens a lot. I take solace in thinking that it’s probably _eventually_ consistent
+
+[14:49:43.0323] <Anthony Bullard>
+And all of the conversations are actually persisted 
+
