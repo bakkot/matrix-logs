@@ -64,3 +64,413 @@ I've posted a PR for the initial spec text for Extractors for possible advanceme
 [09:50:15.0711] <rbuckton>
 In addition, my slides are here if anyone would like to review: https://1drv.ms/p/s!AjgWTO11Fk-TkqpinLRBZZwud0rM9w?e=s7hKoI
 
+[10:20:06.0758] <Jack Works>
+I have a question 
+
+[10:22:50.0251] <Jack Works>
+Does the extractor proposal encourage this? A custom matcher coerces the subject. Example: 
+const date(yyyy, mm, dd) = 123456789
+
+[10:23:51.0119] <Jack Works>
+this is something we don't do in the built-in matchers, which means it is somehow a style we are encouraged for, only test and extract things you own, not something smart
+
+[10:25:51.0697] <Jack Works>
+if we do something smart (in the pattern matching), things might go like this:
+when JSON.parse({ x: 1 }) can match the corresponding JSON string and also in the extractor proposal 
+const JSON.parse({ x: 1 }) = localStorage.get(...)
+
+[10:26:13.0300] <Jack Works>
+* if we do something smart (in the pattern matching), things might go like this:
+when JSON.parse({ x: 1 }) can match the corresponding JSON string and also in the extractor proposal 
+const JSON.parse({ x }) = localStorage.get(...)
+
+[10:28:32.0046] <rbuckton>
+In general you want an extractor to be the inverse of construction, but Scala (which is the inspiration for this design) explicitly calls out use cases like that.
+
+[10:30:10.0027] <rbuckton>
+I would say, it's acceptable for users to write user-defined extractors for this purpose, but built-ins generally shouldn't. With the exception being something like `RegExp` instances, since that is a convenient mechanism to explain how RegExp patterns in pattern matching work, and to allow users to decompose a regexp match pattern into a reusable regexp.
+
+[10:33:02.0695] <rbuckton>
+> <@jackworks:matrix.org> if we do something smart (in the pattern matching), things might go like this:
+> when JSON.parse({ x: 1 }) can match the corresponding JSON string and also in the extractor proposal 
+> const JSON.parse({ x }) = localStorage.get(...)
+
+While this is feasible, I'd caution against doing something like this for `JSON.parse` as a string can be an arbitrarily large JSON object from which you only intend to extract a fragment, so it has a fairly sizable hidden cost.
+
+[10:33:20.0207] <Jack Works>
+I wonder if there is any style inconsistency that lives behind, that pattern matching encourages people to write dumb matchers and extractors encourage them to write smart ones.
+
+[10:33:38.0244] <Jack Works>
+(and they use the same symbol)
+
+[10:34:49.0196] <rbuckton>
+If we had a SAX-like streaming parser for JSON and the matcher had full knowledge of the nested destructuring graph, maybe it would be possible to implement something efficient.
+
+[10:35:43.0476] <rbuckton>
+Considering I'm as likely to use extractors for the same reasons in both cases, I don't see a difference between the two.
+
+[10:35:44.0680] <ljharb>
+wait, why would pattern matching encourage people to write dumb matchers?
+
+[10:37:32.0786] <rbuckton>
+Though I still don't find the predicate-function capability quite as important. I wonder if it would make sense to only allow predicates in `x is y`, and not `x is y(z)` 
+
+[10:37:39.0019] <Jack Works>
+I don't know, maybe because how built-in acts
+
+[10:37:39.0616] <Jack Works>
+just my personal feeling 
+
+[10:39:04.0210] <rbuckton>
+If and when ADT enums become a thing, and even before that, the 95% use case will be inversion of construction, i.e. `Point(let x, let y) = new Point(x, y)`. Just like the 95% use case of `yield` and `yield*` is for iteration, not coroutine-like generators.
+
+[10:39:21.0218] <ljharb>
+> <@jackworks:matrix.org> just my personal feeling
+
+that's fine but i still don't understand it, can you elaborate?
+
+[10:39:44.0787] <ljharb>
+> <@rbuckton:matrix.org> Though I still don't find the predicate-function capability quite as important. I wonder if it would make sense to only allow predicates in `x is y`, and not `x is y(z)`
+
+to me, the predicate function use case will be the vast majority of pattern matching's usage, even over time
+
+[10:40:29.0335] <ljharb>
+but i operate in a subset of the JS ecosystem that basically doesn't use `class` at all
+
+[10:40:43.0783] <ljharb>
+ * but i operate in a subset of the JS ecosystem that basically doesn't use `class` or `new` at all outside of builtins
+
+[10:40:56.0491] <rbuckton>
+I just don't see it. Maybe for a while, but pattern matching leads developers towards a certain style of development that tends to favor instances (or tags) and structure.
+
+[10:41:33.0995] <ljharb>
+structure certainly. instances, i'm skeptical.
+
+[10:43:09.0006] <Jack Works>
+> <@ljharb:matrix.org> that's fine but i still don't understand it, can you elaborate?
+
+think for a while, this comes from my experience of crafting smart ones as built-in being rejected by the group but smart style appears in introduction of extractors
+
+[10:43:35.0418] <ljharb>
+hm, maybe the criteria for your "smart" isn't clear to me
+
+[10:43:49.0797] <rbuckton>
+I'm still working out a fresh design for ADT enums. I think that if I can work out the performance characteristics of ADT enums with implementations to everyone's satisfaction, there's a huge opportunity for ADT enums to gain significant traction.
+
+[10:44:02.0045] <ljharb>
+(but certainly i think matchers should avoid being overtly clever. cleverness is an antipattern)
+
+[10:44:42.0487] <rbuckton>
+And ADT enums are strongly tied to both instance and structure, since instance is the part of the enum domain that I'm hoping will give it the performance characteristics necessary to be worthwhile.
+
+[10:45:09.0940] <ljharb>
+almost all of my enum use cases would not involve a class
+
+[10:45:50.0894] <rbuckton>
+if you are talking about number or symbol-valued enums, that's not the focus.
+
+[10:46:17.0218] <ljharb>
+yes, that's the primary use case for enums imo and ime, and i'm not yet motivated by other ones
+
+[10:46:21.0293] <rbuckton>
+Yes, they need to be supported, but the benefit of ADT enums is actually how engines can optimize for them vs. regular objects.
+
+[10:46:21.0620] <Jack Works>
+> <@ljharb:matrix.org> hm, maybe the criteria for your "smart" isn't clear to me
+
+accepts non instances and even primitives. extract/normalize data from it. like json.parse
+
+[10:46:51.0262] <ljharb>
+something that does what your JSON.parse matcher did seems useful; using JSON.parse for it to me seems overly clever.
+
+[10:47:08.0649] <rbuckton>
+By having a closed domain of type identities associated with enum values, a specific class of inline cache can be used that avoids megamorphism when branching on the type of an enum value.
+
+[10:47:30.0900] <ljharb>
+that sounds like a very niche performance need that most practitioners won
+
+[10:47:35.0387] <ljharb>
+ * that sounds like a very niche performance need that most practitioners won't care or think about
+
+[10:47:53.0210] <rbuckton>
+i.e., if you take TypeScript's AST for example, every `node.kind` is megamorphic, while individual branches are ideally monomorphic.
+
+[10:47:53.0347] <ljharb>
+ * that sounds like a very niche performance need that most practitioners won't care or think about (which doesn't make it unimportant, but does mean it wouldn't achieve much dev traction)
+
+[10:48:45.0086] <rbuckton>
+> <@ljharb:matrix.org> that sounds like a very niche performance need that most practitioners won't care or think about (which doesn't make it unimportant, but does mean it wouldn't achieve much dev traction)
+
+I completely disagree. ADT enums have many of the characteristics that Shu also wants for `struct`. Fixed object layout is extremely important for engines, and you can't guarantee that with a regular Object.
+
+[10:48:55.0282] <ljharb>
+structs are also incredibly niche
+
+[10:49:08.0517] <ljharb>
+the majority of devs won't ever use structs directly or think about them.
+
+[10:49:29.0884] <ljharb>
+certainly the engine, and things like TS or other libraries, can benefit, which is why it's still worth spending time on it
+
+[10:49:33.0821] <rbuckton>
+I think the opposite would be true for ADT enums.
+
+[10:49:57.0333] <Jack Works>
+> <@rbuckton:matrix.org> i.e., if you take TypeScript's AST for example, every `node.kind` is megamorphic, while individual branches are ideally monomorphic.
+
+you should not explain from a performance perspective. even normal programming need to write adt a lot. no syntax sugar for this wastes a lot of time to define data structures 
+
+[10:50:00.0377] <ljharb>
+i would be very surprised if non-primitive enums were ever adopted at scale.
+
+[10:50:12.0265] <ljharb>
+ * i would be very surprised if non-primitive enums were ever adopted at scale. (primitive enums, most certainly will be)
+
+[10:50:36.0189] <rbuckton>
+Structs are niche, but would have an outsized impact on the ecosystem as they're most likely to be used by major applications with broad reach (Google Docs, Office 365, etc.)
+
+[10:50:55.0809] <ljharb>
+right - i'm not disputing that anything that makes major apps/tools faster has a large impact
+
+[10:50:58.0551] <rbuckton>
+ADT enums are likely to be used by everyone as a convenient way to model related information.
+
+[10:51:03.0301] <ljharb>
+but that's a different claim than "developers will use this"
+
+[10:51:15.0165] <ljharb>
+ * but that's a different claim than "developers will use this directly"
+
+[10:51:44.0642] <ljharb>
+i look forward to an ADT enum presentation that helps me understand why it's a thing anyone should care about - i haven't understood that yet.
+
+[10:52:35.0834] <ljharb>
+ * i look forward to an ADT enum presentation that helps me understand why it's a thing anyone should care about - i haven't understood that yet.
+
+(i've long believed primitive enums are a thing everyone wants)
+
+[10:52:41.0336] <rbuckton>
+Developers already use similar mechanisms (i.e., discriminated unions), but they constantly suffer from the performance bottleneck of megamorphic ICs. If ADT enums can avoid that bottleneck, they're very likely to gain adoption.
+
+[10:55:23.0125] <rbuckton>
+The pushback I usually get on primitive enums, is that the same thing can be accomplished via an object literal. My original enum proposal has long had value-adds far above the object literal case, but ADT enums are a whole world unto themselves as far as new capabilities.
+
+[10:55:29.0084] <rbuckton>
+ * The pushback I usually get on primitive enums is that the same thing can be accomplished via an object literal. My original enum proposal has long had value-adds far above the object literal case, but ADT enums are a whole world unto themselves as far as new capabilities.
+
+[10:55:56.0050] <rbuckton>
+With an object literal, the engine has to treat every access as a property access, there's no special casing that can go on there.
+
+[10:56:01.0423] <ljharb>
+right - a net new mental model is something that will be difficult to impart to devs, i think.
+
+[10:56:59.0484] <rbuckton>
+With an `enum` that has a well-defined, immutable domain, then engines can use that type feedback to introduce specific optimizations that aren't otherwise possible.
+
+[10:57:03.0739] <ljharb>
+ * right - a net new mental model is something that will be difficult to impart to devs, i think. (also i have zero grasp of it so far)
+
+[10:57:53.0598] <rbuckton>
+ * With an `enum` that has a well-defined, immutable domain, engines can use that type feedback to introduce specific optimizations that aren't otherwise possible.
+
+[10:59:45.0952] <Jack Works>
+> <@ljharb:matrix.org> but that's a different claim than "developers will use this directly"
+
+I don't care about the performance though. ADT enum can improve many people shape their program, how they represent data structures in their code. so yes. they'll use this feature directly especially typescript users.
+
+[11:00:45.0276] <rbuckton>
+For instance
+```
+enum Option {
+  Some(value),
+  None
+}
+
+match (opt) {
+  when Option.Some(let x): ...;
+  when Option.None: ...;
+}
+```
+An implementation could use type feedback from `opt` and `Option` to optimize away the extractor implementation and destructuring overhead to reach directly into the object, but only because `Option` has a well-defined domain that `opt` can belong to. That requires statically analyzable syntax to know how that would differ from a regular-old JS object.
+
+[11:06:19.0376] <rbuckton>
+You could imagine `opt` has an _internal_ representation analogous to `map { enumType: Option, member: map { enumMember: Option.Some, instance: map { value: ... } } }`, such that each `when` clause starts with a monomorphic IC lookup against `map { enumType: Option, member: heap }`, and the first branch has another monomorphic IC lookup against `map { enumMember: Some, instance: heap }`. By the time you get to the nested pattern you're still essentially on a code path that is entirely monomorphic.
+
+[11:07:23.0299] <rbuckton>
+vs. a flat internal representation of `map { constructor: Option.Some, value: ... }` that differs from `map { constructor: Option.#None }`, which are different maps and thus a polymorphic IC.
+
+[11:10:26.0137] <rbuckton>
+From the JS developers point of view, they just write `when Option.Some(let value)` or `opt.value` and it acts like a normal JS object. This is something that implementers strive for with `class` (and one of the reasons we had to add things like `accessor` to decorators), but it still isn't entirely reliable for `class` due to all of the shenanigans that developer's play with regular objects.
+
+[14:14:12.0504] <ljharb>
+> <@jackworks:matrix.org> I don't care about the performance though. ADT enum can improve many people shape their program, how they represent data structures in their code. so yes. they'll use this feature directly especially typescript users.
+
+i'd love to see some examples that feel javascripty
+
+[14:14:25.0105] <ljharb>
+as much as i actually do like the Option pattern from scala etc, it's not javascripty.
+
+[15:01:37.0245] <rbuckton>
+Pattern matching isn't javascripty. Nothing is javascripty until its in the language. ADT enums *are* javascripty though, as they are readily modeled in JS as discriminated unions or even classes, but without the potential performance benefits.
+
+[15:07:08.0476] <rbuckton>
+If we had them now, I'd model the custom matcher return value using them instead of an iterable.
+```
+enum Match {
+  No = false, // not a match
+  Yes = true, // a match, but no nested result
+  One(value), // a match with a single element, no iteration
+  List(values), // a match with multiple elements, uses iteration
+}
+```
+We already have `No`, `Yes`, and `List` in our current design, but a fast-path for `One()` that skips iteration entirely could be beneficial. Scala has something similar as well, though you use `Option[Seq[T]]` or `unapplySeq` for the sequence case.
+
+[15:41:08.0132] <ljharb>
+> <@rbuckton:matrix.org> Pattern matching isn't javascripty. Nothing is javascripty until its in the language. ADT enums *are* javascripty though, as they are readily modeled in JS as discriminated unions or even classes, but without the potential performance benefits.
+
+plenty of things are javascripty even while not being in the language - idioms exist independent of the language's featureset. also tons of things IN the language are NOT javascripty, like proxy or generators.
+
+
+2024-03-28
+[20:56:20.0502] <Jack Works>
+> <@ljharb:matrix.org> i'd love to see some examples that feel javascripty
+
+I'll show some code I found in our product source. You may argue TypeScript is not javascripty but it's a big part you cannot unsee in the JS community
+
+```js
+type Action =
+    | { type: 'SET_ACCOUNT_TYPE', accountType: BackupAccountType }
+    | { type: 'TO_STEP', step: RestoreStep }
+    | { type: 'SET_EMAIL', form: Partial<RestoreState['emailForm']> }
+    | { type: 'SET_PHONE', form: Partial<RestoreState['phoneForm']> }
+    | { type: 'SET_VALIDATION' }
+    | { type: 'SET_BACKUP_INFO', info: BackupFileInfo }
+    | { type: 'SET_BACKUP_SUMMARY', summary: BackupSummary, backupDecrypted: string }
+    | { type: 'SET_PASSWORD', password: string }
+    | { type: 'SET_LOADING', loading: boolean }
+
+function restoreReducer(state: RestoreState, action: Action) {
+    return produce(state, (draft) => {
+        switch (action.type) {
+            case 'SET_ACCOUNT_TYPE':
+                // ...
+            case 'NEXT_STEP':
+                // ...
+            case 'TO_STEP':
+                // ...
+        }
+    })
+}
+dispatch({ type: 'SET_ACCOUNT_TYPE', accountType: 'email' })
+```
+
+[20:56:42.0934] <Jack Works>
+I wrote this pattern a lot. My co-workers also.
+
+[20:57:05.0370] <ljharb>
+nah TS code isn’t necessarily un-JavaScripty :-) not making that claim.
+
+[20:57:46.0287] <ljharb>
+so, that kind of switch usage is very common. That’s using a tagged union where the tag could be a primitive enum.
+
+[20:58:22.0448] <Jack Works>
+well, the important thing here is that the tag is always bind with a known-shaped structure
+
+[20:59:51.0480] <Jack Works>
+I'll rewrite this code with primitive enum and ADT enum
+
+[21:02:29.0935] <Jack Works>
+Primitive
+
+```js
+enum Action {
+    SET_ACCOUNT_TYPE,
+    TO_STEP,
+    SET_EMAIL,
+    SET_PHONE,
+    SET_VALIDATION,
+    SET_BACKUP_INFO,
+    SET_BACKUP_SUMMARY,
+    SET_PASSWORD,
+    SET_LOADING,
+}
+type Action =
+    | { type: Action.SET_ACCOUNT_TYPE, accountType: BackupAccountType }
+    | { type: Action.TO_STEP, step: RestoreStep }
+    | { type: Action.SET_EMAIL, form: Partial<RestoreState['emailForm']> }
+    | { type: Action.SET_PHONE, form: Partial<RestoreState['phoneForm']> }
+    | { type: Action.SET_VALIDATION }
+    | { type: Action.SET_BACKUP_INFO, info: BackupFileInfo }
+    | { type: Action.SET_BACKUP_SUMMARY, summary: BackupSummary, backupDecrypted: string }
+    | { type: Action.SET_PASSWORD, password: string }
+    | { type: Action.SET_LOADING, loading: boolean }
+
+function restoreReducer(state: RestoreState, action: Action) {
+    return produce(state, (draft) => {
+        match(action) {
+            when { type: Action.SET_ACCOUNT_TYPE, let accountType }: expr,
+            when { type: Action.SET_EMAIL, let form }: expr,
+            when { type: Action.TO_STEP, let step }: expr,
+        }
+    })
+}
+dispatch({ type: 'SET_ACCOUNT_TYPE', accountType: 'email' })
+```
+
+[21:04:53.0906] <Jack Works>
+ADT
+
+```js
+enum Action {
+    SET_ACCOUNT_TYPE(accountType: BackupAccountType),
+    TO_STEP(step: RestoreStep),
+    SET_EMAIL(form: Partial<RestoreState['emailForm']>),
+    SET_PHONE(form: Partial<RestoreState['phoneForm']>),
+    SET_VALIDATION,
+    SET_BACKUP_INFO(info: BackupFileInfo),
+    SET_BACKUP_SUMMARY(summary: BackupSummary, backupDecrypted: string),
+    SET_PASSWORD(password: string),
+    SET_LOADING(loading: boolean),
+}
+
+function restoreReducer(state: RestoreState, action: Action) {
+    return produce(state, (draft) => {
+        match(action) {
+            when Action.SET_ACCOUNT_TYPE(let accountType): expr,
+            when Action.SET_EMAIL(let form): expr,
+            when Action.TO_STEP(let step): expr,
+        }
+    })
+}
+dispatch(Action.SET_ACCOUNT_TYPE('email'))
+```
+
+[21:08:30.0963] <Jack Works>
+adt can reduce a lot of redundant code in this pattern. make code more dense and let people write more semantic code
+
+[21:12:46.0766] <ljharb>
+What about that code requires the enum values to not be strings?
+
+[21:13:43.0226] <Jack Works>
+> <@ljharb:matrix.org> What about that code requires the enum values to not be strings?
+
+sorry can you rephrase? I did not understand the meaning
+
+[21:14:31.0720] <ljharb>
+i mean that seems like a nicer sugar for the non-enum version of the code - where the tags are still strings, just better typed.
+
+[21:16:46.0339] <Jack Works>
+yes, if we remove the typescript part, it looks like just a small syntax sugar (but also with all performance benefits that Ron mentioned)
+
+[21:16:56.0003] <Jack Works>
+with typescript this feature is a huge improve
+
+[21:17:12.0911] <ljharb>
+right, and I’m super on board for that. but i don’t see what “adt” adds there nor why enum values need to be objects
+
+[21:17:48.0553] <ljharb>
+every enum proposal so far has satisfied that code’s need, which is a good thing
+
+[09:44:43.0897] <ljharb>
+(note: there was a typo in the TOC, but then i realized having a TOC is redundant because github auto-makes one on every markdown file, so i removed it)
+

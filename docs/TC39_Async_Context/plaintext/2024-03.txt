@@ -309,3 +309,430 @@ Why don’t you have access to the TC39 calendar?
 [11:56:38.0030] <littledan>
 Anyway more broadly we are hoping to give an update on AsyncContext next TC39 meeting, so that will give you a chance 
 
+
+2024-03-29
+[03:31:16.0454] <Andreu Botella>
+I'm starting to get the feeling that the different use cases for AsyncContext are actually so different that for some things it won't be possible to find a behavior that works for all of them
+
+[03:32:16.0113] <Andreu Botella>
+APMs need different things than something like the `console.log` example would need, which are also different from what task attribution needs
+
+[03:33:28.0277] <Andreu Botella>
+in particular, task attribution doesn't really care about registration, it cares about the event loop task that caused the current event loop task to run
+
+[03:34:01.0878] <Andreu Botella>
+and that doesn't even map to async continuation, it just so happens that for promises, you tend to call `.then` or await them immediately after creating/receiving them
+
+[03:37:19.0205] <Andreu Botella>
+use cases which so far relied on zone.js would want a mostly registration-time context for DOM events, but that doesn't work for APMs
+
+[03:37:28.0418] <Andreu Botella>
+I'm not sure there's a solution
+
+[03:39:01.0596] <Andreu Botella>
+ * APMs need different things than something like the `console.log` server platform example would need, which are also different from what task attribution needs
+
+[03:43:00.0431] <Andreu Botella>
+for events I guess you could opt into some behavior in the event registation, but this also affects observers and generators
+
+[09:38:26.0850] <Chengzhong Wu>
+do you have a concrete case where their needs are divergent?
+
+[09:38:38.0392] <Chengzhong Wu>
+* do you have a concrete case where their needs and definition are divergent?
+
+[09:44:18.0044] <Andreu Botella>
+Well, the various `XMLHttpRequest` events are fired with the context active at the time `send` was called
+
+[09:44:46.0811] <Andreu Botella>
+this is different even from task attribution's behavior with `fetch`, which is at async continuations (equivalent to `addEventListener`)
+
+[09:45:57.0817] <Andreu Botella>
+this is why I suspect that they don't actually need the async continuation behavior, and the context in which `fetch` was called might be better suited for that
+
+[09:46:20.0915] <Andreu Botella>
+but it just happens that most code won't see the difference for promise, whereas it might for events
+
+[09:50:49.0970] <Andreu Botella>
+because events tend to be registered for multiple uses, which increases the likelyhood that the registration has a different context than the immediate async cause
+
+[11:34:09.0963] <Justin Ridgewell>
+So Zone.js uses call time context instead of registration time?
+
+[11:39:15.0929] <Andreu Botella>
+No, Zone.js seems to use registration time for every event
+
+[11:40:02.0512] <Justin Ridgewell>
+Oh, you said task attribution uses registration time
+
+[11:40:18.0519] <Justin Ridgewell>
+* Oh, you said task attribution doesn’t use registration time
+
+[11:40:37.0454] <Andreu Botella>
+If I said so, I meant the opposite
+
+[11:40:52.0991] <Justin Ridgewell>
+> in particular, task attribution doesn't really care about registration, it cares about the event loop task that caused the current event loop task to run
+
+[11:41:10.0000] <Justin Ridgewell>
+Maybe I misunderstand
+
+[11:41:28.0197] <Justin Ridgewell>
+(Or I confused you with my edit)
+
+[11:41:29.0663] <Steve Hicks>
+FWIW, registration time by default makes it a lot harder to maintain the cause's context, whereas cause-by-default can restore registration time with a simple call to wrap.
+
+[11:42:14.0541] <Andreu Botella>
+> <@jridgewell:matrix.org> (Or I confused you with my edit)
+
+That, and I'm currently in the middle of walking my dog 😅
+
+[11:43:37.0441] <Justin Ridgewell>
+So for attribution, if I do `el.addEventListener(‘click’, () => {})`, they want to propagate the context that happens during the trigger?
+
+[11:43:54.0925] <Justin Ridgewell>
+> <@abotella:igalia.com> That, and I'm currently in the middle of walking my dog 😅
+
+SEND PICS PLZ
+
+[11:54:12.0845] <Andreu Botella>
+> <@jridgewell:matrix.org> So for attribution, if I do `el.addEventListener(‘click’, () => {})`, they want to propagate the context that happens during the trigger?
+
+Task attribution doesn't seem to care too much about most events, since it's not something that can be queried by the user. The default is call-time, and that's the case for the click event
+
+[11:55:00.0393] <Andreu Botella>
+So `el.click()` (which fires the event synchronously) uses the call-time event, and clicks coming from the user are fired in the empty context
+
+[11:55:13.0909] <Andreu Botella>
+ * So `el.click()` (which fires the event synchronously) uses the call-time context, and clicks coming from the user are fired in the empty context
+
+[11:55:24.0231] <Andreu Botella>
+> <@jridgewell:matrix.org> So for attribution, if I do `el.addEventListener(‘click’, () => {})`, they want to propagate the context that happens during the trigger?
+
+ * Task attribution doesn't seem to care too much about most events, since it's not something that can be queried by JS code. The default is call-time, and that's the case for the click event
+
+[11:56:31.0654] <Andreu Botella>
+The only things which are registration-time in task attribution are web APIs which schedule a callback: `setTimeout`, `requestAnimationFrame`, `scheduler.postTask`...
+
+[12:05:58.0290] <Justin Ridgewell>
+So a coulple of questions:
+- Is call-time behavior necessary for Task Attribution? (Probably yes?)
+- Do we feel that registration-time is correct for AC? (I think so, but could be persuaded)
+
+[12:06:49.0143] <Justin Ridgewell>
+If we don’t match Task Attribution’s semantics, then we cannot share the same CPED pointer in the job records
+
+[12:07:13.0324] <Justin Ridgewell>
+We’d need to reevaluate our performanc/memory impact since we’d need a new pointer
+
+[12:07:23.0789] <Justin Ridgewell>
+* We’d need to reevaluate our performance/memory impact since we’d need a new pointer.
+
+[12:08:41.0328] <Andreu Botella>
+> <@jridgewell:matrix.org> If we don’t match Task Attribution’s semantics, then we cannot share the same CPED pointer in the job records
+
+It could be shared if the code in Blink that sets the propagation has task attribution in mind, but that would mean turning what would be `AsyncContext.Snapshot.p.run` into an `AsyncContext.Variable.p.run`
+
+[12:08:47.0688] <Andreu Botella>
+which would have memory and performance effects
+
+[12:10:31.0187] <Justin Ridgewell>
+I don’t understand, how would that work?
+
+[12:11:21.0908] <Justin Ridgewell>
+Would the `click()` restore the snapshot, then run a `taskAttribution.run(callTime, …)`?
+
+[12:11:41.0517] <Andreu Botella>
+yeah
+
+[12:12:50.0492] <Justin Ridgewell>
+Ok, that’s not terrible
+
+[12:13:10.0348] <Justin Ridgewell>
+If we had a fixed key slot for attribution, we could make that reasonably fast
+
+[12:13:25.0617] <Justin Ridgewell>
+Instead of storing attribution inside the HAMT with the user variables
+
+[12:14:50.0225] <Andreu Botella>
+> <@jridgewell:matrix.org> So a coulple of questions:
+> - Is call-time behavior necessary for Task Attribution? (Probably yes?)
+> - Do we feel that registration-time is correct for AC? (I think so, but could be persuaded)
+
+about 1, I asked Scott Haseley last week, and these were his initial thoughts
+
+[12:14:56.0675] <Andreu Botella>
+> It might be okay, but I'll need to think about it and discuss with the team -- and some folks are out this week. Initial concerns/uncertainties:
+> - This could impact soft navigation because code running within a soft nav task-attributable task will have a different context, e.g. an event fired within a click or setTimeout. Is this okay (not sure)? Either way it could change reported soft navs, so we'd need to run experiments (assuming the soft nav context isn't automatically plumbed through).
+> - We previously created a new TaskScope for every event/callback, which we changed because of performance issues, so we'd need to be really careful here.
+
+[12:15:39.0607] <Andreu Botella>
+`TaskScope` is the equivalent of a `Variable.p.run`
+
+[12:24:01.0967] <Justin Ridgewell>
+Ok, worse case we could add a host-hook before we set the context when restoring a snapshot
+
+[12:24:20.0491] <Justin Ridgewell>
+That way engines could perform whatever call-time modification they n eed
+
+[12:24:22.0498] <Justin Ridgewell>
+* That way engines could perform whatever call-time modification they need
+
+[12:24:44.0706] <Justin Ridgewell>
+Though now I’m curious when they don’t need a new `TaskScope`
+
+[12:27:22.0334] <Andreu Botella>
+> <@jridgewell:matrix.org> Ok, worse case we could add a host-hook before we set the context when restoring a snapshot
+
+I think the only chance that this might be needed for task attribution is if whatever we end up deciding for generators doesn't end up working for them (which I doubt will happen)
+
+[12:27:44.0226] <Andreu Botella>
+because they're fine with the CPED behavior, and anything else would be Blink calling the V8 embedder API
+
+[12:28:16.0898] <Justin Ridgewell>
+I think the ordering is incorrect, which will require it
+
+[12:28:50.0588] <Justin Ridgewell>
+Actually, no, for regular `addEventListener()` they should be fine
+
+[12:29:11.0237] <Justin Ridgewell>
+I was thinking we did `AC.wrap(listener)` on the V8 side, but we don't
+
+[12:29:37.0737] <Justin Ridgewell>
+But, how would Attribution work when I invoke a `snapshot.run(foo)`?
+
+[12:30:10.0344] <Justin Ridgewell>
+Should the current `TaskScope` be kept, or is it ok to restore the snapshot’s?
+
+[12:31:17.0979] <Andreu Botella>
+When I talked with Yoav Weiss, the conclusion was that it would be fine to restore the snapshot's, because that is already a thing you can do with promises, although it's obviously not as accessible
+
+[12:31:22.0757] <Andreu Botella>
+but I haven't discussed this with Scott
+
+[12:48:51.0280] <Steve Hicks>
+Unrelated (so maybe respond in a thread): have we thought about dynamic import (with top-level `await`)?  In particular, does the imported module run in the context of the importer, or in the root context?
+
+[12:49:46.0502] <Andreu Botella>
+huh, I hadn't thought of that
+
+[12:50:09.0503] <Andreu Botella>
+task attribution does something for script and module evaluation, but I haven't looked at it in any detail
+
+[12:51:52.0668] <Justin Ridgewell>
+We discussed that a bit in the SES meeting, I think they were expecting it to run within the context of the importer
+
+[12:52:05.0228] <Justin Ridgewell>
+That’s my thought as well
+
+[12:57:10.0473] <Justin Ridgewell>
+That probably makes it difficult to polyfil, huh?
+
+[12:59:02.0961] <Andreu Botella>
+if we end up having things in the web integration that aren't exactly call time or registration time, but instead some async originating context, that would probably be impossible to polyfill
+
+[12:59:56.0370] <Justin Ridgewell>
+It would require bundler integration to do properly
+
+[15:36:39.0954] <littledan>
+> <@abotella:igalia.com> I'm starting to get the feeling that the different use cases for AsyncContext are actually so different that for some things it won't be possible to find a behavior that works for all of them
+
+OK, this is possible, and people have claimed it, but for me to understand it better, it would help me to see concrete examples of where different behavior would make sense for the same callback, depending on the context. Are you working on collecting any examples like this?
+
+[15:37:23.0271] <littledan>
+something I've heard claimed is that certain variables make sense to treat in different ways than other variables
+
+[15:38:38.0050] <littledan>
+anyway if it turns out that this is intractably bad, we can withdraw the proposal (it has been raised as a counterargument before), but I'm not at all convinced that the requirements for different environments are different.
+
+[15:38:54.0280] <Andreu Botella>
+I'm not arguing at this point that this is intractable
+
+[15:39:13.0230] <littledan>
+could you characterize the difference in any more detail?
+
+[15:39:14.0083] <Andreu Botella>
+but I'm fearing that it might be the case
+
+[15:39:26.0362] <littledan>
+right, so, I'd like to understand what's behind that fear
+
+[15:42:33.0425] <littledan>
+I think it'd be helpful if we had a table of different functions which take callbacks, and then we can think about various different policies for which snapshot they should restore. You had something like this in progress, right? Were there any particularly challenging "rows" that you encountered?
+
+[15:43:16.0494] <Andreu Botella>
+well, for every single event, task attribution's behavior is different from zone.js's
+
+[15:43:33.0607] <littledan>
+could you give a concrete example and we can think through what's useful?
+
+[15:48:44.0395] <Andreu Botella>
+the example that made me realize that task attribution's use case is probably quite different from most users of AsyncContext is that task attribution recently made the `XMLHttpRequest` events have the context of the `send()` call
+
+[15:49:12.0812] <Andreu Botella>
+whereas before it just had an empty context (which is the default for async events in task attribution)
+
+[15:49:24.0232] <Andreu Botella>
+note that this is different from fetch
+
+[15:49:28.0390] <Andreu Botella>
+even in task attribution
+
+[15:49:34.0098] <littledan>
+OK, so let's think about XMLHttpRequest and fetch. What are the semantics in zone.js and task attribution of each?
+
+[15:49:55.0569] <littledan>
+we should probably add AsyncLocalStorage's semantics as well to that list, at least for fetch
+
+[15:50:15.0055] <littledan>
+oh I guess fetch doesn't have a callback so this doesn't come up? it's just from promises?
+
+[15:50:21.0398] <Andreu Botella>
+yeah
+
+[15:50:53.0878] <littledan>
+I would very much not assume that either of those two implementations (zone.js or task attribution) is perfect and has semantics that we must preserve exactly as they are. We should think about what is important about their behavior for their users.
+
+[15:51:07.0513] <littledan>
+they are just reference points that are useful in an investigation
+
+[15:51:22.0632] <Andreu Botella>
+yeah, and indeed I think task attribution is not perfect here
+
+[15:51:27.0576] <Andreu Botella>
+at least for what I think they need
+
+[15:51:38.0725] <littledan>
+(also XHR is legacy; it would somehow be easier to think about something which isn't so deprecated)
+
+[15:52:02.0865] <Andreu Botella>
+well, the fact that this was different in XHR and fetch was what made me realize the different semantics
+
+[15:52:15.0400] <littledan>
+OK, what are the semantics of each, in each framework?
+
+[15:52:35.0977] <littledan>
+oh I see you explained in a thread
+
+[15:52:42.0929] <littledan>
+https://matrix.to/#/!eQuZUAhGqudVFPodUG:matrix.org/$MWb8YUBP-AfcdHf9n2LVI-EIbo390545jUohOKlSZ6Q?via=matrix.org&via=mozilla.org&via=igalia.com
+
+[15:53:27.0852] <Andreu Botella>
+since fetch returns a promise, ALS, task attribution and zone.js all propagate the context at the point that the promise is awaited or called `.then()`
+
+[15:53:43.0399] <Andreu Botella>
+not the context at which `fetch()` is called
+
+[15:54:26.0696] <Andreu Botella>
+in XHR, calling `fetch()` would be equivalent to calling either `open()` or `send()` – it doesn't really matter which, but task attribution uses `send()`
+
+[15:54:34.0030] <Andreu Botella>
+and that is the context that task attribution propagates
+
+[15:54:45.0480] <littledan>
+let's just focus on XHR onto itself. Is this consistent between zone.js and task attribution?
+
+[15:54:56.0741] <Andreu Botella>
+no, zone.js uses the registration-time context (for `addEventListener`)
+
+[15:55:42.0790] <littledan>
+So, let's think, when do we expect these contexts to differ?
+
+[15:56:26.0727] <littledan>
+we've already made calls in this proposal that it's OK for us to change semantics slightly if we expect the contexts to be equal in practice (e.g., for unhandled promise rejections)
+
+[15:56:52.0552] <littledan>
+I think, with XHR, you tend to create it, add the events, and send it all in one piece of JS
+
+[15:57:31.0352] <Andreu Botella>
+IIRC the `XMLHttpRequest` object can be reused for multiple fetches, but it tends not to be
+
+[15:57:59.0285] <Andreu Botella>
+and this is very different from something long lived like a DOM element, document, window...
+
+[15:58:20.0448] <littledan>
+I wonder if we can find any old zone.js bug report/incremental development around this. I'll ask my Angular contacts.
+
+[15:58:28.0872] <littledan>
+Have you run into anything else besides XHR?
+
+[15:58:42.0205] <littledan>
+setTimeout is unambiguous, for example, right?
+
+[15:59:15.0006] <Andreu Botella>
+yeah, for web APIs which schedule a callback, there is only one possible context that could be used
+
+[16:11:45.0905] <littledan>
+OK, I suspect that this particular case is one where either answer would be fine... it'll be good to dig into another one once we think of it
+
+[16:12:56.0445] <Andreu Botella>
+I think I should focus on which possible contexts would make sense for each event, rather than on what task attribution or zone.js do
+
+[16:13:32.0397] <Andreu Botella>
+I suspect that's more likely to give us general rules
+
+[16:14:00.0068] <littledan>
+I agree; those two are interesting reference points to keep in mind, but we're not going for 100% backwards compatibility with either.
+
+[16:14:18.0656] <littledan>
+I suggested looking at those because they represent some accumulation of knowledge/experience in this area
+
+[16:14:50.0347] <Justin Ridgewell>
+I think it’s still useful to consider which context Zone.js uses for each API
+
+[16:15:07.0614] <Justin Ridgewell>
+We don’t need to be 100% compatible, but we should have a good reason for breaking with it.
+
+[16:15:08.0089] <Andreu Botella>
+zone.js's behavior seems to be to use registration time on every event, except that it allows overriding the behavior for different events
+
+[16:15:22.0222] <Andreu Botella>
+although it's not fully consistent in that
+
+[16:15:48.0860] <littledan>
+It would be easier for me to understand these descriptions of what zone.js does based on concrete examples, and what we think of them
+
+[16:15:52.0197] <Andreu Botella>
+(i.e. `MessagePort.p.onmessage` is call-time, but the `message` event on `MessagePort` is registration-time)
+
+[16:16:11.0872] <Justin Ridgewell>
+Even if it’s always registraiton time, we still need to list out each of the APIs we expect will integrate with AC
+
+[16:16:21.0381] <littledan>
+also what kind of overriding they allow (we have AsyncContext.Snapshot.wrap for certain kinds of overriding, but I'm not sure whether or not this models everything)
+
+[16:16:33.0164] <Justin Ridgewell>
+That way we can discuss with the Shu and Dan Minor
+
+[16:16:54.0283] <littledan>
+> <@jridgewell:matrix.org> Even if it’s always registraiton time, we still need to list out each of the APIs we expect will integrate with AC
+
+yes, either that or make a uniform change in WebIDL. But I think we should list out many APIs to make sure we're specifying the behavior that we want to actually happen.
+
+[16:17:24.0232] <littledan>
+the ideal case would be something that's uniform in some way or other. I just don't know what that policy is (people have posited directly contradictory general rules), and I think we will be able to derive this best from examples.
+
+[16:17:50.0360] <Andreu Botella>
+> <@littledan:matrix.org> also what kind of overriding they allow (we have AsyncContext.Snapshot.wrap for certain kinds of overriding, but I'm not sure whether or not this models everything)
+
+it seems like you can list a set of event names which shouldn't be registration-time
+
+[16:18:12.0728] <littledan>
+> <@abotella:igalia.com> it seems like you can list a set of event names which shouldn't be registration-time
+
+yep, that's one possibility! and this can be expressed in WebIDL with things like extended attributes.
+
+[16:18:42.0045] <littledan>
+but first is figuring this out through concrete examples. Something can look scary in the abstract but then prove to be small/easy when you examine it concretely.
+
+[16:19:06.0243] <littledan>
+or, "obviously" one way in the abstract, when under concrete inspection, it is clearly wrong
+
+
+2024-03-30
+[20:31:07.0206] <Steve Hicks>
+> <@littledan:matrix.org> also what kind of overriding they allow (we have AsyncContext.Snapshot.wrap for certain kinds of overriding, but I'm not sure whether or not this models everything)
+
+Along these lines - if there's not a clear choice between registration-time and some other context, then it may be worth remembering that you can always get the registration context using wrap no matter what option is chosen, but if the spec is to go with registraion context, then the other option is likely much harder to achieve in the use cases where it may be needed.
+
