@@ -130,3 +130,27 @@ Hi jakebailey Rob's mentioned some of your use cases, would be great to discuss 
 [11:43:37.0864] <jakebailey>
 More or less, the issue with switching TS to ESM is that TypeScript has conditional support for Node; we check if we're in Node (or Node-ish), then `require` stuff from Node if possible. This is good because the same bundle can be used for any use case. But, we can't do this in ESM without top-level await because this code can't be asynchronous (besides during load of the module), defeating the awesome "require ESM works" case that would allow us to move to ESM-only without breaking downstream CJS users. My thinking was that `import.meta.require` or a new `import.meta.importSync` or `import(..., { sync: true })` could be created to allow synchronous dynamic import of synchronously loadable ESM; as it stands, the only use of "synchronous ESM" seems to be require-ing ESM.
 
+[11:46:37.0679] <jakebailey>
+It's theoretically possible to do this with import mappings, but that has a bunch of bad knock-on effects for our build, plus the fact that it may exclude downstream consumers who polyfill or aren't actually Node
+
+[11:46:41.0566] <guybedford>
+This was one of the motivations for top-level await to make these workflows easier. I'm curious what the issue is with relying on it? import sync is a great discussion point, I suppose the important question there is whether or not you expect to synchronously load arbitrary modules in Node.js through this mechanism or just the builtin host APIs or already-loaded code
+
+[11:47:15.0331] <jakebailey>
+TLA prevents require of ESM, so we'd sooner stay CJS because most of the TS ecosystem is CJS.
+
+[11:47:36.0160] <guybedford>
+most tools these days support package imports conditions as well
+
+[11:47:56.0365] <jakebailey>
+This is all relating to Joyee's change to Node, which would typically mean that an ESM only project would be usable in CJS via require
+
+[11:48:19.0131] <guybedford>
+it sounds like your major pressure is on import sync then yes, in which case it would be interesting to hear what modules you expect the import to work for
+
+[11:49:22.0247] <kriskowal>
+Also curious how we would square this with TS-to-ESM on the web.
+
+[11:49:26.0080] <jakebailey>
+Well, for us, it's just like `require("fs")` and so on; but I think there's a more general question about "if there's now a very clear set of sync-loadable ESM code, isn't it nice for anyone to be able to load that sync too?"
+
