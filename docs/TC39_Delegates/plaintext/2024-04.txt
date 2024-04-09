@@ -1944,3 +1944,69 @@ no I mean they do interning
 
 I assumed 'no', but never asked
 
+[12:05:16.0687] <shu>
+> <@bakkot:matrix.org> no I mean they do interning
+
+oh by "===" you mean they do interning?
+
+[12:05:40.0285] <shu>
+i see, ok
+
+[12:05:43.0547] <bakkot>
+https://github.com/benjamn/immutable-tuple/blob/485b32326349cb0329c749090cebf43f8359fa12/src/tuple.js#L12-L19
+
+[12:06:01.0997] <rbuckton>
+Isn't the discussion around `CompositeKey` predicated on R&T *not* having `===` equality? I have concerns about the GC overhead associated with `CompositeKey` using something like weakmaps/maps as either `CompositeKey("a")` leaks forever, or it requires a FinalizationRegistry and the GC overhead for tracking/collection the object.
+
+[12:06:22.0422] <littledan>
+> <@rbuckton:matrix.org> Isn't the discussion around `CompositeKey` predicated on R&T *not* having `===` equality? I have concerns about the GC overhead associated with `CompositeKey` using something like weakmaps/maps as either `CompositeKey("a")` leaks forever, or it requires a FinalizationRegistry and the GC overhead for tracking/collection the object.
+
+yes, it's all predicated on === not being supported for R&T
+
+[12:06:31.0243] <shu>
+rbuckton: that was also my confusion. the resolution is that CompositeKeys have interning semantics built in, they return deduplicated objects such that === just works like object ===, because it's literally deduplicated
+
+[12:06:39.0950] <bakkot>
+or you forbid having a `CompositeKey` that doesn't contain an object, which is what userland does
+
+[12:06:50.0347] <rbuckton>
+Interning semantics will have GC overhead
+
+[12:06:55.0760] <shu>
+yes indeedy
+
+[12:07:35.0555] <shu>
+but it's like, deterministic overhead that's always there, instead of non-deterministic overhead that engines have to tune for and hope they get it right for the largest swath of the code that runs
+
+[12:07:35.0943] <rbuckton>
+> <@bakkot:matrix.org> or you forbid having a `CompositeKey` that doesn't contain an object, which is what userland does
+
+`CompsiteKey(obj, "a")` works, but `CompositeKey("a", "b")` does not? That seems like a very unstable design. 
+
+[12:07:45.0699] <shu>
+which is a better place to be in, but... definitely still overhead, yes
+
+[12:07:54.0973] <Ashley Claymore>
+I dropped it after presenting the slides to some other people, they felt it complicated the question I was asking
+
+[12:08:04.0220] <Mathieu Hofman>
+I believe that is NOT was was presented. `#[1] !== #[1] `
+
+[12:08:22.0786] <rbuckton>
+I'm concerned about the overhead of 1000s of `map.get(CompositeKey(a, b))` in a loop.
+
+[12:08:34.0530] <eemeli>
+I kinda like the idea of being able to do something like 
+```
+new Map([], { compare: 'duck' })
+```
+and have that "just work".
+
+[12:08:34.0675] <Mathieu Hofman>
+but when used in collections, the equality used is the one supporting R&T equality
+
+[12:08:34.0758] <bakkot>
+> <@mhofman:matrix.org> I believe that is NOT was was presented. `#[1] !== #[1] `
+
+CompositeKey was presented, it's just not what was proposed
+
