@@ -845,3 +845,893 @@ I think that's a chrome/chromium-specific feature
 
 I didn't ask that question, but I did notice that non-whitespace control characters weren't escaped. I thought that was deliberate, but escaping them would be a worthwhile change for readability. I agree with `\x00` for the reasons you state.
 
+
+2024-04-09
+[06:52:32.0959] <ryzokuken>
+good morning/evening/night everyone!
+
+[06:52:36.0888] <ryzokuken>
+meeting starts in ~7
+
+[07:29:19.0744] <littledan>
+I have trouble understanding the motivation for this null change, but also it doesn't seem harmful
+
+[07:29:55.0863] <littledan>
+(or rather, I have trouble understanding the motivation for the null skipping in the first place)
+
+[07:30:39.0976] <nicolo-ribaudo>
+Random fact: Babel accidentally ignores `null`s while guaranteeing at least one `await` -- we have a PR open to match the behavior of the current (pre-this-change) proposal
+
+[07:35:07.0570] <hax (HE Shi-Jun)>
+It seems this PR try to avoid nulls introducing extra awaits, am I understanding this correctly?
+
+[07:35:17.0535] <nicolo-ribaudo>
+Yes
+
+[07:37:51.0235] <shu>
+this is a small thing, but i'd be interested in people's thoughts on banning `using` inside base switch cases: https://github.com/tc39/proposal-explicit-resource-management/issues/215#issuecomment-2040486653
+
+[07:39:23.0609] <nicolo-ribaudo>
+Babel's `using` support in `switch` is currently completely broken
+
+[07:39:42.0017] <nicolo-ribaudo>
+Because everything in `switch` is incredibly annoying to compile
+
+[07:39:57.0272] <shu>
+i wanna ban it but recognize that'll break symmetry with let/const
+
+[07:40:52.0756] <nicolo-ribaudo>
+Is it for implementation reasons?
+
+[07:41:54.0326] <shu>
+it's laid out in the comment -- saves some codegen complexity
+
+[07:42:36.0729] <shu>
+we can unroll the dispose loop in all cases except switch cases
+
+[07:44:25.0497] <nicolo-ribaudo>
+I'm trying to think of any usecase for `using` in switch, but I cannot think of any where I would want `using`'s scope to fall through multiple cases
+
+[07:46:00.0809] <nicolo-ribaudo>
+(Babel doesn't unroll the loop anymore, so for us it wouldn't actually be difficult to fix `using` in `switch`)
+
+[07:46:39.0248] <shu>
+we don't unroll currently, but would like to
+
+[07:50:26.0532] <rbuckton>
+> <@nicolo-ribaudo:matrix.org> I'm trying to think of any usecase for `using` in switch, but I cannot think of any where I would want `using`'s scope to fall through multiple cases
+
+The most relevant case I can see would be something like manual loop unrolling, where you skip over the `using` for a chunk of operations when it isn't needed, such as if a lock was needed for a 16k chunk of data that isn't needed for a smaller chunk of data. The point of manual loop unrolling is to avoid a bunch of comparisons and branches based on a single condition such as input size, so a smaller chunk of data skips over the `using` (and avoids the extraneous `null`/`undefined` check), while a larger chunk of data enforces the `using` and holds the lock until the current iteration of the loop ends.
+
+[07:52:52.0530] <nicolo-ribaudo>
+Oh I see, like for transpiling generators
+
+[07:53:13.0016] <nicolo-ribaudo>
+(in a world where generators are transpiled and `using` is not I guess)
+
+[07:53:51.0282] <rbuckton>
+```js
+for (let start = 0; start < len; start += 8) {
+    switch (start % 8) {
+        case 0:
+          // full chunk, perform lock
+          using lck = new UniqueLock(mut);
+          readByte();
+        case 1: readByte();
+        case 2: readByte();
+        case 3: readByte();
+        case 4: readByte();
+        case 5: readByte();
+        case 6: readByte();
+        case 7: readByte();
+    } // lock released if taken
+}
+```
+
+[07:56:40.0590] <rbuckton>
+not for transpiling generators, no. that would be using a `switch` as a finite state machine, but an FSM would result in the `using` terminating early. Loop unrolling in this case is to handle chunks of data without continuously spinning and checking in the `for` to process one element at a time and cutting down the number of comparisons/branching from n to 1/n for a given chunk size of n.
+
+[07:58:31.0396] <rbuckton>
+ * not for transpiling generators, no. that would be using a `switch` as a finite state machine, but an FSM would result in the `using` terminating early. Loop unrolling in this case is to handle chunks of data without continuously spinning and checking in the `for` to process one element at a time and cut down the number of comparisons/branching from n to 1/n for a given chunk size of n.
+
+[08:25:18.0882] <littledan>
+If we could get to Ashley's point, he can explain why TLA running eagerly is useful within Bloomberg
+
+[08:26:40.0529] <hax (HE Shi-Jun)>
+tla already can break expectations...
+
+[08:29:10.0363] <ljharb>
+certainly a TLA being added anywhere in your graph is a breaking change
+
+[08:29:20.0562] <littledan>
+The thing is: in practice, you really shouldn't use JSON or CSS modules either, due to the lack of built-in bundling. The limited utility of built-in modules is not at all limited to this feature
+
+[08:29:46.0958] <bakkot>
+this strongly suggests to me that we need a path to standardize bundler-only syntax
+
+[08:29:48.0867] <littledan>
+until then, we'll be talking about features that are mostly useful for bundlers and non-web environments
+
+[08:29:55.0338] <ljharb>
+ * certainly a TLA being added anywhere in your graph (that's not an entrpoint) is a breaking change
+
+[08:30:13.0856] <littledan>
+> <@bakkot:matrix.org> this strongly suggests to me that we need a path to standardize bundler-only syntax
+
+I disagree; I think we should fix the issues to allow native modules to be usable in browsers
+
+[08:30:27.0596] <shu>
+i disagree with that disagree
+
+[08:30:32.0747] <shu>
+doesn't seem a good use of resources tbh
+
+[08:31:06.0008] <bakkot>
+> <@littledan:matrix.org> I disagree; I think we should fix the issues to allow native modules to be usable in browsers
+
+That is also good! And then, after that, standardizing things like this everywhere instead of bundler-only. But not before that.
+
+[08:31:13.0688] <littledan>
+these are all arguments against ES6 modules in the first place
+
+[08:31:22.0335] <bakkot>
+*cough*
+
+[08:31:31.0248] <bakkot>
+I mean, yes.
+
+[08:31:36.0224] <bakkot>
+But that ship has sailed.
+
+[08:31:45.0035] <ljharb>
+you're soooo close
+
+[08:31:53.0368] <rbuckton>
+bundler-related, but could `import defer` potentially avoid fetch and parse as well if we could serialize the import graph on the server side ahead of time?
+
+[08:32:03.0172] <hax (HE Shi-Jun)>
+In Jack's "assert sync" proposal I suggest we can also add "use async" directive which might help to make TLA explicit. Maybe it also help this issue.
+
+[08:32:16.0253] <littledan>
+well, yeah, so this would be good input to the module harmony group, if we don't like modules features anymore...
+
+[08:32:19.0410] <bakkot>
+I think standardizing ES6 modules as bundler-only syntax would have been better than the current world
+
+[08:32:33.0030] <rbuckton>
+or is that not an option because fetch is async
+
+[08:33:28.0283] <bakkot>
+> <@littledan:matrix.org> well, yeah, so this would be good input to the module harmony group, if we don't like modules features anymore...
+
+`import source` is useful on the web!
+
+[08:33:45.0613] <bakkot>
+so it's not "module features" in general, just those specific ones which aren't useful on the web
+
+[08:34:11.0898] <Justin Ridgewell>
+/me Taking over Chair responsibilities for a bit
+
+[08:34:12.0251] <bakkot>
+(possibly "[...] aren't useful on the web _yet_")
+
+[08:34:29.0614] <littledan>
+I think the Matrix results show that it's useful on the web *in practice*
+
+[08:34:53.0125] <littledan>
+It's a good thing that bundlers are aligned to TC39 and browsers in their syntax and semantics. It will be good for us to preserve that.
+
+[08:35:07.0286] <Ashley Claymore>
+> <@rbuckton:matrix.org> bundler-related, but could `import defer` potentially avoid fetch and parse as well if we could serialize the import graph on the server side ahead of time?
+
+yep. That's what we do at Bloomberg. We find the TLA at build time. And add a simplified module graph of which imports have TLA deps to our equivalent of 'package.json'
+
+[08:35:09.0814] <bakkot>
+IIUC the Matrix results show that it's useful on the web to have bundler-level syntax for this, but not that it's useful to have in browsers, right?
+
+[08:35:22.0291] <littledan>
+we've made tons of progress by actually building things into JS; the code splitting situation was a mess before import(), and it resulted in code splitting not occurring.
+
+[08:35:30.0794] <bakkot>
+I am not proposing "give up on this"; I am proposing "have a path to standardize bundler-level syntax that isn't actually in browsers"
+
+[08:35:40.0746] <littledan>
+TC39 is the JavaScript standards committee--our role is to find this common syntax
+
+[08:36:27.0193] <littledan>
+once we find common syntax, it's OK if some implementations fall behind and don't implement everything, but it'd be a big cost to split the language in two
+
+[08:36:33.0100] <bakkot>
+my response is the thing Shu is saying out loud right now
+
+[08:36:54.0555] <littledan>
+we should have this as an actual agenda item; that'd make it easier to discuss
+
+[08:39:05.0549] <littledan>
+IMO Stage 3 serves this purpose of "it's in tools and not necessarily in browsers". Maybe we just want to leave things in Stage 3 for longer.
+
+[08:39:36.0712] <bakkot>
+fwiw eslint refuses to implement features prior to stage 4, though that's maybe a them problem
+
+[08:41:07.0294] <ljharb>
+stage 3 is when it gets shipped in browsers tho
+
+[08:41:10.0342] <ljharb>
+ * stage 3 is when it gets shipped in (most) browsers tho
+
+[08:42:48.0786] <shu>
+John-David Dalton: why is it disingenuous? this is arguably _better_ handled by tools. tools have a different view (they can see the whole app) and optimization opportunities than a VM
+
+[08:43:14.0638] <shu>
+we designed a super static module system. it is not surprising to me that it has been leveraged to success with ahead-of-time tooling
+
+[08:44:10.0049] <littledan>
+> <@bakkot:matrix.org> fwiw eslint refuses to implement features prior to stage 4, though that's maybe a them problem
+
+well, there's babel-eslint
+
+[08:46:23.0828] <ljharb>
+(`@babel/eslint-parser` as of babel 7)
+
+[08:47:03.0198] <littledan>
+> <@ljharb:matrix.org> stage 3 is when it gets shipped in (most) browsers tho
+
+IMO browsers *should* ship features like this at that point, but if they want to leave some features out of browsers for now (but we still assess that the feature is solid enough for Stage 3), maybe they can just let them sit in that bucket. Doesn't require holding back 2.7 or 3.
+
+[08:47:22.0696] <littledan>
+> <@ljharb:matrix.org> stage 3 is when it gets shipped in (most) browsers tho
+
+ * I'd be happiest if browsers ship features like this at that point, but if they want to leave some features out of browsers for now (but we still assess that the feature is solid enough for Stage 3), maybe they can just let them sit in that bucket. Doesn't require holding back 2.7 or 3.
+
+[08:47:33.0695] <ljharb>
+3 is a pretty clear signal, that's the big purpose of 2.7. i agree it wouldn't require holding back 2.7
+
+[08:48:23.0429] <Michael Ficarra>
+so is this feature going to encourage the dreaded "barrel" module pattern?
+
+[08:48:36.0398] <littledan>
+> <@michaelficarra:matrix.org> so is this feature going to encourage the dreaded "barrel" module pattern?
+
+it's about optimizing the feature--no encouragement is needed
+
+[08:48:44.0114] <bakkot>
+While that's technically true, I would be happier revising our process if we want to do that - I would prefer that stage 2.7/3 be taken as a commitment from browsers to implement a feature at some point. I don't want to get to a point where browsers allow features to reach 2.7 that they intend to never implement.
+
+[08:49:04.0020] <shu>
+agree
+
+[08:49:09.0469] <shu>
+the two design spaces are honestly different
+
+[08:49:14.0285] <shu>
+the constraints are different
+
+[08:49:17.0420] <ljharb>
+> <@michaelficarra:matrix.org> so is this feature going to encourage the dreaded "barrel" module pattern?
+
+oof, i hadn't thought about that.
+
+[08:49:29.0454] <littledan>
+> <@bakkot:matrix.org> While that's technically true, I would be happier revising our process if we want to do that - I would prefer that stage 2.7/3 be taken as a commitment from browsers to implement a feature at some point. I don't want to get to a point where browsers allow features to reach 2.7 that they intend to never implement.
+
+ah OK well I'm happy to get browser commitments like that; I don't want to discourage that. I haven't thought this through enough.
+
+[08:49:54.0372] <Michael Ficarra>
+> <@littledan:matrix.org> it's about optimizing the feature--no encouragement is needed
+
+well it doesn't provide any benefit to those not using the pattern, so it seems like encouragement to use it
+
+[08:50:06.0567] <shu>
+littledan: i have been thinking about for most of this year, i'll give you something more thought out soon
+
+[08:51:05.0282] <littledan>
+> <@michaelficarra:matrix.org> well it doesn't provide any benefit to those not using the pattern, so it seems like encouragement to use it
+
+I think you're overthinking it... there's a lot of existing usages of this pattern, and it's slow, and it is hard to migrate away from (a lot of effort has gone into this migration)
+
+[08:51:20.0789] <littledan>
+it's not about newly incentivizing usage
+
+[08:51:54.0139] <Michael Ficarra>
+so someone who wants to get similar tree-shakeability can just dump this pattern?
+
+[08:52:24.0635] <littledan>
+> <@michaelficarra:matrix.org> so someone who wants to get similar tree-shakeability can just dump this pattern?
+
+sure, if you can get all your dependencies to dump this pattern, then you'll have no reason to use this pattern in your dependency tree
+
+[08:52:44.0025] <littledan>
+> <@michaelficarra:matrix.org> so someone who wants to get similar tree-shakeability can just dump this pattern?
+
+ * sure, if you can get all your dependencies to dump this pattern, then you'll have no reason to use this feature in your dependency tree
+
+[08:52:59.0639] <ljharb>
+there's a growing group of vocal folks in the ecosystem telling people to get rid of barrel modules, fwiw
+
+[08:53:18.0876] <ljharb>
+(coinbase's RN app's binary size dropped 71% when we banned barrel exports)
+
+[08:53:40.0499] <ljharb>
+ * (coinbase's RN app's binary size dropped 71% when we/they banned barrel exports back in 2021)
+
+[08:53:52.0538] <littledan>
+> <@ljharb:matrix.org> there's a growing group of vocal folks in the ecosystem telling people to get rid of barrel modules, fwiw
+
+yes, they're doing good work; I think those two groups (the ecosystem effort and this proposal) should be understood to be supporting each other
+
+[08:54:42.0621] <ljharb>
+even with import defer, barrel exports will still result in a larger app than "just import what you need directly", no?
+
+[08:54:53.0357] <bakkot>
+I don't think "this feature is not useful in browsers" is a new category of objection?
+
+[08:54:57.0161] <bakkot>
+that's like... the main objection
+
+[08:55:03.0284] <Michael Ficarra>
+can someone remind me why people ever did that in the first place?
+
+[08:55:23.0889] <ljharb>
+i don't know why people tend to like "god objects"
+
+[08:55:44.0526] <ljharb>
+ * i don't know why people tend to like "god objects", deep imports is The Way
+
+[08:55:53.0557] <ljharb>
+ * i don't know why people tend to like "god objects", deep imports is The Way. but they do tend to like them.
+
+[08:56:02.0865] <ptomato>
+maybe the pattern was copied from python modules and `__init__.py`?
+
+[08:56:08.0294] <littledan>
+> <@michaelficarra:matrix.org> can someone remind me why people ever did that in the first place?
+
+I always understood it to be a response to named exports being a thing, making use of that syntactic space, whereas require returning a single function was more natural
+
+[08:56:16.0208] <ljharb>
+i've seen people have a visceral preference for one `import` keyword that has N identifiers, instead of N `import` keywords
+
+[08:56:44.0865] <shu>
+> <@bakkot:matrix.org> that's like... the main objection
+
+yeah i feel like most of our concerns that have caused feature compromises and redesigns boil down to this. sometimes it's couched in more specific terms, like "performance footgun" etc
+
+[08:56:59.0201] <Michael Ficarra>
+I'm finding it very hard to find sympathy for these people...
+
+[08:57:00.0961] <ljharb>
+also i think that a number of major IDEs implemented auto-refactoring features for named exports but ignored default exports
+
+[08:57:06.0477] <ljharb>
+ * also i think that a number of major IDEs implemented auto-refactoring features for named exports but ignored default exports (for no technical reason)
+
+[08:57:15.0173] <ljharb>
+ * also i think that a number of major IDEs implemented auto-refactoring features for named exports but ignored default exports (for no technical reason) which drove increased usage of named exports
+
+[08:57:26.0804] <littledan>
+> <@michaelficarra:matrix.org> I'm finding it very hard to find sympathy for these people...
+
+why does it matter whose fault this is? it's currently a performance issue, and this is a solution.
+
+[08:58:01.0118] <ljharb>
+but is "don't use barrel files" perhaps a better solution?
+
+[08:58:08.0095] <ljharb>
+ * but is "don't use barrel files" perhaps a better solution? (genuine question)
+
+[08:58:53.0606] <Justin Ridgewell>
+Barrels are so convenient, and so awful for performance (both browsers and bundlers)
+
+[08:58:56.0043] <littledan>
+I dunno, there's a lot of recommendations about performance that people aren't taking up...
+
+[08:59:24.0498] <Justin Ridgewell>
+@guybedford:matrix.org Your mic is echoing
+
+[08:59:47.0003] <bakkot>
+but wouldn't this be a recommendation for performance in exactly the same way? it requires work to adopt; it doesn't just give you performance for free
+
+[08:59:59.0606] <ryzokuken>
+sorry guybedford bad timing
+
+[09:00:06.0237] <Justin Ridgewell>
+Timebox!
+
+[09:00:09.0827] <bakkot>
+and if the people in question were willing to do work to get performance they already can already do so, right?
+
+[09:01:13.0988] <Michael Ficarra>
+@nicolo-ribaudo:matrix.org your async feedback from me is that, for now, I'm unconvinced by the motivation
+
+[09:01:30.0332] <ljharb>
+> <@jridgewell:matrix.org> Barrels are so convenient, and so awful for performance (both browsers and bundlers)
+
+convenience often makes for better paving than good intentions
+
+[09:01:48.0748] <littledan>
+> <@bakkot:matrix.org> but wouldn't this be a recommendation for performance in exactly the same way? it requires work to adopt; it doesn't just give you performance for free
+
+The uptake is a "semver-minor" change--it doesn't require that importers update
+
+[09:02:09.0563] <ljharb>
+> <@jridgewell:matrix.org> Barrels are so convenient, and so awful for performance (both browsers and bundlers)
+
+ * convenience often makes for better road-paving than good intentions
+
+[09:03:04.0365] <ljharb>
+so importers keep thinking they're doing a fine thing, when they're doing a horrible thing, and the entire ecosystem has to move to `import defer` to avoid the education problem?
+
+[09:03:41.0791] <ljharb>
+education's super hard so maybe that's the right tradeoff to make, tbf
+
+[09:10:02.0762] <nicolo-ribaudo>
+> <@bakkot:matrix.org> but wouldn't this be a recommendation for performance in exactly the same way? it requires work to adopt; it doesn't just give you performance for free
+
+It moves the changes from the consumers to the library itself
+
+[09:10:08.0224] <nicolo-ribaudo>
+So 1 instead of N
+
+[09:10:47.0173] <nicolo-ribaudo>
+> <@ljharb:matrix.org> so importers keep thinking they're doing a fine thing, when they're doing a horrible thing, and the entire ecosystem has to move to `import defer` to avoid the education problem?
+
+There is currently a choice to make between convenience and performance, and the goal here is to not make them exclusive
+
+[09:43:07.0539] <ljharb>
+does using `import defer` on a barrel file with a bundler that supports it give the ~same results as using deep imports in the first place?
+
+[09:43:31.0739] <ljharb>
+ * does using `import defer` on a barrel file with a bundler that supports it give the ~same results as using deep imports in the first place? because treeshaking so far still doesn't fully achieve "only importing what you need in the first place" afaik.
+
+[09:46:05.0602] <Michael Ficarra>
+in a language without so many hidden effects all over the place, it would be
+
+[09:49:25.0896] <nicolo-ribaudo>
+> <@ljharb:matrix.org> does using `import defer` on a barrel file with a bundler that supports it give the ~same results as using deep imports in the first place? because treeshaking so far still doesn't fully achieve "only importing what you need in the first place" afaik.
+
+Sorry no, it's `export defer`/`export optional` that helps with barrel files
+
+[09:49:50.0264] <nicolo-ribaudo>
+And `export defer` would have the same result as using deep imports
+
+[09:50:02.0350] <ljharb>
+ok, so that's a compelling argument in favor of that one
+
+[09:51:34.0893] <ljharb>
+so `import defer` would be to lessen the downside of importing a barrel file that did not use `export defer`?
+
+[09:52:04.0637] <nicolo-ribaudo>
+And the boundary is still at the `export defer` level, so if you do
+```js
+// main.js
+import { x } from "library;
+
+// library
+export defer { x, y } from "./x-and-y";
+export defer { z } from "./z";
+
+// library/x-and-y
+export const x = 1;
+export const y = 2;
+```
+
+it will also load `y` (so it's not complete dead code elimination), but gives the building block to remove code if you put unrelated code in separate modules
+
+[09:52:09.0264] <nicolo-ribaudo>
+ * And the boundary is still at the `export defer` level, so if you do
+
+```js
+// main.js
+import { x } from "library";
+
+// library
+export defer { x, y } from "./x-and-y";
+export defer { z } from "./z";
+
+// library/x-and-y
+export const x = 1;
+export const y = 2;
+```
+
+it will also load `y` (so it's not complete dead code elimination), but gives the building block to remove code if you put unrelated code in separate modules
+
+[09:52:39.0112] <nicolo-ribaudo>
+ * And the boundary is still at the `export defer` level, so if you do
+
+```js
+// main.js
+import { x } from "library";
+
+// library
+export defer { x, y } from "./x-and-y";
+export defer { z } from "./z";
+
+// library/x-and-y
+export const x = 1;
+export const y = 2;
+```
+
+it will also load/run the code for `const y = 2` (so it's not complete dead code elimination), but gives the building block to remove code if you put unrelated code in separate modules
+
+[09:52:55.0016] <nicolo-ribaudo>
+Exactly like deep imports
+
+[09:53:14.0206] <nicolo-ribaudo>
+> <@ljharb:matrix.org> so `import defer` would be to lessen the downside of importing a barrel file that did not use `export defer`?
+
+`import defer` is not really related to barrel file
+
+[09:53:28.0915] <nicolo-ribaudo>
+It's in general for "big modules subgraphs"
+
+[09:53:40.0275] <nicolo-ribaudo>
+Even if you have a file with a single export but many dependencies, `import defer` is useful there
+
+[09:54:00.0084] <littledan>
+One thing that's important to understand is, the barrel file stuff doesn't relate to the motivation for `import defer`--they solve for totally unrelated issues, just both about loading less code
+
+[10:14:46.0864] <littledan>
+Agree with the various arguments for minimalism here, we just don't have any reason to go into this fractional stuff or BigInts, and IsSafeInteger is a good test.
+
+[10:16:38.0985] <Michael Ficarra>
+I agree with Kevin that this isn't especially confusing
+
+[10:17:57.0970] <littledan>
+ * <del>Agree with the various arguments for minimalism here, we just don't have any reason to go into this fractional stuff or BigInts, and IsSafeInteger is a good test.</del> I don't have a strong opinion about any of this and am just happy for range to happen
+
+[10:18:06.0226] <Michael Ficarra>
+is there maybe justification to have this produce its own iterator subclass that can have optimised helpers implemented on it?
+
+[10:18:33.0888] <Michael Ficarra>
+like `.drop(1e300)` could be implemented very efficiently for this special iterator
+
+[10:19:07.0346] <bakkot>
+I think `drop` and `take` are the only things which could have better implementations and I don't think it's worth doing just for those
+
+[10:19:38.0502] <bakkot>
+and engines could do this optimization anyway
+
+[10:20:16.0703] <hax (HE Shi-Jun)>
+The original proposal includes `BigInt.range()`, don't remember why it is added in first place
+
+[10:20:25.0275] <Bradford Smith>
+I might expect to be able to use `Iterator.range()` to generate unique identifiers, in which case possibly a BigInt type is desirable.
+
+[10:21:10.0762] <hax (HE Shi-Jun)>
+> <@bradfordcsmith:matrix.org> I might expect to be able to use `Iterator.range()` to generate unique identifiers, in which case possibly a BigInt type is desirable.
+
+seems a valid use case :P
+
+[10:21:11.0214] <Michael Ficarra>
+to waldemar's point, yes, there are some editorial bugs, but nothing that's not fixable
+
+[10:21:21.0391] <Michael Ficarra>
+it hasn't passed editorial review yet
+
+[10:21:35.0623] <shu>
+> <@bradfordcsmith:matrix.org> I might expect to be able to use `Iterator.range()` to generate unique identifiers, in which case possibly a BigInt type is desirable.
+
+oh yeah?
+
+[10:21:56.0277] <shu>
+like, give me monotonic ids starting with <large number> or something?
+
+[10:22:19.0093] <ljharb>
+i have no bigint range use cases, but "works for one kind of numeric primitive and not the others" seems like a big problem
+
+[10:22:55.0359] <Bradford Smith>
+> <@shuyuguo:matrix.org> like, give me monotonic ids starting with <large number> or something?
+
+yes, something like that
+
+[10:23:28.0592] <Justin Ridgewell>
+Are bigints still massively slower than numbers?
+
+[10:23:31.0141] <rbuckton>
+I'd prefer it work for bigint just so I'm not having to coerce using `BigInt()` when I need to do math with other bigints.
+
+[10:23:31.0609] <shu>
+> <@ljharb:matrix.org> i have no bigint range use cases, but "works for one kind of numeric primitive and not the others" seems like a big problem
+
+why is that a big problem?
+
+[10:23:36.0139] <shu>
+> <@jridgewell:matrix.org> Are bigints still massively slower than numbers?
+
+haha yes
+
+[10:23:51.0728] <danielrosenwasser>
+Mathieu Hofman: can you add yourself to the notes?
+
+[10:23:57.0368] <ljharb>
+it's an inconsistency. one of those warts we'd inevitably have to make a "fill in the table" proposal for in a few years.
+
+[10:23:59.0128] <eemeli>
+Timestamps in microseconds as a use case?
+
+[10:24:26.0548] <ljharb>
+it's fine if we want to wait for that, but is there a reason why it's beneficial to defer it?
+
+[10:24:28.0683] <shu>
+> <@ljharb:matrix.org> it's an inconsistency. one of those warts we'd inevitably have to make a "fill in the table" proposal for in a few years.
+
+not everyone shares that goal though
+
+[10:24:53.0581] <ljharb>
+that is true of most of the goals we all have :-)
+
+[10:25:09.0283] <shu>
+right, which is why i pushed back on "seems like a big problem"
+
+[10:25:19.0072] <bakkot>
+it's not that inconsistent - the Math methods do not and never will take Numbers
+
+[10:25:23.0971] <bakkot>
+ * it's not that inconsistent - the Math methods do not and never will take BigInts
+
+[10:25:35.0052] <shu>
+in any case i was given a concrete use case i found plausible
+
+[10:25:38.0744] <bakkot>
+in fact I don't think we have _anything_ that takes only Number of BigInt?
+
+[10:25:39.0682] <shu>
+so i'm happy with bigints being accepted here
+
+[10:25:53.0572] <bakkot>
+but yeah I also prefer accepting BigInt here
+
+[10:26:13.0522] <ptomato>
+> <@eemeli:mozilla.org> Timestamps in microseconds as a use case?
+
+I think the idea was to introduce Temporal.Instant ranges for this use case in the future
+
+[10:28:10.0892] <nicolo-ribaudo>
+> <@pchimento:igalia.com> I think the idea was to introduce Temporal.Instant ranges for this use case in the future
+
+Maybe `Iterator.range(instant1, instant2, duration)` if `range` is overloaded anyway
+
+[10:28:15.0922] <nicolo-ribaudo>
+> <@pchimento:igalia.com> I think the idea was to introduce Temporal.Instant ranges for this use case in the future
+
+ * Maybe `Iterator.range(instant1, instant2, duration)` if `range` is overloaded anyway?
+
+[10:28:41.0761] <Jack Works>
+> <@bradfordcsmith:matrix.org> I might expect to be able to use `Iterator.range()` to generate unique identifiers, in which case possibly a BigInt type is desirable.
+
+can you explain this use case more? I think unique id should be something like crypto.getRandomUUID()
+
+[10:29:17.0689] <shu>
+might not need to be unique
+
+[10:29:36.0590] <ljharb>
+also autoincrementing is fine sometimes, not everything has the german tank problem
+
+[10:30:00.0346] <nicolo-ribaudo>
+Python bans floats in range() right?
+
+[10:30:46.0389] <ptomato>
+right
+
+[10:32:40.0106] <ptomato>
+python's popular computing library has `numpy.arange()` which does suffer from unexpected iterations due to floating point errors, and `numpy.linspace()` which does not
+
+[10:33:08.0960] <Jesse>
+...decimal.
+
+[10:33:58.0185] <bakkot>
+I do like linspace 
+
+[10:34:13.0086] <bakkot>
+the options object does leave room for it
+
+[10:34:57.0125] <nicolo-ribaudo>
+You can just use a range of integers and .map for what Matthew is proposing, right?
+
+[10:35:02.0238] <Michael Ficarra>
+FWIW it would be nice to have extra time to iron out all the editorial issues as well
+
+[10:35:09.0610] <Michael Ficarra>
+then we can have a really solid 2.7 advancement
+
+[10:36:23.0494] <Bradford Smith>
+I'll definitely +1 this feature either with or without fractional values.
+
+[10:36:39.0158] <bakkot>
+same though I do prefer accepting fractional values
+
+[10:36:52.0090] <bakkot>
+but if left out it's not the end of the world
+
+[10:41:01.0148] <hax (HE Shi-Jun)>
+> <@bakkot:matrix.org> the options object does leave room for it
+
+I think linspace should be a separate method?
+
+[10:41:30.0943] <Michael Ficarra>
+even 2-4x slower must still be faster than `.reduce((a, b) => a + b, -0)`
+
+[10:43:58.0486] <hax (HE Shi-Jun)>
+As the original author of range floating issue, I prefer not accepting franctional values , and change the name from`Iterator.range` to `Iterator.integers` which make it even more clear to developers 😉 
+
+[10:44:38.0306] <Michael Ficarra>
+`intRange`
+
+[10:46:34.0236] <hax (HE Shi-Jun)>
+Do people also need `ProductExact()` ?
+
+[10:46:51.0683] <littledan>
+I can't understand the difference in precision/exactitude between precise and exact in this case... can anyone else?
+
+[10:47:42.0675] <eemeli>
+I think "precise" applies to all numbers. So `0.1 + 0.2` has a precise value, it's just not exactly `0.3`.
+
+[10:47:45.0962] <shu>
+kinda, i guess there is a notion of "low precision" vs "high precision" that's more commonly used than "low exactitude" vs "high exactitude"
+
+[10:47:56.0832] <shu>
+but in this particular case i don't really understand
+
+[10:47:59.0640] <eemeli>
+"Accurate" would be more... accurate.
+
+[10:48:21.0363] <hax (HE Shi-Jun)>
+> <@littledan:matrix.org> I can't understand the difference in precision/exactitude between precise and exact in this case... can anyone else?
+
+It just avoid some loss and more close to exact number?
+
+[10:48:23.0882] <littledan>
+> <@eemeli:mozilla.org> I think "precise" applies to all numbers. So `0.1 + 0.2` has a precise value, it's just not exactly `0.3`.
+
+huh? but we're starting with Numbers, not those funny things that we don't have a representation of in JS
+
+[10:49:04.0788] <littledan>
+> <@shuyuguo:matrix.org> kinda, i guess there is a notion of "low precision" vs "high precision" that's more commonly used than "low exactitude" vs "high exactitude"
+
+OK but it's not like we have a precision arg here... it's just supposed to get the right answer
+
+[10:49:12.0294] <littledan>
+right?
+
+[10:49:22.0826] <shu>
+right, in this particular case i don't understand the difference
+
+[10:49:41.0299] <shu>
+if it were up to me i'd name it sumSlow
+
+[10:50:13.0140] <shu>
+like i would totally believe that if kevin's slides said "this is named sumPrecise, but it may give the wrong impression", someone will then say "sumExact is better"
+
+[10:50:15.0934] <eemeli>
+To be clear, I'm fine with sumExact as a least worst option.
+
+[10:50:53.0161] <Jack Works>
+> <@nicolo-ribaudo:matrix.org> Maybe `Iterator.range(instant1, instant2, duration)` if `range` is overloaded anyway?
+
+Yes, next follow on might be adding a new Symbol.rangeTo, and then range(a, b, options) where a is an object will do the following: `yield* a[Symbol.rangeTo](b, options)`, then you can add it on Temporal, Decimal (they're not primitive now) and your own class.
+
+[10:51:01.0101] <Jack Works>
+> <@nicolo-ribaudo:matrix.org> Maybe `Iterator.range(instant1, instant2, duration)` if `range` is overloaded anyway?
+
+ * Yes, next follow on proposal might be adding a new Symbol.rangeTo, and then range(a, b, options) where a is an object will do the following: `yield* a[Symbol.rangeTo](b, options)`, then you can add it on Temporal, Decimal (they're not primitive now) and your own class.
+
+[10:51:01.0197] <rbuckton>
+Doesn't temporal use `from` ?
+
+[10:51:12.0861] <littledan>
+what name are we considering?
+
+[10:52:16.0817] <Bradford Smith>
+So, I guess we should go with `Math.sumPreciseFrom()`?
+
+[10:52:33.0603] <Bradford Smith>
+or not...
+
+[10:52:37.0067] <bakkot>
+it sounds like we are not doing `From` based on everyone else doesn't like it
+
+[10:52:41.0303] <bakkot>
+so `sumExact` or `sumPrecise`
+
+[10:54:29.0625] <hax (HE Shi-Jun)>
+> <@shuyuguo:matrix.org> if it were up to me i'd name it sumSlow
+
+As I understand, it is not necessarily slow.
+
+[10:54:42.0708] <danielrosenwasser>
+dminor: can you clarify your last point in the notes?
+
+[10:54:43.0245] <shu>
+yeah it is?
+
+[10:54:48.0756] <shu>
+it's necessarily slow_er_
+
+[10:54:50.0160] <nicolo-ribaudo>
+I was going to say that I dislike `From` because it currently means "I'm creating something of this type from these other values". `Iterator.from` creates an iterator, `Array.from` an array, `Object.fromEntries` an object. If we wanted this to contain from it should be on number (`Number.fromSum`), but also Number is not a collection
+
+[10:55:23.0762] <rbuckton>
+Temporal uses `from` in many places and those functions do not take iterables, so I disagree with the Michael Ficarra 's statement that "everything named from takes an iterable"
+
+[10:56:03.0724] <Mathieu Hofman>
+> <@nicolo-ribaudo:matrix.org> You can just use a range of integers and .map for what Matthew is proposing, right?
+
+It's not ergonomic at all: `range(start * stepDivider, end * stepDivider, stepMultipler) | map(x => x / stepDivider)`
+
+[10:56:20.0889] <rbuckton>
+> <@nicolo-ribaudo:matrix.org> I was going to say that I dislike `From` because it currently means "I'm creating something of this type from these other values". `Iterator.from` creates an iterator, `Array.from` an array, `Object.fromEntries` an object. If we wanted this to contain from it should be on number (`Number.fromSum`), but also Number is not a collection
+
+Agreed. "Foo.from" does imply "takes an iterable", it imples "make a `Foo` from these inputs"
+
+[10:56:28.0104] <rbuckton>
+> <@nicolo-ribaudo:matrix.org> I was going to say that I dislike `From` because it currently means "I'm creating something of this type from these other values". `Iterator.from` creates an iterator, `Array.from` an array, `Object.fromEntries` an object. If we wanted this to contain from it should be on number (`Number.fromSum`), but also Number is not a collection
+
+ * Agreed. "Foo.from" does not imply "takes an iterable", it imples "make a `Foo` from these inputs"
+
+[10:57:42.0897] <littledan>
+I'm having trouble understanding why we're bothering with an optimization for an error case
+
+[10:57:46.0107] <Michael Ficarra>
+I don't think arithmetic commutativity comes into play when we're talking about throwing, which is inherently not arithmetic
+
+[10:58:10.0356] <Michael Ficarra>
+@littledan:matrix.org an iterable of Number producing a NaN is not an error case?
+
+[10:58:45.0358] <littledan>
+I think NaN is kinda usually for error cases?
+
+[10:59:05.0953] <littledan>
+I get that it's within the domain of Numbers but.... when was the last time you wanted NaN to come up for you?
+
+[10:59:08.0733] <Michael Ficarra>
+at the business logic layer, maybe, but at this data processing layer, no
+
+[10:59:38.0109] <dminor>
+I have to drop, Eemeli and Matthew Gaudet will represent SpiderMonkey for the rest of the day.
+
+[11:00:18.0622] <littledan>
+> <@michaelficarra:matrix.org> at the business logic layer, maybe, but at this data processing layer, no
+
+obviously we need a well-defined answer, but is this going to provide a meaningful speedup meaningfully often?
+
+[11:00:38.0045] <Michael Ficarra>
+yes, iterators can yield very many values
+
+[11:01:04.0621] <Michael Ficarra>
+a multi-hours' batch could be short-circuited immediately after starting instead of waiting until the end
+
+[11:03:16.0007] <hax (HE Shi-Jun)>
+> <@shuyuguo:matrix.org> it's necessarily slow_er_
+
+As https://en.wikipedia.org/wiki/Pairwise_summation "Pairwise summation is the default summation algorithm in NumPy[8] and the Julia technical-computing language,[9] where in both cases it was found to have comparable speed to naive summation"
+
+[11:04:22.0688] <danielrosenwasser>
+eemeli: can you add yourself to the notes doc?
+
+[11:09:51.0346] <Justin Ridgewell>
+I had to miss the presentation, but why is empty list `-0`? (no opinion, just curious)
+
+[11:10:11.0098] <shu>
+it is the identity of floating point addition
+
+[11:10:36.0658] <Michael Ficarra>
+@jridgewell:matrix.org `Object.is(-0 + -0, -0)`
+
+[11:10:58.0835] <shu>
+(while +0 + -0 = +0)
+
+[11:11:20.0612] <Justin Ridgewell>
+Why is `-0` the starting point?
+
+[11:11:32.0340] <Justin Ridgewell>
+If I’m interpreting those correctly....
+
+[11:11:32.0664] <shu>
+what does starting point mean?
+
+[11:11:57.0197] <Justin Ridgewell>
+`let sum = -0; for (const i of array) sum += i`
+
+[11:12:22.0686] <Michael Ficarra>
+so that when `array` is `[-0]` you get the correct answer
+
