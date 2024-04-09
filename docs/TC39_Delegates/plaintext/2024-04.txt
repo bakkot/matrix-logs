@@ -2423,3 +2423,24 @@ https://docs.google.com/presentation/d/1JfChmW8tQ2_mrFDynosNqa1tjJ2j-qX6WoKm8vc_
 [14:14:38.0673] <rbuckton>
 Sorry, I should have said m instead of n for that case.
 
+[14:15:56.0824] <rbuckton>
+> <@aclaymore:matrix.org> Gotcha. That matches my understanding. It's not that lots of custom collections can't be built, but they will need to do more allocations.
+
+ * Map/Set wrappers can be built with allocation overhead, but only if their keys are easily translated to something that works as an existing key. Complex objects end up requiring O(n)
+
+[14:17:37.0348] <littledan>
+> <@rbuckton:matrix.org> Let me summarize my thoughts:
+> 
+> - Any mechanism to customize equality for `Map` and `Set` should be done in a way that could be leveraged by a custom collection. Anything less is too short sighted.
+> - Using a composite key/tuple will not give me the performance characteristics I would need in a custom collection, as it would result in O(n\*m) lookup time.
+> - Equals/hash can be employed by a hashtable in a custom collection for O(1) lookup time.
+> - Using a composite key/tuple would not be compatible with custom collections under shared memory multithreading, which are likely to be necessary since concurrent/synchronized collections are not part of the shared structs MVP.
+> - Composite keys require an allocation that is likely to be repeated for every call to `map.get`. Engines _could_ optimize, but likely won't do so immediately, if ever.
+> - A composite key mechanism can be implemented on top of equals/hash such that a WeakMap/Map-based registry is unnecessary. equals/hash cannot be implemented on top of a composite key.
+> - Equals/hash can use 32-bit integers, `<<`, `>>>` and `^`, which are all already fast and optimized. Opaque values require boxing, making them slow (see bigint performance as an example)
+
+we actually added Map and Set as built-ins without having a way that what they do could be done in a custom collection. Of course it would be nice to support efficient maps defined in JS if possible given all of the other goals and constraints, but I don't see why it makes sense to say that no advances should be made for Map and Set without managing to support this other goal.
+
+[14:18:40.0207] <littledan>
+the composite-ness of composite keys or R&T doesn't actually depend on any new built-in thing, but identity hashcodes continue to not be exposed
+
