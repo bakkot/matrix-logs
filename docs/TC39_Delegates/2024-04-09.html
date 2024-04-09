@@ -384,6 +384,32 @@ const map = new HashMap(undefined, { equaler: Uri.equaler });
 <p>In .NET, you can control whether to use a randomized string hashing algorithm via configuration: <a href="https://learn.microsoft.com/en-us/dotnet/framework/configure-apps/file-schema/runtime/userandomizedstringhashalgorithm-element">https://learn.microsoft.com/en-us/dotnet/framework/configure-apps/file-schema/runtime/userandomizedstringhashalgorithm-element</a>.</p>
 </td></tr>
   <tr class="msg" id="L315"><td class="ts-cell"><a class="ts" href="#L315" alt="Tue Apr 09 2024 12:34:20 GMT-0700 (Pacific Daylight Time)">19:34</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell"><mx-reply><blockquote> We don't automatically need to expose the result of the internal hashing. We could have special values for <code>compare</code></blockquote></mx-reply>I considered describing it as an opaque value, but you need to be able to do math on it.</td></tr>
+  <tr class="msg" id="L316"><td class="ts-cell"><a class="ts" href="#L316" alt="Tue Apr 09 2024 12:35:16 GMT-0700 (Pacific Daylight Time)">19:35</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@mhofman:matrix.org">Mathieu Hofman</span>&gt;</div></td><td class="msg-cell">To follow up on <span class="nick-4">Ashley Claymore</span> 's comment, I would be opposed to any new APIs to expose non determinism to the program. It's fine for these things to remain internal to the engine, but I don't want them to be observable</td></tr>
+  <tr class="msg" id="L317"><td class="ts-cell"><a class="ts" href="#L317" alt="Tue Apr 09 2024 12:37:46 GMT-0700 (Pacific Daylight Time)">19:37</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@mhofman:matrix.org">Mathieu Hofman</span>&gt;</div></td><td class="msg-cell">Or should I say, the new API would have to be extremely well motivated and fairly self contained, like FR/WeakRef, but I don't think hashcode would clear that line</td></tr>
+  <tr class="msg" id="L318"><td class="ts-cell"><a class="ts" href="#L318" alt="Tue Apr 09 2024 12:38:12 GMT-0700 (Pacific Daylight Time)">19:38</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell"><p>For example</p>
+<pre><code class="language-js">class Point {
+  #x;
+  #y;
+  constructor(x, y) {
+    this.#x = x;
+    this.#y = y;
+  }
+  get x() { return this.#x; }
+  get y() { return this.#y; }
+  static equaler = {
+    equals(a, b) {
+      return #x in a &amp;&amp; #x in b &amp;&amp; a.#x === b.#x &amp;&amp; a.#y === b.#y;
+    },
+    hash(obj) {
+      let hc = Object.hash(obj.#x);
+      hc = ((hc &lt;&lt; 7) | (hc &gt;&gt;&gt; 25)) ^ Object.hash(obj.#y);
+      return hc;
+    }
+  }
+}
+</code></pre>
+</td></tr>
+  <tr class="msg" id="L319"><td class="ts-cell"><a class="ts" href="#L319" alt="Tue Apr 09 2024 12:40:02 GMT-0700 (Pacific Daylight Time)">19:40</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@mhofman:matrix.org">Mathieu Hofman</span>&gt;</div></td><td class="msg-cell">I honestly don't understand why <code>hashLike(obj) { return #[obj.#x, obj.#y] }</code> is not an acceptable approach`. Engines are definitely capable of optimizing this</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>
