@@ -421,6 +421,30 @@ const map = new HashMap(undefined, { equaler: Uri.equaler });
   <tr class="msg" id="L326"><td class="ts-cell"><a class="ts" href="#L326" alt="Tue Apr 09 2024 13:03:20 GMT-0700 (Pacific Daylight Time)">20:03</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">Case in point, even if you're using the non-random string hash algorithm in .NET, <code>Object.GetHashCode()</code> is still considered to be non-deterministic as upgrading the version can change the hash algorithm to one that is more efficient.</td></tr>
   <tr class="msg" id="L327"><td class="ts-cell"><a class="ts" href="#L327" alt="Tue Apr 09 2024 13:03:27 GMT-0700 (Pacific Daylight Time)">20:03</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@mhofman:matrix.org">Mathieu Hofman</span>&gt;</div></td><td class="msg-cell">I just don't think there is sufficient motivation to expose this in the language</td></tr>
   <tr class="msg" id="L328"><td class="ts-cell"><a class="ts" href="#L328" alt="Tue Apr 09 2024 13:09:22 GMT-0700 (Pacific Daylight Time)">20:09</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">I'd argue that the number of times we've discussed mechanisms for customizing equality indicates it <em>is</em> sufficient motivation. The main reason I want custom equality for Map/Set at all is related to performance. You can use them as-is as long as you're willing to sacrifice performance and memory at the cost of the overhead introduced by alternatives. I want custom <code>Map</code> equality so that I <em>don't</em> have to <code>.toString()</code> every Uri I use as a key in a <code>map.get()</code>. Forcing custom collections to operate at O(n) while native collections can have O(1) because they can cheat and do the hashtable lookup is not the answer when your algorithms are performance-critical.</td></tr>
+  <tr class="msg" id="L329"><td class="ts-cell"><a class="ts" href="#L329" alt="Tue Apr 09 2024 13:18:40 GMT-0700 (Pacific Daylight Time)">20:18</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell"><p>I'm not saying that <code>Object.hash()</code> must return a number, but that you could conceivably do all the things you would need to do to implement a hash table for an alternative to be a reasonable compromise. For example, let's say we had an API like this:</p>
+<pre><code class="language-ts">interface Equaler&lt;T&gt; {
+  equals(a: T, b: T): boolean;
+  hash(a: T): opaque;
+}
+</code></pre>
+<p>where <code>hash</code> returns an opaque value. I'd need, at a minimum, something like this as well:</p>
+<pre><code class="language-ts">declare const defaultEqualer: Equaler&lt;unknown&gt;;
+declare function combineHash(a: opaque, b: opaque): opaque;
+interface HashArray&lt;T&gt; {
+  length: number;
+  [hash: opaque]: T;
+  ...
+}
+interface SharedHashArray&lt;T&gt; {
+  length: number;
+  [hash: opaque]: T;
+  ...
+}
+</code></pre>
+<p>to have any possibility of achieving similar perf to it being a number.</p>
+</td></tr>
+  <tr class="msg" id="L330"><td class="ts-cell"><a class="ts" href="#L330" alt="Tue Apr 09 2024 13:18:47 GMT-0700 (Pacific Daylight Time)">20:18</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@mhofman:matrix.org">Mathieu Hofman</span>&gt;</div></td><td class="msg-cell">You can customize equality using the <code>hashLike</code> approach I suggested above. It is also optimizable by engines.</td></tr>
+  <tr class="msg" id="L331"><td class="ts-cell"><a class="ts" href="#L331" alt="Tue Apr 09 2024 13:19:46 GMT-0700 (Pacific Daylight Time)">20:19</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@mhofman:matrix.org">Mathieu Hofman</span>&gt;</div></td><td class="msg-cell">The combine hash is exactly what creating a R/T with your components does</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>

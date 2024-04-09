@@ -2208,3 +2208,36 @@ I just don't think there is sufficient motivation to expose this in the language
 [13:09:22.0821] <rbuckton>
 I'd argue that the number of times we've discussed mechanisms for customizing equality indicates it *is* sufficient motivation. The main reason I want custom equality for Map/Set at all is related to performance. You can use them as-is as long as you're willing to sacrifice performance and memory at the cost of the overhead introduced by alternatives. I want custom `Map` equality so that I *don't* have to `.toString()` every Uri I use as a key in a `map.get()`. Forcing custom collections to operate at O(n) while native collections can have O(1) because they can cheat and do the hashtable lookup is not the answer when your algorithms are performance-critical.
 
+[13:18:40.0627] <rbuckton>
+I'm not saying that `Object.hash()` must return a number, but that you could conceivably do all the things you would need to do to implement a hash table for an alternative to be a reasonable compromise. For example, let's say we had an API like this:
+
+```ts
+interface Equaler<T> {
+  equals(a: T, b: T): boolean;
+  hash(a: T): opaque;
+}
+```
+where `hash` returns an opaque value. I'd need, at a minimum, something like this as well:
+```ts
+declare const defaultEqualer: Equaler<unknown>;
+declare function combineHash(a: opaque, b: opaque): opaque;
+interface HashArray<T> {
+  length: number;
+  [hash: opaque]: T;
+  ...
+}
+interface SharedHashArray<T> {
+  length: number;
+  [hash: opaque]: T;
+  ...
+}
+```
+
+to have any possibility of achieving similar perf to it being a number.
+
+[13:18:47.0429] <Mathieu Hofman>
+You can customize equality using the `hashLike` approach I suggested above. It is also optimizable by engines.
+
+[13:19:46.0383] <Mathieu Hofman>
+The combine hash is exactly what creating a R/T with your components does
+
