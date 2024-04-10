@@ -3347,3 +3347,108 @@ The closure would have to move the value in. I’m not sure it works the way you
 [08:30:06.0606] <ljharb>
 those are in the pattern matching proposal, fwiw
 
+[08:30:12.0143] <ljharb>
+ * those are already in the pattern matching proposal, fwiw
+
+[08:30:28.0214] <ljharb>
+ * those are already in the pattern matching proposal, fwiw, with brand checking semantics
+
+[08:30:51.0041] <bakkot>
+... brand checking or typeof?
+
+[08:30:56.0316] <eemeli>
+Something like
+```
+class Number {
+  ...
+  [Symbo.customMatcher](subject) {
+    if (typeof subject === 'number') return [subject];
+    if (subject instanceof Number) return [Number(subject)];
+    return false;
+  }
+}
+```
+
+[08:31:21.0465] <eemeli>
+ * Something like
+
+```
+class Number {
+  ...
+  [Symbol.customMatcher](subject) {
+    if (typeof subject === 'number') return [subject];
+    if (subject instanceof Number) return [Number(subject)];
+    return false;
+  }
+}
+```
+
+[08:31:33.0154] <bakkot>
+I am categorically opposed to accepting boxed primitives here or anywhere
+
+[08:31:38.0386] <ljharb>
+it'd check for the internal slot of a Number instead of instanceof, but otherwise yes
+
+[08:31:52.0609] <Justin Ridgewell>
+> <@jridgewell:matrix.org> The closure would have to move the value in. I’m not sure it works the way you think.
+
+Actually you can’t reference `_` in a closure (I’ve never tried before): https://play.rust-lang.org/?version=stable&mode=debug&edition=2021&gist=ab28412522dba608f6964c9a11ce600f
+
+[08:32:18.0124] <ljharb>
+> <@bakkot:matrix.org> I am categorically opposed to accepting boxed primitives here or anywhere
+
+it doesn't make any sense to reject boxed primitives if people are going to be referencing the constructor
+
+[08:32:27.0053] <ljharb>
+i don't expect it to come up in practice either way tho, tbf
+
+[08:32:38.0354] <ljharb>
+> <@bakkot:matrix.org> I am categorically opposed to accepting boxed primitives here or anywhere
+
+ * it doesn't make any sense to reject boxed primitives if people are going to be referencing the _constructor_
+
+[08:32:41.0875] <bakkot>
+sure it does, `Number(foo)` doesn't produce a boxed primitive
+
+[08:32:44.0217] <eemeli>
+I don't care about boxed primitives tbh.
+
+[08:32:55.0952] <ljharb>
+it's a constructor. `new Number(foo)` does
+
+[08:33:05.0594] <bakkot>
+if the extractor used `new` I would agree with you
+
+[08:33:08.0081] <bakkot>
+but it doesn't
+
+[08:33:15.0844] <Michael Ficarra>
+`const new Number(n) = 5`
+
+[08:33:23.0096] <ljharb>
+so you want the requirement to be `new UserClass()` to match a user class?
+
+[08:33:35.0333] <ljharb>
+ * so you want the requirement to be `new UserClass` as a pattern to match a user class?
+
+[08:33:42.0655] <eemeli>
+`new Number` is not a valid ExtractorMemberExpression.
+
+[08:34:10.0610] <Michael Ficarra>
+@eemeli:mozilla.org sorry I forgot the Kappa
+
+[08:34:13.0495] <ljharb>
+iow, a pattern of `Number` and a pattern of `UserClass` should work the same - either both require new or neither does
+
+[08:34:16.0329] <Michael Ficarra>
+I'll go back to TDZ
+
+[08:34:25.0593] <ljharb>
+and i don't see any argument for requiring `new` on non-primitive constructors
+
+[08:34:50.0469] <bakkot>
+`UserClass(foo)` should throw or either behave the same as `new UserClass(foo)`, so it's fine for `let UserClass(foo) = bar` to be the extractor pattern
+
+[08:35:03.0442] <bakkot>
+but `Number` doesn't work like that, so we can't use that as precedent for how `Number` should work
+
