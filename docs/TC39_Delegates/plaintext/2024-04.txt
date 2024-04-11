@@ -4253,3 +4253,2575 @@ Promise.resolve().then(() => {
 });
 ```
 
+[11:35:35.0446] <Ashley Claymore>
+If I add a TLA to "app.js" the assert fails
+
+[11:37:22.0726] <Jack Works>
+> <@aclaymore:matrix.org> how about
+> 
+> ```
+> import { ticked } "./start-test.js";
+> import "./app.js";
+> assert(!ticked); // ticked live binding
+> ```
+
+this is like implementing lodash.throttle but you also need to be a ES module specialist 
+
+[11:38:31.0094] <hax (HE Shi-Jun)>
+Is `Error.isError(new Proxy(new Error, {}))` returns true?
+
+[11:39:39.0276] <ljharb>
+in the 9 year old spec, yes. it's fine if it returns false tho
+
+[11:39:52.0867] <Ashley Claymore>
+> <@jackworks:matrix.org> this is like implementing lodash.throttle but you also need to be a ES module specialist
+
+Maybe this could be an npm library?
+
+[11:41:58.0621] <ljharb>
+eemeli: yes, and we would regardless of this proposal
+
+[11:44:45.0243] <ljharb>
+shu: i checked and the HTML spec already requires doing that, i think?
+
+[11:44:54.0481] <shu>
+no it doesn't?
+
+[11:45:03.0430] <ljharb>
+https://html.spec.whatwg.org/#structureddeserialize
+
+[11:45:03.0836] <shu>
+where do you read that it does
+
+[11:45:17.0838] <ljharb>
+ * https://html.spec.whatwg.org/#structureddeserialize, step 21
+
+[11:45:20.0443] <shu>
+wait what are you responding to?
+
+[11:45:23.0030] <eemeli>
+So if extractors or pattern matching would provide for an `Error[Symbol.customMatcher]` "regardless", does it make sense to advance a separate proposal on this?
+
+[11:45:40.0232] <ljharb>
+"be a real subclass" is the same as "has the expected slots and [[Prototype]]"
+
+[11:45:49.0951] <ptomato>
+`{ isError() { return true; } }` yup that's a native Error
+
+[11:46:04.0858] <shu>
+> <@ljharb:matrix.org> "be a real subclass" is the same as "has the expected slots and [[Prototype]]"
+
+those are not deserializing DOMExceptions
+
+[11:46:09.0118] <ljharb>
+> <@eemeli:mozilla.org> So if extractors or pattern matching would provide for an `Error[Symbol.customMatcher]` "regardless", does it make sense to advance a separate proposal on this?
+
+yes, because having a predicate is the more basic component
+
+[11:46:10.0673] <shu>
+those are deserializing actual JS errors, not subclassed
+
+[11:46:17.0553] <ljharb>
+oh i don't care about domexceptions
+
+[11:46:18.0509] <shu>
+ * those steps are deserializing actual JS errors, not subclassed
+
+[11:46:22.0031] <shu>
+*i* do
+
+[11:46:40.0808] <Jack Works>
+> <@aclaymore:matrix.org> Maybe this could be an npm library?
+
+might be better to PR webpack and rollup
+
+[11:46:44.0338] <littledan>
+> <@eemeli:mozilla.org> So if extractors or pattern matching would provide for an `Error[Symbol.customMatcher]` "regardless", does it make sense to advance a separate proposal on this?
+
+yes, that's an excuse we can use to stash the check there -- Jordan has generally been requesting that proposal authors find a way to make such an API (though it has to serve some sort of dual use case today, due to this set of arguments we're having)
+
+[11:46:49.0120] <ljharb>
+i mean that i'm 100% fine with domexceptions passing this predicate, or not. what would you prefer?
+
+[11:47:05.0088] <littledan>
+> <@littledan:matrix.org> yes, that's an excuse we can use to stash the check there -- Jordan has generally been requesting that proposal authors find a way to make such an API (though it has to serve some sort of dual use case today, due to this set of arguments we're having)
+
+I agree that `[Symbol.customMatcher]` should make this easier
+
+[11:47:27.0290] <shu>
+> <@ljharb:matrix.org> i mean that i'm 100% fine with domexceptions passing this predicate, or not. what would you prefer?
+
+those are my topics, i'll discuss it then
+
+[11:47:41.0106] <Jack Works>
+> <@shuyuguo:matrix.org> *i* do
+
+_HostIsErrorLike_
+
+[11:48:46.0972] <eemeli>
+> <@littledan:matrix.org> yes, that's an excuse we can use to stash the check there -- Jordan has generally been requesting that proposal authors find a way to make such an API (though it has to serve some sort of dual use case today, due to this set of arguments we're having)
+
+Fair point; makes this sound appropriate for Stage 1.
+
+[11:48:56.0823] <shu>
+yes, we can do HostIsErrorLike. but look, like, 90% of the time, when i ask a question, i'm not also implicitly asking "how do we do this mechanically". most things are possible to do! i'm asking if it's a good idea
+
+[11:49:50.0278] <Jack Works>
+then no, DOMException does not inherit Error and missing some property Error have
+
+[11:50:03.0030] <Michael Ficarra>
+@littledan:matrix.org regarding "What policies has TC39 adopted?" do you think we need to cover this during Jordan's limited time?
+
+[11:50:05.0713] <bakkot>
+if no code can distinguish between "a real error" and "not a real error", why would you ever need to know the answer to that question when debugging?
+
+[11:50:16.0289] <bakkot>
+"I need this for debugging" is confusing to me
+
+[11:50:17.0999] <shu>
+i am also confused by this point
+
+[11:50:56.0131] <Jack Works>
+> <@jackworks:matrix.org> then no, DOMException does not inherit Error and missing some property Error have
+
+Oh no longer the case. In my memory, in the past, a DOMException has no "stack" (although stack is not standarized) property
+
+[11:52:56.0891] <Jack Works>
+then yes, DOMException is a normal sense of "Error". but by that mean, if I made my own Exception, is it a "Error"
+
+[11:54:26.0319] <Jack Works>
+but why we should care this... I'll just log/report anything thrown to me, without categorize them
+
+[11:57:18.0622] <littledan>
+> <@michaelficarra:matrix.org> @littledan:matrix.org regarding "What policies has TC39 adopted?" do you think we need to cover this during Jordan's limited time?
+
+No, I'm fine to skip it
+
+[11:57:57.0110] <littledan>
+but it's kinda funny that we have these dualing policies asserted by Jordan and Mark, and these are not written down and just enforced personally by them... we have to get out of this situation
+
+[11:58:26.0818] <littledan>
+ * but it's kinda funny that we have these dualing policies asserted by Jordan and Mark, and these are not written down and just enforced personally by them... we have to get out of this situation by documenting shared policies that we agree on
+
+[11:58:42.0810] <Michael Ficarra>
+hopefully after this meeting we will have a place to put them: https://github.com/tc39/how-we-work/pull/136
+
+[11:59:07.0543] <Michael Ficarra>
+everybody just say yes to everything Kevin suggests and then we will have a `normative-conventions.md` on Friday
+
+[11:59:09.0807] <hax (HE Shi-Jun)>
+yeah, DOMException is strange, domException instanceof Error is true, but they do not have all properties of Error (eg. no stack?)
+
+[11:59:47.0223] <Jack Works>
+> <@haxjs:matrix.org> yeah, DOMException is strange, domException instanceof Error is true, but they do not have all properties of Error (eg. no stack?)
+
+it has stack now
+
+[12:00:35.0911] <bakkot>
+`(new DOMException).stack // undefined`
+
+[12:02:29.0239] <littledan>
+IIRC it differs between browsers whether you get the stack when allocating the exception or when it's thrown
+
+[12:05:05.0634] <eemeli>
+I'm getting a stack from that in Firefox and Node.js.
+
+[12:06:28.0690] <rbuckton>
+Chakra did not set `.stack` during construction, but during `throw`. Setting `.stack` during construction was a V8 contrivance, I think, that was later adopted by some other implementations.
+
+[12:07:15.0461] <rbuckton>
+So `try { throw new DOMException(); } catch (e) { e.stack; }` would still show a stack in Chakra
+
+[12:08:34.0656] <Jack Works>
+on firefox
+
+[12:17:34.0615] <bakkot>
+yeah looks like this is browser-specific
+
+[12:17:35.0468] <bakkot>
+fun!
+
+
+2024-04-11
+[18:04:33.0408] <rkirsling>
+woo-ow
+
+[18:04:44.0073] <rkirsling>
+that example Waldemar found is pretty epic
+
+[18:04:56.0958] <littledan>
+what example?
+
+[18:05:34.0532] <rkirsling>
+https://github.com/tc39/proposal-pattern-matching/issues/323, at the end of the link
+
+[18:06:23.0815] <rkirsling>
+keywords are terrifying
+
+[18:07:04.0687] <rkirsling>
+ * contextual keywords are terrifying
+
+[19:04:49.0901] <Justin Ridgewell>
+@rbuckton:matrix.org Have you considered `.` for discard bindings before? It’s visually insigificant, isn’t an identifier, and can’t be used in any place that makes discard bindings useful.
+
+[19:05:17.0723] <Justin Ridgewell>
+It might be _too_ visually small.
+
+[19:06:20.0138] <rbuckton>
+That, and too easy to confuse for a property access.
+
+[19:19:37.0017] <Justin Ridgewell>
+How would you confuse it for propery access?
+
+[19:19:49.0685] <Justin Ridgewell>
+There’s no preceding object
+
+[20:02:24.0783] <rbuckton>
+it could theoretically be mixed with `and`, `or`, or `not` in pattern matching, though that's not exactly practical.
+
+[03:24:40.0737] <Jack Works>
+for (using is of and [not/a+"/g]; b++; [/"/g, 5])
+
+[03:25:07.0175] <Jack Works>
+how Waldemar find this
+
+[03:26:18.0638] <Jack Works>
+😨 real insight 
+
+[03:50:12.0222] <Jack Works>
+```
+for (using is of and [not/a+"/g]; b++; [/"/g, 5])
+
+First parse
+for (using x of ...) {}
+    keyword using
+    Identifier is
+    keyword of
+    Expression [not/a+"/g]; b++; [/"/g, 5]
+        ArrayExpression [
+            Element not/a+"/g]; b++; [/"/g
+                Division not/a
+                Plus +
+                Division "/g]; b++; [/"/g
+                    Left "/g]; b++; [/"
+                    Right g
+            Element 5
+        ]
+
+Second parse
+for (a; b; c)
+FirstPart
+    PatternMatching
+        Identifier using
+        Keyword is
+        Pattern
+            IdentifierPattern of
+            Keyword and
+            ArrayPatter []
+                Keyword not
+                RegExpPattern /a+"/g
+SecondPart b++
+ThirdPart [/"/g, 5]
+```
+
+[03:53:03.0875] <rbuckton>
+Anything involving regexp literals is suspect
+
+[04:03:18.0119] <Jack Works>
+but it's a real ambiguous example 
+
+[04:03:29.0793] <Jack Works>
+both interpretations are legal 
+
+[06:09:45.0480] <ryzokuken>
+the authors' copy of the soon-to-be RFC 9557 🎉
+
+https://www.rfc-editor.org/authors/rfc9557.html
+
+[06:29:18.0857] <littledan>
+> <@usharma:igalia.com> the authors' copy of the soon-to-be RFC 9557 🎉
+> 
+> https://www.rfc-editor.org/authors/rfc9557.html
+
+Wow! The extension if ISO 8601 with custom timezone and calendar syntax has an RFC number!
+
+[06:54:38.0304] <keith_miller>
+Does anyone else fill out the sign-in form every day because they didn't save the Webex link?
+
+[06:54:48.0099] <keith_miller>
+ * Does anyone else fill out the sign-in form every day because they didn't save the Webex link? lol
+
+[06:58:40.0761] <ryzokuken>
+starting real soon folks!
+
+[07:37:31.0612] <Chris de Almeida>
+we lost Nicolo as a notes helper.  if someone else here could volunteer to help, even just for this topic, that would really help us out.  chair group is trying to help w/ notes (as we often do), but also have to juggle other things.  thank you 🙏
+
+[07:38:07.0926] <Chris de Almeida>
+it's easier during the presentation, and a little more work during discussion
+
+[07:46:03.0925] <hax (HE Shi-Jun)>
+> <@jackworks:matrix.org> for (using is of and [not/a+"/g]; b++; [/"/g, 5])
+
+It's just like old `for (async of () => {}` issue, maybe worse?
+
+[07:49:30.0439] <littledan>
+saminahusain: It'd be great if Ecma could facilitate getting TC39 the relevant ISO/IEEE specs. This is a technical barrier for us in this proposal, as it was in the development of Temporal (with the relationship with ISO 8601)
+
+[07:54:33.0291] <Chris de Almeida>
+> <@softwarechris:matrix.org> sent a file.
+
+☝️
+
+[08:29:10.0719] <waldemar>
+What's TLS?
+
+[08:29:26.0626] <rbuckton>
+ljharb: no `class extends sharedStruct {}` won't work, for the reasons shu is discussing now, as well as that it has too many rough edges. You can't add new public or private fields in a subclass of a shared struct as it would violate the fixed layout. Plus we can't correlate a class prototype across realms.
+
+[08:29:29.0233] <rbuckton>
+thread-local storage
+
+[08:29:37.0348] <rbuckton>
+ * TLS: thread-local storage
+
+[08:29:54.0384] <rbuckton>
+Though he really means "Realm-local storage"
+
+[08:29:56.0506] <ljharb>
+the instance would still be sealed ofc
+
+[08:30:25.0084] <ljharb>
+and it has the same problem of correlation, but it seems a better way to correlate to me than a "boxed primitive"-like hand wavy mechanism
+
+[08:30:50.0732] <rbuckton>
+> <@ljharb:matrix.org> the instance would still be sealed ofc
+
+The prototype would not be correlated.
+
+[08:31:04.0080] <ljharb>
+this also reminds me of yaml class marshalling attack vectors in ruby, for some reason
+
+[08:31:43.0902] <rbuckton>
+You are misunderstanding correlation, I think. We're talking about ensuring the same struct type defined in the same file and loaded into two different realms/threads/agents will have same methods.
+
+[08:31:53.0794] <ljharb>
+right
+
+[08:32:15.0604] <ljharb>
+i'm suggesting that you make a class with methods, and extend the struct, and then the "automatic" part would be reloading that same class code in each place
+
+[08:32:20.0801] <rbuckton>
+We can't correlate a class prototype, because classes and class prototypes aren't correlated across threads. We can correlate a struct definition and prototype.
+
+[08:32:37.0185] <ljharb>
+the prototype is a mutable object tho
+
+[08:32:48.0795] <ljharb>
+if that can be correlated, why can't anything be?
+
+[08:33:11.0304] <rbuckton>
+No, correlation is based on syntax and source location. 
+
+[08:33:41.0666] <ljharb>
+right but i mean, you have to re-evaluate code in each place in order to get the prototype, right?
+
+[08:33:47.0102] <ljharb>
+ * right but i mean, you have to re-evaluate code in each context in order to get the prototype, right?
+
+[08:33:50.0286] <rbuckton>
+correlating every `class` is way too much overhead.
+
+[08:33:51.0088] <ljharb>
+ * right but i mean, you have to re-evaluate code in each context in order to get the prototype object, right?
+
+[08:34:22.0035] <littledan>
+> <@rbuckton:matrix.org> correlating every `class` is way too much overhead.
+
+this is just the shared ones, right?
+
+[08:34:37.0406] <ljharb>
+well sure, not every class. only one canonical one that the shared struct creator indicates
+
+[08:34:52.0464] <ljharb>
+ * well sure, not every class. only one canonical one that the shared struct creator indicates. that seems like it'd be precisely the same amount of overhead as the prototype object correlation
+
+[08:34:54.0992] <rbuckton>
+We would only correlate `shared struct` types between realms
+
+[08:35:07.0839] <ljharb>
+the prototype object isn't a shared struct
+
+[08:35:37.0654] <rbuckton>
+> <@ljharb:matrix.org> well sure, not every class. only one canonical one that the shared struct creator indicates. that seems like it'd be precisely the same amount of overhead as the prototype object correlation
+
+`class extends sharedStruct` cannot be cannonical and cannot be determined syntactically.
+
+[08:35:42.0940] <rbuckton>
+> <@ljharb:matrix.org> well sure, not every class. only one canonical one that the shared struct creator indicates. that seems like it'd be precisely the same amount of overhead as the prototype object correlation
+
+ * `class extends sharedStruct` cannot be canonical and cannot be determined syntactically.
+
+[08:35:43.0889] <ljharb>
+if a function is re-eval'd in multiple contexts to achieve the goal of "having the same methods", then surely any code could be
+
+[08:36:02.0100] <rbuckton>
+That isn't the problem.
+
+[08:36:03.0915] <ljharb>
+there's all sorts of ways that can be covered
+
+[08:36:29.0052] <ljharb>
+the wrapper class could be defined inside the shared struct, or you could just define method syntax inside the struct definition and the semantics would be that methods are copied
+
+[08:36:50.0923] <ljharb>
+ * the wrapper class could be defined lexically inside the shared struct, or you could just define method syntax inside the struct definition and the semantics would be that methods are copied
+
+[08:36:59.0691] <ljharb>
+ * the wrapper class could be defined lexically inside the shared struct, or you could just define method syntax directly inside the struct definition and the semantics would be that methods are copied
+
+[08:37:05.0363] <ljharb>
+ * the wrapper class could be defined lexically inside the shared struct, or you could just define method syntax directly inside the shared struct definition and the semantics would be that shared struct methods are copied
+
+[08:37:45.0866] <rbuckton>
+Those sound categorically worse than what we are proposing. Class construction has the wrong semantics for shared structs.
+
+[08:38:03.0148] <ljharb>
+```
+
+[08:38:26.0829] <rbuckton>
+> <@ljharb:matrix.org> the wrapper class could be defined lexically inside the shared struct, or you could just define method syntax directly inside the shared struct definition and the semantics would be that shared struct methods are copied
+
+we are proposing methods defined in the struct.
+
+[08:38:32.0121] <ljharb>
+ * why would something like
+```
+shared struct {
+  // existing stuff
+  foo() {}
+}
+```
+where the methods are auto-re-eval'd be worse?
+
+[08:38:50.0370] <ljharb>
+hm, maybe i misunderstood shu's slides, it looked like he was mutating `.prototype`
+
+[08:39:10.0387] <rbuckton>
+He was showing a build up to what we actually want.
+
+[08:46:07.0441] <littledan>
+We already reference source location in TemplateMap. This isn't a new solution
+
+[08:46:13.0378] <littledan>
+ * We already reference source location in TemplateMap. This isn't a new concept
+
+[08:51:18.0808] <Ashley Claymore>
+Maybe tooling could extract out the minimal part of the struct declarations so they can have a more concrete source text location. And then re-write the code so it can reference that.
+
+[08:51:34.0093] <Ashley Claymore>
+(for the virtulization case)
+
+[08:52:18.0372] <bakkot>
+this is a sidebar but it would be nice if we could structuredClone symbols in a coherent way (i.e., such that if you send the same one over twice, you get the same value)
+
+[08:52:44.0606] <rbuckton>
+That's what bundlers would need to do if they have different entrypoints. IIRC, many bundlers can already do source splitting for those cases.
+
+[08:52:54.0666] <littledan>
+> <@bakkot:matrix.org> this is a sidebar but it would be nice if we could structuredClone symbols in a coherent way (i.e., such that if you send the same one over twice, you get the same value)
+
+I've been told that this would be too troublesome to implement
+
+[08:53:43.0062] <Ashley Claymore>
+> <@bakkot:matrix.org> this is a sidebar but it would be nice if we could structuredClone symbols in a coherent way (i.e., such that if you send the same one over twice, you get the same value)
+
+only RegisteredSymbols would be the easier form of this
+
+[08:53:56.0579] <bakkot>
+> <@littledan:matrix.org> I've been told that this would be too troublesome to implement
+
+huh. doesn't seem like it would be that hard.
+
+[08:54:07.0527] <ljharb>
+the usefulness for me would be unforgeable transferable symbols
+
+[08:54:12.0280] <ljharb>
+ * the usefulness for me would be unforgeable transferable symbols, ie, not registered ones
+
+[08:54:43.0440] <bakkot>
+you can do it in userland if you patch postMessage / the message event / structuredClone and stash symbols in a weakmap
+
+[08:56:36.0329] <rbuckton>
+littledan: Maybe doesn't matter, but I prefer the term `ConcurrentMap` to `SharedMap`. Just because a map is shareable does not mean it can be used concurrently by multiple threads. A true concurrent map uses lock-free CAS mechanisms to allow for concurrent reads and writes. 
+
+[08:57:24.0290] <Mathieu Hofman>
+keith_miller: I have previously advocated for a manual correlation over postMessage, but apparently the DX of that is not acceptable, and prevents some use cases that I don't fully understand
+
+[08:58:06.0274] <Ashley Claymore>
+> <@bakkot:matrix.org> you can do it in userland if you patch postMessage / the message event / structuredClone and stash symbols in a weakmap
+
+Like CK, if the sending realm is also trying to put these symbols in a weak{Map/set/ref}, now the local GC only holds them weakly. They might be GC'ed before the round trip comes back
+
+[08:58:39.0269] <bakkot>
+CK?
+
+[08:58:46.0427] <ljharb>
+put them in a weakref that's strongly held by a Map, and if the weakref is collected, you can just make a new symbol?
+
+[08:58:55.0283] <Ashley Claymore>
+CompositeKeys
+
+[08:59:12.0368] <Ashley Claymore>
+But then that's not round tripping
+
+[08:59:23.0132] <bakkot>
+ah, sure, ok
+
+[08:59:44.0346] <ljharb>
+ah true, hm
+
+[09:00:28.0206] <Ashley Claymore>
+In Java Valhala, they 'fix' that by letting WeakMaps have a 'soft' policy. Where there is no guarantee that the value will remain in the map, even if it's reachable
+
+[09:00:50.0543] <littledan>
+> <@rbuckton:matrix.org> littledan: Maybe doesn't matter, but I prefer the term `ConcurrentMap` to `SharedMap`. Just because a map is shareable does not mean it can be used concurrently by multiple threads. A true concurrent map uses lock-free CAS mechanisms to allow for concurrent reads and writes.
+
+I don't get it; shouldn't we use ConcurrentArray then?
+
+[09:01:39.0422] <rbuckton>
+Arrays only usually require a single operation to update. Maps require many more operations that are not thread safe.
+
+[09:02:49.0785] <Mathieu Hofman>
+> <@littledan:matrix.org> I've been told that this would be too troublesome to implement
+
+How is it so much more troublesome that sharing an instance of `shared struct SharedSymbol {}` ?
+
+[09:03:31.0796] <Ashley Claymore>
+> <@mhofman:matrix.org> How is it so much more troublesome that sharing an instance of `shared struct SharedSymbol {}` ?
+
+SharedStructs are in someways Finite, due to source text location ?
+
+[09:03:36.0053] <Ashley Claymore>
+> <@mhofman:matrix.org> How is it so much more troublesome that sharing an instance of `shared struct SharedSymbol {}` ?
+
+ * SharedStructs are in someways finite, due to source text location ?
+
+[09:03:42.0811] <Mathieu Hofman>
+> <@bakkot:matrix.org> you can do it in userland if you patch postMessage / the message event / structuredClone and stash symbols in a weakmap
+
+You cannot if you want to make sure you don't leak memory. You need distributed GC for this to work
+
+[09:04:12.0788] <bakkot>
+presumably shared structs will in fact be more work than structuredCloning symbols would be, and engines just think it's worth it because it is plainly much more valuable
+
+[09:04:14.0344] <Ashley Claymore>
+ * SharedStructs are in someways finite (and eternal), due to source text location ?
+
+[09:05:39.0582] <Mathieu Hofman>
+Right, if you do the work for shared structs you basically could share unique symbols almost for free
+
+[09:06:21.0548] <Mathieu Hofman>
+> <@aclaymore:matrix.org> SharedStructs are in someways finite (and eternal), due to source text location ?
+
+instances of shared structs are definitely not eternal. they require distributed gc. and fun part, they can be used as WeakMap keys
+
+[09:07:20.0217] <bakkot>
+it would certainly be a nice bonus if this feature gave us clonable symbols!
+
+[09:10:22.0124] <hax (HE Shi-Jun)>
+Will `import {SharedStruct} from "shared.js" with { foo: "bar" }` have same source location? I guess not?
+
+[09:12:41.0175] <littledan>
+> <@mhofman:matrix.org> How is it so much more troublesome that sharing an instance of `shared struct SharedSymbol {}` ?
+
+I guess this was from back when we didn't have a shared heap, and it would've been about correlating signals in different agents (and then the question is, how do you GC them)
+
+[09:32:53.0173] <Richard Gibson>
+> <@mhofman:matrix.org> keith_miller: I have previously advocated for a manual correlation over postMessage, but apparently the DX of that is not acceptable, and prevents some use cases that I don't fully understand
+
+I'd _really_ like to see these use cases enumerated, because it seems to me like explicit handshaking in which e.g. a reference to the shared struct is exchanged constitutes a more comprehensible and robust pattern
+```
+let ready = false;
+onmessage = evt => {
+  if (!ready) {
+    ready = true;
+    correlate(localStructDef, evt.data);
+    return;
+  }
+
+  assert(Object.getPrototypeOf(evt.data) === localStructDef.prototype);
+  …use evt.data as an instance of the shared struct…
+}
+```
+
+[09:35:12.0094] <keith_miller>
+Yeah, I guess I still don't fully understand. It seems like the spawner of a worker could just forward their shared types to that worker. Or alternatively the spawned worker could fetch it lazily, if desired.
+
+[09:35:35.0088] <keith_miller>
+ * Yeah, I guess I still don't fully understand. It seems like the spawner of a worker could just forward their shared types to that worker before revealing the existence of that worker to the world. Or alternatively the spawned worker could fetch it lazily, if desired.
+
+[09:35:49.0340] <keith_miller>
+ * Yeah, I guess I still don't fully understand. It seems like the spawner of a worker could just forward their shared types to that worker before revealing the existence of that worker to the world. Or alternatively the spawned worker could fetch the shared structs lazily, if desired.
+
+[09:37:21.0762] <littledan>
+maybe the answer to this question would be in the V8 CL history, if Shu has already implemented it and found it to be not good enough?
+
+[09:39:22.0488] <keith_miller>
+I guess it could be hard to do it lazily because there's no sync postMessage for workers
+
+[09:41:43.0738] <shu>
+> <@gibson042:matrix.org> I'd _really_ like to see these use cases enumerated, because it seems to me like explicit handshaking in which e.g. a reference to the shared struct is exchanged constitutes a more comprehensible and robust pattern
+> ```
+> let ready = false;
+> onmessage = evt => {
+>   if (!ready) {
+>     ready = true;
+>     correlate(localStructDef, evt.data);
+>     return;
+>   }
+> 
+>   assert(Object.getPrototypeOf(evt.data) === localStructDef.prototype);
+>   …use evt.data as an instance of the shared struct…
+> }
+> ```
+
+that constitutes a barrier though, right?
+
+[09:42:22.0945] <shu>
+like, your workers can't just import and start doing stuff. it has to import, wait till some barrier is reached, then continue doing stuff. it's worse for loading performance
+
+[09:42:35.0972] <shu>
+it's definitely _possible_, rbuckton has built such a thing
+
+[09:43:14.0428] <shu>
+the "more robust" argument is interesting, i buy the explicitness of it for sure
+
+[09:43:41.0444] <Richard Gibson>
+an example of "more robust" is the fact that it isn't broken by naïve bundlers
+
+[09:44:00.0284] <shu>
+ah okay
+
+[09:44:15.0943] <shu>
+that depends on whether that's a goal worth optimizing for
+
+[09:44:50.0191] <bakkot>
+There's only a small handful of bundlers in common use, and they're all maintained by specific individuals who you can talk to, so I don't wan to design a feature on the assumption that bundlers will not be writing careful handling
+
+[09:44:56.0460] <bakkot>
+ * There's only a small handful of bundlers in common use, and they're all maintained by specific individuals who you can talk to, so I don't want to design a feature on the assumption that bundlers will not be writing careful handling
+
+[09:45:01.0339] <shu>
+i was also initially on the other side of comprehendability argument, but flipped after realizing that the "JS classes are distinct per evaluation" thing is pretty JS-specific and folks generally don't have that mental model
+
+[09:45:04.0545] <rbuckton>
+> <@shuyuguo:matrix.org> it's definitely _possible_, rbuckton has built such a thing
+
+I did not build such a thing, but I do have a document describing that kind of interaction. There is a lot more user error involved though. I also have hopes to eventually support `#name` private state, but that isn't safe to do so unless I can be certain the struct declarations on both sides are identical. A handshaking mechanism makes that impossible.
+
+[09:45:19.0600] <shu>
+i see, i misremembered
+
+[09:45:21.0529] <rbuckton>
+> <@shuyuguo:matrix.org> it's definitely _possible_, rbuckton has built such a thing
+
+ * I did not build such a thing, but I do have a document describing that kind of interaction. There is a lot more user error involved though. I also have hopes to eventually support `#name` private state, but it isn't safe to do so unless I can be certain the struct declarations on both sides are identical. A handshaking mechanism makes that impossible.
+
+[09:45:56.0165] <rbuckton>
+Private state can only maintain its privacy if you can ensure the same encapsulation exists in both realms.
+
+[09:46:30.0703] <Richard Gibson>
+> <@bakkot:matrix.org> There's only a small handful of bundlers in common use, and they're all maintained by specific individuals who you can talk to, so I don't want to design a feature on the assumption that bundlers will not be writing careful handling
+
+I'm not limiting "more robust" to bundlers, just using that as an easily understood example. The same applies to e.g. dynamic code evaluation/version skew/etc.
+
+[09:47:16.0012] <keith_miller>
+Do shared structs allow for private state in the current proposal?
+
+[09:47:39.0019] <rbuckton>
+No, it is not part of the MVP. They do allow fields, methods, getters, and setters though. 
+
+[09:47:44.0277] <keith_miller>
+Is that strictly needed? Or just ergonomic?
+
+[09:47:57.0456] <rbuckton>
+I believe it is needed.
+
+[09:48:32.0493] <rbuckton>
+You cannot use a `WeakMap` as pseudo-privacy like you might have done for a `class` because a `WeakMap` is local to a specific thread/agent/realm.
+
+[09:48:34.0823] <keith_miller>
+Because it seems like you could wrap the private bits in a per-worker wrapper?
+
+[09:48:59.0170] <rbuckton>
+How, without exposing the private state as public state?
+
+[09:49:22.0560] <rbuckton>
+You have to share something between threads to communicate private state, and if it is not itself private then there is no private state.
+
+[09:49:22.0946] <keith_miller>
+I guess you can't have that in transitive members though?
+
+[09:50:49.0044] <keith_miller>
+I also don't fully understand how private state interacts with wasm GC
+
+[09:52:10.0401] <rbuckton>
+If private state was important for `class`, despite `WeakMap` as a possible solution, then it is _more_ important for `struct` as `WeakMap` is not a possible solution. There are a lot of open questions on private state, which is why it's not part of the MVP, but I don't want to chose a direction that completely rules it out as a possibility.
+
+[09:52:46.0225] <rbuckton>
+Are we resuming at 1:00pm or 1:10pm?
+
+[09:53:43.0970] <shu>
+i heard 1
+
+[09:54:23.0965] <rbuckton>
+Ah, trying to finish eating and wrangling my dogs before we start back up. Thanks
+
+[09:54:37.0998] <ljharb>
+you're eating your dogs?
+
+[09:54:44.0747] <rbuckton>
+lol.
+
+[09:54:47.0961] <ljharb>
+ * you're eating your dogs? (lol sorry, will take it to tdz)
+
+[09:55:33.0597] <Richard Gibson>
+> <@rbuckton:matrix.org> I did not build such a thing, but I do have a document describing that kind of interaction. There is a lot more user error involved though. I also have hopes to eventually support `#name` private state, but it isn't safe to do so unless I can be certain the struct declarations on both sides are identical. A handshaking mechanism makes that impossible.
+
+I dispute the "makes that impossible" claim. As a strawperson, consider
+```
+shared struct SharedPoint {
+  …
+  #id
+  x;
+  y;
+}
+```
+describing a struct with three fields in which instance properties `x` and `y` can be accessed from anywhere but `#id` can be accessed only from functions within the definition (i.e., just like `class`)
+
+[09:55:53.0151] <Richard Gibson>
+> <@rbuckton:matrix.org> I did not build such a thing, but I do have a document describing that kind of interaction. There is a lot more user error involved though. I also have hopes to eventually support `#name` private state, but it isn't safe to do so unless I can be certain the struct declarations on both sides are identical. A handshaking mechanism makes that impossible.
+
+ * I dispute the "makes that impossible" claim. As a strawperson, consider
+
+```
+shared struct SharedPoint {
+  …
+  #id;
+  x;
+  y;
+}
+```
+
+describing a struct with three fields in which instance properties `x` and `y` can be accessed from anywhere but `#id` can be accessed only from functions within the definition (i.e., just like `class`)
+
+[09:55:59.0151] <Richard Gibson>
+ * I dispute the "makes that impossible" claim. As a strawperson, consider
+
+```
+shared struct SharedPoint {
+  #id;
+  x;
+  y;
+  …
+}
+```
+
+describing a struct with three fields in which instance properties `x` and `y` can be accessed from anywhere but `#id` can be accessed only from functions within the definition (i.e., just like `class`)
+
+[09:56:38.0732] <rbuckton>
+Sure. And via handshaking I can replace what with my own `SharedPoint` that has a getter that exposes `#id`.
+
+[09:56:55.0348] <rbuckton>
+The correlation must be unforgeable.
+
+[09:56:55.0593] <Richard Gibson>
+correct
+
+[09:57:12.0351] <Richard Gibson>
+because...?
+
+[09:57:37.0634] <rbuckton>
+Otherwise a bad actor could spin up a worker with code that does this, pass it a shared struct instance, and extract the private state.
+
+[09:58:04.0584] <ljharb>
+or even observe that it exists.
+
+[09:58:28.0022] <keith_miller>
+How are they doing this?
+
+[09:58:49.0090] <Richard Gibson>
+it seems like you and I have wildly different threat models and conceptions of the purpose of private fields
+
+[09:58:52.0747] <keith_miller>
+Wouldn't they be different types? With different private names?
+
+[09:58:52.0952] <rbuckton>
+Sorry, must finish eating and prep for my presentation.
+
+[10:00:28.0710] <Mathieu Hofman>
+> <@rbuckton:matrix.org> Private state can only maintain its privacy if you can ensure the same encapsulation exists in both realms.
+
+Not entirely true. If the capability is derived from the shared struct declaration, it is likely fine for that capability to allow wiring private state access. The same way you can declare static methods on a class that can be plucked to give friends the ability to access class privates. 
+
+[10:01:55.0941] <Richard Gibson>
+exactly. Access to private fields in the above example would require a reference to the struct _definition_; a mere instance would not suffice
+
+[10:02:45.0670] <littledan>
+> <@keith_miller:matrix.org> Wouldn't they be different types? With different private names?
+
+it'd be like, you'd have a different private name in each agent, but they would both be associated to the same underlying field in memory
+
+[10:02:57.0022] <eemeli>
+ryzokuken / Chris de Almeida : Will we have time for the extractor continuation?
+
+[10:02:58.0689] <Chris de Almeida>
+for anyone who is disappointed that they missed their opportunity to help with the notes during this plenary meeting, there is an opportunity opening up in about 30 minutes after this topic.  please register your interest by contacting the chair group. first come, first served.  thank you 🙏
+
+[10:03:35.0962] <Chris de Almeida>
+> <@eemeli:mozilla.org> ryzokuken / Chris de Almeida : Will we have time for the extractor continuation?
+
+virtually no chance, unfortunately 😞
+
+[10:03:46.0629] <eemeli>
+Alas.
+
+[10:04:42.0126] <Aki>
+yikes i'm having a really hard time cognitively keeping up, this is the first time i've tried doing notes since i went on leave for a head injury and maybe it was a touch overambitious of me
+
+[10:05:49.0743] <Chris de Almeida>
+> <@akirose:matrix.org> yikes i'm having a really hard time cognitively keeping up, this is the first time i've tried doing notes since i went on leave for a head injury and maybe it was a touch overambitious of me
+
+oh.  hopefully Daniel is able to keep up. chais also help but aren't always able to. if you need to bow out, no worries, don't feel obliged if the vibes are off
+
+[10:06:02.0091] <Chris de Almeida>
+> <@akirose:matrix.org> yikes i'm having a really hard time cognitively keeping up, this is the first time i've tried doing notes since i went on leave for a head injury and maybe it was a touch overambitious of me
+
+ * oh.  hopefully Daniel is able to keep up. chairs also help but aren't always able to. if you need to bow out, no worries, don't feel obliged if the vibes are off
+
+[10:10:49.0699] <Michael Ficarra>
+the getter and the FinalizationRegistry solutions don't seem so bad...
+
+[10:13:19.0126] <ptomato>
+particularly FinalizationRegistry seems pretty suboptimal compared to strict enforcement where you can just throw one exception saying "you forgot `using`" _from the source code location where you forgot it_
+
+[10:13:38.0842] <bakkot>
+FinalizationRegistry is very bad
+
+[10:13:43.0369] <bakkot>
+it is not a guarantee at all
+
+[10:13:49.0081] <bakkot>
+and it is at some point in the future
+
+[10:13:59.0798] <bakkot>
+it's really, really not a solution for anything except releasing memory
+
+[10:14:04.0481] <bakkot>
+which is the only thing it was ever for
+
+[10:15:29.0114] <Mathieu Hofman>
+FR is only ok here as a diagnostic mechanism 
+
+[10:24:46.0452] <Justin Ridgewell>
+Is @shuyuguo:matrix.org's concern that you can just manually call `foo[Symbol.enter]()` and so there’s no real enforcement?
+
+[10:25:00.0282] <shu>
++ it's still not local warning to the user doing something wrong
+
+[10:25:13.0062] <bakkot>
+yeah but you don't have the resource if you don't call Symbol.enter, so there's no leak
+
+[10:25:19.0415] <shu>
+right okay
+
+[10:25:29.0911] <shu>
+i think i understand it now, it's just not [[nodiscard]]
+
+[10:25:32.0402] <shu>
+it's something pretty different
+
+[10:25:35.0433] <bakkot>
+yeah
+
+[10:26:15.0847] <ljharb>
+it really does seem like you have to gate every public operation on "the dispose getter has been called, and the resource is not yet disposed"
+
+[10:26:43.0395] <ljharb>
+iow, the entire thing is invalid before being `using`d - queued for disposal - and again invalid after disposal
+
+[10:26:51.0238] <bakkot>
+"resource is not yet disposed" is not quite as important; that can be invalid but is not a leak
+
+[10:27:34.0389] <bakkot>
+it's still probably good practice but the hit to performance for public fields is not necessarily worth it
+
+[10:27:34.0972] <ljharb>
+ * it really does seem like you have to gate every public operation on "the dispose getter has been called, and the resource is not yet disposed" (in order to get the enforcement that motivates this proposal)
+
+[10:27:53.0116] <shu>
+can... TS add [[nodiscard]]?
+
+[10:28:06.0638] <ljharb>
+not yet disposed? or not yet queued for disposal? because the former is the only time you want people to interact with the resource
+
+[10:28:12.0564] <bakkot>
+https://github.com/microsoft/TypeScript/issues/8240
+
+[10:28:16.0246] <ljharb>
+ * not yet disposed? or not yet queued for disposal? because the former true, and the latter false, is the only time you want people to interact with the resource, i'd think
+
+[10:28:30.0647] <Ashley Claymore>
+The userland solution might be a naming convention
+
+[10:28:40.0258] <Ashley Claymore>
+like how in react all hooks are `use[A-Z...`
+
+[10:28:54.0498] <Ashley Claymore>
+and linters enforce where they are allowed to be called from
+
+[10:28:56.0622] <ljharb>
+oof, that was such a poor choice by react tho
+
+[10:29:05.0458] <bakkot>
+unfortunately Ron wants to add it to existing things, which do not follow any naming convention
+
+[10:29:21.0018] <ljharb>
+i think they're still planning to name their new mega-hook "use", so RIP googling for things
+
+[10:29:21.0808] <bakkot>
+ * unfortunately Ron wants to add Symbol.dispose to existing things, which do not follow any naming convention
+
+[10:29:26.0930] <Ashley Claymore>
+> <@bakkot:matrix.org> unfortunately Ron wants to add Symbol.dispose to existing things, which do not follow any naming convention
+
+they'll have to be grandparented in to the set of names ;)
+
+[10:29:52.0272] <bakkot>
+inconsistent naming I think makes that naming not viable as a solution for saving people from errors here
+
+[10:30:16.0192] <littledan>
+It'd be nice if we can really nail down the full scope of these protocols before Stage 3. It'll make rollout of this solution slower to have this diversity of interpretations for using.
+
+[10:31:39.0409] <littledan>
+It's too bad that this proposal doesn't give strong enough guarantees to let us use it for AsyncContext
+
+[10:32:15.0074] <ptomato>
+I'm not sure I understand why adding strict enforcement will bifurcate the ecosystem. resource management doesn't exist currently; code wanting to use resource management needs to port, so why would strict enforcement be a burden that hinders adoption?
+
+[10:33:01.0130] <bakkot>
+rbuckton: to be clear I am not going to block further advancement of `using` on this feature existing: it is too late in the process
+
+[10:33:13.0120] <rbuckton>
+_Mandatory_ strict enforcement could cause bifurcation. That's why this is an opt-in mechanism.
+
+[10:33:20.0643] <Andreu Botella>
+> <@littledan:matrix.org> It's too bad that this proposal doesn't give strong enough guarantees to let us use it for AsyncContext
+
+I opened an issue to discuss this: https://github.com/rbuckton/proposal-using-enforcement/issues/1
+
+[10:33:32.0159] <Andreu Botella>
+> <@littledan:matrix.org> It's too bad that this proposal doesn't give strong enough guarantees to let us use it for AsyncContext
+
+ * I opened an issue yesterday to discuss this: https://github.com/rbuckton/proposal-using-enforcement/issues/1
+
+[10:33:38.0191] <Mathieu Hofman>
+> <@littledan:matrix.org> It's too bad that this proposal doesn't give strong enough guarantees to let us use it for AsyncContext
+
+why is it not sufficient?
+
+[10:33:42.0496] <littledan>
+> <@pchimento:igalia.com> I'm not sure I understand why adding strict enforcement will bifurcate the ecosystem. resource management doesn't exist currently; code wanting to use resource management needs to port, so why would strict enforcement be a burden that hinders adoption?
+
+I think it means, if some transpilers/browsers ship the initial `using` semantics, and others ship the later semantics, then it's harder to start shipping APIs using strict enforcement (since it's not enough to check whether the syntax exists, you also have to check that users are updated)
+
+[10:34:06.0421] <littledan>
+> <@mhofman:matrix.org> why is it not sufficient?
+
+you can just call enter and not call dispose, so you'd have unbalanced use of the stack
+
+[10:34:11.0484] <ptomato>
+> <@littledan:matrix.org> I think it means, if some transpilers/browsers ship the initial `using` semantics, and others ship the later semantics, then it's harder to start shipping APIs using strict enforcement (since it's not enough to check whether the syntax exists, you also have to check that users are updated)
+
+that's the breaks of stage 3 though?
+
+[10:34:34.0497] <littledan>
+> <@pchimento:igalia.com> that's the breaks of stage 3 though?
+
+right, the part that makes this painful is that we knew about this part of the design space through the whole life of the `using` proposal.
+
+[10:34:43.0293] <Michael Ficarra>
+it is within our power to demote a proposal from stage 3 to 2
+
+[10:35:03.0357] <rbuckton>
+> <@littledan:matrix.org> you can just call enter and not call dispose, so you'd have unbalanced use of the stack
+
+Calling enter is an explicit action the user takes. They are opting out of strict enforcement, and thus must ensure they do the work themselves.
+
+[10:35:42.0603] <rbuckton>
+I've said elsewhere, I'd be fine with a `Symbol.enter_DO_NOT_USE_OR_YOU_WILL_BE_FIRED`, or something less meme-y, to illustrate the unsafe nature of the operation.
+
+[10:35:57.0368] <Andreu Botella>
+> <@rbuckton:matrix.org> Calling enter is an explicit action the user takes. They are opting out of strict enforcement, and thus must ensure they do the work themselves.
+
+We agree that if a user does this, their code is buggy. That's not in discussion. But some use cases need something stricter
+
+[10:36:08.0894] <Andreu Botella>
+> <@rbuckton:matrix.org> Calling enter is an explicit action the user takes. They are opting out of strict enforcement, and thus must ensure they do the work themselves.
+
+ * We agree that if a user does this, their code is buggy. I don't think that's in discussion. But some use cases need something stricter
+
+[10:36:10.0350] <keith_miller>
+I'm going to guess that implementors are going to reject production work for the equivelent of a [[nodiscard]] attribute. I know I currently would.
+
+[10:36:20.0275] <littledan>
+> <@rbuckton:matrix.org> Calling enter is an explicit action the user takes. They are opting out of strict enforcement, and thus must ensure they do the work themselves.
+
+right, so in the rollout, people may find themselves wanting to do that more than would be optimal, to deal with the risk that their code will be transpired with an older version of `using`.
+
+[10:36:20.0968] <keith_miller>
+ * I'm going to guess that implementors are going to reject production time work for the equivelent of a \[\[nodiscard\]\] attribute. I know I currently would.
+
+[10:36:39.0525] <rbuckton>
+> <@abotella:igalia.com> We agree that if a user does this, their code is buggy. I don't think that's in discussion. But some use cases need something stricter
+
+Without a compiler or type system, I'm not sure something stricter is entirely feasible in JS. 
+
+[10:37:00.0935] <littledan>
+> <@rbuckton:matrix.org> Without a compiler or type system, I'm not sure something stricter is entirely feasible in JS.
+
+AsyncContext currently enforces stack discipline strictly by having a callback-based API.
+
+[10:37:11.0512] <littledan>
+but there's real demand for having something "flatter"
+
+[10:37:11.0907] <ljharb>
+you'd do it with a type-aware linter, like typescript-eslint
+
+[10:37:31.0115] <Michael Ficarra>
+unary plus is such a weird thing to have
+
+[10:37:31.0225] <ljharb>
+ * you'd do it with a type-aware linter, like typescript-eslint. that's already how people catch unawaited promises with the `no-floating-promises` rule.
+
+[10:37:38.0922] <Michael Ficarra>
+what was the intention behind its inclusion?
+
+[10:37:46.0591] <Mathieu Hofman>
+> <@littledan:matrix.org> you can just call enter and not call dispose, so you'd have unbalanced use of the stack
+
+sure, but just don't do that? disposables are not only used syntactically. If you call enter, you accept responsibility to call dispose
+
+[10:37:48.0833] <ptomato>
+I mean, I'm trying to understand how bad the burden of mandatory enforcement would be? I expect the vast majority of the potential future users of this feature have not ported their code yet (or written it, for that matter)
+
+[10:38:40.0564] <Andreu Botella>
+> <@mhofman:matrix.org> sure, but just don't do that? disposables are not only used syntactically. If you call enter, you accept responsibility to call dispose
+
+Do we want to allow that to effectively pollute the caller's scope, switching the current context at their function from under their feet? That's not something I'm confortable with
+
+[10:38:43.0155] <Mathieu Hofman>
+> <@abotella:igalia.com> We agree that if a user does this, their code is buggy. I don't think that's in discussion. But some use cases need something stricter
+
+I still do not understand the use case
+
+[10:38:56.0926] <ptomato>
+anyway is there a github issue where I can follow this? I'm splitting my attention between this discussion and Kevin's presentation and it's not working very well 😄
+
+[10:39:25.0665] <littledan>
+Yes, we can follow up in https://github.com/rbuckton/proposal-using-enforcement/issues/1
+
+[10:39:57.0156] <rbuckton>
+> <@pchimento:igalia.com> I mean, I'm trying to understand how bad the burden of mandatory enforcement would be? I expect the vast majority of the potential future users of this feature have not ported their code yet (or written it, for that matter)
+
+It depends on the definition of mandatory enforcement. There are two approaches: some magic mechanism that indicates to the resource producer the user is initializing to a `using`, or that `using` and `DisposableStack` explicitly call `[Symbol.enter]` and throw if it doesn't exist.
+
+[10:40:11.0194] <Andreu Botella>
+> <@mhofman:matrix.org> sure, but just don't do that? disposables are not only used syntactically. If you call enter, you accept responsibility to call dispose
+
+ * Do we want to allow that to effectively pollute the caller's scope, switching the current context at their function from under their feet? That's something the current AsyncContext proposal explicitly avoids doing
+
+[10:40:53.0834] <Michael Ficarra>
+RequireObjectCoercible -> is an Object
+
+[10:41:09.0590] <Mathieu Hofman>
+> <@abotella:igalia.com> Do we want to allow that to effectively pollute the caller's scope, switching the current context at their function from under their feet? That's something the current AsyncContext proposal explicitly avoids doing
+
+Ok I think I now understand, and I have ideas on how to do this at the AsyncContext API layer
+
+[10:41:31.0129] <rbuckton>
+A magical mechanism doesn't work with `DisposableStack` and wouldn't allow user-defined resource management building blocks.
+
+[10:42:16.0645] <ljharb>
+lol, core-js used to make Number.prototype iterable
+
+[10:44:43.0234] <rbuckton>
+If `[Symbol.enter]` is mandatory, existing APIs would have to write `[Symbol.enter]() { return this; }`, or would need to duplicate the API to one that produces an object with a `[Symbol.enter]()`. API Bifurcation is a documentation and maintenance headache and would break the ability for tools to introduce simple refactors from `const res = ...; try { ... } finally { res.close(); }` to `using res = ...`
+
+[10:45:52.0718] <Andreu Botella>
+are we conflating two separate things? I don't think "true strict enforcement" necessarily means a mandatory `[Symbol.enter]`
+
+[10:46:37.0450] <rbuckton>
+For examples of existing APIs that could be adapted to support `[Symbol.dispose]`, see https://github.com/tc39/proposal-explicit-resource-management#relation-to-dom-apis and https://github.com/tc39/proposal-explicit-resource-management?tab=readme-ov-file#relation-to-nodejs-apis
+
+[10:46:50.0262] <rbuckton>
+> <@abotella:igalia.com> are we conflating two separate things? I don't think "true strict enforcement" necessarily means a mandatory `[Symbol.enter]`
+
+What would you consider to be "true strict enforcement"?
+
+[10:47:14.0866] <Andreu Botella>
+> <@rbuckton:matrix.org> A magical mechanism doesn't work with `DisposableStack` and wouldn't allow user-defined resource management building blocks.
+
+^ this "magical mechanism"
+
+[10:48:04.0742] <rbuckton>
+Can you conceive of a magical mechanism that works with both `using` and `DisposableStack` and user-defined resource management wrapper classes?
+
+[10:48:58.0458] <Andreu Botella>
+I don't have an alternative, but I think that issue has been conflated with the mandatoryness of `[Symbol.enter]`
+
+[10:49:22.0179] <rbuckton>
+for example, if there were a `function.using` meta-property accessible within a function that is only `true` when being initialized to a `using`, how would that work with `DisposableStack.prototype.use`?
+
+[10:50:18.0926] <rbuckton>
+I wasn't trying to conflate strict enforcement with mandatory enforcement. They are mostly separate concerns.
+
+[10:50:56.0894] <rbuckton>
+I'm bouncing between two different discussions
+
+[10:51:38.0093] <bakkot>
+that was much faster than I was expecting!
+
+[10:52:50.0329] <rbuckton>
+Mandatory enforcement is a concern for API bifurcation. In general I don't believe mandatory enforcement is necessary, API producers should be able to opt-in or opt-out of enforcement, as should API consumers. 
+
+[10:54:46.0119] <rbuckton>
+API producers need an opt-out mechanism for existing APIs or for APIs that don't require such a guarantee. API consumers need an opt-out mechanism so they can compose disposables in their own classes and extend resource management capabilities in userland.
+
+[10:55:00.0130] <Justin Ridgewell>
+Agree, mandatory use of `enter` is necessary.
+
+[10:55:16.0404] <Justin Ridgewell>
+But for APIs that choose to have an `enter`, some require much stricter requirements.
+
+[10:55:23.0956] <Justin Ridgewell>
+(I still need to read https://github.com/rbuckton/proposal-using-enforcement/issues/1)
+
+[10:55:27.0853] <rbuckton>
+> <@jridgewell:matrix.org> Agree, mandatory use of `enter` is necessary.
+
+What are you agreeing with?
+
+[10:55:34.0756] <Justin Ridgewell>
+But ideally we’d only allow syntatic `using`.
+
+[10:55:49.0940] <Justin Ridgewell>
+> <@rbuckton:matrix.org> Mandatory enforcement is a concern for API bifurcation. In general I don't believe mandatory enforcement is necessary, API producers should be able to opt-in or opt-out of enforcement, as should API consumers. 
+
+I was agreeing with this.
+
+[10:55:56.0411] <rbuckton>
+I believe `Symbol.enter` is optional, for those APIs that need it.
+
+[10:56:06.0915] <Mathieu Hofman>
+Syntactic super powers make me feel suspicious
+
+[10:56:12.0180] <rbuckton>
+We can't only have syntactic using.
+
+[10:56:30.0206] <rbuckton>
+You absolutely need composition.
+
+[10:56:57.0169] <Justin Ridgewell>
+`AsyncContext` demands knowing whether you’re using `using` syntatically, using `DisposableStack` (bad), or manually calling (even worse).
+
+[10:57:21.0719] <Mathieu Hofman>
+I don't think this use case requires such a capability. I'll write down my idea after plenary
+
+[10:57:51.0147] <rbuckton>
+why is `DisposableStack` bad?
+
+[10:58:01.0682] <Justin Ridgewell>
+Only syntatic `using` guarantees returning the context stack to the appropriate state.
+
+[10:58:16.0796] <Mathieu Hofman>
+Nope there are alternatives
+
+[10:58:19.0486] <Justin Ridgewell>
+`DisposableStack` may not be disposed.
+
+[10:58:31.0003] <Justin Ridgewell>
+Or it’s disposed later.
+
+[10:58:38.0183] <Justin Ridgewell>
+In which case the caller has been polluted.
+
+[10:58:44.0443] <Mathieu Hofman>
+you can do a hybrid by introducing a single new stack entry
+
+[10:58:45.0539] <Justin Ridgewell>
+Either way, it doesn’t work.
+
+[10:59:33.0080] <Andreu Botella>
+My point with opening that issue is to point out that there are use cases that need something stricter. I would be fine with the proposal simply not supporting that, and using callbacks.
+
+[10:59:36.0656] <rbuckton>
+`DisposableStack`, or any other composition mechanism, is a necessity for building applications that work with resources.
+
+[10:59:54.0050] <Justin Ridgewell>
+I’m not arguing against `DisposableStack` in general.
+
+[11:00:08.0286] <Justin Ridgewell>
+But it’s not acceptable for `AsyncContext`.
+
+[11:01:02.0614] <rbuckton>
+I only have a very rough idea of the use case for `AsyncContext` you're concerned about.
+
+[11:01:07.0828] <bakkot>
+ljharb: should `Array.zip` zip iterables or arrays or array-likes?
+
+[11:01:12.0649] <rbuckton>
+I think I need more context.
+
+[11:01:23.0036] <bakkot>
+presumably array-likes?
+
+[11:01:38.0158] <ljharb>
+iirc all the array things, except Array.from/fromAsync, take "arraylikes" only (which includes arrays)
+
+[11:01:44.0449] <bakkot>
+and of course it will produce an array rather than an iterator
+
+[11:01:54.0699] <ljharb>
+right
+
+[11:02:04.0540] <Mathieu Hofman>
+The stack frame requirement comes from the use case (AsyncContext). It happens that `using` is a close concept: scope. I will provide an example of API that satisfies the use case without making `using` required
+
+[11:02:14.0366] <ljharb>
+i don't *mind* if it takes iteratables, but at that point `Array.zip(iterable)` is just sugar for `Iterator.zip(iterable).toArray()` which isn't that valuable
+
+[11:02:18.0703] <ljharb>
+ * i don't _mind_ if it takes iterables, but at that point `Array.zip(iterable)` is just sugar for `Iterator.zip(iterable).toArray()` which isn't that valuable
+
+[11:02:34.0638] <ljharb>
+ * i don't _mind_ if it takes iterables, but at that point `Array.zip(...iterables)` is just sugar for `Iterator.zip(...iterables).toArray()` which isn't that valuable
+
+[11:03:00.0142] <Justin Ridgewell>
+> <@rbuckton:matrix.org> I think I need more context.
+
+I’ll provide details in the #1 issue later today
+
+[11:03:42.0972] <bakkot>
+(it's `.zip(iterables)` not a var-args, to be clear)
+
+[11:04:12.0045] <ljharb>
+ * i don't _mind_ if it takes iterables, but at that point `Array.zip(iterables)` is just sugar for `Iterator.zip(iterables).toArray()` which isn't that valuable
+
+[11:05:11.0712] <bakkot>
+this seems like it will be a useful place to Stop Coercing Things, so that `{ optionsbag }` isn't treated as an array-like of length 0
+
+[11:09:29.0662] <ljharb>
+```
+let x
+(a) = b;
+```
+
+[11:09:52.0672] <ljharb>
+ * WH's example:
+```
+let x
+(a) = b;
+```
+
+[11:10:13.0660] <bakkot>
+`let` strikes again, I hate it
+
+[11:10:20.0753] <ljharb>
+an NLTH between the identifier and the `(` seems fine to me
+
+[11:10:28.0518] <ljharb>
+ * an NLTH between the identifier and the `(` seems fine to me, just for extractors
+
+[11:10:43.0818] <bakkot>
+the line break restriction is also bad, I want to write
+
+```
+let Foo
+  (long extractor pattern) = RHS
+```
+
+[11:10:46.0630] <ljharb>
+i don't have empathy for folks who want to write calls like
+```
+fn
+(a, b)
+```
+
+[11:10:50.0246] <ljharb>
+lol
+
+[11:11:06.0953] <ljharb>
+i'd expect there to see
+```
+let Foo(
+  long extractor pattern
+) = RHS
+```
+
+[11:11:07.0812] <littledan>
+extractors are extremely limited in their syntax; this seems way more minor than the other parts
+
+[11:11:19.0281] <littledan>
+> <@ljharb:matrix.org> i'd expect there to see
+> ```
+> let Foo(
+>   long extractor pattern
+> ) = RHS
+> ```
+
+I don't think Waldemar's case runs into that
+
+[11:11:46.0593] <littledan>
+I think we're just talking about between `Foo` and `)`
+
+[11:11:50.0926] <ljharb>
+true, it's only if the extractor pattern looks like a valid parenthesized LHS?
+
+[11:12:19.0015] <littledan>
+(I don't understand the question)
+
+[11:12:58.0527] <bakkot>
+man ASI is just the worst
+
+[11:12:59.0447] <ljharb>
+like i think waldemar's ambiguity pops up only when the extractor pattern is a valid thing to be in a `(reference) =` usage
+
+[11:13:12.0059] <ljharb>
+eg, `(x) = 3` is currently valid, `(x, y) = 3` is not
+
+[11:13:19.0741] <ljharb>
+ * eg, `(x) = 3` is currently valid, `(x, y) = 3` is not, so only the former has the conflict
+
+[11:13:34.0078] <ljharb>
+and we couldn't even agree to *suggest people avoid it*
+
+[11:13:52.0813] <ljharb>
+ * eg, `(x) = 3` is currently valid, `(x, y) = 3` is not, so only the former has the conflict, afaict
+
+[11:14:01.0728] <littledan>
+we actually *did* agree to suggest people avoid it! and then took it back
+
+[11:14:26.0202] <ljharb>
+fax
+
+[11:14:39.0826] <ljharb>
+i guess our decision got a second-pass
+
+[11:14:41.0201] <littledan>
+I wish we required you to start your arrow functions with a `^` or something
+
+[11:14:52.0544] <ljharb>
+ * eg, `(x) = 3` and `(x.y) = 3` are currently valid, `(x, y) = 3` is not, so only the former have the conflict, afaict
+
+[11:15:00.0392] <littledan>
+but now I'm dreaming of other possible uses for prefix ^
+
+[11:15:12.0886] <ljharb>
+(parenthesized assignment LHS's are gross also)
+
+[11:16:03.0866] <bakkot>
+`(x, y) = 3 technically doesn't but introducing a cover grammar which could distinguish those would be a nightmare
+
+[11:16:07.0868] <bakkot>
+ * `(x, y) = 3` technically doesn't but introducing a cover grammar which could distinguish those would be a nightmare
+
+[11:17:31.0667] <ljharb>
+but as long as we say that extractors are only an identifier followed by a no-newline `(`, then i think the problem's solved?
+
+[11:17:53.0658] <rbuckton>
+As I understand it, Waldemar's concern is this:
+
+```
+let a
+(b) = {};
+```
+
+[11:18:03.0202] <dminor>
+Did Extractors advance to Stage 2? I wasn't clear if all blocking concerns were withdrawn.
+
+[11:18:21.0395] <rbuckton>
+I don't believe it did, no.
+
+[11:18:25.0798] <littledan>
+> <@dminor:mozilla.org> Did Extractors advance to Stage 2? I wasn't clear if all blocking concerns were withdrawn.
+
+Extractors did not advance to Stage 2. The sole blocking concern was the NLT issue.
+
+[11:18:28.0400] <Michael Ficarra>
+> <@littledan:matrix.org> I wish we required you to start your arrow functions with a `^` or something
+
+backslash surely
+
+[11:18:33.0052] <dminor>
+Ok, thank you.
+
+[11:18:46.0533] <littledan>
+> <@michaelficarra:matrix.org> backslash surely
+
+,\
+
+[11:18:47.0236] <rbuckton>
+It sounded like the cover grammar complexity might not be blocking, but the NLT issue is still a concern.
+
+[11:19:08.0928] <littledan>
+> <@rbuckton:matrix.org> It sounded like the cover grammar complexity might not be blocking, but the NLT issue is still a concern.
+
+the cover grammar complexity will be investigated during stage 2, to resolve before stage 2.7
+
+[11:19:10.0207] <bakkot>
+> <@ljharb:matrix.org> but as long as we say that extractors are only an identifier followed by a no-newline `(`, then i think the problem's solved?
+
+yeah, but waldemar didn't like that solution either
+
+[11:19:12.0299] <shu>
+> <@rbuckton:matrix.org> It sounded like the cover grammar complexity might not be blocking, but the NLT issue is still a concern.
+
+not blocking for stage 2. i need to do more work to figure out how blocking we consider it for 3
+
+[11:19:13.0250] <bakkot>
+(I would be fine with it)
+
+[11:21:52.0310] <Richard Gibson>
+> <@ljharb:matrix.org> (parenthesized assignment LHS's are gross also)
+
+`++((Ⅰ))`
+
+[11:22:03.0478] <rbuckton>
+We would need an NLT in binding patterns, which seems fine to me. The question is how easy is it to make the NLT conditional on whether we're parsing a `let`/`const`/`var` or not.
+
+[11:26:15.0706] <Michael Ficarra>
+the first speaker (currently being referred to as JRA in the notes) is not assigned this abbreviation in https://github.com/tc39/notes/blob/main/delegates.txt
+
+[11:26:29.0901] <Michael Ficarra>
+could someone reach out to them to create a PR?
+
+[11:28:09.0534] <shu>
+i did already https://github.com/tc39/notes/pull/318
+
+[11:28:11.0816] <waldemar>
+I'm having trouble understanding the syntax of the slides
+
+[11:28:44.0487] <Michael Ficarra>
+oh okay thanks @shuyuguo:matrix.org
+
+[11:29:01.0832] <waldemar>
+What's ({{counter.parity}})?
+
+[11:29:47.0339] <ljharb>
+literal parens, with a rendered JS value inside them
+
+[11:29:49.0749] <Michael Ficarra>
+@shuyuguo:matrix.org oh, it hasn't been merged because CI is failing due to you not adding them in the correct order
+
+[11:29:50.0521] <rbuckton>
+It's vue's templating mechanism.
+
+[11:30:01.0051] <shu>
+> <@michaelficarra:matrix.org> @shuyuguo:matrix.org oh, it hasn't been merged because CI is failing due to you not adding them in the correct order
+
+oh
+
+[11:31:09.0045] <shu>
+someone more inclined can fix
+
+[11:34:09.0576] <ljharb>
+i'm confused, isn't the parity supposed to autoupdate with the counter?
+
+[11:34:14.0834] <littledan>
+Preact does recreate the vdom, but at least we didn't bother recalculating parity 
+
+[11:34:29.0409] <ljharb>
+but 2 isn't odd
+
+[11:34:32.0522] <littledan>
+and Preact may be able to save more work when you have nested components--Preact only has to re-render at the component level
+
+[11:35:10.0690] <littledan>
+> <@ljharb:matrix.org> i'm confused, isn't the parity supposed to autoupdate with the counter?
+
+in this case, because it incremented by 2, the parity bit stayed the same, so we didn't have to redo the expensive calculation to change 1/0 into odd/even
+
+[11:35:13.0963] <ljharb>
+ * but 2 isn't odd. the parity depends on the counter.
+
+[11:35:17.0589] <rbuckton>
+> <@ljharb:matrix.org> but 2 isn't odd
+
+1 + 2 is
+
+[11:35:23.0366] <keith_miller>
+ljharb: It's was X+2 so parity shouldn't change
+
+[11:35:25.0697] <ljharb>
+ahhh gotcha
+
+[11:35:42.0053] <ljharb>
+thanks
+
+[11:35:58.0013] <littledan>
+so we memoize things in the data dependency graph so that we have to do minimal work to recompute based on changes
+
+[11:36:12.0766] <keith_miller>
+I'm confused is this some mechanism where at closure time we detect the captured variable is a Signal?
+
+[11:36:59.0343] <littledan>
+> <@keith_miller:matrix.org> I'm confused is this some mechanism where at closure time we detect the captured variable is a Signal?
+
+there's a hidden global variable that tracks all the signals read within the execution of the computed
+
+[11:37:10.0540] <keith_miller>
+I don't understand how we would know that `parity` doesn't need to be updated in general
+
+[11:37:34.0366] <ljharb>
+what about signals that aren't unconditionally read?
+
+[11:37:37.0211] <ljharb>
+ * what about signals that aren't unconditionally read in the computation?
+
+[11:38:05.0106] <rbuckton>
+I expect the execution of `Computed`'s callback could record any `get` for a nested signal
+
+[11:38:33.0600] <rbuckton>
+> <@ljharb:matrix.org> what about signals that aren't unconditionally read in the computation?
+
+Their changes don't matter until the condition that made them unread changes?
+
+[11:38:46.0103] <ljharb>
+this sounds like why react hooks force you via linter to always unconditionally run all hooks, which is super annoying and unergonomic
+
+[11:38:59.0086] <ljharb>
+> <@rbuckton:matrix.org> Their changes don't matter until the condition that made them unread changes?
+
+right but you have to rerun the computation, then, to know if it's updated
+
+[11:39:07.0296] <ljharb>
+which means doing the expensive thing
+
+[11:39:33.0670] <keith_miller>
+What if the condition isn't tracked by a Signal?
+
+[11:39:43.0175] <keith_miller>
+Is that a bug?
+
+[11:39:43.0226] <shu>
+> <@keith_miller:matrix.org> I don't understand how we would know that `parity` doesn't need to be updated in general
+
+my understanding from reading the readme was that the dependencies are dynamically re-computed per computation (per "pull")
+
+[11:39:43.0868] <rbuckton>
+No, you either record what signals were used and query whether they've changed, or when they change they notify any computations that depend on them.
+
+[11:39:55.0903] <shu>
+oh dan is saying that right now
+
+[11:40:14.0146] <bakkot>
+if your signal depends on values which can change which are not themselves signals, it's not going to be able to correctly track updates
+
+[11:40:23.0618] <bakkot>
+but i mean... don't do that
+
+[11:40:23.0635] <ljharb>
+ok so it doesn't prevent an expensive computation, it prevents *dependent* ones?
+
+[11:40:41.0165] <ljharb>
+ * ok so it doesn't prevent an expensive computation, it prevents _dependent_ expensive ones?
+
+[11:41:19.0916] <Duncan MacGregor>
+I'm trying to think how this would work if multiple realms are involved… Do they all need to share the hidden global?
+
+[11:42:12.0521] <ljharb>
+i'd assume it's realm-specific, since we probably wouldn't want another cross-realm registry
+
+[11:44:01.0558] <Ashley Claymore>
+I thought we didn't want per-realm state :D
+
+[11:44:40.0393] <Mathieu Hofman>
+Observable global mutable state is definitely a concern we want to discuss with the champions.
+
+[11:45:48.0080] <Mathieu Hofman>
+it's fine to have internal global state, but it's not to make it observable to user code. It's a fine line that AsyncContext took a lot of pain to prove and satisfy
+
+[11:46:28.0989] <ljharb>
+i mean, this would effectively just be closed-over variables
+
+[11:46:36.0009] <ljharb>
+it's not an object you can mutate
+
+[11:46:58.0651] <Mathieu Hofman>
+I'm not sufficiently familiar with signals usages, but I'm wondering if there would be ways to implement this auto tracking without making this internal contextual state observable
+
+[11:50:08.0368] <Duncan MacGregor>
+> <@mhofman:matrix.org> I'm not sufficiently familiar with signals usages, but I'm wondering if there would be ways to implement this auto tracking without making this internal contextual state observable
+
+Yeah. It feels like the graph should have GC roots somewhere and shouldn't really need a separate global variable… but I think I'd need some time and paper to work that out.
+
+[11:50:18.0326] <rbuckton>
+Seems like this could be done with weakly held pub/sub events rather than a global variable.
+
+[11:51:06.0748] <Anthony Bullard>
+> <@rbuckton:matrix.org> Seems like this could be done with weakly held pub/sub events rather than a global variable.
+
+This is, if memory serves, closer to userland implementations I’ve seen
+
+[11:51:07.0638] <Ashley Claymore>
+the benefit is that the code doesn't need to know that it's being tracked
+
+[11:51:22.0902] <Ashley Claymore>
+everything adding event observers manually is a lot of work
+
+[11:51:46.0646] <Ashley Claymore>
+with signals, I can call functions and they don't need to know that the things they call to get data are getters that add to the tracking
+
+[11:52:31.0849] <bakkot>
+like `Promise`s
+
+[11:52:32.0906] <Ashley Claymore>
+In FunctionalReactiveProgramming their are events and cells.
+Signals are much more like cells, than events
+
+[11:52:36.0722] <bakkot>
+the data does not need to know you're looking at it
+
+[11:52:41.0945] <Mathieu Hofman>
+I understand the motivation, but this is effectively dynamic scoping, and I'm trying to understand if we can put it back within the limits of fluid scoping that AsyncContext offers
+
+[11:54:00.0748] <Ashley Claymore>
+ * In FunctionalReactiveProgramming there are events and cells.
+Signals are much more like cells, than events
+
+[11:56:46.0738] <Anthony Bullard>
+There needs to be a tracking context/scope, and a way to access the underlying value without tracking.
+
+[11:56:49.0389] <Michael Ficarra>
+this sounds like perfect incubation call material
+
+[11:57:14.0268] <keith_miller>
+Could there be a registry for each signal that's not an hidden global value? Not sure if that would be possible or cause other problems?
+
+[11:57:36.0475] <bakkot>
+> <@michaelficarra:matrix.org> this sounds like perfect incubation call material
+
+they already have other discussions going
+
+[11:57:41.0968] <bakkot>
+I don't think an incubation call would help
+
+[11:57:46.0261] <shu>
+signals sounds like it has _way_ bigger scope than incubation calls
+
+[11:57:46.0530] <keith_miller>
+ * Could there be a registry for each batch of signals that's not an hidden global value? Not sure if that would be possible or cause other problems?
+
+[11:57:54.0937] <ljharb>
+if you create the computed by providing all the signals it cares about explicitly, then you wouldn't need any global state, i think?
+
+[11:57:55.0833] <shu>
+incubation calls are time set-aside for one-off smaller things that don't have regular side discussions
+
+[11:57:57.0404] <Justin Ridgewell>
+This is large enough they need a dedicated group call
+
+[11:58:02.0271] <Duncan MacGregor>
+> <@keith_miller:matrix.org> Could there be a registry for each batch of signals that's not an hidden global value? Not sure if that would be possible or cause other problems?
+
+Couldn't that be on the signal itself?
+
+[11:58:06.0646] <ljharb>
+like `Signal.Computed(fn, signals)`
+
+[11:58:18.0966] <Michael Ficarra>
+> <@jridgewell:matrix.org> This is large enough they need a dedicated group call
+
+sure, even better!
+
+[11:58:22.0179] <shu>
+that would be static dependencies, not dynamic
+
+[11:58:28.0602] <shu>
+that's a pretty big reduction in expressivity
+
+[11:58:36.0320] <shu>
+(not arguing for one way or another, but it's pretty different)
+
+[11:58:38.0556] <bakkot>
+yeah that API would not be worth having
+
+[11:58:39.0352] <Michael Ficarra>
+then I think we should just go for stage 1 and provide all of this feedback in such a call
+
+[11:59:09.0132] <ljharb>
+right, i agree
+
+[11:59:19.0837] <ljharb>
+ * right, i agree with that too
+
+[11:59:20.0391] <danielrosenwasser>
+Yes, these topics seem fair to discuss after stage 1.
+
+[11:59:38.0408] <Anthony Bullard>
+> <@ljharb:matrix.org> if you create the computed by providing all the signals it cares about explicitly, then you wouldn't need any global state, i think?
+
+This ruins a good amount of the ergonomics of this feature
+
+[11:59:39.0413] <Duncan MacGregor>
+Where did the term `Signal` itself come from? It feels like these are Signallers rather than Signals.
+
+[11:59:49.0659] <ljharb>
+> <@anthonybullard:matrix.org> This ruins a good amount of the ergonomics of this feature
+
+it certainly does
+
+[11:59:55.0526] <Justin Ridgewell>
+I’m confused by the global state discussion, there shouldn’t be any.
+
+[12:00:10.0694] <Justin Ridgewell>
+It’s all on the Signal
+
+[12:00:19.0309] <rbuckton>
+While I don't consider it a blocking concern, my concern seemed wide reaching enough that it might be a concern for others who had not previously considered the implications.
+
+[12:00:25.0186] <rbuckton>
+ * While I don't consider it a Stage 1 blocking concern, my concern seemed wide reaching enough that it might be a concern for others who had not previously considered the implications.
+
+[12:00:26.0841] <ljharb>
+but if the ergonomics are only achievable with weird unenforceable caveats like "you must evaluate all signals unconditionally, in the callback", i'm not sure it's worth striving for them (i dont think that's the case, to be clear)
+
+[12:00:36.0326] <ljharb>
+ * but if the ergonomics are only achievable with weird unenforceable caveats like "you must evaluate all signals unconditionally, in the callback" - like react has for hooks, i'm not sure it's worth striving for them (i dont think that's the case, to be clear)
+
+[12:00:55.0555] <Mathieu Hofman>
+> <@jridgewell:matrix.org> It’s all on the Signal
+
+From what I understand it's used for auto-tracking and preventing notify footguns
+
+[12:01:00.0841] <Justin Ridgewell>
+> <@ljharb:matrix.org> but if the ergonomics are only achievable with weird unenforceable caveats like "you must evaluate all signals unconditionally, in the callback" - like react has for hooks, i'm not sure it's worth striving for them (i dont think that's the case, to be clear)
+
+You don’t need to
+
+[12:01:12.0619] <Anthony Bullard>
+> <@jridgewell:matrix.org> I’m confused by the global state discussion, there shouldn’t be any.
+
+Usually there is a tracking context that coordinates updates of a set of signals
+
+[12:01:20.0880] <bakkot>
+> <@ljharb:matrix.org> but if the ergonomics are only achievable with weird unenforceable caveats like "you must evaluate all signals unconditionally, in the callback" - like react has for hooks, i'm not sure it's worth striving for them (i dont think that's the case, to be clear)
+
+you don't have to evaluate all signals unconditionally
+
+[12:01:23.0784] <Justin Ridgewell>
+> <@mhofman:matrix.org> From what I understand it's used for auto-tracking and preventing notify footguns
+
+But the state is stored on the Signal itself
+
+[12:01:37.0727] <ljharb>
+i'd love to hear how a computed callback of `one.get() ? two.get() : three.get()` can deterministically track all three signals
+
+[12:01:51.0083] <Ashley Claymore>
+As Dan said, it's the last read that is tracked
+
+[12:01:56.0527] <rbuckton>
+> <@ljharb:matrix.org> i'd love to hear how a computed callback of `one.get() ? two.get() : three.get()` can deterministically track all three signals
+
+Why would it need to?
+
+[12:01:58.0895] <Ashley Claymore>
+the last set of reads
+
+[12:02:02.0921] <Anthony Bullard>
+> <@ljharb:matrix.org> i'd love to hear how a computed callback of `one.get() ? two.get() : three.get()` can deterministically track all three signals
+
+One of those would not be tracked until called
+
+[12:02:05.0287] <Justin Ridgewell>
+> <@ljharb:matrix.org> i'd love to hear how a computed callback of `one.get() ? two.get() : three.get()` can deterministically track all three signals
+
+You only need to track 2 of the 3, the third is irrelevant.
+
+[12:02:11.0097] <rbuckton>
+It only needs to track `one.get()` and whichever branch was evaluated.
+
+[12:02:19.0835] <ljharb>
+hm
+
+[12:02:21.0933] <rbuckton>
+if `three.get()` changes it doesn't affect the computation.
+
+[12:02:34.0599] <rbuckton>
+If `one.get()` changes, it evaluates the other branch.
+
+[12:02:49.0023] <Mathieu Hofman>
+> <@jridgewell:matrix.org> But the state is stored on the Signal itself
+
+but it's ambient during signal computation, which is currently exposed to any user code running during that time
+
+[12:02:50.0382] <ljharb>
+ok, so the list of tracked signals potentially shifts over time?
+
+[12:02:56.0452] <bakkot>
+correct
+
+[12:03:02.0066] <bakkot>
+each time it's re-evaluated
+
+[12:03:02.0351] <Anthony Bullard>
+ljharb: yes
+
+[12:03:02.0644] <rbuckton>
+> <@ljharb:matrix.org> ok, so the list of tracked signals potentially shifts over time?
+
+It would have to
+
+[12:03:21.0558] <Anthony Bullard>
+Which is why there is usually a hierarchy of tracking contexts
+
+[12:03:43.0971] <Anthony Bullard>
+That do the actually coordination and scheduling
+
+[12:03:47.0735] <Ashley Claymore>
+> <@ljharb:matrix.org> ok, so the list of tracked signals potentially shifts over time?
+
+exactly
+
+```
+if (false) {
+  readSignal();
+}
+```
+
+tracks nothing
+
+[12:03:49.0555] <Justin Ridgewell>
+> <@mhofman:matrix.org> but it's ambient during signal computation, which is currently exposed to any user code running during that time
+
+It’s the same as an `AsyncContxt.Variable.run()` internally in a `computed()` call
+
+[12:03:54.0695] <Chris de Almeida>
+it appears we lost the transcriptionist
+
+[12:04:00.0406] <rbuckton>
+My concern is how a `Computed` interacts with a weakly held `Signal`. Does it then strongly hold the `Signal`? that seems leaky.
+
+[12:04:20.0115] <Mathieu Hofman>
+> <@jridgewell:matrix.org> It’s the same as an `AsyncContxt.Variable.run()` internally in a `computed()` call
+
+Not quite, there are APIs that effectively expose the `acVar.get()` value
+
+[12:04:29.0102] <bakkot>
+wouldn't the `Computed` strongly hold the signal in its closure?
+
+[12:04:46.0515] <rbuckton>
+> <@bakkot:matrix.org> wouldn't the `Computed` strongly hold the signal in its closure?
+
+Not if it's closure is `() => weakRef.get()?.get()`
+
+[12:04:52.0874] <Anthony Bullard>
+> <@rbuckton:matrix.org> My concern is how a `Computed` interacts with a weakly held `Signal`. Does it then strongly hold the `Signal`? that seems leaky.
+
+Isn’t putting a weakly held anything in a closure potentially leaky?
+
+[12:05:05.0231] <bakkot>
+oh, yeah, I would hope that this case wouldn't leak
+
+[12:05:13.0595] <rbuckton>
+Not if you're holding the weakRef.
+
+[12:05:31.0660] <Justin Ridgewell>
+> <@mhofman:matrix.org> Not quite, there are APIs that effectively expose the `acVar.get()` value
+
+Internally the `Signal` can access the ambient Computed context’s var, but that’s not exposed?
+
+[12:05:48.0090] <bakkot>
+though, a `weakRef` is kind of a scary thing to use in a signal - it's a thing whose state can change which is not being read by a Signal
+
+[12:05:50.0477] <Justin Ridgewell>
+That’s still not global state any more than `AsyncContext` is.
+
+[12:06:05.0265] <bakkot>
+ * though, a `weakRef` is kind of a scary thing to use in a signal - it's a thing whose state can change which is not being read via a Signal
+
+[12:06:15.0203] <Xuan Huang (黄玄)>
+> <@ljharb:matrix.org> ok, so the list of tracked signals potentially shifts over time?
+
+Yes, the dependency graph collected and re-formed by Signals is dynamic, as opposed to the number and indexes of Hooks, which are fixed in React. Therefore you don't need it to be unconditional and don't need a lint rule
+
+[12:06:40.0352] <rbuckton>
+> <@bakkot:matrix.org> though, a `weakRef` is kind of a scary thing to use in a signal - it's a thing whose state can change which is not being read via a Signal
+
+Sure, but its code someone could conceivably write. I'd just like to know what the behavior is. 
+
+[12:06:42.0632] <Mathieu Hofman>
+> <@jridgewell:matrix.org> Internally the `Signal` can access the ambient Computed context’s var, but that’s not exposed?
+
+See things like `currentComputed()` and notify guards
+
+[12:07:25.0119] <trueadm>
+In various signal implementations, there's the notion of a computed signal being "connected" to the graph. In other words, they are actively being watched by a an effect (via a Watcher) when you `get()` the comptued. If a signal reads a state signal, the state signal strongly holds a relationship with the computed signal. However, if the comptued is read outside an effect, then no strong connection is made, and instead we use a form of counter/version instead.
+
+[12:07:27.0605] <Ashley Claymore>
+> <@softwarechris:matrix.org> it appears we lost the transcriptionist
+
+I'm guessing we only paid for up to the hour :)
+
+[12:07:51.0412] <Chris de Almeida>
+🙂  they bill us after the fact
+
+[12:07:55.0608] <Duncan MacGregor>
+So what can a Signal hold? How do we stop people putting something whose values can change unexpectedly?
+
+[12:07:56.0936] <Justin Ridgewell>
+> <@mhofman:matrix.org> See things like `currentComputed()` and notify guards
+
+Oh, `subtle` exposes it.
+
+[12:08:12.0364] <Ashley Claymore>
+There is `Signal.subtle.currentComputed`
+
+[12:08:16.0585] <trueadm>
+The computed will always have a strong connection to the state signals and other comptueds it depends on, but they might not have a relationship back to it.
+
+[12:08:28.0006] <Ashley Claymore>
+It's like an async context that everyone has a reference to
+
+[12:08:33.0446] <shu>
+> <@aardvark179:matrix.org> So what can a Signal hold? How do we stop people putting something whose values can change unexpectedly?
+
+what does that mean? the developer has to update a Signal.State afaict
+
+[12:08:41.0497] <trueadm>
+> <@aardvark179:matrix.org> So what can a Signal hold? How do we stop people putting something whose values can change unexpectedly?
+
+I state signal holds a value. a computed also holds a value and is memoized.
+
+[12:08:51.0583] <rbuckton>
+I have a very mild concern over the name `Signal`. It could be conflated with `AbortSignal`. Many years ago it was indicated that WHATWG planned to eventually make more things called `Signal` that likely weren't this.
+
+[12:10:37.0740] <Duncan MacGregor>
+> <@rbuckton:matrix.org> I have a very mild concern over the name `Signal`. It could be conflated with `AbortSignal`. Many years ago it was indicated that WHATWG planned to eventually make more things called `Signal` that likely weren't this.
+
+I have many concerns with the name Signal, all of them mild but I think it overlaps existing terms that mean different things and doesn't quite express the concept they seem to be aiming for.
+
+[12:10:41.0857] <Anthony Bullard>
+> <@rbuckton:matrix.org> I have a very mild concern over the name `Signal`. It could be conflated with `AbortSignal`. Many years ago it was indicated that WHATWG planned to eventually make more things called `Signal` that likely weren't this.
+
+Yeah, but it is an omnipresent term in userland today, and always meaning something similar to this. A different term would be more confusing I think
+
+[12:10:47.0090] <Yehuda Katz>
+HI!
+
+[12:11:15.0254] <Anthony Bullard>
+Though this usage is only within the past few years
+
+[12:12:24.0042] <Yehuda Katz>
+This is valid. That said, `Signal` has a ton of momentum in the ecosystem right now to describe this effort, in part because the standardization effort was spurred by multiple shipped features called "Signal." I have been happy to go with the name :)
+
+[12:12:30.0575] <bakkot>
+> <@softwarechris:matrix.org> it appears we lost the transcriptionist
+
+whisper transcript (linked on reflector) is still going
+
+[12:12:37.0852] <rbuckton>
+I find it interesting that signals are gaining so much popularity right now, given that knockout existed 
+
+[12:12:50.0809] <trueadm>
+Arguably, signals existed all the way back from Knockout.js and various other libraries, but the popularity of of the name "signal" has been in the last few years.
+
+[12:12:51.0128] <Chris de Almeida>
+> <@bakkot:matrix.org> whisper transcript (linked on reflector) is still going
+
+saved again by the kevbot!
+
+[12:12:59.0963] <ryzokuken>
+bakkotbot*
+
+[12:13:01.0211] <Yehuda Katz>
+Starbeam calls the primitives `Cell` and `Formula` as an Excel pun, which I like but I'm not that attached to these details :)
+
+[12:13:03.0138] <Anthony Bullard>
+> <@rbuckton:matrix.org> I find it interesting that signals are gaining so much popularity right now, given that knockout existed 
+
+Ryan Carniato was a knockout dev. Sometimes things come back around
+
+[12:13:39.0435] <Yehuda Katz>
+Convergence around pull-based signals is a pretty important detail imo.
+
+[12:13:42.0084] <rbuckton>
+In .NET there is a somewhat similar mechanism called dependency properties.
+
+[12:13:59.0320] <rbuckton>
+Though its tied to a property declaration, not an independent value.
+
+[12:14:01.0760] <Yehuda Katz>
+It's what makes them so abstractable and allows for the separation we were talking about. 
+
+[12:14:47.0004] <rbuckton>
+(not suggesting that as a name, "dependency" has an overloaded meaning in JS already)
+
+[12:15:15.0394] <danielrosenwasser>
+> <@bakkot:matrix.org> whisper transcript (linked on reflector) is still going
+
+let me know next time!
+
+[12:15:21.0348] <Yehuda Katz>
+Ultimately, for convergence/interop, it's pretty important that the shared primitive can support both arbitrarily interesting reactive objects built on the primitives *and* integrate deeply with the framework. 
+
+[12:15:40.0248] <danielrosenwasser>
+:D
+
+[12:16:04.0962] <Yehuda Katz>
+If either of those are missing, there's no real motivation to collaborate on a standard rather than build something well tuned for your framework's rendering needs
+
+[12:16:28.0030] <ljharb>
+also "abortsignal" isn't a great name anyways. the DOM _shouldn't_ build more "signal" things like it
+
+[12:17:24.0001] <Yehuda Katz>
+I am willing to go with this narrative, but I personally don't believe in the strong version that implies a lost decade simply because people couldn't see what was in front of their faces ;)
+
+[12:17:50.0122] <Yehuda Katz>
+👍️
+
+[12:18:25.0206] <Duncan MacGregor>
+> <@rbuckton:matrix.org> (not suggesting that as a name, "dependency" has an overloaded meaning in JS already)
+
+PropagatedValue and PropagatingCalculation?
+
+[12:18:37.0884] <littledan>
+Yeah we've definitely been making incremental progress the whole time
+
+[12:18:59.0054] <ljharb>
+"propagate" is too easy to misspell
+
+[12:20:11.0461] <Yehuda Katz>
+The signals proposal does something in between. There's always a counter that can be used for invalidation, and you can form a strong connection from state->effect (via a watcher). The invalidation itself works the same in both cases though (e.g. the cache is invalidated not via a watcher but via the counter)
+
+[12:21:44.0068] <Yehuda Katz>
+I think I had this in my slides: the watcher is narrowly focused on notifying something that is going to flush the signal out into the real world. But then the actual flushing is a regular pull that works in the the way you described the "no strong connection" scenario.
+
+[12:23:38.0116] <rbuckton>
+> <@aardvark179:matrix.org> PropagatedValue and PropagatingCalculation?
+
+That's decidedly worse.
+
+[12:24:16.0036] <ptomato>
+> <@anthonybullard:matrix.org> Yeah, but it is an omnipresent term in userland today, and always meaning something similar to this. A different term would be more confusing I think
+
+a counterexample is the GNOME platform, where "Signal" means pub-sub, and "property notify" is used for this
+
+[12:24:24.0710] <rbuckton>
+Maybe something using `Cell`? i.e., `ValueCell`, `DataCell`, etc.
+
+[12:25:17.0141] <Yehuda Katz>
+I have a weak aesthetic dislike for Signal for a similar reason as these rub me the wrong way: the mental model (and design) is really focused on pull-based patterns (i.e. normal JS access patterns). Propagating implies that there's a strong, semantically meaningful arrow from the state through intermediate computeds that lands on effects, and that that's how you think about invalidation.
+
+[12:25:19.0139] <shu>
+`CellLikeTheOneInExcel`
+
+[12:26:57.0644] <Yehuda Katz>
+What systems that use signals are aiming for is to make the whole end-to-end feel like a one-shot function that somehow is up to date, and one reason signals end up working so well across many different paradigms (and evolved independently) is that the pull-based model facilitates that design. 
+
+[12:27:12.0731] <rbuckton>
+If we had a native event mechanism, would we need `Watcher`?
+
+[12:27:17.0427] <Yehuda Katz>
+Starbeam is `Cell` and `Formula` for this reason 🤷
+
+[12:28:01.0214] <Yehuda Katz>
+I just want to respect the ecosystem and my fellow framework collaborators and not turn the conversation into a rathole on this. And frankly I would be ecstatic to get framework interop with a name I don't love.
+
+[12:30:33.0653] <Yehuda Katz>
+`Watcher` is very careful to facilitate lossy consumption patterns (i.e. the notification itself is fairly simple, you're not allowed to read from the reactive value inside of it, and you can trivially and efficiently coalesce notifications into a consumer-specified scheduling mechanism)
+
+[12:30:44.0094] <littledan>
+> <@rbuckton:matrix.org> If we had a native event mechanism, would we need `Watcher`?
+
+I don't understand the question; what would a native event mechanism solve to simplify Watcher?
+
+[12:30:53.0070] <Yehuda Katz>
+The scheduling mechanism can include things like "validation happens from the top-down in tree order"
+
+[12:31:38.0984] <Yehuda Katz>
+rbuckton: events and observables are really awesome for lossless streams of data, and have affordances and efficiency tradeoffs that are tuned for that.
+
+[12:31:40.0405] <rbuckton>
+For example, I'd sketched out an idea awhile back about using a symbol-protocol for pub/sub events that could sit on top of `EventTarget`/`EventEmitter`/etc., and just add a very lightweight event primitive to JS. 
+
+then you do something like `cell::onchanged += () => {}` to watch for changes on a single cell.
+
+[12:31:59.0604] <Yehuda Katz>
+`stopImmediatePropagation` 🤦
+
+[12:32:02.0659] <Yehuda Katz>
+Did I get it right?
+
+[12:33:34.0831] <Yehuda Katz>
+I feel like I'm brushing you off a little too much here. I'd love to sync up and give enough time to hear you out. You've thought about this a lot and I would love to mind-meld :)
+
+[12:33:41.0352] <rbuckton>
+If the event mechanism is hookable (which it would have to be to work with `EventTarget`/`EventEmitter`), then you can be flexible in the underlying event notifaction mechanism.
+
+[12:33:52.0877] <trueadm>
+I think the important part of Watcher, vs events, is that is that signals are designed to be lossy. If you were to write to a signal multiple times, we'd only really care that the signal is dirty and when we get around to scheduling an update from the watcher we get the latest value. The intermediate signal state values wouldn't be important as we only "pull" the latest value when we're interested in it, vs being notified everytime a signal changes.
+
+[12:34:59.0669] <rbuckton>
+> <@trueadm:matrix.org> I think the important part of Watcher, vs events, is that is that signals are designed to be lossy. If you were to write to a signal multiple times, we'd only really care that the signal is dirty and when we get around to scheduling an update from the watcher we get the latest value. The intermediate signal state values wouldn't be important as we only "pull" the latest value when we're interested in it, vs being notified everytime a signal changes.
+
+That's perfectly fine. Events don't have to be lossless.
+
+[12:35:39.0445] <Yehuda Katz>
+I can definitely imagine a foundation for events that allows things like the watcher API to fit neatly into it.
+
+[12:36:31.0814] <Yehuda Katz>
+This use-case a good thing to keep in mind if people are going to try to nail down an events foundation
+
+[12:38:19.0721] <rbuckton>
+My main concern is adding Yet Another Subscription Mechanism to JS. I'll admit, I've done my fair share. `DisposableStack` can take callbacks and notify them, but that capability is a one shot notification and is primarily designed as an adapter for legacy code. 
+
+[12:38:22.0986] <Mathieu Hofman>
+(I really wish Matrix had better threading support)28375256508519
+
+[12:38:30.0567] <Mathieu Hofman>
+ * (I really wish Matrix had better threading support)
+
+[12:38:42.0638] <rbuckton>
+Same...
+
+[12:39:13.0149] <Yehuda Katz>
+rbuckton: that's a good framing for your feelings. It will help me remember your concern as we iterate the design :)
+
+[12:40:11.0109] <Mathieu Hofman>
+bakkot: is the log bot down?
+
+[12:40:46.0894] <littledan>
+But why can’t the unifying mechanism be “callbacks”?
+
+[12:41:27.0118] <rbuckton>
+Regardless as to its internal implementation, `Watcher` is yet another in a long line of pub/sub mechanisms. One would be enough, two is pushing it, but we already have 5+ and some are for *very* niche events. I'd like us to stop that trend if possible.
+
+[12:42:36.0754] <littledan>
+I mean, that underlies all these other ones
+
+[12:42:47.0486] <rbuckton>
+That's not a unified mechanism. If you ask any JS developer if JS has events, I expect they'd say yes. Except, it doesn't. DOM has events, NodeJS has events, JS itself does not.
+
+[12:43:29.0306] <littledan>
+One thing to understand about the watcher mechanism is that it’s use should really be buried within the implementation of effects or rendering
+
+[12:43:59.0742] <trueadm>
+In an earlier design, we had the notion that you could pass a computed a callback function that would trigger when it was made dirty. The downside was that you had to pass this upon construction of the computed, which meant interoperability was impaired. However, it could be modelled differently. Is that better than having a watcher?
+
+[12:45:31.0445] <littledan>
+* One thing to understand about the watcher mechanism is that its use should really be buried within the implementation of effects or rendering, not for direct use by JS devs
+
+[12:46:05.0759] <rbuckton>
+Maybe I didn't represent my position correctly when I asked if `Watcher` is needed. I agree it is needed, even with a native event mechanism, even if only as the event coordinator. I'm trying to ascertain which parts of `Watcher` are unique to `Watcher` as opposed to a generalized pub/sub mechanism.
+
+[12:46:33.0661] <Yehuda Katz>
+rbuckton: I mostly defer to Dan and other deep in the implementation constraint space on the fine details. What I primarily care about is not turning it into yet another pipe for data to flow through
+
+[12:46:49.0938] <Yehuda Katz>
+so I guess we're both worried about the same thing, it turns out? :)
+
+[12:47:19.0751] <Yehuda Katz>
+trueadm: doesn't that fly in the face of decoupling and abstraction goals?
+
+[12:47:39.0504] <Yehuda Katz>
+I guess not, since you're always making a computed at the edge
+
+[12:47:46.0638] <rbuckton>
+Using .NET as an example (as I am oft to do), events aren't only defined using `Delegate` or `MulticastDelegate`, they are hookable. WPF has RoutedEvents which act similar to DOM events and are primarily used to work with dependency properties.
+
+[12:47:53.0162] <Yehuda Katz>
+however... it implies that the watcher is forever, no?
+
+[12:49:32.0345] <trueadm>
+> <@wycats:matrix.org> however... it implies that the watcher is forever, no?
+
+Well back then the design allowed for effects to be detached from the graph. I was just seeing what the appetite was for an alternative approach.
+
+[12:50:48.0759] <trueadm>
+I think events might be fine. However, I do worry about the overhead in allocations from events and EventTarget. The signal graph is essential for performance so it needs to be as lean and optimal as possible to ensure it can scale well for complex UI cases.
+
+[12:51:08.0978] <Yehuda Katz>
+trueadm: I'm both pretty free-and-easy on the exact details of what's going on at the flushing edges *and* very committed to designing a feature that facilitates and supports "it looks like one-shot but is magically up to date" patterns.
+
+[12:51:25.0693] <Yehuda Katz>
+Preact and React get a lot of that "for free" (with some cost) from the JSX model.
+
+[12:51:51.0981] <Yehuda Katz>
+But the Watcher API should facilitate a way of thinking about Vue/Svelte/Ember/etc templates that are, more-or-less, like JSX.
+
+[12:51:55.0813] <rbuckton>
+It could be that `Watcher` ends up being a poor use case for events. I'm still concerned that we don't have events. Signals and events both belong to a similar class of observer-related mechanisms, and that we're catering to a niche use case without considering wider issues.
+
+[12:53:29.0025] <Yehuda Katz>
+I think I see where you're coming from. I'm especially interested in the possibility of stripping away the affordances that have accreted onto the high-level EventEmitter and get down to the fundamentals
+
+[12:54:15.0491] <Yehuda Katz>
+What bothers me about "why not use an event" is that it implies a bunch of noise around the usage pattern when a much tinier pattern actually works. This is probably also why we keep getting more of these things.
+
+[12:54:44.0329] <rbuckton>
+FYI, I think the general consensus is that Matrix threads are a terrible UI. Replies are easier to follow when there aren't 5 conversations going on at once.
+
+[12:56:11.0100] <Yehuda Katz>
+I guess I'm just used to it via work Slack. I have been keeping the threads pane open, but I'm probably swallowing a lot of cognitive overhead because I'm used to it.
+
+[12:56:17.0866] <rbuckton>
+> <@wycats:matrix.org> What bothers me about "why not use an event" is that it implies a bunch of noise around the usage pattern when a much tinier pattern actually works. This is probably also why we keep getting more of these things.
+
+Yes, but this becomes a death by a thousand papercuts. At some point we have to stop tacking on one-off "similar but not the same" mechanisms.
+
+[12:57:03.0637] <Yehuda Katz>
+I'm super into the design space of "what's the minimal EventEmitter that would be ergonomic enough so people would use it instead of ad-hoc callbacks, and also serve as a foundation for the ones that exist"
+
+[12:57:10.0722] <Yehuda Katz>
+Does that characterize your position correctly?
+
+[12:57:11.0915] <rbuckton>
+If `Watcher` is dissimilar enough, maybe I drop the concern, It just doesn't *feel* so dissimilar.
+
+[12:58:14.0584] <Yehuda Katz>
+> <@littledan:matrix.org> One thing to understand about the watcher mechanism is that its use should really be buried within the implementation of effects or rendering, not for direct use by JS devs
+
+ljharb was quibbling with this point, but I really liked your point that the "simple effects" people intuit they want are a DOM feature, which keeps this point true.
+
+[12:59:07.0732] <rbuckton>
+> <@wycats:matrix.org> Does that characterize your position correctly?
+
+That and "how do we make it compatible with the DOM and NodeJS". I'm pretty sure there would be opposition to a wholly new event mechanism.
+
+[12:59:30.0846] <Yehuda Katz>
+> <@littledan:matrix.org> One thing to understand about the watcher mechanism is that its use should really be buried within the implementation of effects or rendering, not for direct use by JS devs
+
+ * ljharb was quibbling with this point, and he's not wrong about the  `fetch` precedent. That said, I really liked what your point (the "simple effects" people intuit they want are a DOM feature). 
+
+[12:59:41.0535] <Yehuda Katz>
+ * ljharb was quibbling with this point, and he's not wrong about the  `fetch` precedent. That said, I really liked your point (the "simple effects" people intuit they want are a DOM feature).
+
+[13:01:29.0691] <Ashley Claymore>
+`Watcher` is in someways like `FinalizationRegistry`, where its core purpose is to be notified. So taking a single callback as a constructor argument maybe does fit this pattern well. As opposed to EventEmitters which are fan out to a changing N
+
+[13:01:52.0178] <Ashley Claymore>
+* `Watcher` is in someways like `FinalizationRegistry`, where its core purpose is to be notified. So taking a single callback as a constructor argument maybe does fit this pattern well. As opposed to EventEmitters which are fan out to a changing N observers 
+
+[13:01:53.0365] <Yehuda Katz>
+> <@aclaymore:matrix.org> `Watcher` is in someways like `FinalizationRegistry`, where its core purpose is to be notified. So taking a single callback as a constructor argument maybe does fit this pattern well. As opposed to EventEmitters which are fan out to a changing N
+
+Great observation!
+
+[13:02:09.0355] <rbuckton>
+I would like to have proposed an events mechanism before, and have wanted one for years, but I'm already overcommitted to other work and I hadn't yet reached the proverbial "last straw".
+
+[13:04:05.0624] <rbuckton>
+> <@aclaymore:matrix.org> `Watcher` is in someways like `FinalizationRegistry`, where its core purpose is to be notified. So taking a single callback as a constructor argument maybe does fit this pattern well. As opposed to EventEmitters which are fan out to a changing N observers
+
+Maybe it is, but Signals, Observables, Promises, and Events all belong to a similar category of observation mechanisms, even if they fill out different quadrants.
+
+[13:05:09.0152] <Ashley Claymore>
+True, but something grouping things hides how they should be approached differently 
+
+[13:07:04.0899] <Ashley Claymore>
+Observables can model Promises and also synchronous return values. But when I worked on projects that used Observables in perhaps too many places it was hard to reason about them. "Is this an observable of many values, or one. Is it async or sync"  
+
+[13:07:41.0284] <Ashley Claymore>
+The Watcher is more like a Sink than an Emitter. And has a different set of responsibilities 
+
+[13:07:58.0532] <Ashley Claymore>
+but I do see your point
+
+[13:08:09.0915] <rbuckton>
+Side question: How much of the Signals proposal is actually `Signal`/`Computed` vs `Watcher`? In other words, is `Watcher` the building block that both `Signal` and `Computed` are built on?
+
+[13:10:05.0553] <Ashley Claymore>
+Signals and computed on their own work, but to be reactive without watcher that would be a polling system. Like how some hardware works where the main loop just keeps checking what is dirty 
+
+[13:10:23.0569] <Ashley Claymore>
+on their own the caching still works 
+
+[13:10:33.0731] <Yehuda Katz>
+> <@rbuckton:matrix.org> Side question: How much of the Signals proposal is actually `Signal`/`Computed` vs `Watcher`? In other words, is `Watcher` the building block that both `Signal` and `Computed` are built on?
+
+No, it's not
+
+[13:10:36.0047] <Ashley Claymore>
+Reading a computed twice in a row is cached 
+
+[13:12:13.0377] <Yehuda Katz>
+> <@wycats:matrix.org> No, it's not
+
+Everything about reading computeds, having them cache, invalidation, etc can be described without reference to the `Watcher`
+
+[13:13:08.0132] <Yehuda Katz>
+a `Watcher` allows you to say "I am using this computed to populate a sink of some sort (usually a DOM node), and I need to know when any of its dependencies change so I can properly schedule it to update and read its value when I do that"
+
+[13:13:26.0551] <rbuckton>
+> <@aclaymore:matrix.org> The Watcher is more like a Sink than an Emitter. And has a different set of responsibilities
+
+This is a fair point. I have to think more about my concerns and whether I might still consider them blocking for stage 2. Either way, I still think it is unfortunate that we might have this and yet still be missing events.
+
+[13:17:39.0173] <Yehuda Katz>
+> <@rbuckton:matrix.org> This is a fair point. I have to think more about my concerns and whether I might still consider them blocking for stage 2. Either way, I still think it is unfortunate that we might have this and yet still be missing events.
+
+I keep trying to nudge the term `Sink` into the explanations we give
+
+[13:17:42.0109] <Yehuda Katz>
+I think it's really good
+
+[13:17:55.0019] <rbuckton>
+Signals feels like we're giving everyone a chainsaw when they need a flathead screwdriver. Sure, that's great for the woodcutters, but that means the rest of us have to get by with a butter knife. Normally, I wouldn't conflate two proposals in this way were it not for the close similarities.
+
+[13:19:16.0317] <Yehuda Katz>
+> <@rbuckton:matrix.org> Maybe it is, but Signals, Observables, Promises, and Events all belong to a similar category of observation mechanisms, even if they fill out different quadrants.
+
+I'm pretty open to filling out the table. Some formal-ish observations: Signals facilitate discrete updates, are pull-based, and have a lot in common with the incremental computation academic space
+
+[13:19:39.0471] <rbuckton>
+And don't get me wrong, I like the idea of signals. I've used knockout and React and so many other systems with a similar concept, and I can see its utility in other places as well.
+
+[13:20:12.0617] <Yehuda Katz>
+> <@wycats:matrix.org> I'm pretty open to filling out the table. Some formal-ish observations: Signals facilitate discrete updates, are pull-based, and have a lot in common with the incremental computation academic space
+
+People want to tell me that they're push-pull, but signals do a pretty different thing than what people usually mean by push-pull, producing pretty different abstractability and interface outcomes
+
+[13:20:28.0306] <Yehuda Katz>
+I could believe you want to make "push-pull" more subtle
+
+[13:21:20.0565] <rbuckton>
+"Filling out the table" was supposed to include Observable as well. I'm not certain why the proposal switched venues.
+
+[13:21:45.0146] <rbuckton>
+Can setting a signal trigger a UI update? If so, it's push based.
+
+[13:21:47.0484] <Yehuda Katz>
+rbuckton: What, imo, is new from the FRP wikipedia page (or even the various attempts to nail this down in terms of promises and observables) is that we have a lot of existence proofs now that the theoretical issues people have with those choices are managable and efficient at scale in the context of web UIs.
+
+[13:21:55.0172] <rbuckton>
+ * Can setting a signal trigger a UI update? If so, it's _also_ push based.
+
+[13:22:47.0958] <Yehuda Katz>
+> <@rbuckton:matrix.org> Can setting a signal trigger a UI update? If so, it's _also_ push based.
+
+Setting a signal sends a notification, but there's an all-signals read-write barrier in the notification, which prevents you from simply updating the UI right there
+
+[13:22:57.0435] <Yehuda Katz>
+it also doesn't need to propagate through computeds
+
+[13:22:57.0790] <rbuckton>
+`Computed` is definitely pull only.
+
+[13:24:02.0522] <Yehuda Katz>
+At the extreme end, the original Ember model (which is spiritually equivalent) has a single microtask notification that coalesces any amount of signal updates
+
+[13:25:37.0746] <Yehuda Katz>
+and that causes a top-down revalidation uses pull-based revalidation to cut off subtrees, and which manages to be relatively efficient because of the natural logarithmic(ish) properties of output DOM trees
+
+[13:26:06.0256] <Yehuda Katz>
+You can call this a "push" but it's not really what people mean when they talk about "push-pull" models
+
+[13:29:04.0199] <rbuckton>
+I will withdraw my Stage 2 blocking concern. While I'd like to have a native event mechanism, `Watcher` does not seem like a fit for it and I don't think it's fair to block a proposal on the basis of the existence or non-existence of a separate proposal I do not have the capacity to champion myself. I am still concerned about the lack of events, but I'm willing to wait until the next push trigger to raise the concern, or for when I have less on my plate.
+
+[13:31:37.0080] <rbuckton>
+> <@wycats:matrix.org> You can call this a "push" but it's not really what people mean when they talk about "push-pull" models
+
+I suppose that's true in the broader sense
+
+[13:50:39.0539] <rbuckton>
+I have an interesting observation, though in the end it is perhaps not relevant to signals. For a number of years I have also been considering a proposal to add `ref` (though potentially spelled `&`) for both reference passing and reified references, i.e.:
+
+```js
+function f(&x) { x = 1; } // reference passing
+function g(xref) { xref.value = 2; } // reified reference
+
+let y = 0;
+
+f(&y); // pass reference to mutable binding
+y; // 1
+
+const yref = &y; 
+g(yref); // pass reified reference to mutable binding
+
+y; // 2
+
+let &ym = yref; // dereference to mutable binding
+ym = 3;
+
+y; // 3
+
+const &yc = yref; // dereference to immutable (but live) binding
+y++;
+yc; // 4
+```
+
+I wonder how interesting it would be if you could treat state/computed as refs:
+
+```js
+let &counter = new Signal.State(0);
+counter; // 0
+counter++;
+counter; // 1
+
+const &parity = new Signal.Computed(() => counter % 2 ? "odd" : "even");
+```
+
+[13:51:28.0206] <rbuckton>
+I've been collecting use cases and this seems like an interesting one.
+
+[13:57:01.0400] <rbuckton>
+Some of the other use cases include decorators (to handle circularity/TDZ)
+
+```js
+@Entity
+class Parent {
+  @OneToMany(&Child) children;
+}
+
+@Entity
+class Child {
+  @ManyToOne(&Parent) parent;
+}
+```
+
+and private state in shared structs
+
+```js
+shared struct AtomicValue {
+  #value; // do not allow unordered access to private field
+
+  load() { return Atomics.load(&this.#value); }
+  compareExchange(expected, replacement) { return Atomics.compareExchange(&this.#value, expected, replacement); }
+  ...
+}
+```
+
+Plus a few others.
+
+[14:02:04.0812] <rbuckton>
+To the runtime, `&` is more like a syntactic transformation, so the signals example ends up treated as something roughly like this:
+
+```js
+const ref_mut_counter = new Signal.State(0);
+ref_mut_counter.value; // 0
+ref_mut_counter.value++;
+ref_mut_counter.value; // 1
+
+const ref_cnst_parity = new Signal.Computed(() => ref_mut_counter.value % 2 ? "odd" : "even");
+```
+
+
+
+[14:03:44.0763] <rbuckton>
+One benefit to having Signals as a built-in mechanism in ECMA-262 is that we could get away with specifying it as a reified reference.
+
+[14:04:09.0775] <rbuckton>
+or rather, a kind of reified reference.
+
+[14:19:23.0671] <Yehuda Katz>
+I had to suddenly switch back to work-work -- sorry for disappearing mid-convo :)
+
+[14:21:32.0477] <Yehuda Katz>
+> <@rbuckton:matrix.org> To the runtime, `&` is more like a syntactic transformation, so the signals example ends up treated as something roughly like this:
+> 
+> ```js
+> const ref_mut_counter = new Signal.State(0);
+> ref_mut_counter.value; // 0
+> ref_mut_counter.value++;
+> ref_mut_counter.value; // 1
+> 
+> const ref_cnst_parity = new Signal.Computed(() => ref_mut_counter.value % 2 ? "odd" : "even");
+> ```
+
+fwiw, I am personally interested in exploring trimming down the portion of the API that really has to be a reference, ideally separating it from the value portion. This is roughly the Starbeam API, but I would need to float it by other framework authors to see whether there are incidental simplifying assumptions in Ember that let us get away with that design, but which prevent it from being fully general
+
+[14:30:31.0967] <Yehuda Katz>
+> <@wycats:matrix.org> I had to suddenly switch back to work-work -- sorry for disappearing mid-convo :)
+
+And now I really do have to go! Please DM me with any follow-ups. The thoughtful feedback and questions were really invigorating :)
+
+[14:43:18.0761] <trueadm>
+> <@rbuckton:matrix.org> I have an interesting observation, though in the end it is perhaps not relevant to signals. For a number of years I have also been considering a proposal to add `ref` (though potentially spelled `&`) for both reference passing and reified references, i.e.:
+> 
+> ```js
+> function f(&x) { x = 1; } // reference passing
+> function g(xref) { xref.value = 2; } // reified reference
+> 
+> let y = 0;
+> 
+> f(&y); // pass reference to mutable binding
+> y; // 1
+> 
+> const yref = &y; 
+> g(yref); // pass reified reference to mutable binding
+> 
+> y; // 2
+> 
+> let &ym = yref; // dereference to mutable binding
+> ym = 3;
+> 
+> y; // 3
+> 
+> const &yc = yref; // dereference to immutable (but live) binding
+> y++;
+> yc; // 4
+> ```
+> 
+> I wonder how interesting it would be if you could treat state/computed as refs:
+> 
+> ```js
+> let &counter = new Signal.State(0);
+> counter; // 0
+> counter++;
+> counter; // 1
+> 
+> const &parity = new Signal.Computed(() => counter % 2 ? "odd" : "even");
+> ```
+
+That's pretty much how Svelte 5 works with signals. We don't actually expose Signal objects, instead they're hidden away by the compiler.
+
+```js
+let counter = $state(0):
+
+counter++;
+console.log(counter); // 2
+```
+
+[14:45:04.0339] <Yehuda Katz>
+> <@trueadm:matrix.org> That's pretty much how Svelte 5 works with signals. We don't actually expose Signal objects, instead they're hidden away by the compiler.
+> 
+> ```js
+> let counter = $state(0):
+> 
+> counter++;
+> console.log(counter); // 2
+> ```
+
+it's also how Ember works with our precursor to signals and how Starbeam (our next generation reactivity system, which is my primary technical project on Ember these days) interacts with them.
+
+[14:45:05.0492] <trueadm>
+ * That's pretty much how Svelte 5 works with signals. We don't actually expose Signal objects, instead they're hidden away by the compiler.
+
+```js
+let counter = $state(0):
+
+counter++;
+console.log(counter); // 1
+```
+
+[14:45:20.0872] <Yehuda Katz>
+There's mostly a pretty close mapping between the concepts we use and signals.
+
+[14:45:39.0175] <Yehuda Katz>
+Also, turns out if I want to avoid nerd-sniping myself, I need to turn off notifications :P
+

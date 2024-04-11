@@ -333,3 +333,375 @@ This interest extends beyond pattern matching, to also ADT enums as well (which 
 
 Another good place to join to discuss `enum` would be https://matrix.to/#/#temp-enum-interests-group:matrix.org
 
+[13:20:06.0761] <rbuckton>
+Pattern matching humor: `that is { question: 0x2b or not 0x2b }`
+
+[14:29:11.0846] <TabAtkins>
+Sorry everyone, I've *very suddenly* gotten extremely swamped this past week. I was gonna finally  have time this afternoon to do the slides, since we were presenting on Thursday, but I guess I don't need to now
+
+
+2024-04-11
+[19:03:18.0661] <rbuckton>
+I'll be honest, I really do not like `~=`. It's not semantically meaningful, it looks like a compound assignment, and `~` is extremely inconvenient for non-us-english keyboard layouts. It only pushes the problem down the road. `is` might require more work for a cover grammar, but the bigger problem, IMO, is regular expression literals.
+
+[21:56:15.0583] <ljharb>
+i agree; i don't like `~=` and i don't think token soup is going to be an improvement
+
+[21:59:19.0217] <ljharb>
+i think having new binary english keywords is important enough that we should halt or alter any proposals that threaten that path
+
+[21:59:23.0137] <ljharb>
+ * i think having new binary english keywords (in general) is important enough that we should halt or alter any proposals that threaten that path
+
+[01:28:13.0424] <eemeli>
+To me `~=` reads first as "not equal" rather than "approximately equal", given how `~` is used as a bitwise not operator in many languages, including C, Java, and Python.
+
+[01:29:30.0388] <eemeli>
+Also, hi! I recently got rather interested in extractors, and thought that therefore this might be a good place to hang out.
+
+[01:44:24.0440] <rkirsling>
+I think in Perl and Ruby it's `=~` ?
+
+[02:39:22.0320] <eemeli>
+In perl `=~` is doing regexp matching; in Ruby it seems to be doing both that _and_ negation, _and_ it's user-customizable.
+
+[03:07:52.0184] <Jack Works>
+I'll think a~=b is a=a~b (is it even a thing? but looks like bit operator to me)
+
+[06:28:17.0098] <dminor>
+rkirsling: I read the issue you created and it aligns with my concerns about this proposal. I think that a python style `match` *statement* is a sufficiently powerful construct, and I'm not seeing an argument as to why we need something more powerful in the language. I'd like to see the champions present on why that design alternative was considered and found not suitable for JavaScript.
+
+[06:28:39.0352] <dminor>
+I also think that `is` should be saved for a follow on proposal. I'm not convinced we need it, and it already seems problematic.
+
+[06:52:58.0822] <rbuckton>
+`is` is profoundly useful. It covers a large number of use cases, including those offered by `if..let` and `while..let` in some languages, `not in` and `not instanceof`, and even `let..in`. It's far too useful, IMO.
+
+[06:53:29.0686] <rbuckton>
+`=~` is not viable either as `a =~ b` is already legal JS.
+
+[06:56:17.0000] <dminor>
+For me, the fact that `is` is that powerful is an argument for it to be a follow-on proposal, not for it to be part of this proposal.
+
+[07:12:40.0573] <ljharb>
+dminor: we made `is` after yulia and spidermonkey's feedback of making simpler composable pieces that build up to pattern matching
+
+[07:20:50.0887] <dminor>
+That's not really an argument for including it in this proposal, rather than a follow-on.
+
+[07:21:29.0161] <rbuckton>
+As I understand it, that was an argument for it to be in the proposal. Having it as a follow-on is counterproductive
+
+[07:21:35.0946] <ljharb>
+it's an argument for having `is` go first, and `match` as the follow-on
+
+[07:21:54.0915] <ljharb>
+the champion group didn't want to ship it piecemeal but that's my understanding of what spidermonkey wanted
+
+[07:22:27.0113] <Jack Works>
+if you check the spec (not the readme) you'll find I wrote the spec in a way that most of the "complexities" can be broken down to simper (but unnecessary annoying long) building block
+
+[07:23:33.0487] <Jack Works>
+e.g. pattern "{x?: y}" can be "{} or {x:y}" if you don't want "?:"
+
+[07:23:48.0185] <Jack Works>
+I documented all these situations 
+
+[07:27:00.0276] <rbuckton>
+TabAtkins: I think we may have to drop RegExp patterns. Even if we resolve the issue with `is`, I think anything involving a RegExp literal is going to be problematic.
+
+[07:27:49.0122] <TabAtkins>
+Why so?
+
+[07:28:03.0354] <ljharb>
+there's lots of ways to have them without the problems
+
+[07:28:14.0737] <ljharb>
+we could require they have some kind of bounding characters or something.
+
+[07:28:22.0181] <ljharb>
+regexes are very important to have.
+
+[07:28:28.0214] <rbuckton>
+Everything starting with `/` is suspect
+
+[07:29:08.0320] <rbuckton>
+> <@ljharb:matrix.org> regexes are very important to have.
+
+I don't disagree, but they are at least achievable with extractors.
+
+[07:29:59.0276] <ljharb>
+> <@rbuckton:matrix.org> Everything starting with `/` is suspect
+
+so let's find another character for it to start with. we could require wrapping parens, or something
+
+[07:30:06.0775] <rbuckton>
+They could also be handled via some other syntax, like `when like "(?i:\w+)"`
+
+[07:30:50.0813] <ljharb>
+sure. i don't think regexes are the primary issues we need to resolve rn
+
+[07:31:00.0603] <rbuckton>
+> <@ljharb:matrix.org> so let's find another character for it to start with. we could require wrapping parens, or something
+
+Maybe, but I still don't consider them to be MVP as there are workarounds without them.
+
+[07:31:33.0087] <ljharb>
+dminor's feedback seems opposite to yulia's feedback; and waldemar is pointing out that binary keyword operators may not be possible. these seem worth focusing on
+
+[07:32:01.0889] <dminor>
+> <@ljharb:matrix.org> it's an argument for having `is` go first, and `match` as the follow-on
+
+Well, to me `match` is the core of pattern matching, not `is`, I'm not convinced we need anything more. I'm happy to be convinced otherwise, but I would like to see an argument made for why a `match` statement is not sufficiently powerful for JavaScript.
+
+[07:32:08.0612] <rbuckton>
+> <@ljharb:matrix.org> sure. i don't think regexes are the primary issues we need to resolve rn
+
+After plenary I'm going to take a closer look at all of the cover grammars to ensure things like `is`, `void`, `using` and `await using` all play nice together. I think choosing something like `~=` would just be kicking the can down the road.
+
+[07:33:04.0499] <ljharb>
+dminor: i like `is` on its own, but i definitely am happy with just having `match` - again, we created it in response to yulia's and the spidermonkey team's feedback.
+
+[07:33:41.0709] <rbuckton>
+Though that may mean I have to drop `void` in _AssignmentPattern_, which may be for the best. The proposal _is_ called Discard _Bindings_...
+
+[07:33:43.0350] <dminor>
+I realize Yulia and I are not in complete agreement about this, I'll chat with her about it.
+
+[07:33:58.0063] <ljharb>
+so it'd be really helpful to have yulia in these discussions to ensure her viewpoint is addressed
+
+[07:36:29.0288] <rbuckton>
+I would very much like to have `if(x is Some(let y)) { }` and `node is Binary(let left, "===", let right) && doSomethingWith(left, right)`
+
+[07:36:48.0626] <dminor>
+Please take what I've said so far as my personal opinion, not the SpiderMonkey team's. We'll be meeting next week, I'm hoping we can come to an internal consensus about pattern matching then.
+
+[07:38:10.0441] <rbuckton>
+I think it would also help if we can pare down the pattern syntax to an MVP and pursue extending the syntax further in follow-ons, much like Iterator helpers has done.
+
+[07:39:02.0181] <yulia>
+Re: my thoughts on the epic. we don't have to have is -- that wasn't my intention. `is` was meant to be illustrative of what a smaller proposal might enable
+
+[07:39:29.0100] <yulia>
+ * Re: my thoughts on the epic. we don't have to have `is` -- that wasn't my intention. `is` was meant to be illustrative of what a smaller proposal might enable. The same re the discussion on `let`/`const`
+
+[07:40:08.0916] <yulia>
+i would be very happy if we first went with extractors and landed the custom matcher there. And then moved forward with match, and then the pattern matching DSL
+
+[07:40:30.0197] <yulia>
+This is the main thing i was communicating with the epic: this proposal is too large and we need to think about it in smaller chunks
+
+[07:40:37.0421] <yulia>
+That is consistent with what Dan is saying
+
+[07:40:41.0387] <rbuckton>
+I think I'm fine with `is` being a follow on, but the semantics of `is` have implications on the design of this proposal that we must keep in mind.
+
+[07:41:35.0569] <ljharb>
+> <@yulia:mozilla.org> This is the main thing i was communicating with the epic: this proposal is too large and we need to think about it in smaller chunks
+
+tbh tho this feels like if someone suggested Temporal ship one type at a time
+
+[07:41:48.0299] <yulia>
+One question I would ask is, are those semantics what we want to preserve, or is there an underlying concept that we can iterate on. I know waldemar had concerns with infix keywords, and i think we should come to a general understanding of what would be preferrable
+
+[07:41:51.0999] <ljharb>
+"large" isn't inherently a problem on its own; some things are just large
+
+[07:41:59.0152] <yulia>
+rather than designing around a preconception
+
+[07:42:08.0380] <yulia>
+temporal should have been split up as well
+
+[07:42:28.0278] <yulia>
+the situation with temporal being endlessly stuck hasn't been great
+
+[07:42:29.0966] <ljharb>
+i agree it's incredibly large, but i don't see how it could have been viable split up.
+
+[07:42:54.0173] <rbuckton>
+There is a core set of pattern mechanics that is an absolute MVP, there are many mechanisms that _aren't_ MVP despite the importance various champions put on them. For example, I find relational patterns much more important than regex literal patterns, but both are not MVP.
+
+[07:42:59.0553] <rbuckton>
+ * There is a core set of pattern mechanics that is an absolute MVP, there are many mechanisms that _aren't_ MVP despite the importance various champions put on them. For example, I find relational patterns much more important than regex literal patterns, but neither are MVP.
+
+[07:43:55.0258] <rbuckton>
+Postponing relational patterns would mean holes in the syntax for corner cases we find important, but they don't break the proposal by not having them immediately.
+
+[07:44:01.0905] <yulia>
+i think you need to start with the ideal that it can be split up, because i think the reason we haven't developed an understanding of a smaller core with principles guiding future design is because we can't align on the principles
+
+[07:44:33.0573] <rbuckton>
+That said, `is not in` and `is not instanceof` are valuable enough that they already have a competing proposal at stage 1
+
+[07:44:45.0105] <yulia>
+that doesn't mean we can only do this by designing everything up front, we should get past the impass on principles. 
+
+[07:44:58.0450] <ljharb>
+certainly there's a lot of differing opinions in committee about how a proposal should be designed :-)
+
+[07:45:20.0473] <ljharb>
+ * certainly there's a lot of differing opinions in committee about how a proposal should be designed and developed :-)
+
+[07:45:26.0289] <yulia>
+im sorry i don't have more time for this, but i do trust dan's leadership on this proposal. he represents the current spidermonkey consensus
+
+[07:47:34.0303] <yulia>
+regarding the epic and the stuff i suggested, they were really suggestions to try and illustrate / bring discussion. It wasn't meant as "you have to include this or we will block it". The block was on complexity. I was trying to help but i think my message was lost
+
+[07:48:24.0640] <yulia>
+I've been struggling with this because every time i ask for the proposal to be considered in smaller parts, i am told it is impossible, so i tried to demonstrate it but that backfired with the proposal becoming more complex and incorporating things I had meant as examples
+
+[07:48:44.0548] <yulia>
+ * I've been struggling with this because every time i asked for the proposal to be considered in smaller parts, i am told it is impossible, so i tried to demonstrate it but that backfired with the proposal becoming more complex and incorporating things I had meant as examples
+
+[07:49:16.0853] <yulia>
+ * I've been struggling with this because every time i asked for the proposal to be considered in smaller parts, i was told it is impossible, so i tried to demonstrate it but that backfired with the proposal becoming more complex and incorporating things I had meant as examples
+
+[07:51:49.0738] <rbuckton>
+I would propose we consider the following as the MVP:
+- irrefutable `match (value)`
+- literal constant patterns
+- prefix numeric unary patterns
+- member reference patterns
+- extractors
+- object patterns (`{}`) w/ property patterns (`a: b`/`[x]: b`) and rest (`...`)
+- exhaustive array patterns (`[]`) w/ elision and rest (`...`)
+- `and`/`or`/`not` patterns
+- grouping patterns
+- variable patterns
+- discards (via either `void` or `let _`)
+- `if` patterns
+
+I think that's the minimal set of pattern matching that is necessary for it to be usable. Maybe we also add `in` relational patterns to cover `is not in`. Anything else is follow on.
+
+
+
+[07:51:56.0226] <Jack Works>
+> <@yulia:mozilla.org> that doesn't mean we can only do this by designing everything up front, we should get past the impass on principles.
+
+after this redesign, most of the content can be dropped, but they're included in the big picture so I can make sure they're work well together (if we have to ship them in multiple batches).
+
+[07:52:54.0520] <Jack Works>
+there are a lot of notes explaining this
+
+[07:53:12.0645] <ljharb>
+> <@rbuckton:matrix.org> I would propose we consider the following as the MVP:
+> - irrefutable `match (value)`
+> - literal constant patterns
+> - prefix numeric unary patterns
+> - member reference patterns
+> - extractors
+> - object patterns (`{}`) w/ property patterns (`a: b`/`[x]: b`) and rest (`...`)
+> - exhaustive array patterns (`[]`) w/ elision and rest (`...`)
+> - `and`/`or`/`not` patterns
+> - grouping patterns
+> - variable patterns
+> - discards (via either `void` or `let _`)
+> - `if` patterns
+> 
+> I think that's the minimal set of pattern matching that is necessary for it to be usable. Maybe we also add `in` relational patterns to cover `is not in`. Anything else is follow on.
+
+what does this suggestion drop?
+
+[07:54:49.0291] <ljharb>
+ * what does this suggestion drop? (regexes, obv, but im hoping for a list)
+
+[07:54:54.0166] <rbuckton>
+`is`, regexp literal patterns, `<`, `<=`, `>`, `>=`, `==`, `!=`, `===`, `!==`, `instanceof`, `has`, `hasOwn`, `{ a?: b }`, any kind of potential shorthand `{ a }` pattern (can't recall if that's in there)
+
+[07:55:25.0281] <ljharb>
+it is
+
+[07:55:49.0856] <ljharb>
+`hasOwn`, as much as i want it, isn't its own ergonomic check in the language, so i can accept that one being a follow-in
+
+[07:56:27.0551] <ljharb>
+`in` and `instanceof` seem like good follow-ons because the semantics are 100% fixed; that's also why it seems like an obvious initial inclusion tho
+
+[07:56:31.0553] <rbuckton>
+I think there were some other optional things as well, plus some reserved things like `` `${let a}` `` (we should still reserve it, but don't need examples of potential uses in the spec text)
+
+[07:56:53.0821] <rbuckton>
+`instanceof` is less motivated since `x is C` and `x is not C` are mostly sufficient.
+
+[07:56:57.0207] <ljharb>
+relational patterns i agree can be added later, altho the equality comparisons maybe should be kept
+
+[07:57:09.0993] <rbuckton>
+`in` is very well motivated, IMO.
+
+[07:57:16.0445] <ljharb>
+why drop `{ a }`?
+
+[07:57:35.0790] <rbuckton>
+I'd rather punt on equality. It handles a narrow corner case.
+
+[07:58:24.0816] <rbuckton>
+what are the semantics of `{ a }` in a pattern? My expectation would be "check if subject has a property `a` whose value must equal the value of the identifier reference `a`". 
+
+[07:59:00.0370] <rbuckton>
+Others might interpret `{a}` as being like `{a: let a }`, which it's not. Instead, they can use `{ a: a }` or `{ a: let a }`.
+
+[07:59:07.0644] <ljharb>
+yes
+
+[07:59:17.0721] <ljharb>
+invoking the matcher protocol as relevant
+
+[07:59:32.0335] <rbuckton>
+> <@ljharb:matrix.org> invoking the matcher protocol as relevant
+
+That doesn't seem practically useful.
+
+[07:59:35.0457] <ljharb>
+and `{ let a }` would be the with-binding shorthand form
+
+[07:59:52.0973] <rbuckton>
+I also think that, despite its convenience, we might want to postpone `{ let a }` and just have `{ a: let a }`.
+
+[08:00:27.0257] <rbuckton>
+It's definitely more convenient, so hopefully it would have quick turnaround as a follow-on proposal.
+
+[08:00:47.0607] <rbuckton>
+But it allows us to further pare down the proposal to the absolute MVP.
+
+[08:01:03.0808] <ljharb>
+and with this simpler featureset, would the grammar concerns and complexity concerns that have been voiced be resolved?
+
+[08:01:46.0781] <ljharb>
+ * and with this simpler featureset, would the grammar concerns and complexity concerns that have been voiced be resolved? (in theory, obv, until the folks that voiced them can confirm)
+
+[08:02:19.0721] <Jack Works>
+and we have 20 follow-ons
+
+[08:02:22.0492] <rbuckton>
+I think it addresses the grammar concerns because we're not including the things with ambiguous parse. `is` and regexp literals were behind waldemar's concerns.
+
+[08:02:40.0276] <rbuckton>
+> <@jackworks:matrix.org> and we have 20 follow-ons
+
+Sure, so has iterator helpers, and it's been fairly successful at getting them adopted.
+
+[08:03:44.0543] <rbuckton>
+If we shoot for the moon now, we won't get there. Start with the bare bones version of the proposal, get that to Stage 4, and then propose enhancements and features. Some may be individual, some may be grouped together.
+
+[08:04:23.0625] <rbuckton>
+Once the base syntax and semantics are in the language, its far easier to argue for QOL improvements.
+
+[08:04:30.0555] <ljharb>
+given the many inadequacies of the max/min approach with `class`, i'd find it sad to go in that direction, but you might be right.
+
+[08:05:44.0164] <rbuckton>
+I do to, but pattern matching *is* a major syntax change. As it stands its far too intimidating.
+
+[08:09:26.0130] <rbuckton>
+Extractors and `if` patterns let us work around missing functionality, at least. It's easier to argue for `> 1` as a QOL improvement over `let a and if(a > 1)` than it is to propose both at the outset.
+
+[08:09:37.0193] <Jack Works>
+> <@ljharb:matrix.org> given the many inadequacies of the max/min approach with `class`, i'd find it sad to go in that direction, but you might be right.
+
+max/min class is a disaster and I don't want repeat it on pattern matching. the way to solve this, is to design all possible follow-ons we can think of and make sure they work good together or not together, then we can cherry pick some. I think we're currently doing this
+

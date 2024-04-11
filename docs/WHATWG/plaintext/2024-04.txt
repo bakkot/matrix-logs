@@ -874,3 +874,107 @@ oh well. I hope it gets revisited at some point
 [10:14:38.0963] <annevk>
 It seems like Google and Mozilla blocked it.
 
+[15:00:42.0951] <Dominic Farolino>
+Suppose I have a spec variable that is "initially null", and I set it to an {{any}} return value of [=invoking=] a JS callback.
+
+[15:01:21.0101] <Dominic Farolino>
+If that callback returns "null" in JS, is my spec variable still "null" (i.e., indicating that it was never set), or is it some special "Web IDL {{null}}" value or something?
+
+[15:01:45.0644] <Dominic Farolino>
+(I know {{null}} does not exist in WebIDL, but I'm trying to understand if spec prose "null" is the same as null that goes through WebIDL)
+
+[15:08:37.0093] <Jeffrey Yasskin>
+I think folks reading that will assume the two "null"s are the same, so you should write the spec so that assumption doesn't cause problems.
+
+[15:11:10.0334] <Andreu Botella>
+Infra's definition of null treats it as interchangeable with the JS `null` value, but WebIDL's `any` conversion converts JS `null` to the null nullable `object`, which is not explicitly said to be the same as Infra's null.
+
+[15:11:21.0512] <Andreu Botella>
+ * Infra's definition of null treats it as interchangeable with the JS `null` value, but WebIDL's `any` conversion converts JS `null` to the null `object?`, which is not explicitly said to be the same as Infra's null.
+
+[15:14:12.0045] <Jeffrey Yasskin>
+WebIDL 'any' is a weird beast, in that "one value of the any type is the unsigned long 150, while another is the long 150. These are distinct values." Specs often implicitly convert all those contained values into a common spec type, but that's not really justified by WebIDL.
+
+[15:17:22.0919] <Jeffrey Yasskin>
+I do think the `null` `object?` value is the same as the Infra null: https://webidl.spec.whatwg.org/#idl-object talks about `object?` adding "the null value" to the type, and it's no more distinguished from Infra than "true" and "false" are in https://webidl.spec.whatwg.org/#idl-boolean.
+
+
+2024-04-11
+[17:46:13.0183] <Domenic>
+I am in favor of treating all nulls the same... the platform has enough null-ish things.
+
+[22:28:36.0270] <annevk>
+I think if you need to distinguish two nullish values in those cases you should start out with your variable being undefined. If you really need the equivalent of any-or-nothing I'm not sure. Maybe a side boolean? But maybe also reconsider the general API shape.
+
+[01:56:19.0596] <Jake Archibald>
+> <@annevk:matrix.org> It seems like Google and Mozilla blocked it.
+
+That's sad. I filed an issue for it. I'll see if it's something Shopify would let me spend time on https://github.com/whatwg/html/issues/10273
+
+[03:12:40.0707] <Noam Rosenthal>
+Looking at the term "similar-origin window agent" (https://html.spec.whatwg.org/multipage/webappapis.html#similar-origin-window-agent). 
+In a nested cross-origin iframe case like `A1 -> B -> A2`, is there a way where `A1` can get script access to A2's window?
+
+[03:15:42.0263] <Noam Rosenthal>
+oh I guess `window[name]`. Weird old stuff I forgot about
+
+[03:19:44.0617] <Ms2ger>
+annevk: what, are you holding me responsible for bugs I introduced now? :)
+
+[03:33:32.0032] <annevk>
+Ms2ger: git blame is a wonderful thing.
+
+[08:09:22.0216] <Domenic>
+> <@noamr:matrix.org> Looking at the term "similar-origin window agent" (https://html.spec.whatwg.org/multipage/webappapis.html#similar-origin-window-agent). 
+> In a nested cross-origin iframe case like `A1 -> B -> A2`, is there a way where `A1` can get script access to A2's window?
+
+I would do `window[0][0]` so you don't even have to know the names, just enumerate over integers until you find something that doesn't throw when calling `.document`
+
+[09:00:27.0139] <Noam Rosenthal>
+Domenic: yea, I meant in general the `window[...]` feature... thanks
+
+[09:35:05.0667] <Noam Rosenthal>
+smaug: see https://source.chromium.org/chromium/chromium/src/+/main:third_party/blink/renderer/core/loader/frame_loader.cc;l=388?q=frame_loader.c
+
+[09:36:04.0669] <Noam Rosenthal>
+We're unloading the document with `will_commit_new_document_in_this_frame === false`
+
+[09:36:13.0570] <smaug>
+Noam Rosenthal: and that gets called at what point when iframe is removed from DOM
+
+[09:37:59.0449] <Noam Rosenthal>
+smaug: that would happen in https://source.chromium.org/chromium/chromium/src/+/main:third_party/blink/renderer/core/dom/container_node.cc;l=642;bpv=1;bpt=1?q=container_node.cc
+
+[09:38:11.0375] <smaug>
+thanks!
+
+[09:38:52.0058] <Noam Rosenthal>
+so it's right *before* doing the actual DOM remove. the iframe would still appear connected if you query the parent's DOM during the `pagehide` event listener
+
+[09:40:06.0474] <smaug>
+looks like the code is pretty much as hacky as in Gecko 😛 
+
+[09:41:41.0814] <smaug>
+/me vaguely recalls fixing some crashes around iframe removal...maybe 15 years ago
+
+[09:42:23.0681] <Noam Rosenthal>
+yea this synchronous removal stuff is nasty. For the synchronous blur event firing we have so much special-case code
+
+[10:00:54.0546] <Luke Warlow>
+Sorry for dropping out there my headset ran out of battery right as I was going to speak
+
+[10:01:27.0639] <smaug>
+I'll need to check all the callers of AddScriptRunner. Gecko has > 100 of those
+
+[10:01:49.0256] <smaug>
+(many of them don't affect anything on the web though)
+
+[12:53:35.0640] <smaug>
+Dominic Farolino: actually, I don't know how the insertion step model works in case of mutations. Say, you have an element and it has 3 child elements.  That subtree root element is inserted to document tree. Now child 1  has insertion steps which run some script which removes the child and adds it to be the last of the child nodes. So child list is now 2, 3, 1.  Do the insertion steps get run on 1 again, because it is now after 2 and 3?
+
+[12:53:43.0882] <smaug>
+The pr doesn't explain this
+
+[13:14:31.0081] <smaug>
+I mean, the insertion step would certainly run when 1 is added back to DOM, but would insertion step run again when iterating through the children of the subtree root.
+
