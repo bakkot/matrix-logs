@@ -957,3 +957,23 @@ That would be a huge footgun.
 [12:33:46.0603] <Justin Ridgewell>
 How? We’re jsut trying to allow unnested use of `Variable`. We don’t need to do anything else.
 
+[12:35:35.0354] <Justin Ridgewell>
+> <@stephenhicks:matrix.org> I was referring to `Scope` in general - I may just not be seeing it, but short of instrumenting _every_ function to have its own separate mutable context, I don't see how two function bodies sharing the same `run` context could have `Scope` mutations from one be isolated from being observed in the other.
+
+Wouldn’t the `dispose` take care of that? And for the dangling async/generator’s mentioned above, it requires a small modification to the pausing behavior.
+
+[12:35:49.0320] <rbuckton>
+It's a footgun because it's confusing to users. If I had `using x = new Scope(ctx)`, and wanted to refactor to `const createScope = ctx => new Scope(ctx); using x = createScope(ctx);`, it suddenly breaks. Nothing else does that in the language, as far as I'm aware.
+
+[12:36:50.0327] <rbuckton>
+It's a TCP violation, made worse because that specific change did not involve new syntax. the "new syntax" part didn't move.
+
+[12:37:18.0070] <Justin Ridgewell>
+Perfect, The normal case now is `v.run(1, () => …)`, which also wouldn’t work that way.
+
+[12:38:27.0602] <rbuckton>
+take any valid expression in `v.run(...)` and turn it into an arrow and it would still work.
+
+[12:39:29.0091] <rbuckton>
+with perhaps the only distinction being `this` receiver handling, which is a known quantity.
+
