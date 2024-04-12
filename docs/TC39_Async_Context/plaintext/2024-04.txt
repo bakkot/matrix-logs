@@ -488,3 +488,68 @@ restoring the context after await is an example of registration-time behavior I 
 [10:21:50.0924] <Steve Hicks>
 That's a good point about `await`.  I brought it up in the context of async generators in https://github.com/tc39/proposal-async-context/pull/77#issuecomment-2048897179 - I think my general expectation is that context needs to be _preserved_ across an `await`, rather than _restored_ to some particular snapshot.
 
+[10:29:18.0120] <Steve Hicks>
+ * That's a good point about `await`.  I brought it up in the context of async generators in https://github.com/tc39/proposal-async-context/pull/77#issuecomment-2048897179 - I think my general expectation is that context needs to be _preserved_ across an `await`, rather than _restored_ to some particular snapshot on reentry
+
+[10:50:55.0096] <littledan>
+> <@stephenhicks:matrix.org> That's a good point about `await`.  I brought it up in the context of async generators in https://github.com/tc39/proposal-async-context/pull/77#issuecomment-2048897179 - I think my general expectation is that context needs to be _preserved_ across an `await`, rather than _restored_ to some particular snapshot on reentry
+
+Justin keeps talking about "restoring to the initial snapshot" but I've always been thinking about the semantics as "preserving the one that was right before the await" (that's my mental model for AsyncContext in general). In the end, there isn't an observable difference between them, though.
+
+[10:51:29.0086] <littledan>
+> <@stephenhicks:matrix.org> That's a good point about `await`.  I brought it up in the context of async generators in https://github.com/tc39/proposal-async-context/pull/77#issuecomment-2048897179 - I think my general expectation is that context needs to be _preserved_ across an `await`, rather than _restored_ to some particular snapshot on reentry
+
+ * Justin keeps talking about "restoring to the initial snapshot" but I've always been thinking about the semantics as "preserving the one that was right before the await or yield" (that's my mental model for AsyncContext in general). In the end, there isn't an observable difference between them, though.
+
+[10:51:30.0272] <Andreu Botella>
+well, with a disposable there would be
+
+[10:51:44.0533] <Andreu Botella>
+ * well, with a disposable there would be a difference
+
+[10:52:22.0666] <littledan>
+right, if we had some flat way of doing `run` within a function, I'd *definitely* want the semantics to be, preserve what was before the await/yield; I don't see any argument for "restore the one at function entry"
+
+[10:52:58.0945] <Steve Hicks>
+I think await and yield are maybe separate questions, but otherwise I agree.
+
+[10:53:25.0697] <Steve Hicks>
+ * I think await and yield are _maybe_ separate questions, but otherwise I agree.
+
+[10:53:29.0334] <littledan>
+is there any post which captures your thoughts on yield? it's been a little hard for me to follow the threads given their length
+
+[10:55:33.0279] <Steve Hicks>
+I don't really use generators, so I don't have particularly strong feelings on yield, beyond recognizing that that's at least a small handful of people who seem to want to be able to observe the calling context somehow or other.  My bigger concern is repeated callbacks, which I think are a little easier to reason about.
+
+[10:56:11.0613] <littledan>
+on yield, it seems like the biggest users in frameworks would actually *benefit* from these semantics because they end up using yield as a replacement for await
+
+[10:56:45.0714] <littledan>
+but I like focusing on the concrete and want to understand more about your thoughts on callbacks
+
+[10:56:49.0925] <Steve Hicks>
+I _think_ yield-as-await already gets the right behavior automatically based on how promises work.
+
+[10:57:15.0008] <littledan>
+> <@stephenhicks:matrix.org> I _think_ yield-as-await already gets the right behavior automatically based on how promises work.
+
+there's a tiny leak when it comes to thenables... but I think if you want the other behavior you're doing it wrong
+
+[10:57:15.0771] <Steve Hicks>
+(but I haven't thought through the details)
+
+[10:57:54.0546] <littledan>
+What I've heard is, Koa doesn't force a Promise.resolve the way native await does, and that's where the difference comes from
+
+[10:59:21.0818] <Steve Hicks>
+For repeated callbacks, it's common to register handlers or data producer graphs at application start time.  These callbacks run every time a particular interaction or data flow happens.  There's no meaningful context when they're registered, so it's much more relevant to propagate the call-time context for _each_ iniating circumstance, rather than the (empty) app-init context.
+
+[10:59:38.0743] <Steve Hicks>
+ * For repeated callbacks, it's common to register handlers or data pipelines at application start time.  These callbacks run every time a particular interaction or data flow happens.  There's no meaningful context when they're registered, so it's much more relevant to propagate the call-time context for _each_ iniating circumstance, rather than the (empty) app-init context.
+
+[11:00:37.0431] <Andreu Botella>
+> <@stephenhicks:matrix.org> For repeated callbacks, it's common to register handlers or data pipelines at application start time.  These callbacks run every time a particular interaction or data flow happens.  There's no meaningful context when they're registered, so it's much more relevant to propagate the call-time context for _each_ iniating circumstance, rather than the (empty) app-init context.
+
+do you think that events should have registration-time semantics for things that are expected to be one-use, i.e. `loadend` on XHR?
+
