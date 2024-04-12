@@ -77,6 +77,31 @@ RpcService.registerMiddleware(UpvoteResponse.typeId, ItemDetail.typeId,
   <tr class="msg" id="L28"><td class="ts-cell"><a class="ts" href="#L28" alt="Fri Apr 12 2024 11:11:16 GMT-0700 (Pacific Daylight Time)">18:11</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@littledan:matrix.org">littledan</span>&gt;</div></td><td class="msg-cell">I can ask my friend who did the other one if he could do this too</td></tr>
   <tr class="msg" id="L29"><td class="ts-cell"><a class="ts" href="#L29" alt="Fri Apr 12 2024 11:11:39 GMT-0700 (Pacific Daylight Time)">18:11</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@littledan:matrix.org">littledan</span>&gt;</div></td><td class="msg-cell">somehow logos make it easier to talk about things, sometimes</td></tr>
   <tr class="msg" id="L30"><td class="ts-cell"><a class="ts" href="#L30" alt="Fri Apr 12 2024 11:41:53 GMT-0700 (Pacific Daylight Time)">18:41</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">I need to better understand the concern about <code>using</code> and an async context scope. As I understand it, even with <code>[Symbol.enter]</code> you're concerned it's possible exit the function without exiting the scope?</td></tr>
+  <tr class="msg" id="L31"><td class="ts-cell"><a class="ts" href="#L31" alt="Fri Apr 12 2024 11:46:32 GMT-0700 (Pacific Daylight Time)">18:46</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@abotella:igalia.com">Andreu Botella</span>&gt;</div></td><td class="msg-cell"><mx-reply><blockquote> I need to better understand the concern about <code>using</code> and an async context scope. As I understand it, even with <code>[Symbol.enter]</code> you're concerned it's possible exit the function without exiting the scope?</blockquote></mx-reply>the concern is that buggy (or malicious) code that calls <code>[Symbol.enter]</code> but not <code>[Symbol.dispose]</code> would change the context available when the function returns</td></tr>
+  <tr class="msg" id="L32"><td class="ts-cell"><a class="ts" href="#L32" alt="Fri Apr 12 2024 11:46:53 GMT-0700 (Pacific Daylight Time)">18:46</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@abotella:igalia.com">Andreu Botella</span>&gt;</div></td><td class="msg-cell">currently in the AsyncContext proposal there's no way to change the context in the middle of a function execution</td></tr>
+  <tr class="msg" id="L33"><td class="ts-cell"><a class="ts" href="#L33" alt="Fri Apr 12 2024 11:47:22 GMT-0700 (Pacific Daylight Time)">18:47</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@abotella:igalia.com">Andreu Botella</span>&gt;</div></td><td class="msg-cell">and I think this was a design goal, which is why we didn't adopt <code>AsyncLocalStorage</code>'s <code>enterWith</code></td></tr>
+  <tr class="msg" id="L34"><td class="ts-cell"><a class="ts" href="#L34" alt="Fri Apr 12 2024 11:47:58 GMT-0700 (Pacific Daylight Time)">18:47</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell"><p>How does this:</p>
+<pre><code class="language-js">function f() {
+  const scopeEnterable = new AsyncContext.Scope();
+  scopeEnterable[Symbol.enter]();
+  // do work
+  // forget to exit scope
+}
+</code></pre>
+<p>differ from this:</p>
+<pre><code class="language-js">function f() {
+  let result;
+  function* g(cb) {
+    using scope = new AsyncContext.Scope();
+    result = cb();
+    yield;
+  }
+  g().next();
+  return result;
+}
+</code></pre>
+</td></tr>
+  <tr class="msg" id="L35"><td class="ts-cell"><a class="ts" href="#L35" alt="Fri Apr 12 2024 11:48:52 GMT-0700 (Pacific Daylight Time)">18:48</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">That would also result in a dangling scope, even with some kind of more comprehensive enforcement of <code>using</code></td></tr>
 
 </tbody></table></div></div></div>
 </body></html>

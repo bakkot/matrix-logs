@@ -667,3 +667,44 @@ In this example, there's a lot of loose coupling: the click handler just fires-a
 [11:41:53.0971] <rbuckton>
 I need to better understand the concern about `using` and an async context scope. As I understand it, even with `[Symbol.enter]` you're concerned it's possible exit the function without exiting the scope?
 
+[11:46:32.0131] <Andreu Botella>
+> <@rbuckton:matrix.org> I need to better understand the concern about `using` and an async context scope. As I understand it, even with `[Symbol.enter]` you're concerned it's possible exit the function without exiting the scope?
+
+the concern is that buggy (or malicious) code that calls `[Symbol.enter]` but not `[Symbol.dispose]` would change the context available when the function returns
+
+[11:46:53.0482] <Andreu Botella>
+currently in the AsyncContext proposal there's no way to change the context in the middle of a function execution
+
+[11:47:22.0293] <Andreu Botella>
+and I think this was a design goal, which is why we didn't adopt `AsyncLocalStorage`'s `enterWith`
+
+[11:47:58.0043] <rbuckton>
+How does this:
+
+```js
+function f() {
+  const scopeEnterable = new AsyncContext.Scope();
+  scopeEnterable[Symbol.enter]();
+  // do work
+  // forget to exit scope
+}
+```
+
+differ from this:
+
+```js
+function f() {
+  let result;
+  function* g(cb) {
+    using scope = new AsyncContext.Scope();
+    result = cb();
+    yield;
+  }
+  g().next();
+  return result;
+}
+```
+
+[11:48:52.0543] <rbuckton>
+That would also result in a dangling scope, even with some kind of more comprehensive enforcement of `using`
+
