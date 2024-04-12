@@ -594,3 +594,26 @@ I can ask my friend who did the other one if he could do this too
 [11:11:39.0171] <littledan>
 somehow logos make it easier to talk about things, sometimes
 
+[11:20:06.0854] <Steve Hicks>
+ * More concretely, we have an internal framework that writes code like this:
+
+```
+class UpvoteButtonComponent {
+  constructor(private readonly rpcService: RpcService, private readonly id: string) {}
+  render(item: ItemDetail) {
+    return <button on:click={this.onClick}>{item.getVotes()}</button>;
+  }
+  onClick() {
+    this.rpcService.sendUpvote(new UpvoteRequest().setId(this.id));
+  }
+}
+RpcService.registerMiddleware(UpvoteResponse.typeId, ItemDetail.typeId,
+    (response: UpvoteResponse) => response.getId(),
+    (item: ItemDetail) => item.getId(),
+    (response: UpvoteResponse, item: ItemDetail) => {
+      item.setVotes(response.getNewVoteCount());
+    });
+```
+
+In this example, there's a lot of loose coupling: the click handler just fires-and-forgets an RPC.  The RPC service has some middleware registered that gets a response of a certain type and then indexes all the cached ItemDetail models by their ID, retrieves the matching detail, and updates its votes.  The UI data binding then picks up this change and rerenders the component.  What I need to be able to do is thread a trace through that sequence of loosely coupled triggers.  The callbacks are all registered once, when the module is loaded, but they need to carry along the call-time context in order to preserve the trace.
+
