@@ -51,6 +51,26 @@
   <tr class="msg" id="L21"><td class="ts-cell"><a class="ts" href="#L21" alt="Fri Apr 12 2024 10:59:21 GMT-0700 (Pacific Daylight Time)">17:59</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@stephenhicks:matrix.org">Steve Hicks</span>&gt;</div></td><td class="msg-cell">For repeated callbacks, it's common to register handlers or data pipelines at application start time.  These callbacks run every time a particular interaction or data flow happens.  There's no meaningful context when they're registered, so it's much more relevant to propagate the call-time context for <em>each</em> iniating circumstance, rather than the (empty) app-init context.</td></tr>
   <tr class="msg" id="L22"><td class="ts-cell"><a class="ts" href="#L22" alt="Fri Apr 12 2024 11:00:37 GMT-0700 (Pacific Daylight Time)">18:00</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@abotella:igalia.com">Andreu Botella</span>&gt;</div></td><td class="msg-cell"><mx-reply><blockquote> For repeated callbacks, it's common to register handlers or data pipelines at application start time.  These callbacks run every time a particular interaction or data flow happens.  There's no meaningful context when they're registered, so it's much more relevant to propagate the call-time context for <em>each</em> iniating circumstance, rather than the (empty) app-init context.</blockquote></mx-reply>do you think that events should have registration-time semantics for things that are expected to be one-use, i.e. <code>loadend</code> on XHR?</td></tr>
   <tr class="msg" id="L23"><td class="ts-cell"><a class="ts" href="#L23" alt="Fri Apr 12 2024 11:01:16 GMT-0700 (Pacific Daylight Time)">18:01</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@abotella:igalia.com">Andreu Botella</span>&gt;</div></td><td class="msg-cell">you can use a single <code>XMLHttpRequest</code> object for multiple fetches, but I don't think most uses do that</td></tr>
+  <tr class="msg" id="L24"><td class="ts-cell"><a class="ts" href="#L24" alt="Fri Apr 12 2024 11:09:17 GMT-0700 (Pacific Daylight Time)">18:09</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@stephenhicks:matrix.org">Steve Hicks</span>&gt;</div></td><td class="msg-cell"><p>More concretely, we have an internal framework that writes code like this:</p>
+<pre><code>class UpvoteButtonComponent {
+  constructor(private readonly rpcService: RpcService, private readonly id: string) {}
+  render(item: ItemDetail) {
+    return &lt;button on:click={this.onClick}&gt;{item.getVotes()}&lt;/button&gt;;
+  }
+  onClick() {
+    this.rpcService.sendUpvote(new UpvoteRequest().setId(this.id));
+  }
+}
+RpcService.registerMiddleware(UpvoteResponse.typeId, ItemDetail.typeId,
+    (response: UpvoteResponse) =&gt; response.getId(),
+    (item: ItemDetail) =&gt; item.getId(),
+    (response: UpvoteResponse, item: ItemDetail) =&gt; {
+      return item.clone().setVotes(response.getNewVoteCount());
+    });
+</code></pre>
+<p>In this example, there's a lot of loose coupling: the click handler just fires-and-forgets an RPC.  The RPC service has some middleware registered that gets a response of a certain type and then indexes all the cached ItemDetail models by their ID, retrieves the matching detail, and updates its votes.  The UI data binding then picks up this change and rerenders the component.  What I need to be able to do is thread a trace through that sequence of loosely coupled triggers.  The callbacks are all registered once, when the module is loaded, but they need to carry along the call-time context in order to preserve the trace.</p>
+</td></tr>
+  <tr class="msg" id="L25"><td class="ts-cell"><a class="ts" href="#L25" alt="Fri Apr 12 2024 11:10:04 GMT-0700 (Pacific Daylight Time)">18:10</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@littledan:matrix.org">littledan</span>&gt;</div></td><td class="msg-cell">(is this the same internal framework that Jatin works on?)</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>
