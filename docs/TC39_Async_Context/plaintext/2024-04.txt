@@ -856,3 +856,33 @@ No
 [12:05:23.0690] <Justin Ridgewell>
 Run enters, invokes the cb, then exits. It can’t leave a dirty stack.
 
+[12:11:50.0346] <rbuckton>
+One way I could envision this behavior would be something like this very naive implementation:
+
+```js
+AsyncContext.run = function (ctx, cb) {
+  using scope = new AsyncContext.Scope(ctx);
+  return cb();
+}
+AsyncContext.Scope = class Scope {
+  static #top;
+  #prev;
+  #ctx;
+  constructor(ctx) {
+    this.#ctx = ctx;
+    this.#prev = Scope.#top;
+    Scope.#top = this;
+    // other scope setup work
+  }
+  [Symbol.dispose]() {
+    if (this !== Scope.#top) throw new Error();
+    Scope.#top = this.#prev;
+    // other scope teardown work
+  }
+}
+```
+Each time you create a new `Scope`, you're pushing it into a stack. When you fail to pop a scope, you get an error. 
+
+[12:12:08.0585] <Steve Hicks>
+(I'll also point out that this is effectively impossible to polyfill, for whatever it's worth - you'd need to instrument every function with a local variable to store the current context in, rather than relying on a global.)
+
