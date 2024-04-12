@@ -708,3 +708,63 @@ function f() {
 [11:48:52.0543] <rbuckton>
 That would also result in a dangling scope, even with some kind of more comprehensive enforcement of `using`
 
+[11:50:18.0246] <rbuckton>
+ * How does this:
+
+```js
+function f() {
+  const scopeEnterable = new AsyncContext.Scope();
+  scopeEnterable[Symbol.enter]();
+  // do work
+  // forget to exit scope
+}
+```
+
+differ from this:
+
+```js
+function f() {
+  function* g() {
+    using scope = new AsyncContext.Scope();
+    // do work
+    yield;
+  }
+  g().next();
+}
+```
+
+[11:50:26.0977] <Andreu Botella>
+the current scope text switches the context when generators are paused and restored – there's still discussion about whether this is the right behavior, but that would take care of that
+
+[11:50:31.0093] <littledan>
+yeah, neither of those is acceptable, that's the thing
+
+[11:50:42.0752] <littledan>
+the current API is based on `.run(cb)` instead
+
+[11:51:23.0490] <rbuckton>
+If failing to exit the scope is unacceptable, then there's no way to achieve that kind of enforcement with `using`
+
+[11:52:18.0517] <Andreu Botella>
+I guess the fact that AsyncContext *can* switch the scope for generators is a thing that no other use cases could do, so maybe that doesn't apply more generally
+
+[11:52:53.0045] <rbuckton>
+Async functions would also result in a dangling scope
+```js
+async function f(p) {
+  using scope = new AsyncContext.Scope();
+  // do work
+  await p;
+}
+
+const { promise, resolve } = Promise.withResolves();
+f(p);
+// never call resolve()
+```
+
+[11:52:54.0325] <Andreu Botella>
+ * I guess the fact that AsyncContext _can_ switch the scope for generators is a thing that no userland use cases could do, so maybe that doesn't apply more generally
+
+[11:54:52.0527] <rbuckton>
+This leads me to believe that `AsyncContext.Scope` isn't viable.
+

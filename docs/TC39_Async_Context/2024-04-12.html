@@ -90,18 +90,34 @@ RpcService.registerMiddleware(UpvoteResponse.typeId, ItemDetail.typeId,
 </code></pre>
 <p>differ from this:</p>
 <pre><code class="language-js">function f() {
-  let result;
-  function* g(cb) {
+  function* g() {
     using scope = new AsyncContext.Scope();
-    result = cb();
+    // do work
     yield;
   }
   g().next();
-  return result;
 }
 </code></pre>
 </td></tr>
   <tr class="msg" id="L35"><td class="ts-cell"><a class="ts" href="#L35" alt="Fri Apr 12 2024 11:48:52 GMT-0700 (Pacific Daylight Time)">18:48</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">That would also result in a dangling scope, even with some kind of more comprehensive enforcement of <code>using</code></td></tr>
+  <tr class="msg" id="L36"><td class="ts-cell"><a class="ts" href="#L36" alt="Fri Apr 12 2024 11:50:26 GMT-0700 (Pacific Daylight Time)">18:50</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@abotella:igalia.com">Andreu Botella</span>&gt;</div></td><td class="msg-cell">the current scope text switches the context when generators are paused and restored – there's still discussion about whether this is the right behavior, but that would take care of that</td></tr>
+  <tr class="msg" id="L37"><td class="ts-cell"><a class="ts" href="#L37" alt="Fri Apr 12 2024 11:50:31 GMT-0700 (Pacific Daylight Time)">18:50</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@littledan:matrix.org">littledan</span>&gt;</div></td><td class="msg-cell">yeah, neither of those is acceptable, that's the thing</td></tr>
+  <tr class="msg" id="L38"><td class="ts-cell"><a class="ts" href="#L38" alt="Fri Apr 12 2024 11:50:42 GMT-0700 (Pacific Daylight Time)">18:50</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@littledan:matrix.org">littledan</span>&gt;</div></td><td class="msg-cell">the current API is based on <code>.run(cb)</code> instead</td></tr>
+  <tr class="msg" id="L39"><td class="ts-cell"><a class="ts" href="#L39" alt="Fri Apr 12 2024 11:51:23 GMT-0700 (Pacific Daylight Time)">18:51</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">If failing to exit the scope is unacceptable, then there's no way to achieve that kind of enforcement with <code>using</code></td></tr>
+  <tr class="msg" id="L40"><td class="ts-cell"><a class="ts" href="#L40" alt="Fri Apr 12 2024 11:52:18 GMT-0700 (Pacific Daylight Time)">18:52</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@abotella:igalia.com">Andreu Botella</span>&gt;</div></td><td class="msg-cell">I guess the fact that AsyncContext <em>can</em> switch the scope for generators is a thing that no userland use cases could do, so maybe that doesn't apply more generally</td></tr>
+  <tr class="msg" id="L41"><td class="ts-cell"><a class="ts" href="#L41" alt="Fri Apr 12 2024 11:52:53 GMT-0700 (Pacific Daylight Time)">18:52</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell"><p>Async functions would also result in a dangling scope</p>
+<pre><code class="language-js">async function f(p) {
+  using scope = new AsyncContext.Scope();
+  // do work
+  await p;
+}
+
+const { promise, resolve } = Promise.withResolves();
+f(p);
+// never call resolve()
+</code></pre>
+</td></tr>
+  <tr class="msg" id="L42"><td class="ts-cell"><a class="ts" href="#L42" alt="Fri Apr 12 2024 11:54:52 GMT-0700 (Pacific Daylight Time)">18:54</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">This leads me to believe that <code>AsyncContext.Scope</code> isn't viable.</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>
