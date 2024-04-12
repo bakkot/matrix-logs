@@ -128,6 +128,35 @@ f(p);
   <tr class="msg" id="L50"><td class="ts-cell"><a class="ts" href="#L50" alt="Fri Apr 12 2024 11:58:20 GMT-0700 (Pacific Daylight Time)">18:58</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell"><mx-reply><blockquote> in the extreme case: if <code>using</code> was passed the delimited continuation as an argument...</blockquote></mx-reply>I don't see how this wouldn't be significantly worse.</td></tr>
   <tr class="msg" id="L51"><td class="ts-cell"><a class="ts" href="#L51" alt="Fri Apr 12 2024 11:58:49 GMT-0700 (Pacific Daylight Time)">18:58</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@littledan:matrix.org">littledan</span>&gt;</div></td><td class="msg-cell"><mx-reply><blockquote> I don't see how this wouldn't be significantly worse.</blockquote></mx-reply>it would solve the problem that Andreu is talking about, while also, yes, being a crazy thing that we definitely shouldn't do</td></tr>
   <tr class="msg" id="L52"><td class="ts-cell"><a class="ts" href="#L52" alt="Fri Apr 12 2024 11:59:08 GMT-0700 (Pacific Daylight Time)">18:59</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@littledan:matrix.org">littledan</span>&gt;</div></td><td class="msg-cell">the design of <code>.run(cb)</code> forces you to extract the delimited continuation manually</td></tr>
+  <tr class="msg" id="L53"><td class="ts-cell"><a class="ts" href="#L53" alt="Fri Apr 12 2024 12:01:19 GMT-0700 (Pacific Daylight Time)">19:01</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@stephenhicks:matrix.org">Steve Hicks</span>&gt;</div></td><td class="msg-cell"><p>Where I see a problem is</p>
+<pre><code>{
+  using scope = new AsyncContext.Scope();
+  // ...
+  const innerScope =  new AsyncContext.Scope();
+  innerScope[Symbol.enter]();
+  // ...
+}
+// what happens to vars set on innerScope?
+innerScope[Symbol.dispose]();
+// what happens now?
+</code></pre>
+</td></tr>
+  <tr class="msg" id="L54"><td class="ts-cell"><a class="ts" href="#L54" alt="Fri Apr 12 2024 12:02:50 GMT-0700 (Pacific Daylight Time)">19:02</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">if you were to treat this like a stack, as <code>run(cb)</code> would do, I would expect <code>innerScope</code> to be on top of the stack, and when <code>scope</code> is disposed it should throw if it's not on the top of the stack.</td></tr>
+  <tr class="msg" id="L55"><td class="ts-cell"><a class="ts" href="#L55" alt="Fri Apr 12 2024 12:03:08 GMT-0700 (Pacific Daylight Time)">19:03</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@abotella:igalia.com">Andreu Botella</span>&gt;</div></td><td class="msg-cell"><mx-reply><blockquote> <p>Where I see a problem is</p>
+<pre><code>{
+  using scope = new AsyncContext.Scope();
+  // ...
+  const innerScope =  new AsyncContext.Scope();
+  innerScope[Symbol.enter]();
+  // ...
+}
+// what happens to vars set on innerScope?
+innerScope[Symbol.dispose]();
+// what happens now?
+</code></pre>
+</blockquote></mx-reply>I think this could be worked around by keeping the scope depth and invalidating <code>innerScope</code> if <code>scope</code> has been disposed. But I'm not sure at this point if this would work for async functions and generators</td></tr>
+  <tr class="msg" id="L56"><td class="ts-cell"><a class="ts" href="#L56" alt="Fri Apr 12 2024 12:04:23 GMT-0700 (Pacific Daylight Time)">19:04</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">Do you have to keep track of when you enter or exit a function with <code>run()</code>?</td></tr>
+  <tr class="msg" id="L57"><td class="ts-cell"><a class="ts" href="#L57" alt="Fri Apr 12 2024 12:04:52 GMT-0700 (Pacific Daylight Time)">19:04</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-1" title="@jridgewell:matrix.org">Justin Ridgewell</span>&gt;</div></td><td class="msg-cell">No</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>

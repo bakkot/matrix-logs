@@ -814,3 +814,42 @@ the design of `.run(cb)` forces you to extract the delimited continuation manual
 
  * I think you're missing something here.  The issue is only in any shared contexts.  The context outside the async function isn't affected by the Scope.  I assume the point of Scope is that it effectively makes a child context "in place" - so it wouldn't impact any other function bodies that were sharing the same context as _before_ the Scope is entered.  Specifically, it would _not_ mutate the current context.
 
+[12:01:19.0675] <Steve Hicks>
+Where I see a problem is
+```
+{
+  using scope = new AsyncContext.Scope();
+  // ...
+  const innerScope =  new AsyncContext.Scope();
+  innerScope[Symbol.enter]();
+  // ...
+}
+// what happens to vars set on innerScope?
+innerScope[Symbol.dispose]();
+// what happens now?
+
+[12:02:50.0273] <rbuckton>
+if you were to treat this like a stack, as `run(cb)` would do, I would expect `innerScope` to be on top of the stack, and when `scope` is disposed it should throw if it's not on the top of the stack.
+
+[12:03:08.0687] <Andreu Botella>
+> <@stephenhicks:matrix.org> Where I see a problem is
+> ```
+> {
+>   using scope = new AsyncContext.Scope();
+>   // ...
+>   const innerScope =  new AsyncContext.Scope();
+>   innerScope[Symbol.enter]();
+>   // ...
+> }
+> // what happens to vars set on innerScope?
+> innerScope[Symbol.dispose]();
+> // what happens now?
+
+I think this could be worked around by keeping the scope depth and invalidating `innerScope` if `scope` has been disposed. But I'm not sure at this point if this would work for async functions and generators
+
+[12:04:23.0758] <rbuckton>
+Do you have to keep track of when you enter or exit a function with `run()`?
+
+[12:04:52.0755] <Justin Ridgewell>
+No
+
