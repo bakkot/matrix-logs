@@ -1028,3 +1028,26 @@ I'm just seeing this now because this website was unloaded in my Chrome and the 
 
 Do you mean post-insertion steps?
 
+[14:46:38.0254] <Dominic Farolino>
+> Do the insertion steps get run on 1 again, because it is now after 2 and 3?
+
+Yes they do, and the PR answers this.
+
+I'll assume every instance of "insertion step" in your message is "post-insertion step". With that edit, here's what happens:
+
+1. Insertion steps would run for the root, and its three children, in tree order, never running script.
+2. Post-insertion steps would run for the root, and its three children, in the same order.
+3. Say the first child is an about:blank iframe with an `onload` handler. This handler is synchronously invoked (for child 1) during its post-insertion steps (that's how iframes work; the initial about:blank iframe fires load syncly).
+4. The event handler removes the iframe from the DOM, and re-inserts it after its siblings.
+5. This re-enters the DOM insertion algorithm, which synchronously re-enters its post-insertion steps, and re-invokes the `onload` event for the same iframe element. This runs the event handler re-entrantly.
+
+Please see https://gist.github.com/domfarolino/83b1a436c5ad4fc68b04aa0092985f58 and run this in the console in Chrome (Firefox does not synchronously fire `onload` for about:blank iframes IIRC).
+
+Note that post-insertion steps do not intend to solve re-entrant event handlers by forcing their order to be broken or anything. They _only_ ensure that by the time script runs in them, the batch of relevant DOM mutations (associated with the insertion) are all complete.
+
+[14:47:02.0231] <Dominic Farolino>
+smaug for above
+
+[14:49:45.0530] <smaug>
+2 is unclear
+

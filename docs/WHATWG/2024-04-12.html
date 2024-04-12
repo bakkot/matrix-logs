@@ -43,6 +43,23 @@
 </blockquote>
 <p>Do you mean post-insertion steps?</p>
 </td></tr>
+  <tr class="msg" id="L13"><td class="ts-cell"><a class="ts" href="#L13" alt="Fri Apr 12 2024 14:46:38 GMT-0700 (Pacific Daylight Time)">21:46</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-1" title="@domfarolino:matrix.org">Dominic Farolino</span>&gt;</div></td><td class="msg-cell"><blockquote>
+<p>Do the insertion steps get run on 1 again, because it is now after 2 and 3?</p>
+</blockquote>
+<p>Yes they do, and the PR answers this.</p>
+<p>I'll assume every instance of "insertion step" in your message is "post-insertion step". With that edit, here's what happens:</p>
+<ol>
+<li>Insertion steps would run for the root, and its three children, in tree order, never running script.</li>
+<li>Post-insertion steps would run for the root, and its three children, in the same order.</li>
+<li>Say the first child is an about:blank iframe with an <code>onload</code> handler. This handler is synchronously invoked (for child 1) during its post-insertion steps (that's how iframes work; the initial about:blank iframe fires load syncly).</li>
+<li>The event handler removes the iframe from the DOM, and re-inserts it after its siblings.</li>
+<li>This re-enters the DOM insertion algorithm, which synchronously re-enters its post-insertion steps, and re-invokes the <code>onload</code> event for the same iframe element. This runs the event handler re-entrantly.</li>
+</ol>
+<p>Please see <a href="https://gist.github.com/domfarolino/83b1a436c5ad4fc68b04aa0092985f58">https://gist.github.com/domfarolino/83b1a436c5ad4fc68b04aa0092985f58</a> and run this in the console in Chrome (Firefox does not synchronously fire <code>onload</code> for about:blank iframes IIRC).</p>
+<p>Note that post-insertion steps do not intend to solve re-entrant event handlers by forcing their order to be broken or anything. They <em>only</em> ensure that by the time script runs in them, the batch of relevant DOM mutations (associated with the insertion) are all complete.</p>
+</td></tr>
+  <tr class="msg" id="L14"><td class="ts-cell"><a class="ts" href="#L14" alt="Fri Apr 12 2024 14:47:02 GMT-0700 (Pacific Daylight Time)">21:47</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-1" title="@domfarolino:matrix.org">Dominic Farolino</span>&gt;</div></td><td class="msg-cell"><span class="nick-4">smaug</span> for above</td></tr>
+  <tr class="msg" id="L15"><td class="ts-cell"><a class="ts" href="#L15" alt="Fri Apr 12 2024 14:49:45 GMT-0700 (Pacific Daylight Time)">21:49</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@smaug:mozilla.org">smaug</span>&gt;</div></td><td class="msg-cell">2 is unclear</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>
