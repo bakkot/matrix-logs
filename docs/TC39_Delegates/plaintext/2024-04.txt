@@ -7038,3 +7038,251 @@ The web streams spec uses it, for example (and they correctly do not expose Asyn
 [07:56:07.0909] <Michael Ficarra>
 please open an issue on ecma262
 
+
+2024-04-17
+[09:49:42.0711] <bakkot>
+hey nice, SRI support for ES modules finally https://github.com/whatwg/html/pull/10269
+
+[12:00:10.0268] <bakkot>
+ljharb: I just realized that I had previously suggested a `Function.prototype.try`, and that kind of conflicts with `Promise.try` in that `Promise` inherits from `Function` but `Promise.try` is a different thing than `Function.prototype.try` would be
+
+[12:00:32.0653] <bakkot>
+I feel like if we are going to use that name for something it would be better used on `Function.prototype.try`
+
+[12:01:18.0593] <bakkot>
+`Function.prototype.try` being https://matrixlogs.bakkot.com/TC39_Delegates/2023-11-29#L10
+
+[12:01:28.0505] <bakkot>
+maybe we can just live with the conflict? but it's a bit awkward
+
+[12:02:25.0335] <bakkot>
+I guess because `Promise` can't be called without `new` it is unlikely to be an issue in practice, but still
+
+[12:19:43.0238] <Justin Ridgewell>
+I don't think that'd be a conflict
+
+[12:20:02.0788] <Justin Ridgewell>
+One returns a sync monad (can we get a `Result` type?), the other returns an async monad
+
+[12:20:25.0678] <Justin Ridgewell>
+Someone actually just asked for `Result` in the internal Google chat yesterday
+
+[12:23:24.0661] <nicolo-ribaudo>
+> <@jridgewell:matrix.org> I don't think that'd be a conflict
+
+Promise is an instance if function, so it would shadow .try with an incompatible implementation 
+
+[12:23:54.0789] <Justin Ridgewell>
+I understand, but disagree that it’s incompatible
+
+[12:24:20.0967] <Justin Ridgewell>
+It’s returning the type appropriate for the constructor
+
+[12:26:46.0036] <Justin Ridgewell>
+And I'm now remembering that `Promise.try` receive the fn to call as its first argument, and `Function.try` would not.
+
+[12:26:53.0168] <Justin Ridgewell>
+ * And I'm now realizing that `Promise.try` receive the fn to call as its first argument, and `Function.try` would not.
+
+[12:26:59.0956] <Justin Ridgewell>
+Never mind, ignore my comments.
+
+[16:07:31.0965] <Michael Ficarra>
+https://github.com/tc39/ecma262/pull/3313
+
+[16:26:27.0057] <rbuckton>
+> <@jridgewell:matrix.org> Someone actually just asked for `Result` in the internal Google chat yesterday
+
+Something along the lines of `Option` that I've been talking about in relation to extractors and pattern matching and ADT enums? 
+
+[16:28:00.0447] <Justin Ridgewell>
+ Similar but not quite, since `None` can’t carry data that `Err` can
+
+[16:29:16.0388] <rbuckton>
+Fair, though `Result` still seems like something in the same ballpark 
+
+
+2024-04-18
+[20:53:19.0757] <rkirsling>
+I feel dumb but can somebody tell me what test262 directory a test for `null[{ toString: () => { ... } }]` belongs in?
+
+[20:53:37.0707] <rkirsling>
+ * I feel dumb but can somebody tell me what test262 directory a test for `null[{ toString() { ... } }]` belongs in?
+
+[21:02:12.0893] <rkirsling>
+e.g. `language/expressions/property-accessors` seems like it's about _specific_ properties to access and not about the general concept of how "bracket access" should operate
+
+[21:36:10.0285] <bakkot>
+rkirsling: I don't see an obvious place for it
+
+[21:36:29.0041] <bakkot>
+so... make `language/expressions/member-expression`?
+
+[21:39:44.0531] <rkirsling>
+can do 
+
+[05:08:50.0935] <Jack Works>
+> <@bakkot:matrix.org> ljharb: I just realized that I had previously suggested a `Function.prototype.try`, and that kind of conflicts with `Promise.try` in that `Promise` inherits from `Function` but `Promise.try` is a different thing than `Function.prototype.try` would be
+
+does it have a receiver parameter?
+
+[06:10:45.0155] <ljharb>
+a receiver param for function try is awkward imo
+
+[06:29:31.0942] <nicolo-ribaudo>
+`fn(...args)!?` and `obj.method(...args)!?` syntax instead of `.try`, so that there is no question problem with the receiver?
+
+[06:31:27.0680] <Anthony Bullard>
+Are we talking about Rust? 😉
+
+[07:28:17.0325] <Ashley Claymore>
+Part of me feels like it should be a static helper. As this is the year of `Object.groupBy` and `Promise.try` but we don't have a class for what this returns. Or maybe we wait until we do and then it's `Result.try(fn)`
+
+[11:14:09.0072] <bakkot>
+It is not worth having syntax for this
+
+[11:14:43.0568] <bakkot>
+For the specifying the receiver, `Function.prototype.tryCall`
+
+[11:15:36.0471] <bakkot>
+ * For the specifying the receiver, `Function.prototype.tryCall(obj.method, obj, ...args)`
+
+[11:37:54.0277] <ljharb>
+i don't think it makes sense to have a receiver argument at all. you can do that yourself with `.bind`. `Function.try` or `Result.try` makes much more sense to me.
+
+[11:54:39.0406] <Michael Ficarra>
+there's no need for a receiver parameter, you can just do `Function.prototype.call.bind(Function.prototype.call).try(fn, thisValue, ...args)`
+
+[11:55:11.0643] <bakkot>
+uhhhh I would much prefer to write `obj.meth.tryCall(obj, ...args)` instead of that
+
+[11:55:16.0362] <Michael Ficarra>
+I often save this "call-bound call" (`Function.prototype.call.bind(Function.prototype.call`) and use it throughout my programs
+
+[11:55:31.0605] <Michael Ficarra>
+maybe instead we need to introduce a `Reflect.call` or something that has it pre-defined
+
+[11:55:57.0907] <bakkot>
+https://github.com/js-choi/proposal-function-demethodize
+
+[11:56:46.0674] <Michael Ficarra>
+lol nice: https://www.npmjs.com/package/call-bind
+
+[11:56:52.0219] <bakkot>
+https://github.com/tc39/proposal-call-this
+
+[11:57:22.0770] <bakkot>
+I am not in favor of new syntax but yes a new method would be good
+
+[11:58:07.0972] <Michael Ficarra>
+I think some people may be opposed to it being on `Reflect`, but it seems so nice to have `call` sitting next to `apply` there
+
+[11:58:09.0145] <Richard Gibson>
+I don't know why the current dislike of receiver is so prevalent (cf. [proposal-async-context#80](https://github.com/tc39/proposal-async-context/issues/80) and the aforementioned [proposal-promise-try#15](https://github.com/tc39/proposal-promise-try/issues/15#issuecomment-2045965423)) and assumed to be permanent, but I very much dislike the corresponding fracturing of the language in which new proposals gratuitously diverge from Function.prototype.{apply,call} and Reflect.apply—_especially_ when discussion in plenary has raised opposition to anything that encourages more use of things like `.bind` and arrow wrappers.
+
+[11:59:21.0644] <Michael Ficarra>
+Richard Gibson: maybe because most of the time you don't need to specify receiver, and when you do, you have call-bound call to bail you out?
+
+[11:59:22.0300] <bakkot>
+`Function.prototype.apply/call` and `Reflect.apply` are special helpers, which are very rarely sensible precedent to use for other methods
+
+[12:00:33.0345] <bakkot>
+I am happy to have a `Function.prototype.tryCall` sitting next to `Function.prototype.try` for that use case, but I don't want to make the signature of methods like that worse for the common case of no receiver just for parity with `Function.prototype.call` 
+
+[12:00:51.0804] <ljharb>
+the receiver argument in array methods is terrible and if not for precedent, i'd hope none of the new methods would have had it. bind, or an arrow, is The Way
+
+[12:01:17.0290] <ljharb>
+> <@bakkot:matrix.org> I am happy to have a `Function.prototype.tryCall` sitting next to `Function.prototype.try` for that use case, but I don't want to make the signature of methods like that worse for the common case of no receiver just for parity with `Function.prototype.call`
+
+which is also why "receiver" and "varargs" is a problem, because having to put `null` when you don't care about the receiver sucks
+
+[12:01:22.0681] <ljharb>
+so, we should just omit the receiver
+
+[12:01:38.0899] <ljharb>
+ * so, we should just omit the receiver. the language has lots of tools to handle that, and there's proposals for the ones it doesn't.
+
+[12:08:58.0378] <Richard Gibson>
+> bind, or an arrow, is The Way
+
+have you forgotten that implementers specifically objected to proposals that would encourage their use?
+
+> **most of the time** you don't need to specify receiver
+> worse for the **common case** of no receiver
+
+Emphasis mine. This is presumptive about future language use, but even so I would agree if not for precedent in the existing ways to call functions with arbitrary arguments. To have new signatures leave no room for an argument that is present in all old ones seems like unnecessary complexity. If you want to break with the past and foster arrow functions, then make that be necessary for arguments as well (e.g., `try(() => fn(…))`).
+
+[12:09:43.0544] <bakkot>
+To have new signatures specifically require the user to think about receivers is unnecessary complexity
+
+[12:12:48.0385] <ljharb>
+> <@gibson042:matrix.org> > bind, or an arrow, is The Way
+> 
+> have you forgotten that implementers specifically objected to proposals that would encourage their use?
+> 
+> > **most of the time** you don't need to specify receiver
+> > worse for the **common case** of no receiver
+> 
+> Emphasis mine. This is presumptive about future language use, but even so I would agree if not for precedent in the existing ways to call functions with arbitrary arguments. To have new signatures leave no room for an argument that is present in all old ones seems like unnecessary complexity. If you want to break with the past and foster arrow functions, then make that be necessary for arguments as well (e.g., `try(() => fn(…))`).
+
+that wasn't about encouraging their _use_, but their _overuse_
+
+[12:13:28.0491] <ljharb>
+as for "make it necessary for arguments as well", i agree with that, which is why Promise.try didn't initially have that capacity, but folks wanted it so i added it
+
+[12:13:35.0463] <bakkot>
+I am happy to have _additional_ methods which allow specifying the receiver, but now that we have spread args there's no reason to use `Function.prototype.call/apply` except when specifying the receiver - specifying the receiver is what they're for. It really, really does not make sense to consider them precedent for other functions
+
+[12:13:44.0051] <ljharb>
+either way, "no recevier, with arguments" is way way more common than "with a receiver"
+
+[12:13:58.0796] <ljharb>
+ * either way, "no receiver, with arguments" is way way more common than "with a receiver"
+
+[12:14:16.0016] <ljharb>
+ * either way, "no receiver, with arguments" is way way more common than "with a receiver", at least for any usage that isn't literally `obj.method(...args)`
+
+[12:14:28.0055] <Richard Gibson>
+> <@ljharb:matrix.org> either way, "no receiver, with arguments" is way way more common than "with a receiver", at least for any usage that isn't literally `obj.method(...args)`
+
+by "more common" you're referring to authored code, right?
+
+[12:14:55.0476] <ljharb>
+yes? if the alternative is "generated code", we should not care about what generated code does
+
+[12:15:03.0509] <ljharb>
+ * yes? if the alternative is "generated code", we should not care about what generated code does (wrt API design, only wrt breakage)
+
+[12:15:09.0550] <ljharb>
+ * yes? if the alternative is "generated code", we should not care about what generated code does (not wrt API design, only wrt breakage)
+
+[12:15:41.0064] <ljharb>
+ * yes? if the alternative is "generated code", we should not care about what generated code does (not wrt API design, i mean, only wrt breakage)
+
+[12:18:26.0868] <bakkot>
+It is worth caring about generated code, but that should take the form of supplying APIs suitable for generated code, not changing the APIs for human-authored code
+
+[12:18:31.0428] <bakkot>
+... human or llm I guess
+
+[12:18:47.0648] <Andreu Botella>
+> <@bakkot:matrix.org> To have new signatures specifically require the user to think about receivers is unnecessary complexity
+
++1 to this, especially because of language learnability. `this`/receivers aren't things that come early when learning JS, especially because of how they differ from the equivalents in other languages. Even if `Promise.try` and `AsyncContext` are advanced use cases, language learning is non-linear.
+
+[12:20:14.0990] <Richard Gibson>
+fine, I yield
+
+[12:31:35.0697] <Justin Ridgewell>
+I also think an inline syntactic arrow fn doesn’t have the same performance penalties that dynamic closure-returning helpers and `fn.bind()` would have.
+
+[12:40:47.0552] <littledan>
+Richard Gibson: 
+> have you forgotten that implementers specifically objected to proposals that would encourage their use?
+
+Thinking about "how many closures is this going to imply are allocated in real use cases" is different from "thisArg should be a thing". Signals try to pass the right `this` value to achieve a similar goal.
+
+[14:28:25.0364] <Michael Ficarra>
+ * I often save this "call-bound call" (`Function.prototype.call.bind(Function.prototype.call)`) and use it throughout my programs
+

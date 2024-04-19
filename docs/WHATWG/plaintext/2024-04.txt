@@ -1311,3 +1311,182 @@ That issue just feels like an area where the community needs to go off and get a
 
 I would like that. Serializing the DOCTYPE in particular is nice. jsdom has its own serialization function just for that, because documentElement.outerHTML misses it.
 
+[00:08:46.0198] <annevk>
+It might be a little weird that `parseHTMLUnsafe()` is a static method then and not just `document.setHTMLUnsafe()`.
+
+[00:10:06.0342] <annevk>
+But I guess it's fine. Serializing the doctype seems good, but we should be opinionated about it and not support all inputs as-is.
+
+[00:22:55.0916] <Luke Warlow>
+> <@annevk:matrix.org> But I guess it's fine. Serializing the doctype seems good, but we should be opinionated about it and not support all inputs as-is.
+
+Yeah okay maybe lossless was the wrong choice of word. I think the compatMode should serialise to the presence or lack of a standard Doctype
+
+[00:24:47.0425] <Luke Warlow>
+> <@annevk:matrix.org> It might be a little weird that `parseHTMLUnsafe()` is a static method then and not just `document.setHTMLUnsafe()`.
+
+I guess that's fine though because it ensures the state of the document object is consistent when parsing?
+
+[00:29:53.0781] <annevk>
+Hmm, the state for non-document nodes is not. But in theory we could also add `setHTMLUnsafe()` to document if we ever wanted to parse without allocation. Prolly not worth it for the foreseeable future though.
+
+[00:33:44.0794] <Luke Warlow>
+I got thinking on this because if we had document getHTML, you could use trusted types and the sanitizer APIs to always safely set the srcdoc attribute on an iframe without needing any dependencies (unless there's some missing issues I've not thought of).
+
+[00:35:00.0762] <Luke Warlow>
+* I got thinking on this because if we had document getHTML, you could use trusted types and the sanitizer APIs to always safely set the srcdoc attribute on an iframe without needing any dependencies (unless there's some missing issues I've not thought of).
+
+And also just because it does feel like a missing piece to the serialization puzzle.
+
+[00:41:50.0874] <Domenic>
+> <@lwarlow:igalia.com> Yeah okay maybe lossless was the wrong choice of word. I think the compatMode should serialise to the presence or lack of a standard Doctype
+
+I don't think compatmode should impact it. It should be whether the Document has a DocumentType node. And then it should serialize according to https://html.spec.whatwg.org/#html-fragment-serialisation-algorithm .
+
+[00:43:29.0441] <Luke Warlow>
+> <@domenicdenicola:matrix.org> I don't think compatmode should impact it. It should be whether the Document has a DocumentType node. And then it should serialize according to https://html.spec.whatwg.org/#html-fragment-serialisation-algorithm .
+
+I was thinking back to how we used to do it where I worked before but maybe we were doing it badly 😅
+
+[00:44:15.0211] <Domenic>
+Interesting that the parser preserves name, system ID, and public ID, but the serializer only keeps the name.
+
+[00:45:28.0483] <Luke Warlow>
+I'll open an issue on the html spec proposing this idea and we can discuss further the details there. Just wanted to guage if we thought it was any good or not.
+
+[00:52:00.0092] <Domenic>
+I can't find any way to trigger the HTML fragment serializing algorithm with a doctype, sad.
+
+[00:53:29.0534] <Domenic>
+I also either found a bug or am blind https://github.com/whatwg/dom/issues/1278
+
+[00:54:18.0305] <freddy>
+Huh, I learned there is `document.doctype` but it doesn't serialize to a doctype string?
+
+[00:54:23.0671] <freddy>
+(testing in Firefox)
+
+[00:55:02.0548] <freddy>
+I've used `document.body.parentElement.outerHTML` in the past, but you'd have to guess and attach the right doctype. Either way. I think there's value in a getter for the document.
+
+[00:55:04.0289] <Domenic>
+It doesn't have any serializing methods or properties
+
+[01:39:13.0791] <Ms2ger>
+Did we manage to remove the getters on doctype?
+
+[01:57:33.0597] <freddy>
+There were some? Well, then apparently...yes? :)
+
+[02:16:22.0995] <annevk>
+I guess I disagree with Domenic. I like the idea of serializing based on quirks mode a lot better. That way we either have no doctype, an almost doctype, or the doctype in the output.
+
+[02:25:02.0544] <Luke Warlow>
+I raised https://github.com/whatwg/html/issues/10280 
+
+[02:26:31.0092] <freddy>
+We also discussed this in our Sanitizer issue triage and thought that a `document.setHTML` might be neat, such that one could do `iframe.contentDocument.setHTML()` and without doing a parsing/serialization roundtrip between for that specific use case. https://github.com/WICG/sanitizer-api/issues/117#issuecomment-2060735167 has more.
+
+[04:55:42.0106] <annevk>
+freddy: note that it would require quite a number of downstream changes (none too hard I suspect) as we currently only consider possible element children
+
+[07:42:52.0505] <Luke Warlow>
+> <@domenicdenicola:matrix.org> It doesn't have any serializing methods or properties
+
+`new XMLSerializer().serializeToString(document.doctype)` this will give you a string representation back
+
+[07:49:23.0384] <Luke Warlow>
+ * I got thinking on this because if we had document getHTML, you could use trusted types and the sanitizer APIs to always safely set the srcdoc attribute on an iframe without needing any dependencies (unless there's some missing issues I've not thought of).
+
+mXSS is what I was missing.
+
+And also just because it does feel like a missing piece to the serialization puzzle.
+
+[07:55:04.0271] <Luke Warlow>
+> <@domenicdenicola:matrix.org> It doesn't have any serializing methods or properties
+
+ * `new XMLSerializer().serializeToString(document.doctype)` this will give you a string representation back. But to your point this obviously goes via XML serialisation rather than HTML.
+
+[16:23:47.0596] <zcorpan>
+Why did we use labels and not milestones for Stages?
+
+
+2024-04-18
+[17:29:20.0984] <Domenic>
+> <@zcorpan:mozilla.org> Why did we use labels and not milestones for Stages?
+
+Milestones are generally pretty inflexible in my experience. E.g. you are encouraged to give them dates, "close" them when they have no issues, things like that. It might work but it doesn't seem like what the system was defined for.
+
+[17:33:18.0638] <zcorpan>
+Domenic: ok, thanks. Yeah thinking about this again, milestones isn't a good match for Stages... Changing milestone for a single issue as it progresses isn't how you normally use milestones
+
+[00:56:21.0482] <Andreu Botella>
+Hey, it's 5 minutes before the WHATNOT meeting, right? I don't have a link to the call
+
+[01:00:37.0763] <sideshowbarker>
+Andreu Botella: https://meet.google.com/hfm-ttah-hfh
+
+[01:01:09.0530] <sideshowbarker>
+I think, at least — I am there now, but nobody else is…
+
+Anyway, that’s the link I had in my calendar at least
+
+[01:02:24.0687] <sideshowbarker>
+Who usuall chairs the WHATNOT meetings in this time slot?
+
+[01:02:28.0985] <sideshowbarker>
+ * Who usually chairs the WHATNOT meetings in this time slot?
+
+[01:02:56.0437] <Domenic>
+Either me or Chris Wilson... I'm a bit late but I thought Chris RSVPed
+
+[01:03:48.0156] <Domenic>
+Be there in 2
+
+[01:06:07.0250] <Andreu Botella>
+I'm in the "asking to be let in" screen, btw
+
+[04:33:58.0276] <annevk>
+Noam Rosenthal: do you remember what https://fetch.spec.whatwg.org/#concept-request-replaces-client-id is? I don't really follow the note below. Because target browsing context is a field on an environment, so if that environment's target browsing context has an active document which is associated with an environment, isn't the same environment as you got the target browsing context from?
+
+[04:35:08.0982] <annevk>
+Also unclear if that's still correct in a world with navigables I suppose.
+
+[04:38:41.0387] <Noam Rosenthal>
+annevk: IIRC it’s for service workers, to let you keep track of a same origin nav. Afk but will double check in a bit
+
+[04:39:40.0627] <annevk>
+Noam Rosenthal: yeah that rings a bell. I have doubts this setup works as intended. It seems like we don't have to look at this for our new cookie work fortunately.
+
+[05:41:06.0628] <Noam Rosenthal>
+annevk: yea it's read at: https://w3c.github.io/ServiceWorker/#dom-fetchevent-replacesclientid
+
+
+[05:42:15.0957] <Noam Rosenthal>
+... and set https://html.spec.whatwg.org/multipage/browsing-the-web.html#create-navigation-params-by-fetching
+The note can probably be updated to use the newer terms
+
+[05:44:42.0562] <Noam Rosenthal>
+... not sure what it means in terms of the new cookie work, I'm not familiar with it
+
+[06:52:04.0143] <annevk>
+Luke Warlow: for your node conversion PR, is it okay if I push to it, or would you prefer to continue with getting reviews?
+
+[06:52:17.0586] <Luke Warlow>
+That's absolutely fine
+
+[06:52:43.0039] <Luke Warlow>
+It's "done" as far as I'm concerned so if there's fix ups where I've misunderstood or done something wrong go ahead :)
+
+[07:07:25.0655] <annevk>
+Luke Warlow: when you have a moment please review my changes and leave a comment in the PR
+
+[07:13:15.0882] <annevk>
+Oh hmm, some more Oxford commas to add I just realized
+
+[12:20:06.0696] <sefeng>
+Noam Rosenthal: I think this is an editorial thing - It looks like the "items" for fetch param got batched into two separate groups https://fetch.spec.whatwg.org/#infrastructure and things like `To reporting timing...` got injected in between?
+
+[12:20:46.0880] <sefeng>
+oh sorry nvm, I misread
+
