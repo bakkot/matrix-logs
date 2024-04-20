@@ -726,3 +726,36 @@ the hard part is how we draw a distinction between that use case, and shelling o
 [17:25:08.0788] <guybedford>
 effectively it's a class of loaders (like Node.js) that know they can do sync imports, but to draw that line also means restricting host hook fallbacks, unless we can solve sync loading generally via something like an `await import.defer(module)` that runs first, before then doing the `import.now(module)`
 
+[17:25:50.0642] <kriskowal>
+Or `import.source`, as it were.
+
+[17:26:54.0167] <kriskowal>
+That’s effectively where we stand. We are falling back to the sync hook only under `import.now`, and `importNowHook` may throw but can’t return a promise.
+
+[17:27:15.0343] <kriskowal>
+Under `import`, you can never reach `importNowHook`.
+
+[17:27:48.0507] <guybedford>
+the concern of having a dedicated sync hook is similar to the issue Node.js has where you end up defining two hooks for the loader - the sync hook and the async hook
+
+[17:28:01.0988] <guybedford>
+this seems sub-optimal and prone to bugs if users have implementation differences
+
+[17:28:02.0425] <kriskowal>
+That is the case for us too.
+
+[17:28:29.0736] <kriskowal>
+It’s definitely not ideal, but ideal doesn’t seem to be available.
+
+[17:28:55.0388] <guybedford>
+I think it's possible to separate loading into two phases - an async phase that gets everything ready, and a sync phase that does the linking and execution (down to TLA)
+
+[17:29:14.0628] <guybedford>
+that does mean two graph walks, but that's what instantiate + exec is anyway
+
+[17:29:49.0434] <kriskowal>
+Eager to talk more about that. Sadly, the evening beckons.
+
+[17:29:57.0308] <guybedford>
+so a fully sync graph just means you're already in the second phase
+
