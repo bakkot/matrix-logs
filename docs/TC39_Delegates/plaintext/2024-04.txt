@@ -7754,3 +7754,128 @@ What do folks think about recommending web authors put the `value`/`done` proper
 [10:54:03.0413] <keith_miller>
 Given there's been a lot of debate about the performance of the iterator protocol on a bunch of recent proposals I'm trying to brainstorm solutions.
 
+[10:55:21.0570] <keith_miller>
+ * What do folks think about recommending web authors put the `value`/`done` properties on the iterator object directly and return `this` (aka the iterator itself) rather than return a fresh object each iteration loop? This, I think, should improve the performance of their iterators as they're not allocating fresh objects all the time. Is this a compatibility breaking change we should look into for built-in iterators too?
+
+[10:56:21.0643] <keith_miller>
+ * What do folks think about recommending web authors put the `value`/`done` properties on the iterator object directly and return `this` (aka the iterator itself) from `next` rather than return a fresh object each iteration loop? This, I think, should improve the performance of their iterators as they're not allocating fresh objects all the time. Is this a compatibility breaking change we should look into for built-in iterators too?
+
+[10:57:37.0973] <shu>
+are you saying as a new protocol?
+
+[10:58:46.0654] <keith_miller>
+No, as in you'd do ```function makeRangeIterator(start = 0, end = Infinity, step = 1) {
+ let iterationCount = 0;
+
+ const rangeIterator = {
+   // It's recommended that iterators attach their value and done properties to the
+   // iterator itself rather than return a new object every time (e.g. via `return { value: ..., done: ... }`)
+   // as a performance optimization.
+   value: start,
+   done: false,
+   next() {
+     if (nextIndex < end) {
+       this.value += step;
+       iterationCount++;
+       return this;
+     }
+
+     this.value = iterationCount; // Nit: This isn’t read so I don’t know why it’s here
+     this.done = true;
+     return this;
+   },
+ };
+ return rangeIterator;
+}``` Stolen from MDN's example and refactored
+
+[10:59:04.0067] <shu>
+ooh
+
+[10:59:21.0782] <keith_miller>
+ * No, as in you'd do ```function makeRangeIterator(start = 0, end = Infinity, step = 1) {
+let iterationCount = 0;
+
+const rangeIterator = {
+// It's recommended that iterators attach their value and done properties to the
+// iterator itself rather than return a new object every time (e.g. via `return { value: ..., done: ... }`)
+// as a performance optimization.
+value: start,
+done: false,
+next() {
+if (nextIndex \< end) {
+this.value += step;
+iterationCount++;
+return this;
+}
+
+ this.value = iterationCount; // Nit: This isn’t read so I don’t know why it’s here
+ this.done = true;
+ return this;
+```
+
+},
+};
+return rangeIterator;
+}\`\`\` Stolen from MDN's example and refactored
+
+[10:59:31.0018] <keith_miller>
+ * No, as in you'd do function makeRangeIterator(start = 0, end = Infinity, step = 1) {
+let iterationCount = 0;
+
+const rangeIterator = {
+// It's recommended that iterators attach their value and done properties to the
+// iterator itself rather than return a new object every time (e.g. via `return { value: ..., done: ... }`)
+// as a performance optimization.
+value: start,
+done: false,
+next() {
+if (nextIndex \< end) {
+this.value += step;
+iterationCount++;
+return this;
+}
+
+this.value = iterationCount; // Nit: This isn’t read so I don’t know why it’s here
+this.done = true;
+return this;
+
+```
+
+},
+};
+return rangeIterator;
+}\`\`\` Stolen from MDN's example and refactored
+```
+
+[10:59:34.0794] <shu>
+that certainly has a _higher_ chance of being compatible but i still don't know how we find out other than "ship and see"
+
+[10:59:49.0997] <keith_miller>
+ * No, as in you'd do 
+```
+function makeRangeIterator(start = 0, end = Infinity, step = 1) {
+let iterationCount = 0;
+
+const rangeIterator = {
+// It's recommended that iterators attach their value and done properties to the
+// iterator itself rather than return a new object every time (e.g. via `return { value: ..., done: ... }`)
+// as a performance optimization.
+value: start,
+done: false,
+next() {
+if (nextIndex \< end) {
+this.value += step;
+iterationCount++;
+return this;
+}
+
+this.value = iterationCount; // Nit: This isn’t read so I don’t know why it’s here
+this.done = true;
+return this;
+
+},
+};
+return rangeIterator;
+}
+```
+

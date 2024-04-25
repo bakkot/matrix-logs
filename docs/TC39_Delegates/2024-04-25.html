@@ -47,8 +47,38 @@
   <tr class="msg" id="L18"><td class="ts-cell"><a class="ts" href="#L18" alt="Thu Apr 25 2024 08:33:13 GMT-0700 (Pacific Daylight Time)">15:33</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-1" title="@softwarechris:matrix.org">Chris de Almeida</span>&gt;</div></td><td class="msg-cell">a lot of good points have been made. I think it's important to proceed a bit cautiously, at the risk of overcorrecting with solutions to non-problems.  in other words, I am a lot more interested in solving for things like "what should delegates/IEs do when creating a proposal repo" and not as much in more abstract things like "what is the meaning of stage 0"</td></tr>
   <tr class="msg" id="L19"><td class="ts-cell"><a class="ts" href="#L19" alt="Thu Apr 25 2024 08:39:01 GMT-0700 (Pacific Daylight Time)">15:39</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-1" title="@softwarechris:matrix.org">Chris de Almeida</span>&gt;</div></td><td class="msg-cell">I should have worded the last bit better.  it's important to have a shared understanding of what stage 0 means. further qualifying what is or is not stage 0 based on some criteria is only useful as far as it is practically relevant</td></tr>
   <tr class="msg" id="L20"><td class="ts-cell"><a class="ts" href="#L20" alt="Thu Apr 25 2024 08:53:27 GMT-0700 (Pacific Daylight Time)">15:53</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-1" title="@softwarechris:matrix.org">Chris de Almeida</span>&gt;</div></td><td class="msg-cell">for example, if we added entrance criteria for stage 0, such as "there must be a champion", how is this valuable or materially different than the status quo?  a champion is needed for the proposal to progress to stage 1 (and beyond) anyway. so adding this (or probably <em>any</em> entrance criteria) to stage 0 doesn't help anything, and it introduces a new problem: what to call non-stage 0 proposals. you effectively introduce a new stage, and to what end?</td></tr>
-  <tr class="msg" id="L21"><td class="ts-cell"><a class="ts" href="#L21" alt="Thu Apr 25 2024 10:52:38 GMT-0700 (Pacific Daylight Time)">17:52</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-6" title="@keith_miller:matrix.org">keith_miller</span>&gt;</div></td><td class="msg-cell">What do folks think about recommending web authors put the <code>value</code>/<code>done</code> properties on the iterator object directly and return that rather than return a fresh object each iteration loop? This, I think, should improve the performance of their iterators as they're not allocating fresh objects all the time. Is this a compatibility breaking change we should look into for built-in iterators too?</td></tr>
+  <tr class="msg" id="L21"><td class="ts-cell"><a class="ts" href="#L21" alt="Thu Apr 25 2024 10:52:38 GMT-0700 (Pacific Daylight Time)">17:52</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-6" title="@keith_miller:matrix.org">keith_miller</span>&gt;</div></td><td class="msg-cell">What do folks think about recommending web authors put the <code>value</code>/<code>done</code> properties on the iterator object directly and return <code>this</code> (aka the iterator itself) from <code>next</code> rather than return a fresh object each iteration loop? This, I think, should improve the performance of their iterators as they're not allocating fresh objects all the time. Is this a compatibility breaking change we should look into for built-in iterators too?</td></tr>
   <tr class="msg" id="L22"><td class="ts-cell"><a class="ts" href="#L22" alt="Thu Apr 25 2024 10:54:03 GMT-0700 (Pacific Daylight Time)">17:54</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-6" title="@keith_miller:matrix.org">keith_miller</span>&gt;</div></td><td class="msg-cell">Given there's been a lot of debate about the performance of the iterator protocol on a bunch of recent proposals I'm trying to brainstorm solutions.</td></tr>
+  <tr class="msg" id="L23"><td class="ts-cell"><a class="ts" href="#L23" alt="Thu Apr 25 2024 10:57:37 GMT-0700 (Pacific Daylight Time)">17:57</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-8" title="@shuyuguo:matrix.org">shu</span>&gt;</div></td><td class="msg-cell">are you saying as a new protocol?</td></tr>
+  <tr class="msg" id="L24"><td class="ts-cell"><a class="ts" href="#L24" alt="Thu Apr 25 2024 10:58:46 GMT-0700 (Pacific Daylight Time)">17:58</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-6" title="@keith_miller:matrix.org">keith_miller</span>&gt;</div></td><td class="msg-cell"><p>No, as in you'd do</p>
+<pre><code>function makeRangeIterator(start = 0, end = Infinity, step = 1) {
+let iterationCount = 0;
+
+const rangeIterator = {
+// It's recommended that iterators attach their value and done properties to the
+// iterator itself rather than return a new object every time (e.g. via `return { value: ..., done: ... }`)
+// as a performance optimization.
+value: start,
+done: false,
+next() {
+if (nextIndex \&lt; end) {
+this.value += step;
+iterationCount++;
+return this;
+}
+
+this.value = iterationCount; // Nit: This isn’t read so I don’t know why it’s here
+this.done = true;
+return this;
+
+},
+};
+return rangeIterator;
+}
+</code></pre>
+</td></tr>
+  <tr class="msg" id="L25"><td class="ts-cell"><a class="ts" href="#L25" alt="Thu Apr 25 2024 10:59:04 GMT-0700 (Pacific Daylight Time)">17:59</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-8" title="@shuyuguo:matrix.org">shu</span>&gt;</div></td><td class="msg-cell">ooh</td></tr>
+  <tr class="msg" id="L26"><td class="ts-cell"><a class="ts" href="#L26" alt="Thu Apr 25 2024 10:59:34 GMT-0700 (Pacific Daylight Time)">17:59</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-8" title="@shuyuguo:matrix.org">shu</span>&gt;</div></td><td class="msg-cell">that certainly has a <em>higher</em> chance of being compatible but i still don't know how we find out other than "ship and see"</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>
