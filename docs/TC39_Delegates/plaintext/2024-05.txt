@@ -31,3 +31,34 @@ it's just a lot of work
 [08:09:20.0345] <bakkot>
 (also it is extremely unlikely to ever be as fast as a bare loop, even with a huge amount of work)
 
+[08:16:24.0663] <bakkot>
+if we are interested in making iterator helpers faster, something we _could_ do is make all the `{ next, done }` pairs yielded by a given call to an iterator helper be the same object
+
+[08:16:54.0739] <bakkot>
+ * if we are interested in making iterator helpers faster, something we _could_ do is make all the `{ value, done }` pairs yielded by a given call to an iterator helper be the same object
+
+[08:18:50.0345] <bakkot>
+so like
+
+```js
+function map(fn) {
+  let result = { value, done }; // probably with those properties being non-configurable
+  let underlying = this;
+  return {
+    next() {
+      let { value, done } = underlying.next();
+      if (!done) value = fn(value);
+      result.value = value;
+      result.done = done;
+      return result;
+    }
+  }
+}
+```
+
+[08:19:06.0588] <bakkot>
+this would avoid most of the overhead and no one would ever notice
+
+[08:19:14.0911] <bakkot>
+but it is, as littledan indicates, conceptually quite gross
+
