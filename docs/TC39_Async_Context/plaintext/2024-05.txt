@@ -742,3 +742,43 @@ so yah, I'd still expect either undefined or foo
 
 `useOriginatingContext` is there so the registration time isn't used
 
+[12:55:42.0312] <Andreu Botella>
+run is basically implemented like:
+```js
+function run(value, cb) {
+  const previousContext = changeContext(updateContext(value));
+  try {
+    return cb();
+  } finally {
+    changeContext(previousContext);  // this loses track of foo and restores bar
+  }
+}
+```
+
+[12:56:00.0204] <Andreu Botella>
+there's currently nothing in the spec text that preserves the context in which an exception is thrown
+
+[12:56:23.0995] <Andreu Botella>
+because the caller context is switched in the finally
+
+[12:57:13.0919] <Andreu Botella>
+ * because the current context is switched back to the previous one in the finally
+
+[12:57:32.0384] <Steve Hicks>
+ah, my understanding was that unhandled rejections (at least) would hold onto the rejection context.  I'd assumed that this extended to "error" as well, though that's not an API I'm familiar with
+
+[12:58:13.0610] <Andreu Botella>
+yeah, I think no one considered error until I started looking into it last week
+
+[12:58:53.0224] <Andreu Botella>
+I suspect that making that work would mean patching how completions work in the spec 😰
+
+[12:59:35.0331] <Andreu Botella>
+though I guess you could also have a `lastThrowContext` global state
+
+[12:59:50.0283] <Andreu Botella>
+that would only be used if `cb()` threw
+
+[13:00:16.0952] <Andreu Botella>
+that's a much less invasive change
+
