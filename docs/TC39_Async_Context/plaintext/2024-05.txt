@@ -513,3 +513,59 @@ for observers you could have a property of the observer entry
 [12:20:16.0242] <littledan>
 Yeah I think this works *better* for observers than other options since they have a single callback for multiple things
 
+[12:21:18.0355] <Andreu Botella>
+> <@littledan:matrix.org> Why were these semantics chosen for priority, btw?
+
+I think because `scheduler.yield()` wants to distinguish between a continuation of the current task and a subtask
+
+[12:21:23.0183] <littledan>
+For promise-based APIs: I am having trouble picturing what we would want and how; maybe you could give a concrete example of where you don’t want the restore-around-await semantics (“registration time”) and what you want instead?
+
+[12:21:41.0153] <littledan>
+> <@abotella:igalia.com> I think because `scheduler.yield()` wants to distinguish between a continuation of the current task and a subtask
+
+What does that have to do with setTimeout?
+
+[12:21:52.0562] <Steve Hicks>
+> <@littledan:matrix.org> Why were these semantics chosen for priority, btw?
+
+I don't know the background there.  I scanned through https://github.com/WICG/scheduling-apis/blob/main/explainers/yield-and-continuation.md but don't see anything specifically about this choice.
+
+[12:22:00.0667] <Andreu Botella>
+> <@littledan:matrix.org> What does that have to do with setTimeout?
+
+`setTimeout` would be a subtask
+
+[12:22:33.0403] <littledan>
+> <@stephenhicks:matrix.org> I don't know the background there.  I scanned through https://github.com/WICG/scheduling-apis/blob/main/explainers/yield-and-continuation.md but don't see anything specifically about this choice.
+
+I guess you are relaying this case based on personal communication with Scott? Maybe he can clarify (or join here)?
+
+[12:23:21.0321] <Steve Hicks>
+> <@littledan:matrix.org> I guess you are relaying this case based on personal communication with Scott? Maybe he can clarify (or join here)?
+
+Yes, I can ask.
+
+[12:23:46.0963] <littledan>
+> <@littledan:matrix.org> Can you say more about how you imagine that option being used? One possible default could be “use the originating/call context where available, otherwise fall back to registration if it doesn’t exist” and you could override that to “always registration time” by wrapping your callback yourself.
+
+What do you think of this option Steve Hicks ?
+
+[12:24:22.0322] <Andreu Botella>
+> <@littledan:matrix.org> I guess you are relaying this case based on personal communication with Scott? Maybe he can clarify (or join here)?
+
+from a conversation I had with him:
+> It's important (as of now, subject to change) that those [yield-related CPED state fields] are not propagated to subtasks and events. The idea is that yield() can inherit the priority of the current task, but the current task and subtasks are not necessarily related (i.e. breaking up the current task by yielding in a loop does not imply other work spawned should have the same priority). It's possible this will change, but as of now we need to keep that behavior.
+
+[12:24:42.0046] <Steve Hicks>
+> <@littledan:matrix.org> For promise-based APIs: I am having trouble picturing what we would want and how; maybe you could give a concrete example of where you don’t want the restore-around-await semantics (“registration time”) and what you want instead?
+
+My understanding is that this is what Stephen is asking for.  I don't have quite as good a sense of the use case, but from the examples I've seen, he wants to `await openFile()` and have a trace span opened in `openFile` still be present on the outside.
+
+[12:25:01.0268] <Andreu Botella>
+> <@littledan:matrix.org> I guess you are relaying this case based on personal communication with Scott? Maybe he can clarify (or join here)?
+
+ * from a conversation I had with him:
+
+> It's important (as of now, subject to change) that those \[yield-related fields of the object propagated through CPED\] are not propagated to subtasks and events. The idea is that yield() can inherit the priority of the current task, but the current task and subtasks are not necessarily related (i.e. breaking up the current task by yielding in a loop does not imply other work spawned should have the same priority). It's possible this will change, but as of now we need to keep that behavior.
+
