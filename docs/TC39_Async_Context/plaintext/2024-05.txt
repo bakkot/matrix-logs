@@ -1351,3 +1351,23 @@ Yeah, so the expression which produces the promises which _will_ be awaited occu
 [02:44:59.0255] <Stephen Belanger>
 In your example there, you captured a snapshot and ran that around the resolve, so that changes the context which should come out of the await.
 
+[02:47:34.0479] <Stephen Belanger>
+This is why I feel flowing up to the resolve barrier makes a lot more sense, and then not binding around awaits at all, or maybe having some _secondary_ flow that could be captured for those. If you follow the resolve path you will naturally have the context from the start of the async function flow through all the awaits and continue to be available, only changing if something in that causal path changed the context around what led to their resolve.
+
+[02:48:45.0066] <Stephen Belanger>
+Binding around awaits is chopping off branches of the execution graph, which I'm unclear why anyone would want to do that by default. 🤔
+
+[02:49:44.0174] <Andreu Botella>
+but in cases like this, wouldn't this mess up tracing?
+```js
+async function someFunctionYouCareAboutTracing() {
+	const response1 = await fetch(...);
+	await someAPI();  // this empties out the context after the await!
+	const response2 = await fetch(...);
+	return await doSomethingWith(response1, response2);
+}
+```
+
+[02:49:50.0237] <Stephen Belanger>
+Like I get that there seems to be some use case people have in mind for _why_ it makes sense _for them_ to bind and restore around awaits, but I _still_ have not seen any adequate explanation on _why_ anyone would ever want that. 😕
+
