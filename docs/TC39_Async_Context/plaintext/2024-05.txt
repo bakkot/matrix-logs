@@ -1371,3 +1371,45 @@ async function someFunctionYouCareAboutTracing() {
 [02:49:50.0237] <Stephen Belanger>
 Like I get that there seems to be some use case people have in mind for _why_ it makes sense _for them_ to bind and restore around awaits, but I _still_ have not seen any adequate explanation on _why_ anyone would ever want that. 😕
 
+[02:50:41.0584] <Stephen Belanger>
+> <@abotella:igalia.com> but in cases like this, wouldn't this mess up tracing?
+> ```js
+> async function someFunctionYouCareAboutTracing() {
+> 	const response1 = await fetch(...);
+> 	await someAPI();  // this empties out the context after the await!
+> 	const response2 = await fetch(...);
+> 	return await doSomethingWith(response1, response2);
+> }
+> ```
+
+What about that would mess it up? Is `someApi()` _explicitly_ emptying the context for some reason?
+
+[02:51:23.0931] <Andreu Botella>
+I meant the definition of `someApi()` above, which *is*
+
+[02:51:54.0499] <Stephen Belanger>
+Ah, you mean it's restoring the snapshot captured previously?
+
+[02:52:17.0557] <Stephen Belanger>
+Yeah, that would return to whatever the context was which was captured in that snapshot.
+
+[02:52:30.0650] <Stephen Belanger>
+So if you're using a snapshot in that way then that is _expected_.
+
+[02:53:18.0005] <Stephen Belanger>
+And this is also why I would like to have per-instance bind because sometimes it makes sense globally like connection pools, but sometimes opinions may vary.
+
+[02:53:21.0929] <Andreu Botella>
+maybe this isn't something worth worrying about, but someone might be using snapshots to do things around their `AsyncContext.Variable`s not realizing that that might affect the context in which their promise gets resolved, which would affect other use libraries that use AsyncContext
+
+[02:54:10.0271] <Andreu Botella>
+also, if you have an interaction of various libraries that use AsyncContext for their separate goals, they might interact in unforeseen ways
+
+[02:54:12.0401] <Stephen Belanger>
+But yes, I believe it is "correct" for that to break context. Or rather, it might be _incorrect_ that it is _doing_ that snapshot restore.
+
+[02:54:46.0296] <Stephen Belanger>
+> <@abotella:igalia.com> maybe this isn't something worth worrying about, but someone might be using snapshots to do things around their `AsyncContext.Variable`s not realizing that that might affect the context in which their promise gets resolved, which would affect other use libraries that use AsyncContext
+
+Yep, this is why Node.js hates `AsyncResource`. 🙈
+
