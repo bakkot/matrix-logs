@@ -1319,3 +1319,35 @@ Not sure what you mean by that. Do you have an example?
 [02:39:46.0689] <Stephen Belanger>
 From _my_ perspective: context flows into the promise executor, it flows into anything that happens _within_ that executor, it then captures whenever the `resolve(...)` is called as _that_ is what actually schedules passing the value to continuations. If the context value is set outside the promise constructor it will use that context. If it gets set somewhere within the executor leading up to when it calls `resolve(...)` it will use that. It all flows naturally toward the resolve point where it schedules the value to pass to continuations.
 
+[02:40:49.0340] <Andreu Botella>
+so IIUC, you're saying that in cases like `await someAPI()`, the resolve time is a child of the context before the await
+
+[02:40:50.0769] <Andreu Botella>
+but that is not the case with things like
+```js
+const somePreviousSnapshot = new AsyncContext.Snapshot();
+
+function someAPI() {
+  return new Promise(resolve => {
+    // I don't know why someone might do this, but they *can* do it.
+    somePreviousSnapshot.run(resolve);
+  });
+}
+```
+
+[02:41:36.0787] <Stephen Belanger>
+Now you _could_ look at it the other way of _attaching a continuation_ is the scheduling and the resolve is a fulfillment of that scheduling, but the fulfillment is not _triggered_ by that attaching of a continuation so I don't really feel like that's actually correct. Possibly a _useful_ path to follow in some cases, though I'm unclear _when_.
+
+[02:43:53.0634] <Stephen Belanger>
+> <@abotella:igalia.com> so IIUC, you're saying that in cases like `await someAPI()`, the resolve time is a child of the context before the await
+
+Yeah, so the expression which produces the promises which _will_ be awaited occurs within that context, so the context flows into it naturally. The context of that outer function should reach into the promise and flow all the way to its resolve, unless some other context is set along that path. When the promise _resolves_ the following execution is then a _continuation_ of that resolution and should therefore flow the context which was captured at the point that path resolved.
+
+[02:44:04.0674] <Stephen Belanger>
+> <@abotella:igalia.com> so IIUC, you're saying that in cases like `await someAPI()`, the resolve time is a child of the context before the await
+
+ * Yeah, so the expression which produces the promise which _will_ be awaited occurs within that context, so the context flows into it naturally. The context of that outer function should reach into the promise and flow all the way to its resolve, unless some other context is set along that path. When the promise _resolves_ the following execution is then a _continuation_ of that resolution and should therefore flow the context which was captured at the point that path resolved.
+
+[02:44:59.0255] <Stephen Belanger>
+In your example there, you captured a snapshot and ran that around the resolve, so that changes the context which should come out of the await.
+
