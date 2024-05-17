@@ -1413,3 +1413,27 @@ But yes, I believe it is "correct" for that to break context. Or rather, it migh
 
 Yep, this is why Node.js hates `AsyncResource`. 🙈
 
+[02:56:42.0544] <Stephen Belanger>
+So in Node.js, async_hooks made the mistake of producing a _singular_ execution graph which is grafted with `AsyncResource` binds. AsyncLocalStorage is layered over it so it inherits that mistake. We want it to _not_ be layered over that so we can _fix_ that problem.
+
+[02:57:42.0009] <Andreu Botella>
+I'm not sure I understand. Even if we do have per-instance wrap, you would still need global wraps, right?
+
+[02:57:58.0592] <Stephen Belanger>
+APMs (unfortunately) fairly often use `AsyncResource` to "fix" context management flows, but then we break other vendors because we change the graph _they_ were expecting. 😬
+
+[02:58:12.0324] <Stephen Belanger>
+Yes, global is still needed.
+
+[02:58:18.0625] <Stephen Belanger>
+Just not _always_.
+
+[02:58:58.0651] <Stephen Belanger>
+And this is specifically why I created the WindowChannel concept. So different consumers could make different decisions in a reasonably user-friendly way.
+
+[02:59:59.0376] <Andreu Botella>
+So my worry is about a (maybe small) library that might not realize they're supposed to be doing per-instance wrap rather than global wrap, since it works fine in their tests
+
+[03:00:13.0224] <Andreu Botella>
+Or cases where a library might have multiple variables and they use global wrap to handle all of them at once
+
