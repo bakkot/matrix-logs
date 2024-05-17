@@ -953,3 +953,18 @@ I don't love those properties... but I think any observability of `callingContex
 [01:07:44.0279] <littledan>
 Huh, how would it figure out the previous one at runtime? Currently you can just use a single global variable for the current snapshot.
 
+[01:36:07.0864] <Stephen Belanger>
+> <@legendecas:matrix.org> Whould you mind expanding on the distinguishing of child-of and follow-from? All promise resolutions are scheduled asynchronously, it seems to me that in this case "child-of" would be meaning-less in promise's case
+
+The resolution is async, but we create a span around the thing that _created_ the promise, so the child-of or follows-from relationship should already have been established at this point. When calling an async function, the portion up to the first await is called synchronously, so if we choose to wrap that part in a span then that activity should be considered a child-of relationship. However, anything after the first await is schedule asynchronously and so should be considered a continuation and therefore a follows-from relationship.
+
+```js
+async function foo() {
+  console.log('1')
+  await Promise.resolve()
+  console.log('3')
+}
+foo()
+console.log('2')
+```
+
