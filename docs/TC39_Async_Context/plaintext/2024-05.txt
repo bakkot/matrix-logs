@@ -1012,3 +1012,161 @@ Bytecode manipulation isn’t magic; I would be surprised if we can’t do what�
 [02:00:02.0350] <Stephen Belanger>
 Not sure. Like I said, most do this externally to the runtime itself so I'm unsure if any particular language is a good example of it.
 
+[02:02:12.0623] <Chengzhong Wu>
+> <@stephenbelanger:matrix.org> The resolution is async, but we create a span around the thing that _created_ the promise, so the child-of or follows-from relationship should already have been established at this point. When calling an async function, the portion up to the first await is called synchronously, so if we choose to wrap that part in a span then that activity should be considered a child-of relationship. However, anything after the first await is schedule asynchronously and so should be considered a continuation and therefore a follows-from relationship.
+> 
+> ```js
+> async function foo() {
+>   console.log('1')
+>   await Promise.resolve()
+>   console.log('3')
+> }
+> foo()
+> console.log('2')
+> ```
+
+```
+handleRequest((req, res) => {
+  // ROOT SPAN0
+  // child-of context.variable: SPAN0
+  // await connection.query() SPAN1
+  connection.query('SELECT 1 + 1 AS two') // SPAN1
+    .then(a => {
+      // PROPOSED CONTEXT: SPAN1.2
+      return connection.query('SELECT 2 + 2 AS four') // SPAN2
+    })
+    .then(a => {
+      // PROPOSED CONTEXT: SPAN2.2
+      // If the context.variable at this point is SPAN2, how do we determine
+      // child-of or follow-from?
+      // As proposed this should be a follow-from SPAN2.3 instead of SPAN3
+      return connection.query('SELECT 3 + 3 AS four') // SPAN3
+    })
+    .then(b => {
+      // PROPOSED CONTEXT: SPAN3.2
+      res.writeHead(200, { 'Content-Type': 'text/plain' })
+      res.end(a[0].two + b[0].four)
+    })
+})
+
+function connectionQuery(query) {
+  // Current Context: SPANx
+  return makeFirstRequest() // SPANx.1
+    .then(() => {
+      makeSecondRequest() // SPANx.2
+    })
+}
+```
+In the middle of a promise chain, it reads to me that the proposed solution needs to depends on additional cost to determine a child-of relationship now
+
+[02:02:25.0021] <littledan>
+That’s OK if it’s external, if it implements the right semantics I am still happy to have that as the reference point
+
+[02:02:32.0024] <Stephen Belanger>
+> <@littledan:matrix.org> Bytecode manipulation isn’t magic; I would be surprised if we can’t do what’s achieved with it
+
+Much of the code we need to patch to do that in JS is not reachable at runtime. With bytecode you can manipulate everything, even private things.
+
+[02:03:10.0168] <Chengzhong Wu>
+ * ```
+handleRequest((req, res) => {
+  // ROOT SPAN0
+  // child-of context.variable: SPAN0
+  // await connection.query() SPAN1
+  connection.query('SELECT 1 + 1 AS two') // SPAN1
+    .then(a => {
+      // PROPOSED CONTEXT: SPAN1.2
+      return connection.query('SELECT 2 + 2 AS four') // SPAN2
+    })
+    .then(a => {
+      // PROPOSED CONTEXT: SPAN2.2
+      // If the context.variable at this point is SPAN2.2, how do we determine
+      // child-of or follow-from?
+      // As proposed this should be a follow-from SPAN2.3 instead of SPAN3
+      return connection.query('SELECT 3 + 3 AS four') // SPAN3
+    })
+    .then(b => {
+      // PROPOSED CONTEXT: SPAN3.2
+      res.writeHead(200, { 'Content-Type': 'text/plain' })
+      res.end(a[0].two + b[0].four)
+    })
+})
+
+function connectionQuery(query) {
+  // Current Context: SPANx
+  return makeFirstRequest() // SPANx.1
+    .then(() => {
+      makeSecondRequest() // SPANx.2
+    })
+}
+```
+
+In the middle of a promise chain, it reads to me that the proposed solution needs to depends on additional cost to determine a child-of relationship now
+
+[02:03:33.0179] <littledan>
+> <@stephenbelanger:matrix.org> Much of the code we need to patch to do that in JS is not reachable at runtime. With bytecode you can manipulate everything, even private things.
+
+Sounds good, so can a language runtime, which is what we are talking about changing. It would help us to have a concrete reference point even if it is external/messy
+
+[02:04:21.0970] <Chengzhong Wu>
+ * ```
+handleRequest((req, res) => {
+  // ROOT SPAN0
+  connection.query('SELECT 1 + 1 AS two') // SPAN1
+    .then(a => {
+      // PROPOSED CONTEXT: SPAN1.2
+      // If the context.variable at this point is SPAN1.2, how do we determine
+      // child-of or follow-from?
+      // As proposed this should be a follow-from SPAN1.3 instead of SPAN2
+      return connection.query('SELECT 2 + 2 AS four') // SPAN2
+    })
+    .then(b => {
+      // PROPOSED CONTEXT: SPAN3.2
+      res.writeHead(200, { 'Content-Type': 'text/plain' })
+      res.end(a[0].two + b[0].four)
+    })
+})
+
+function connectionQuery(query) {
+  // Current Context: SPANx
+  return makeFirstRequest() // SPANx.1
+    .then(() => {
+      makeSecondRequest() // SPANx.2
+    })
+}
+```
+
+In the middle of a promise chain, it reads to me that the proposed solution needs to depends on additional cost to determine a child-of relationship now
+
+[02:04:41.0373] <Stephen Belanger>
+> <@legendecas:matrix.org> ```
+> handleRequest((req, res) => {
+>   // ROOT SPAN0
+>   connection.query('SELECT 1 + 1 AS two') // SPAN1
+>     .then(a => {
+>       // PROPOSED CONTEXT: SPAN1.2
+>       // If the context.variable at this point is SPAN1.2, how do we determine
+>       // child-of or follow-from?
+>       // As proposed this should be a follow-from SPAN1.3 instead of SPAN2
+>       return connection.query('SELECT 2 + 2 AS four') // SPAN2
+>     })
+>     .then(b => {
+>       // PROPOSED CONTEXT: SPAN3.2
+>       res.writeHead(200, { 'Content-Type': 'text/plain' })
+>       res.end(a[0].two + b[0].four)
+>     })
+> })
+> 
+> function connectionQuery(query) {
+>   // Current Context: SPANx
+>   return makeFirstRequest() // SPANx.1
+>     .then(() => {
+>       makeSecondRequest() // SPANx.2
+>     })
+> }
+> ```
+> 
+> In the middle of a promise chain, it reads to me that the proposed solution needs to depends on additional cost to determine a child-of relationship now
+
+What do you mean by `PROPOSED CONTEXT: SPAN1.2`? What I'm expecting is for the context there to be a continuation of `SPAN1`.
+

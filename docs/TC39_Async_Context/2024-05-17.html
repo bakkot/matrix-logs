@@ -57,6 +57,63 @@ console.log('2')
   <tr class="msg" id="L19"><td class="ts-cell"><a class="ts" href="#L19" alt="Fri May 17 2024 01:58:47 GMT-0700 (Pacific Daylight Time)">08:58</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@littledan:matrix.org">littledan</span>&gt;</div></td><td class="msg-cell"><mx-reply><blockquote> Yes, basically every other language flows this way with OTel, but other languages also provide things like bytecode manipulation so it's <em>able</em> to do this externally. With Node.js there is no solution.</blockquote></mx-reply>Other languages work the way you are proposing we adopt for JS? That is great to know. Can you suggest a concrete one for us to look into?</td></tr>
   <tr class="msg" id="L20"><td class="ts-cell"><a class="ts" href="#L20" alt="Fri May 17 2024 01:59:25 GMT-0700 (Pacific Daylight Time)">08:59</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@littledan:matrix.org">littledan</span>&gt;</div></td><td class="msg-cell">Bytecode manipulation isn’t magic; I would be surprised if we can’t do what’s achieved with it</td></tr>
   <tr class="msg" id="L21"><td class="ts-cell"><a class="ts" href="#L21" alt="Fri May 17 2024 02:00:02 GMT-0700 (Pacific Daylight Time)">09:00</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@stephenbelanger:matrix.org">Stephen Belanger</span>&gt;</div></td><td class="msg-cell">Not sure. Like I said, most do this externally to the runtime itself so I'm unsure if any particular language is a good example of it.</td></tr>
+  <tr class="msg" id="L22"><td class="ts-cell"><a class="ts" href="#L22" alt="Fri May 17 2024 02:02:12 GMT-0700 (Pacific Daylight Time)">09:02</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-7" title="@legendecas:matrix.org">Chengzhong Wu</span>&gt;</div></td><td class="msg-cell"><pre><code>handleRequest((req, res) =&gt; {
+  // ROOT SPAN0
+  connection.query('SELECT 1 + 1 AS two') // SPAN1
+    .then(a =&gt; {
+      // PROPOSED CONTEXT: SPAN1.2
+      // If the context.variable at this point is SPAN1.2, how do we determine
+      // child-of or follow-from?
+      // As proposed this should be a follow-from SPAN1.3 instead of SPAN2
+      return connection.query('SELECT 2 + 2 AS four') // SPAN2
+    })
+    .then(b =&gt; {
+      // PROPOSED CONTEXT: SPAN3.2
+      res.writeHead(200, { 'Content-Type': 'text/plain' })
+      res.end(a[0].two + b[0].four)
+    })
+})
+
+function connectionQuery(query) {
+  // Current Context: SPANx
+  return makeFirstRequest() // SPANx.1
+    .then(() =&gt; {
+      makeSecondRequest() // SPANx.2
+    })
+}
+</code></pre>
+<p>In the middle of a promise chain, it reads to me that the proposed solution needs to depends on additional cost to determine a child-of relationship now</p>
+</td></tr>
+  <tr class="msg" id="L23"><td class="ts-cell"><a class="ts" href="#L23" alt="Fri May 17 2024 02:02:25 GMT-0700 (Pacific Daylight Time)">09:02</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@littledan:matrix.org">littledan</span>&gt;</div></td><td class="msg-cell">That’s OK if it’s external, if it implements the right semantics I am still happy to have that as the reference point</td></tr>
+  <tr class="msg" id="L24"><td class="ts-cell"><a class="ts" href="#L24" alt="Fri May 17 2024 02:02:32 GMT-0700 (Pacific Daylight Time)">09:02</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@stephenbelanger:matrix.org">Stephen Belanger</span>&gt;</div></td><td class="msg-cell"><mx-reply><blockquote> Bytecode manipulation isn’t magic; I would be surprised if we can’t do what’s achieved with it</blockquote></mx-reply>Much of the code we need to patch to do that in JS is not reachable at runtime. With bytecode you can manipulate everything, even private things.</td></tr>
+  <tr class="msg" id="L25"><td class="ts-cell"><a class="ts" href="#L25" alt="Fri May 17 2024 02:03:33 GMT-0700 (Pacific Daylight Time)">09:03</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@littledan:matrix.org">littledan</span>&gt;</div></td><td class="msg-cell"><mx-reply><blockquote> Much of the code we need to patch to do that in JS is not reachable at runtime. With bytecode you can manipulate everything, even private things.</blockquote></mx-reply>Sounds good, so can a language runtime, which is what we are talking about changing. It would help us to have a concrete reference point even if it is external/messy</td></tr>
+  <tr class="msg" id="L26"><td class="ts-cell"><a class="ts" href="#L26" alt="Fri May 17 2024 02:04:41 GMT-0700 (Pacific Daylight Time)">09:04</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@stephenbelanger:matrix.org">Stephen Belanger</span>&gt;</div></td><td class="msg-cell"><mx-reply><blockquote> <pre><code>handleRequest((req, res) =&gt; {
+  // ROOT SPAN0
+  connection.query('SELECT 1 + 1 AS two') // SPAN1
+    .then(a =&gt; {
+      // PROPOSED CONTEXT: SPAN1.2
+      // If the context.variable at this point is SPAN1.2, how do we determine
+      // child-of or follow-from?
+      // As proposed this should be a follow-from SPAN1.3 instead of SPAN2
+      return connection.query('SELECT 2 + 2 AS four') // SPAN2
+    })
+    .then(b =&gt; {
+      // PROPOSED CONTEXT: SPAN3.2
+      res.writeHead(200, { 'Content-Type': 'text/plain' })
+      res.end(a[0].two + b[0].four)
+    })
+})
+
+function connectionQuery(query) {
+  // Current Context: SPANx
+  return makeFirstRequest() // SPANx.1
+    .then(() =&gt; {
+      makeSecondRequest() // SPANx.2
+    })
+}
+</code></pre>
+<p>In the middle of a promise chain, it reads to me that the proposed solution needs to depends on additional cost to determine a child-of relationship now</p>
+</blockquote></mx-reply>What do you mean by <code>PROPOSED CONTEXT: SPAN1.2</code>? What I'm expecting is for the context there to be a continuation of <code>SPAN1</code>.</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>
