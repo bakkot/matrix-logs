@@ -968,3 +968,11 @@ foo()
 console.log('2')
 ```
 
+[01:42:10.0060] <littledan>
+Do OTel implementations in any other language with async/await make this distinction properly? If so it would be great to be able to refer to their implementation strategies.
+
+[01:42:41.0677] <Stephen Belanger>
+> <@littledan:matrix.org> where can I read more about that pile of hacks? (maybe you already wrote about it somewhere?)
+
+There's not really any writing on it presently, but basically because we don't flow into promise continuations we need to keep an object at the top-level of the request which we push spans into and basically _guess_ what the parent is because, unlike with callbacks, the parent does not flow into the continuation. This means we have to look at what has been pushed into that list in the past and try to guess what the parent would be. Sometimes it's simply the last span in the list, but not always, so we need to do some additional analysis to figure out what was the last span which _could_ be a realistic parent, which requires we also hold a bunch of the span metadata. Holding all this metadata is expensive given that we could have hundreds of thousands of concurrent spans. What we _want_ is for the _correct_ context to just be able to flow through the resolve path so we only need to store the IDs and can entirely eliminate that big bag of data which lives for the whole life of the request.
+
