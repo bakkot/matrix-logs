@@ -243,3 +243,28 @@ i'm trying to understand why this can't be expressed as AwaitUsingDeclaration: `
 [14:57:55.0817] <shu>
 it's still the case that there's no valid parse of that sequence of tokens with an AwaitExpression
 
+[15:00:16.0196] <rbuckton>
+Given the source text `await using x = y`, you have two potential parses for `await using`: An _ExpressionStatement_ containing an _AwaitExpresion_, or a _LexicalDeclaration_ containing an _AwaitUsingDeclaration_. You have to consider both parses as equally viable until they are not. For _ExpressionStatement_, you descend through _Expression_ to parse `await using`, but _ExpressionStatement_ must end in a `;`. Since `x` is not `;`, it's not a valid _ExpressionStatement_. For _LexicalDeclaration_, you can parse `await using` followed by an identifier and that matches an _AwaitUsingDeclaration_.
+It's only after both of these potential parses fails that ASI is considered, and a `;` would only be inserted after `await using` if there was a line terminator before the `x`. 
+
+[15:01:06.0949] <rbuckton>
+Given the source
+```
+await using
+x = y
+```
+The same process occurs, except the NLT restriction means AwaitUsingDeclaration isn't a valid parse in that case
+
+[15:04:38.0820] <shu>
+ah, it's ASI
+
+[15:04:39.0501] <shu>
+got it
+
+[15:04:40.0566] <rbuckton>
+ * Given the source text `await using x = y`, you have two potential parses for `await using`: An _ExpressionStatement_ containing an _AwaitExpresion_, or a _LexicalDeclaration_ containing an _AwaitUsingDeclaration_. You have to consider both parses as equally viable until they are not. For _ExpressionStatement_, you descend through _Expression_ to parse `await using`, but _ExpressionStatement_ must end in a `;`. Since `x` is not `;`, it's not a valid _ExpressionStatement_. For _LexicalDeclaration_, you can parse `await using` followed by an identifier and that matches an _AwaitUsingDeclaration_.
+It's only after both of these potential parses fail that ASI is considered, and a `;` would only be inserted after `await using` if there was a line terminator before the `x`.
+
+[15:04:50.0648] <shu>
+well that's also fucking terrible
+
