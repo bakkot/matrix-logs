@@ -1538,3 +1538,15 @@ Here's a new issue from Matteo about the exact issue I'm talking about with awai
 [06:08:11.0396] <Stephen Belanger>
 It happens to use `enterWith(...)` rather than `run(...)`, but the confusion around expected slow is effectively the same.
 
+[06:26:33.0251] <Stephen Belanger>
+> <@littledan:matrix.org> Do you have an example of this sort of fix, and the costs and benefits of it, that we can look into?
+
+We use it all over the place in the Datadog tracer, though we've been gradually migrating away to doing context recovery using TracingChannel instead as we don't break other users and tracing products that way. The cost is not really much, and like I said _will_ happen whether we provide fast-paths for it or not--you can just do `store.get()` and `store.run(...)` in a closure, but then you're making a closure and doing some extra steps which could _probably_ be more optimizable as an instance-scoped bind method of some sort.
+
+[06:28:42.0229] <Stephen Belanger>
+> <@stephenhicks:matrix.org> Catching up on a lot here. I think I'm starting to come around a bit more to Stephen's perspective w.r.t. context flowing out from resolves.  I think he's right that, in general (when people do the right thing) it ends up maintaining the same root for the context tree, since the resolved promise generally comes from earlier in the same scope, and I like the fact that it aligns the opt-in for registration time with something that's actually quite reasonable to implement. I believe it's also pretty trivial to do a paranoid await-wrapping: `await bindTask(() => untrustedApi())` which would guarantee the untrustedApi can't change the context on you. Where it still feels wrong to me is Andreu's concern. The really nice property in the current proposal is that it's really well encapsulated. Context variable behave just like lexical consts, where you have guarantees that anything you can't see can never change them out from under you, and that's a _very attractive_ guarantee. Whereas the flows-out approach seems very brittle if any single bad/careless actor anywhere in your downstream call chain is able to irretrievably break the flow. I think that's where this disconnect is coming from - the encapsulation purists in the group are very hesitant to give up that guarantee.
+> 
+> I wonder if there's some middle ground where you could at least detect when an abrupt context change has occurred? For instance, I could imagine something along the lines of `using _ = contextMonitor();` at the top of the function.  It could install a new variable and if it detected that the variable has changed at the end of the scope, it knows something fishy has happened. And if we're giving up the encapsulation, I suspect mutating variables with `using` might actually be reasonable as well...
+
+The bad actor changing your value is only a problem if you explicitly give them the store and let them _do_ that. If you just keep your stores private this is not a real problem.
+
