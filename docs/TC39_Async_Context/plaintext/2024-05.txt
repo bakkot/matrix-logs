@@ -1590,3 +1590,10 @@ I don't think that's right. Simply restoring a global snapshot is enough. If the
 
 I found this initially surprising, but I'm wondering if this actually makes more sense under the "flow through await" scenario. With preserve-around-await semantics and default registration-time binding, you end up needing a bunch of global binds just to get reasonable behavior. Again, my axiom here is that application code and library/framework code shouldn't need to be aware of each other's variables in order to do the right thing. With preserve-around-await, global binds seems like generally the thing you need to uphold that axiom. But with flow-through-await, I can imagine that maybe that's no longer required, provided you're not somehow picking up promises that came from vastly different contexts, which seems generally unlikely to happen in most common situations.
 
+[01:15:04.0735] <Stephen Belanger>
+> <@stephenhicks:matrix.org> I don't think that's right. Simply restoring a global snapshot is enough. If the subtask you're awaiting resolves its promise in a context that didn't derive from the one that was active when you called it, then you've lost your state even though it didn't have access to your variable.
+
+Well, yes, global snapshots are bad, which is why they should be discouraged except when absolutely necessary. If you flow _through_ rather than _around_ things then it's _generally_ most advisable to actually bind-per store to only do graph reductions where needed whereas trying to bind _around_ things all over the place takes way more binds and is often inescapable.
+
+It's a lot better to just let things flow _through_ by default and then provide some additional tools to reduce the graph where necessary. In general cases this is just the bind method, but for awaits it might make sense to have a store option to make it auto-bind on awaits or something like that. I _personally_ feel it makes a lot more sense for await binds to be an option rather than a default we need to find a way out of, but I don't care _too_ much either way, so long as the tools can do what is needed in a reasonable way.
+
