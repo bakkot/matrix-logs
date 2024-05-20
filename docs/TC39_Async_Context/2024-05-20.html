@@ -271,6 +271,22 @@ store.run(1, main)
   <tr class="msg" id="L165"><td class="ts-cell"><a class="ts" href="#L165" alt="Mon May 20 2024 08:16:54 GMT-0700 (Pacific Daylight Time)">15:16</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@stephenbelanger:matrix.org">Stephen Belanger</span>&gt;</div></td><td class="msg-cell">Definitely not, no.</td></tr>
   <tr class="msg" id="L166"><td class="ts-cell"><a class="ts" href="#L166" alt="Mon May 20 2024 08:17:32 GMT-0700 (Pacific Daylight Time)">15:17</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@stephenbelanger:matrix.org">Stephen Belanger</span>&gt;</div></td><td class="msg-cell">Some adjustments were made to make it a bit less <em>crashy</em> when trying to do that, but it was very much about resource tracking.</td></tr>
   <tr class="msg" id="L167"><td class="ts-cell"><a class="ts" href="#L167" alt="Mon May 20 2024 08:19:11 GMT-0700 (Pacific Daylight Time)">15:19</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@stephenbelanger:matrix.org">Stephen Belanger</span>&gt;</div></td><td class="msg-cell">async_hooks was created and then <em>years</em> later core finally accepted that context management was actually a reasonable thing to want.</td></tr>
+  <tr class="msg" id="L168"><td class="ts-cell"><a class="ts" href="#L168" alt="Mon May 20 2024 08:36:21 GMT-0700 (Pacific Daylight Time)">15:36</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-3" title="@jasnell:matrix.org">James M Snell</span>&gt;</div></td><td class="msg-cell"><p>I think the two types of variables makes sense... but maybe with two distinct behaviors.. For this example I'm going to change up the terms a bit from what is currently spec'd and known. What the spec currently calls <code>AsyncContext.Variable</code>, I'm going to call <code>AsyncContext.Scope</code> instead... it's a thing that can be entered with a specific value. Then, what I'm calling <code>AsyncContext.Variable</code> in this example is a thing whose value can be set (similar to <code>enterWith</code> but that cannot be explicitly entered... the value is just retained as the context is propagated.</p>
+<pre><code>const store1 = new AsyncContext.Scope
+const store2 = new AsyncContext.Variable
+
+async function doSomething() {
+  store2.set(`abc${store1.get()}`);
+}
+
+await Promise.all([
+  store1.run(1, async () =&gt; { await doSomething(); console.log(store2.get()); // 'abc1' }),
+  store1.run(2, async () =&gt; { await doSomething(); console.log(store2.get()); // 'abc2' }),
+]);
+console.log(store2.get()); // undefined ?
+</code></pre>
+<p>The key point is <code>store2</code> here is not a context that can be entered but only a value that can be set at any point during a flow such that the value propagates through the flow</p>
+</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>
