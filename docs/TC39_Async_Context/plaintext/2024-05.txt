@@ -1696,3 +1696,47 @@ In Node.js we intentionally push capturing to as _close_ to the edges as possibl
 [05:19:32.0375] <Stephen Belanger>
 We could have bound the user callbacks directly instead, but then we would miss all that internal behaviour which may be relevant.
 
+[05:20:44.0145] <littledan>
+I've asked two questions that I don't yet know the answer to:
+- How are we handling merges, given that both contexts are often relevant (and in general this forms a big tree--there are more than two relevant things)?
+- How could per-variable handling scale, when you have a lot of different libraries and a lot of different variables and they're all supposed to fit together? It's easier for me to understand "two classes of variables".
+
+[05:20:55.0600] <Stephen Belanger>
+> <@littledan:matrix.org> but also sometimes the registration context *is* the most relevant one (often it's the only possible one)
+
+I have never found that with ALS. The appropriate place to do "resolve" path _does_ get pushed a bit out sometimes though. Like if the resolve is in C++ internals somewhere then it gets pushed back to whatever call ran the C++ code which _led_ to that resolve.
+
+[05:21:30.0374] <littledan>
+> <@stephenbelanger:matrix.org> I have never found that with ALS. The appropriate place to do "resolve" path _does_ get pushed a bit out sometimes though. Like if the resolve is in C++ internals somewhere then it gets pushed back to whatever call ran the C++ code which _led_ to that resolve.
+
+For example, in setTimeout, there's nothing to do but restore the snapshot from when it was previously called
+
+[05:21:53.0352] <Stephen Belanger>
+Everything _always_ has some cause _somewhere_.
+
+[05:22:07.0778] <littledan>
+sure, the cause is often the registration time
+
+[05:22:17.0221] <littledan>
+so we're not necessarily disagreeing on the semantics
+
+[05:22:43.0193] <littledan>
+you wouldn't want internals of the scheduler to be understood as the cause, though--that would scramble information
+
+[05:22:52.0672] <Stephen Belanger>
+It's not that `setTimeout` needs to be registration time. It's that registration and scheduling time happen at the same time in some case. But it's not the registering of a callback which you actually _care_ about, it's the path that led to it being _called_.
+
+[05:23:46.0166] <littledan>
+> <@stephenbelanger:matrix.org> It's not that `setTimeout` needs to be registration time. It's that registration and scheduling time happen at the same time in some case. But it's not the registering of a callback which you actually _care_ about, it's the path that led to it being _called_.
+
+sure, yes I agree these are the semantics we are going for. As I've been saying, the "registration time vs call time" framing is not helpful. Instead, it's more like the organizing principle is, "preserve relevant information".
+
+[05:24:04.0177] <littledan>
+which sometimes means "registration time" in the terms we've been using
+
+[05:24:33.0252] <littledan>
+let's think about better ways to call this; there's just no debate about what setTimeout does
+
+[05:25:20.0424] <Andreu Botella>
+the cases where this distinction matters are cases where the "scheduling time" is at the start of the agent before any JS code can run – in which case the agent is necessarily empty, and necessarily preserves *no* relevant information
+
