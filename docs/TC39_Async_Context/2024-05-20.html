@@ -95,6 +95,47 @@
   <tr class="msg" id="L52"><td class="ts-cell"><a class="ts" href="#L52" alt="Mon May 20 2024 05:33:35 GMT-0700 (Pacific Daylight Time)">12:33</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@littledan:matrix.org">littledan</span>&gt;</div></td><td class="msg-cell">in the terms you set up, it sounds like you're saying, "we should switch from call to continuation when it comes to await"</td></tr>
   <tr class="msg" id="L53"><td class="ts-cell"><a class="ts" href="#L53" alt="Mon May 20 2024 05:34:15 GMT-0700 (Pacific Daylight Time)">12:34</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@littledan:matrix.org">littledan</span>&gt;</div></td><td class="msg-cell">and what I'm missing is the understanding of why that's not a meaningful loss of information (given that it's useful for establishing a certain sense of parentage)</td></tr>
   <tr class="msg" id="L54"><td class="ts-cell"><a class="ts" href="#L54" alt="Mon May 20 2024 05:34:53 GMT-0700 (Pacific Daylight Time)">12:34</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@stephenbelanger:matrix.org">Stephen Belanger</span>&gt;</div></td><td class="msg-cell">We create a span and store it in the context with <code><a href="http://store.run">store.run</a>(span, ...)</code>. If inside the function given to that we then <em>immediately</em> create another span because some <em>other</em> instrumented function was called synchronously, we would consider that a child-of relationship and link that accordingly. But if it happened within an async continuation then it is a follows-from relationship. So we differentiate the sync code from the continuations.</td></tr>
+  <tr class="msg" id="L55"><td class="ts-cell"><a class="ts" href="#L55" alt="Mon May 20 2024 05:35:57 GMT-0700 (Pacific Daylight Time)">12:35</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@stephenbelanger:matrix.org">Stephen Belanger</span>&gt;</div></td><td class="msg-cell">We can do that easily enough by just wrapping the store runs with a global flag like this: <a href="https://gist.github.com/Qard/6ceaca8bb792679e82c7693513baee0e/#file-span-js-L66-L70">https://gist.github.com/Qard/6ceaca8bb792679e82c7693513baee0e/#file-span-js-L66-L70</a></td></tr>
+  <tr class="msg" id="L56"><td class="ts-cell"><a class="ts" href="#L56" alt="Mon May 20 2024 05:36:33 GMT-0700 (Pacific Daylight Time)">12:36</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@abotella:igalia.com">Andreu Botella</span>&gt;</div></td><td class="msg-cell"><p>wait, if we go with resolution context, and we don't change how the current API works otherwise, we'd run into this. Is this what we want?</p>
+<pre><code class="language-js">await asyncVar.run("foo", async () =&gt; {
+    await doSomethingHere();
+});
+
+console.log(asyncVar.get()) // "foo"
+</code></pre>
+</td></tr>
+  <tr class="msg" id="L57"><td class="ts-cell"><a class="ts" href="#L57" alt="Mon May 20 2024 05:37:54 GMT-0700 (Pacific Daylight Time)">12:37</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@stephenbelanger:matrix.org">Stephen Belanger</span>&gt;</div></td><td class="msg-cell">So it's not <em>critical</em> that the API does the whole two paths thing. Like I've said before, what is in my doc is essentially the ideal from APM perspective, but quite possibly has things which shouldn't actually exist at language level and should just be done externally. But we're aiming for a balance that anything we need to do externally is as low-cost as possible, because what we have <em>right now</em> is <em>very</em> expensive.</td></tr>
+  <tr class="msg" id="L58"><td class="ts-cell"><a class="ts" href="#L58" alt="Mon May 20 2024 05:38:27 GMT-0700 (Pacific Daylight Time)">12:38</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@stephenbelanger:matrix.org">Stephen Belanger</span>&gt;</div></td><td class="msg-cell"><mx-reply><blockquote> <p>wait, if we go with resolution context, and we don't change how the current API works otherwise, we'd run into this. Is this what we want?</p>
+<pre><code class="language-js">await asyncVar.run("foo", async () =&gt; {
+    await doSomethingHere();
+});
+
+console.log(asyncVar.get()) // "foo"
+</code></pre>
+</blockquote></mx-reply>Yes. That is actually what users keep telling me they are <em>expecting</em>.</td></tr>
+  <tr class="msg" id="L59"><td class="ts-cell"><a class="ts" href="#L59" alt="Mon May 20 2024 05:38:41 GMT-0700 (Pacific Daylight Time)">12:38</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@abotella:igalia.com">Andreu Botella</span>&gt;</div></td><td class="msg-cell"><mx-reply><blockquote> Yes. That is actually what users keep telling me they are <em>expecting</em>.</blockquote></mx-reply>that is a very different behavior from the sync case</td></tr>
+  <tr class="msg" id="L60"><td class="ts-cell"><a class="ts" href="#L60" alt="Mon May 20 2024 05:38:57 GMT-0700 (Pacific Daylight Time)">12:38</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@littledan:matrix.org">littledan</span>&gt;</div></td><td class="msg-cell">I know about the expense of PromiseHooks and patching all the libraries (which we all definitely want to resolve); what kind of expense is related to this issue that you're talking about now?</td></tr>
+  <tr class="msg" id="L61"><td class="ts-cell"><a class="ts" href="#L61" alt="Mon May 20 2024 05:39:01 GMT-0700 (Pacific Daylight Time)">12:39</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@stephenbelanger:matrix.org">Stephen Belanger</span>&gt;</div></td><td class="msg-cell">The issue posted earlier is a user expecting that, and I get people making the same complaint about ALS someone or other every other week or so.</td></tr>
+  <tr class="msg" id="L62"><td class="ts-cell"><a class="ts" href="#L62" alt="Mon May 20 2024 05:39:37 GMT-0700 (Pacific Daylight Time)">12:39</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@littledan:matrix.org">littledan</span>&gt;</div></td><td class="msg-cell">I'm pretty sure if we'll get a bunch of complaints in the other direction if you change it; this is just a difficult feature to have any intuition for</td></tr>
+  <tr class="msg" id="L63"><td class="ts-cell"><a class="ts" href="#L63" alt="Mon May 20 2024 05:39:50 GMT-0700 (Pacific Daylight Time)">12:39</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@littledan:matrix.org">littledan</span>&gt;</div></td><td class="msg-cell">(that's not an argument one way or another0</td></tr>
+  <tr class="msg" id="L64"><td class="ts-cell"><a class="ts" href="#L64" alt="Mon May 20 2024 05:40:07 GMT-0700 (Pacific Daylight Time)">12:40</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@stephenbelanger:matrix.org">Stephen Belanger</span>&gt;</div></td><td class="msg-cell"><mx-reply><blockquote> I know about the expense of PromiseHooks and patching all the libraries (which we all definitely want to resolve); what kind of expense is related to this issue that you're talking about now?</blockquote></mx-reply>Just the general expense of <em>all</em> the stuff we have to do. Like I pointed out before that we presently need to keep a list of all spans in-memory from the lifetime of the whole request as we don't know how to do follows-from relationships otherwise.</td></tr>
+  <tr class="msg" id="L65"><td class="ts-cell"><a class="ts" href="#L65" alt="Mon May 20 2024 05:40:34 GMT-0700 (Pacific Daylight Time)">12:40</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@abotella:igalia.com">Andreu Botella</span>&gt;</div></td><td class="msg-cell"><pre><code class="language-js">function syncCase() {
+    asyncVar.run("foo", () =&gt; {
+        doSomethingHere()
+    });
+
+    console.log(asyncVar.get());  // undefined
+}
+
+async function asyncCase() {
+    await asyncVar.run("foo", async () =&gt; {
+        await doSomethingHere()
+    });
+
+    console.log(asyncVar.get());  // "foo"
+}
+</code></pre>
+</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>

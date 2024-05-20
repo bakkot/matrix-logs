@@ -1805,3 +1805,72 @@ and what I'm missing is the understanding of why that's not a meaningful loss of
 [05:34:53.0403] <Stephen Belanger>
 We create a span and store it in the context with `store.run(span, ...)`. If inside the function given to that we then _immediately_ create another span because some _other_ instrumented function was called synchronously, we would consider that a child-of relationship and link that accordingly. But if it happened within an async continuation then it is a follows-from relationship. So we differentiate the sync code from the continuations.
 
+[05:35:57.0579] <Stephen Belanger>
+We can do that easily enough by just wrapping the store runs with a global flag like this: https://gist.github.com/Qard/6ceaca8bb792679e82c7693513baee0e/#file-span-js-L66-L70
+
+[05:36:33.0340] <Andreu Botella>
+wait, if we go with resolution context, and we don't change how the current API works otherwise, we'd run into this. Is this what we want?
+```js
+await asyncVar.run("foo", async () => {
+    await doSomethingHere();
+});
+
+console.log(asyncVar.get()) // "foo"
+```
+
+[05:37:54.0474] <Stephen Belanger>
+So it's not _critical_ that the API does the whole two paths thing. Like I've said before, what is in my doc is essentially the ideal from APM perspective, but quite possibly has things which shouldn't actually exist at language level and should just be done externally. But we're aiming for a balance that anything we need to do externally is as low-cost as possible, because what we have _right now_ is _very_ expensive.
+
+[05:38:27.0038] <Stephen Belanger>
+> <@abotella:igalia.com> wait, if we go with resolution context, and we don't change how the current API works otherwise, we'd run into this. Is this what we want?
+> ```js
+> await asyncVar.run("foo", async () => {
+>     await doSomethingHere();
+> });
+> 
+> console.log(asyncVar.get()) // "foo"
+> ```
+
+Yes. That is actually what users keep telling me they are _expecting_.
+
+[05:38:41.0847] <Andreu Botella>
+> <@stephenbelanger:matrix.org> Yes. That is actually what users keep telling me they are _expecting_.
+
+that is a very different behavior from the sync case
+
+[05:38:57.0901] <littledan>
+I know about the expense of PromiseHooks and patching all the libraries (which we all definitely want to resolve); what kind of expense is related to this issue that you're talking about now?
+
+[05:39:01.0638] <Stephen Belanger>
+The issue posted earlier is a user expecting that, and I get people making the same complaint about ALS someone or other every other week or so.
+
+[05:39:37.0426] <littledan>
+I'm pretty sure if we'll get a bunch of complaints in the other direction if you change it; this is just a difficult feature to have any intuition for
+
+[05:39:50.0156] <littledan>
+(that's not an argument one way or another0
+
+[05:40:07.0000] <Stephen Belanger>
+> <@littledan:matrix.org> I know about the expense of PromiseHooks and patching all the libraries (which we all definitely want to resolve); what kind of expense is related to this issue that you're talking about now?
+
+Just the general expense of _all_ the stuff we have to do. Like I pointed out before that we presently need to keep a list of all spans in-memory from the lifetime of the whole request as we don't know how to do follows-from relationships otherwise.
+
+[05:40:34.0012] <Andreu Botella>
+```js
+function syncCase() {
+    asyncVar.run("foo", () => {
+        doSomethingHere()
+    });
+
+    console.log(asyncVar.get());  // undefined
+}
+
+async function asyncCase() {
+    await asyncVar.run("foo", async () => {
+        await doSomethingHere()
+    });
+
+    console.log(asyncVar.get());  // "foo"
+}
+```
+
