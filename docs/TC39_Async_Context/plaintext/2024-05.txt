@@ -1769,3 +1769,39 @@ oh, sure. to make what I'm saying concrete, I mean: the host should be able to p
 
 cool, sounds like we're all agreeing, "JS shouldn't create empty contexts". This doesn't resolve the "two causes" point which your document so clearly lays out.
 
+[05:31:29.0008] <Stephen Belanger>
+Context is basically just a mirror of the directed acyclic graph expressing the flow of the code of the entire process. That then has reductions applied to carve paths around any irrelevant implementation details. Some things are _universally_ irrelevant, like you'll want microtasks to flow context in a fairly universal way, but as things get to higher levels of abstraction from the instructions running on the cpu the more path decisions become subjective.
+
+[05:32:09.0775] <littledan>
+> <@littledan:matrix.org> I've asked two questions that I don't yet know the answer to:
+> - How are we handling merges, given that both contexts are often relevant (and in general this forms a big tree--there are more than two relevant things)?
+> - How could per-variable handling scale, when you have a lot of different libraries and a lot of different variables and they're all supposed to fit together? It's easier for me to understand "two classes of variables".
+
+still looking forward to answers to these questions
+
+[05:32:12.0390] <Stephen Belanger>
+> <@littledan:matrix.org> cool, sounds like we're all agreeing, "JS shouldn't create empty contexts". This doesn't resolve the "two causes" point which your document so clearly lays out.
+
+Are you referring to call versus continuation context in my doc?
+
+[05:32:25.0318] <littledan>
+yes
+
+[05:32:34.0458] <littledan>
+(I think)
+
+[05:32:47.0473] <Stephen Belanger>
+Ah, I've said a few times that particular point is far less critical than the ability to flow through awaits.
+
+[05:33:17.0713] <Stephen Belanger>
+The call versus continuation context thing is basically just differentiating between the sync code within a `store.run(...)` from anything it has propagated that context into.
+
+[05:33:35.0396] <littledan>
+in the terms you set up, it sounds like you're saying, "we should switch from call to continuation when it comes to await"
+
+[05:34:15.0470] <littledan>
+and what I'm missing is the understanding of why that's not a meaningful loss of information (given that it's useful for establishing a certain sense of parentage)
+
+[05:34:53.0403] <Stephen Belanger>
+We create a span and store it in the context with `store.run(span, ...)`. If inside the function given to that we then _immediately_ create another span because some _other_ instrumented function was called synchronously, we would consider that a child-of relationship and link that accordingly. But if it happened within an async continuation then it is a follows-from relationship. So we differentiate the sync code from the continuations.
+
