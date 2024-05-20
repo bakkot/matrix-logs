@@ -2260,3 +2260,46 @@ Flowing _around_ is essentially just lexical scope which, to me, doesn't really 
 [07:55:10.0930] <Stephen Belanger>
  * Flowing _around_ is essentially just local variable scope which, to me, doesn't really seem to have much value. I've asked a few times for an explanation or some use case _why_ anyone would want that flow but have not yet got any answer on that. 🤔
 
+[07:55:31.0773] <Andreu Botella>
+> <@stephenbelanger:matrix.org> Flowing _around_ is essentially just local variable scope which, to me, doesn't really seem to have much value. I've asked a few times for an explanation or some use case _why_ anyone would want that flow but have not yet got any answer on that. 🤔
+
+it would be lexical scope *within a function*, but it propagates across function calls in a way that lexical scope doesn't
+
+[07:55:51.0038] <littledan>
+> <@stephenbelanger:matrix.org> Flowing _around_ is essentially just local variable scope which, to me, doesn't really seem to have much value. I've asked a few times for an explanation or some use case _why_ anyone would want that flow but have not yet got any answer on that. 🤔
+
+this is a straw man, no one is proposing fully lexically scoped semantics, but rather sticking with how AsyncLocalStorage currently works
+
+[07:57:17.0841] <Stephen Belanger>
+> <@littledan:matrix.org> this is a straw man, no one is proposing fully lexically scoped semantics, but rather sticking with how AsyncLocalStorage currently works
+
+I'm aware this is how AsyncLocalStorage presently works, and I have also stated that a bunch of times that how it works now should not be taken as any suggestion of _correctness_ as it mostly certainly _is not_ and has numerous well-known issues which have been discussed at length in the past.
+
+[07:58:14.0307] <Stephen Belanger>
+> <@abotella:igalia.com> it would be lexical scope *within a function*, but it propagates across function calls in a way that lexical scope doesn't
+
+Yep, I understand how it flows, I just don't understand _why_ anyone would ever want it to flow in that particular way. As I said, I still have not had any specific use case explained to me for _why_ we elected to flow it in that way.
+
+[07:58:19.0843] <James M Snell>
+Got it. and yeah, that's what I suspected you meant :-) ... the answer is: whether it should be 1 or 2 depends on the storage cell is being used for. That is, In some cases what you want is `1` and others what you want is `2` . Even in your second example there using the callback, there are use cases where `store.getStore()` within the callback should not "clearly be 2".
+
+[07:58:49.0915] <Stephen Belanger>
+In the case of AsyncLocalStorage, it just flows that way because that's just what we were actually _able_ to do with the limited tools and resources we had available when building it.
+
+[07:59:01.0655] <Stephen Belanger>
+But it's _most certainly_ an imperfect API.
+
+[07:59:03.0437] <littledan>
+> <@jasnell:matrix.org> Got it. and yeah, that's what I suspected you meant :-) ... the answer is: whether it should be 1 or 2 depends on the storage cell is being used for. That is, In some cases what you want is `1` and others what you want is `2` . Even in your second example there using the callback, there are use cases where `store.getStore()` within the callback should not "clearly be 2".
+
+One vague idea I've had is, should there be two kinds of variables, one which leans in one direction and one in the other? (sometimes there is only one choice though)
+
+[08:00:00.0949] <littledan>
+don't you think it's kinda curious that, after ALS was implemented, the V8 team separately made CPED for another couple use cases that Chrome had, and the semantics basically coincide?
+
+[08:00:25.0466] <Stephen Belanger>
+Yeah, I don't have a specific answer on what such a thing should look like, but there have been discussions like the parameter versus return flow thing, but I don't think that's quite right as we need it to flow _through_ which means _both_ ways. (At least for the tracing use case)
+
+[08:00:27.0935] <James M Snell>
+I've been stewing over that also... whether there should be two types of variables... haven't landed on anything concrete yet. Alternatively one variable with two storage cells is an option. Unfortunately the DX gets a bit muddled and complicated 
+
