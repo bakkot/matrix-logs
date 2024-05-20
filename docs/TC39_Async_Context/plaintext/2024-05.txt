@@ -1874,3 +1874,49 @@ async function asyncCase() {
 }
 ```
 
+[05:41:14.0981] <Stephen Belanger>
+> <@abotella:igalia.com> that is a very different behavior from the sync case
+
+It is, but it's _identical_ to how the same code rewritten with callbacks flows, and that's the confusion users are running into. We keep seeing people rewriting their apps with promises and then being confused when the context doesn't flow the way they're used to anymore.
+
+[05:41:21.0355] <littledan>
+> <@stephenbelanger:matrix.org> Just the general expense of _all_ the stuff we have to do. Like I pointed out before that we presently need to keep a list of all spans in-memory from the lifetime of the whole request as we don't know how to do follows-from relationships otherwise.
+
+oh right, this part. I don't get it, can't you offload that processing to happen later? or this would require a change in the Otel protocol?
+
+[05:42:30.0523] <Stephen Belanger>
+It would require a change in the OTel spec which they've basically said _unequivocally no_ to ever changing. 😐️
+
+[05:42:35.0687] <Andreu Botella>
+> <@stephenbelanger:matrix.org> It is, but it's _identical_ to how the same code rewritten with callbacks flows, and that's the confusion users are running into. We keep seeing people rewriting their apps with promises and then being confused when the context doesn't flow the way they're used to anymore.
+
+sure, people rewriting code from callbacks to promises might prefer resolution time, but what about people writing async/await code from scratch? Do we know what they need? Would we be breaking them?
+
+[05:43:17.0802] <littledan>
+> <@stephenbelanger:matrix.org> It is, but it's _identical_ to how the same code rewritten with callbacks flows, and that's the confusion users are running into. We keep seeing people rewriting their apps with promises and then being confused when the context doesn't flow the way they're used to anymore.
+
+is this always the form of this sort of migration, or do people also have this confusion with greenfield promise apps?
+
+[05:43:40.0533] <Stephen Belanger>
+Well, as I said the other day, if we follow resolution path that follows a causation path from the creation of the promise so we still actually get the same context flow unless someone goes and changes the context in the middle.
+
+[05:43:45.0461] <littledan>
+> <@stephenbelanger:matrix.org> It would require a change in the OTel spec which they've basically said _unequivocally no_ to ever changing. 😐️
+
+Can you say more about the interactions with upstream OTel folks? Has anyone offered to make an efficient open-source collector to actually take advantage of this protocol improvement?
+
+[05:44:52.0853] <Andreu Botella>
+> <@stephenbelanger:matrix.org> Well, as I said the other day, if we follow resolution path that follows a causation path from the creation of the promise so we still actually get the same context flow unless someone goes and changes the context in the middle.
+
+in the web specs there are cases where you can get a promise from somewhere else, that wasn't created in a data flow starting from the current function
+
+[05:45:00.0411] <Andreu Botella>
+> <@stephenbelanger:matrix.org> Well, as I said the other day, if we follow resolution path that follows a causation path from the creation of the promise so we still actually get the same context flow unless someone goes and changes the context in the middle.
+
+ * in web APIs there are cases where you can get a promise from somewhere else, that wasn't created in a data flow starting from the current function
+
+[05:45:09.0720] <Stephen Belanger>
+> <@littledan:matrix.org> is this always the form of this sort of migration, or do people also have this confusion with greenfield promise apps?
+
+I see the same confusion with people doing this with new projects too. Moreso from conversions, but also our customers tend to be enterprises that have ancient codebases they've been maintaining forever, so there's a clear bias to who we're talking to regularly.
+
