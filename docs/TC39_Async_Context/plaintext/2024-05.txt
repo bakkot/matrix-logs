@@ -1740,3 +1740,32 @@ let's think about better ways to call this; there's just no debate about what se
 [05:25:20.0424] <Andreu Botella>
 the cases where this distinction matters are cases where the "scheduling time" is at the start of the agent before any JS code can run – in which case the agent is necessarily empty, and necessarily preserves *no* relevant information
 
+[05:25:49.0012] <littledan>
+we should not be in the business of running anything with an empty context ever IMO. That would preclude many important context use cases.
+
+[05:26:53.0011] <Stephen Belanger>
+Yep, so I've found the way to do that effectively is to look _specifically_ at where synchronous execution _stops_ and tasks are stored to return to later in some way. In Node.js we create handle objects and, generally, the creation of those objects captures context and the callback is registered at that same point.
+
+The reason we capture at _this_ specific point though is because we don't have _native_ context. If we _did_ then the _actual_ correct point would be where it queues the kernel task and should flow all the way up to that point and then capture context to restore when the kernel task comes back. For _complete_ context flow you want to be as close to those edges as possible.
+
+[05:27:08.0815] <Andreu Botella>
+> <@littledan:matrix.org> we should not be in the business of running anything with an empty context ever IMO. That would preclude many important context use cases.
+
+I assume you mean we shouldn't be running anything that could not possibly have any data flow from the initial execution of the script or later, right?
+
+[05:27:30.0505] <Andreu Botella>
+because the initial execution will have an empty context, and that context might flow to places
+
+[05:28:34.0666] <Stephen Belanger>
+Everything in the process has a _cause_ and therefore should always have a parent to flow from. The top-level flows from the fact of the process starting, which maybe doesn't have a "value" per-se, but I think that is probably the clearest expression of never having an "empty" context.
+
+[05:28:38.0874] <littledan>
+> <@abotella:igalia.com> because the initial execution will have an empty context, and that context might flow to places
+
+oh, sure. to make what I'm saying concrete, I mean: the host should be able to put some internal variables in that initial context, and then be able to rely on their presence; JS itself should never be creating an empty context.
+
+[05:29:34.0312] <littledan>
+> <@stephenbelanger:matrix.org> Everything in the process has a _cause_ and therefore should always have a parent to flow from. The top-level flows from the fact of the process starting, which maybe doesn't have a "value" per-se, but I think that is probably the clearest expression of never having an "empty" context.
+
+cool, sounds like we're all agreeing, "JS shouldn't create empty contexts". This doesn't resolve the "two causes" point which your document so clearly lays out.
+
