@@ -424,3 +424,29 @@ and yet
 [15:47:42.0135] <shu>
 and why is class static blocks +Await?
 
+[15:53:04.0497] <rbuckton>
+To treat `await` as a keyword and and ban it. 
+
+[15:53:09.0152] <bakkot>
+that one does have an explicit error I am almost certain
+
+[15:53:45.0163] <rbuckton>
+* To treat 
+await as a keyword and then ban it.
+
+[15:53:50.0364] <Richard Gibson>
+I do think the spec may be messed up here, because [|PrimaryExpression|](https://tc39.es/ecma262/multipage/ecmascript-language-expressions.html#prod-PrimaryExpression) propagates [?Yield, ?Await] to |ClassExpression|, which propagates them to |FieldDefinition|, which propagates them to |Initializer|, which propagates them to |AssignmentExpression|, which can expand to |YieldExpression| with [+Yield] and to |AwaitExpression| with [+Await] (and likewise [|StatementList|](https://tc39.es/ecma262/multipage/ecmascript-language-statements-and-declarations.html#prod-StatementList) to |ClassDeclaration|). The engines that reject source like `function* f(){ class C { static foo = yield }; }` are treating the initializer as containing an identifier that is reserved in strict mode code, rather than as containing a yield expression. It seems that only JSC and engine262 parse per spec, although in evaluation JSC acts like the above and engine262 dies with an assertion failure:
+```
+$ eshost -h JavaScriptCore,engine262 -sx 'const iter = (function* f(){ return (class C { static foo = yield }).foo; })(); try { print(JSON.stringify(iter.next("A"))); print(JSON.stringify(iter.next("B"))); } catch (err) { print(err); }'
+#### engine262
+
+AssertError: genContext.Generator !== undefined
+
+#### JavaScriptCore
+{"done":true}
+{"done":true}
+```
+
+[15:54:12.0147] <rbuckton>
+* To treat `await` as a keyword and then ban it.
+
