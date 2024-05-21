@@ -499,3 +499,28 @@ but that's only in `static { … }` blocks
 [15:58:29.0515] <bakkot>
 right
 
+[16:02:57.0861] <shu>
+https://github.com/tc39/ecma262/issues/3333
+
+[16:03:17.0557] <Richard Gibson>
+ * I do think the spec may be messed up here, because [|PrimaryExpression|](https://tc39.es/ecma262/multipage/ecmascript-language-expressions.html#prod-PrimaryExpression) propagates \[?Yield, ?Await\] to |ClassExpression|, which propagates them to |FieldDefinition|, which propagates them to |Initializer|, which propagates them to |AssignmentExpression|, which can expand to |YieldExpression| with \[+Yield\] and to |AwaitExpression| with \[+Await\] (and likewise [|StatementList|](https://tc39.es/ecma262/multipage/ecmascript-language-statements-and-declarations.html#prod-StatementList) to |ClassDeclaration|). The engines that reject source like `function* f(){ class C { static foo = yield }; }` are treating the initializer as containing an _identifier_ that is reserved in strict mode code, rather than as containing a yield expression. It seems that only JSC parses per spec, although in evaluation it acts like the above (and engine262 dies with an assertion failure):
+
+```
+$ eshost -h JavaScriptCore,engine262 -sx '
+  print("START");
+  const iter = (function* f(){ return (class C { static foo = yield }).foo; })();
+  try {
+    print(JSON.stringify(iter.next("A")));
+    print(JSON.stringify(iter.next("B")));
+  } catch (err) { print(err); }
+'
+#### engine262
+
+AssertError: genContext.Generator !== undefined
+
+#### JavaScriptCore
+START
+{"done":true}
+{"done":true}
+```
+
