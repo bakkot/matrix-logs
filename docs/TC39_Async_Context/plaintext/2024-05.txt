@@ -2750,3 +2750,23 @@ The issue I just posted yesterday was exactly this, and we get _numerous_ report
 
 Yes, I get that people want this "around" flow. I'm fine with people wanting it. I'm just not clear what exactly the _reason_ is why they want it. What _specifically_ is the use case for that flow?
 
+[02:36:03.0933] <Stephen Belanger>
+> <@jridgewell:matrix.org> I think this is what I’m missing. I don’t understand why could would need to guess, I’m naively assuming its always follows-from the last child and child-of the current parent. What’s a case where this isn’t correct? How does the flows-through solve holding holding the hundreds of thousands of concurrent spans?
+
+Consider this code:
+
+```js
+async function doSomething() {
+  await doAThing() // first span
+  await doAnotherThing() // no span
+  await doYetAnotherThing() // second span should be follows-from first
+}
+```
+
+If we have call `doSomething()` twice in a `Promise.all(...)`, which we do not instrument or have any particular awareness of--maybe it's user code--then we'll get two spans being created for the first awaits of each, then when the second spans come in they will no have a way to differentiate because the `doSomething()` itself would have the same context when it runs both times and would be restoring that over the awaits, blowing away the context we had from the inner function calls which we otherwise _could_ associate with if we had flow-through semantics.
+
+[02:39:03.0655] <Stephen Belanger>
+> <@abotella:igalia.com> I'm not actually sure I understand this. As with the current proposal, you would still need to have access to an object in order to set or get, so isn't it exactly parallel to setting a variable defined in an outer scope?
+
+Yeah, I really don't get what the security concerns are here. You need access to the variable instance to retrieve the data. Sharing any _normal_ variable would have the same security implications.
+
