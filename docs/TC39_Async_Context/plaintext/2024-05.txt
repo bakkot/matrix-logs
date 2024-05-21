@@ -2733,3 +2733,10 @@ What do you mean by breaking out of awaits?
 
 Comparison with other languages would be really useful if we can figure out where to look 
 
+[02:22:11.0772] <Stephen Belanger>
+> <@jridgewell:matrix.org> I don’t understand this. What are the inner and outer awaits? In my mind, the async context is bound when we enter the function, it doesn’t matter where the awaits are.
+
+The spec, as it is presently, calls for capturing the context at the point where an await happens, not where the promise being awaited resolves. The context flows _into_ that promise, and it _would_ flow all the way to the point of resolving, but then we orphan that branch and return the context back to the captured value of that outer await.
+
+In this particular example though, it's using `store.enterWith(...)` which effectively sets the value in the _current_ scope without creating a new scope first. Because the initial segment of an async function executes synchronously, if that occurs _before_ the first await of that _internal_ function then the point at which the outer function captures its await will have already change _its_ context and so will adopt that inner context. Whereas if that inner function modifies the current context _after_ the first await within that inner function it will have already passed the point where the outer function captured the await context and so it would _not_ use that value. The fact this sometimes changes the outer function context and sometimes doesn't is extremely confusing. Users are expecting it to _always_ change the outer context, as indicated in the issue, because it is logically a continuation and should therefore behave the same as it would were it written with callbacks instead.
+
