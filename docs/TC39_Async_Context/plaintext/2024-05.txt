@@ -2948,3 +2948,67 @@ and that seems to be the thing they're concerned about
 
 How so? The runtime can define that the scope of a set alteration lives to the end of the current microtask.
 
+[04:30:32.0465] <Stephen Belanger>
+This is what most _other_ languages do.
+
+[04:31:08.0555] <Stephen Belanger>
+When the current tick ends at it would transition to an async continuation it terminates the context and sets whatever would get restored for the continuation.
+
+[04:31:37.0274] <Stephen Belanger>
+Or explicitly null/undefined/empty if nothing was captured for that continuation.
+
+[04:31:50.0814] <Stephen Belanger>
+But the point is, a `set(...)` never crosses over into unrelated activity.
+
+[04:33:28.0092] <Stephen Belanger>
+Basically this, but with the `scope.run(...)` being implicitly provided by the runtime:
+
+```js
+// Any calls to set(...) get cleared when scope ends
+scope.run(() => {
+  store.set(1)
+})
+```
+
+[04:34:03.0926] <Stephen Belanger>
+And, to be clear, we are essentially _already doing this_ with propagation.
+
+[04:34:55.0905] <Stephen Belanger>
+All we need to do is raise the set one level out to whatever the _current_ thing which _could have_ had a scope is, and set _there_ rather than introducing a _new_ scope.
+
+[04:35:40.0053] <Stephen Belanger>
+ * When the current tick ends and it would transition to an async continuation it terminates the context and sets whatever would get restored for the continuation.
+
+[04:38:06.0358] <Stephen Belanger>
+The only real concern is that the store needs copy-on-write semantics so that changes don't leak backward in time within the same scope by modifying the _same_ map. The `set(...)` should clone the map and future captures within the same scope should see the _new_ map.
+
+[04:40:47.0213] <Andreu Botella>
+I think I misspoke
+
+[04:40:50.0286] <Stephen Belanger>
+I would argue the set/get model is actually _easier_ to reason about because users can't produce strange scopes that don't behave quite the way they expect, like `const gen = (function*() { ... })(); store.run(1, gen.next())`.
+
+[04:40:56.0865] <Andreu Botella>
+and this whole thing is somewhat hurting my brain
+
+[04:41:01.0883] <Andreu Botella>
+> So if I understand correctly the readme in this PR, a new turn can learn explicit information to where it came from, but it cannot use that information to covertly communicate or affect the integrity of other turns that were also spawned at the same time, if it didn't have a way to do so without async context.
+
+[04:41:23.0015] <Andreu Botella>
+I understand "turn" to mean "microtask" here
+
+[04:41:36.0977] <Stephen Belanger>
+ * I would argue the set/get model is actually _easier_ to reason about because users can't produce strange scopes that don't behave quite the way they expect, like `const gen = (function*() { ... })(); store.run(1, () => gen.next())`.
+
+[04:42:03.0258] <Andreu Botella>
+ * I understand "turn" to mean "(micro)task" here
+
+[04:43:19.0788] <Andreu Botella>
+in the end, I don't know how much of this is needed, because the current proposal already establishes a new overt channel, and `set` would be no different
+
+[04:43:50.0474] <Andreu Botella>
+I don't fully understand the fact that the SES folks are fine with having it be scoped to within the (micro)task
+
+[04:44:17.0624] <Andreu Botella>
+but I was trying to explain what I understand to be their concerns
+
