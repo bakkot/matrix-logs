@@ -3555,3 +3555,44 @@ One particular example we have have been thinking about is, what zone should an 
 [05:54:14.0978] <littledan>
 * One particular example we have been thinking about is, what zone should an event run in, when it is triggered by JS? I guess Zone.js runs it in the zone where the event was registered, but we are thinking about running it in the zone which triggered the event.
 
+[06:46:43.0442] <Jia Li>
+littledan: 
+Yeah, I remembered this issue have been discussed in the earlier stage of zone.js development, the policy of Zone.js is the callback should run in the same context(zone) when the task is scheduled.  
+1. for macrotask, such as `setTimeout(callback)`, the `setTimeout` call schedule the async operation, so the callback should be in the same context(zone) with the setTimeout call
+```
+zone1.run(() => {
+  setTimeout(() => {
+    console.log(Zone.current.name); // should be zone1
+  }, 0);
+});
+```
+2. about eventTask such as `button.addEventListener('click', handler);`, we considered the schedule process is the `addEventListener` call instead of the dispatchEvent call.
+```
+zone1.run(() => {
+  button.addEventListener('click', () => {
+     console.log(Zone.current.name) // should be zone1;
+  });
+
+  zone2.run(() => {
+    button.dispatchEvent(clickEvent);
+  });
+});
+```
+3. for microtask such as Promise, the schedule process is when `promise.then` is called.
+
+```
+let p = null;
+zone1.run(() => {
+  p = new Promise(...);
+});
+zone2.run(() => {
+  p.then(() => {
+    console.log(Zone.current); // will be zone2
+  })
+});
+```
+
+
+[06:47:33.0836] <littledan>
+Jia Li: What kind of feedback have you gotten over time about this policy? Do people ever complain that it gives them the wrong results?
+
