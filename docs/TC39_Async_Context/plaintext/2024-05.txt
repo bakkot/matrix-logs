@@ -3601,3 +3601,10 @@ About eventTask, some people asks the question why the zone is not the zone when
  
 And I think the event trigger such as `dispatchEvent` is a synchronized operation, so depends on should we consider eventTask as an async operation, if it is , I think using the register zone is reasonable, if not, zone.js should leave the eventTask alone and not wrap it at all. 
 
+[07:29:12.0132] <Stephen Belanger>
+> <@jridgewell:matrix.org> There’s literally no exit in the code sample, meaning the value is leaked. There is no way for a user’s runtime to know when the execution graph has ended, and there’s no way the committee would expose that as an API. This was also brought up by Andreu in response to Jason’s proposed design a few days ago, and they also mention that it’s an unsolvable leak. Allowing an enter to exist without a paired exit is an awful design.
+
+The exit is the end of the scope function. It applies scopes in _exactly the same way_. It just does it implicitly at the runtime level. And yes, there most certainly _is_ a way to know when execution ends: any time the runtime would become _idle_ and/or transition to microtask processing it knowns it has reached the end of the current selection of synchronous code. At that point you end that context.
+
+_However_, you don't _actually_ need to know when an end occurs if all execution descends from a root at the beginning of execution as then the _start_ of any execution would be propagating and therefore swapping out the context value _anyway_, so clearing it at the _end_ actually becomes unnecessary. There's actually been mathematical proofs of this for the .NET implementation.
+
