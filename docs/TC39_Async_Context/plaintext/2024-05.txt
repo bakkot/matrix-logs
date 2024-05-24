@@ -3717,3 +3717,18 @@ store.defineScope(() => {
 })
 ```
 
+[05:25:06.0632] <Stephen Belanger>
+> <@jridgewell:matrix.org> > However, you don't actually need to know when an end occurs if all execution descends from a root at the beginning of execution as then the start of any execution would be propagating and therefore swapping out the context value anyway
+> 
+> This doesn’t fully remove the need for the above end of task detection, becuase the last object placed there can’t be freed until the event loops replaces the context. It also means that Jobs would place an empty context when they return, which is OK I guess.
+
+You can know synchronously if the value still needs to be held. If an async task is scheduled in a sync tick where that context is set then it is captured to be propagated. This creates a GC reference that holds it open. If a sync tick _doesn't_ create any further async tasks then it knows at the end of that sync tick that it created no new references.
+
+In branching scenarios you would get each branch flowing up to exactly where it stops directly _causing_ async code and then would have no more references. Each sync tick would only hold the reference while running, and then each async task would hold a reference until it would run. After the task runs it can discard _its_ reference, but that would happen after new references were created for any children. Thus the GC would just function as-normal.
+
+Now it _is_ the case that data might live _quite a long time_ sometimes, but this is _intentional_ as it will only live long if descending execution of that point in context continues for long so it _should_ be holding that value as anywhere in that descending code should be able to retrieve that data.
+
+The risk of things living super long though is also easily mitigated by just emptying the context in some way, such as setting it to `undefined` when you've decided you're done with it.
+
+My point is that in a _correctly formed_ `set`/`get` system with clearly defined execution boundaries you would get a context flow that is perfectly safe from a memory usage perspective, have equivalent security characteristics to what is being proposed now (especially if a user-usable scope definition interface is added, and _most_ importantly would actually match the behaviour which basically every user of AsyncLocalStorage (which is _a lot_--literally every single Fortune 500) is _expecting_ from it.
+
