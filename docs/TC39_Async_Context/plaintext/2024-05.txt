@@ -3791,3 +3791,22 @@ but it's looking like with the current spec, `someApi().then()` would lose track
 [10:59:04.0870] <Andreu Botella>
 in Stephen's proposal of preserving the resolution context, this would just work I think
 
+[11:02:47.0695] <Stephen Belanger>
+> <@jridgewell:matrix.org> This seems funcionally equivalent to https://github.com/tc39/proposal-async-context/issues/60#issuecomment-2050457550, which solves the global leak issue by having a wrapping try-catch reset the vaules after exiting the closure. It’s still not my favorite implementation becuase of mutability and odering of async functions causing unrelated breakages, eg if [main](https://gist.github.com/jridgewell/4aa2d6458f41d4574d6aeb580dc80d5d) started with an `await 0` before entering `’bar’`, the outside caller sees different behavior. It feels like Zalgo-lite.
+
+Similar, but the intent is that the _runtime_ would generally be defining those scopes rather than only ever being handled by a user-facing API. We have a bunch of discrete execution concepts which can be used as boundaries for these scopes such as a promise continuation or a callback. We could also probably extend the Function type with something like a `func.bindToContext(value)` which could be similar to having that function call `run(...)` internally.
+
+My point is, we can have the nice DX of the set/get interface without too heavily exposing the scoping problem to users. Decoupling the scoping also makes it potentially reusable, which would be beneficial if we _do_ decide to make separate types for the two around and through flows. It would simplify things for users if they can describes scopes with a single API and have both flow systems just make different decisions about how to link the scopes together in the graph.
+
+[11:03:47.0425] <Stephen Belanger>
+> <@jridgewell:matrix.org> Everywhere except if it’s set within the global context, which persists beyond just the current sync execution. Your above `defineScope(() => {})` solves this by definining an exit point that cleans the global context.
+
+If you mean the top-level of the file/module, it'd just live as long as that script/module does, which seems to make sense to me.
+
+[11:04:56.0225] <Stephen Belanger>
+> <@jridgewell:matrix.org> > The risk of things living super long though is also easily mitigated by just emptying the context in some way, such as setting it to undefined when you've decided you're done with it.
+> 
+> In a flows-through system, I think you also need to free every cached promise that holds that context? They would strongly hold their resolution context. The engine wouldn’t mutate user’s context automatically, and without a library API to know when the current exeuction is finalized, you’re left guessing when you can mutate the context or drop all promises.
+
+Yes, promises suck a little bit in that they would need to hold the reference alive as long as the promise remains alive. This _could_ increase memory pressure, but is also the _expected_ behaviour as any future continuation attached to that promise _should_ restore that context value.
+
