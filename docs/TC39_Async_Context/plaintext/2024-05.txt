@@ -3974,3 +3974,9 @@ To distill things down to the essence of context management: all that is actuall
 - When top-level or any nested continuations of async tasks would begin sync execution the context needs to be restored.
 - And if context is not flowed _completely_ into all paths then the _end_ of sync execution may also be required as the next sync execution to begin may not apply a context swap before it runs if it is not something which context normally flows into. This point is why I think it's generally best to consider _all_ execution as logically descending from the runtime starting and branch contexts off from that accordingly.
 
+[11:40:54.0869] <Stephen Belanger>
+The window between a sync execution beginning and either that sync execution ending or the _next_ sync execution beginning is the exact scope for which you can apply a `set` in the `set`/`get` model. You would just need copy-on-write semantics so changes don't impact execution already _passed_ in that sync window. And then the `get` is all you need for async task scheduling to capture the value to be restored in the sync execution of its continuation using `set` again before beginning that execution.
+
+[11:43:23.0106] <Stephen Belanger>
+So _in theory_ you actually only need the _two_ points: `set` corresponding to a sync execution starting or a desired change partway through a sync execution to segment out the remainder, and the `get` corresponding to capturing the context when an async task is scheduled or when the user would like to retrieve the value themselves.
+
