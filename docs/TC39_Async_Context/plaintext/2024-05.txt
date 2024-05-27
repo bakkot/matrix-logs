@@ -4066,3 +4066,37 @@ window.addEventListener("unhandledrejection", () => {
 [16:35:53.0447] <Chengzhong Wu>
 A single promise could be branched multiple times, and `unhandledrejection` events are dispatched for each "unhandled" promise, rather than a single source of rejection
 
+[16:40:23.0060] <Chengzhong Wu>
+> <@abotella:igalia.com> in Stephen's proposal of preserving the resolution context, this would just work I think
+
+ * I think the flow-through pattern doesn't answer the similar problem of https://github.com/tc39/proposal-async-context/issues/90.
+
+The originating context could be a stack of contexts and use inner-most context would discard all outer contexts. Each `await` creates resolution handler on a potentially rejected promise, use the inner-most context would lose the context when the rejection was handled multiple times.
+
+```js
+let aGlobalPromise = asyncVar.run('global', () => {
+  return Promise.reject()
+})
+
+async function someAsyncApi() {
+  await asyncVar.run('async-inner', async () => {
+    try {
+      await aGlobalPromise
+    } catch (e) {
+      throw e
+    }
+  })
+}
+
+asyncVar.run("foo", async () => {
+  await someAsyncApi()
+});
+asyncVar.run("bar", async () => {
+  await someAsyncApi()
+});
+
+window.addEventListener("unhandledrejection", () => {
+  console.log(asyncVar.get());  // 'foo' or 'bar' or 'global' or 'async-inner'?
+});
+```
+

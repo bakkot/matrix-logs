@@ -117,7 +117,7 @@ console.log(asyncVar.get());  // foo
   <tr class="msg" id="L47"><td class="ts-cell"><a class="ts" href="#L47" alt="Mon May 27 2024 11:53:09 GMT-0700 (Pacific Daylight Time)">18:53</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@stephenbelanger:matrix.org">Stephen Belanger</span>&gt;</div></td><td class="msg-cell">So it'd create a new scope when starting the async function, then pointer-swap back after it returns its promise.</td></tr>
   <tr class="msg" id="L48"><td class="ts-cell"><a class="ts" href="#L48" alt="Mon May 27 2024 11:54:10 GMT-0700 (Pacific Daylight Time)">18:54</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@stephenbelanger:matrix.org">Stephen Belanger</span>&gt;</div></td><td class="msg-cell">And that first await would have linked its context to whatever the context was <em>inside</em> that async function.</td></tr>
   <tr class="msg" id="L49"><td class="ts-cell"><a class="ts" href="#L49" alt="Mon May 27 2024 11:58:51 GMT-0700 (Pacific Daylight Time)">18:58</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@stephenbelanger:matrix.org">Stephen Belanger</span>&gt;</div></td><td class="msg-cell">The <em>neat</em> thing though, which is partly what I'm trying to define in that context management RFC I'm working on <em>myself</em> which I shared recently, is that if you treat async functions as just a chain of sync segments, you can apply different types of propagation semantics to each segment. The <em>around</em> scope could link each segment <em>directly</em>, flowing context from the point an await starts to the point where it ends, giving you that lexical scope style some want for those things like signal-sharing for cancellation. And the <em>through</em> scope would simply include the nested segment sequences in the flow chain, so context would flow out through the branches and come back out the await. You can use <em>the same</em> scope definitions for both systems though.</td></tr>
-  <tr class="msg" id="L50"><td class="ts-cell"><a class="ts" href="#L50" alt="Mon May 27 2024 15:58:37 GMT-0700 (Pacific Daylight Time)">22:58</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-7" title="@legendecas:matrix.org">Chengzhong Wu</span>&gt;</div></td><td class="msg-cell"><mx-reply><blockquote> in Stephen's proposal of preserving the resolution context, this would just work I think</blockquote></mx-reply><p>I think the in the flow-through pattern doesn't answer the similar problem of <a href="https://github.com/tc39/proposal-async-context/issues/90">https://github.com/tc39/proposal-async-context/issues/90</a>.</p>
+  <tr class="msg" id="L50"><td class="ts-cell"><a class="ts" href="#L50" alt="Mon May 27 2024 15:58:37 GMT-0700 (Pacific Daylight Time)">22:58</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-7" title="@legendecas:matrix.org">Chengzhong Wu</span>&gt;</div></td><td class="msg-cell"><p>I think the flow-through pattern doesn't answer the similar problem of <a href="https://github.com/tc39/proposal-async-context/issues/90">https://github.com/tc39/proposal-async-context/issues/90</a>.</p>
 <p>The originating context could be a stack of contexts and use inner-most context would discard all outer contexts. Each <code>await</code> creates resolution handler on a potentially rejected promise, use the inner-most context would lose the context when the rejection was handled multiple times.</p>
 <pre><code class="language-js">let aGlobalPromise = asyncVar.run('global', () =&gt; {
   return Promise.reject()
@@ -133,11 +133,11 @@ async function someAsyncApi() {
   })
 }
 
-asyncVar.run("foo", () =&gt; {
-  someAsyncApi()
+asyncVar.run("foo", async () =&gt; {
+  await someAsyncApi()
 });
-asyncVar.run("bar", () =&gt; {
-  someAsyncApi()
+asyncVar.run("bar", async () =&gt; {
+  await someAsyncApi()
 });
 
 window.addEventListener("unhandledrejection", () =&gt; {
