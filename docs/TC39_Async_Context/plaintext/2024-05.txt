@@ -3852,3 +3852,61 @@ So it's a little weird to me that we're pursuing _both_ defining the correct flo
 [11:20:22.0081] <Stephen Belanger>
 I may have missed that too. 🤔
 
+[11:21:31.0301] <Andreu Botella>
+would sync function boundaries be part of that scope?
+
+[11:22:06.0201] <Stephen Belanger>
+Yes, it should be only sync segments of execution.
+
+[11:22:28.0687] <Stephen Belanger>
+And then the `run` function would essentially just be: ```run(value, scope) {
+  const prev = this.get()
+  this.set(value)
+  try {
+    return scope()
+  } finally {
+    this.set(prev)
+  }
+}```
+
+[11:23:08.0699] <Stephen Belanger>
+ * And then the `run` function would essentially just be:
+
+```js
+run(value, scope) {
+  const prev = this.get()
+  this.set(value)
+  try {
+    return scope()
+  } finally {
+    this.set(prev)
+  }
+}
+```
+
+[11:25:13.0599] <Stephen Belanger>
+I think one of the hurdles we have at the implementor level is that we _really_ want to think about async functions and generators as singular functions and not chains of segments of synchronous execution managed by a scheduler.
+
+[11:25:17.0949] <Andreu Botella>
+so IIUC:
+```js
+asyncVar.set("foo");
+
+await (async () => {
+	asyncVar.set("bar");
+})();
+
+console.log(asyncVar.get());  // bar
+```
+but
+```js
+asyncVar.set("foo");
+
+// No await!
+(async () => {
+	asyncVar.set("bar");
+})();
+
+console.log(asyncVar.get());  // foo
+```
+

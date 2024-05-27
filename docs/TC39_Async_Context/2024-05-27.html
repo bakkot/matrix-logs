@@ -50,6 +50,41 @@
   <tr class="msg" id="L16"><td class="ts-cell"><a class="ts" href="#L16" alt="Mon May 27 2024 11:19:28 GMT-0700 (Pacific Daylight Time)">18:19</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@abotella:igalia.com">Andreu Botella</span>&gt;</div></td><td class="msg-cell">I might have missed some of the intervening discussion because I was sick</td></tr>
   <tr class="msg" id="L17"><td class="ts-cell"><a class="ts" href="#L17" alt="Mon May 27 2024 11:19:41 GMT-0700 (Pacific Daylight Time)">18:19</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@stephenbelanger:matrix.org">Stephen Belanger</span>&gt;</div></td><td class="msg-cell">So it's a little weird to me that we're pursuing <em>both</em> defining the correct flow model <em>and</em> still using the <code>run(...)</code> scoping when we could just safely modify the <em>current</em> scope if we actually <em>have</em> a clearly defined "current scope" to be modifying.</td></tr>
   <tr class="msg" id="L18"><td class="ts-cell"><a class="ts" href="#L18" alt="Mon May 27 2024 11:20:22 GMT-0700 (Pacific Daylight Time)">18:20</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@stephenbelanger:matrix.org">Stephen Belanger</span>&gt;</div></td><td class="msg-cell">I may have missed that too. 🤔</td></tr>
+  <tr class="msg" id="L19"><td class="ts-cell"><a class="ts" href="#L19" alt="Mon May 27 2024 11:21:31 GMT-0700 (Pacific Daylight Time)">18:21</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@abotella:igalia.com">Andreu Botella</span>&gt;</div></td><td class="msg-cell">would sync function boundaries be part of that scope?</td></tr>
+  <tr class="msg" id="L20"><td class="ts-cell"><a class="ts" href="#L20" alt="Mon May 27 2024 11:22:06 GMT-0700 (Pacific Daylight Time)">18:22</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@stephenbelanger:matrix.org">Stephen Belanger</span>&gt;</div></td><td class="msg-cell">Yes, it should be only sync segments of execution.</td></tr>
+  <tr class="msg" id="L21"><td class="ts-cell"><a class="ts" href="#L21" alt="Mon May 27 2024 11:22:28 GMT-0700 (Pacific Daylight Time)">18:22</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@stephenbelanger:matrix.org">Stephen Belanger</span>&gt;</div></td><td class="msg-cell"><p>And then the <code>run</code> function would essentially just be:</p>
+<pre><code class="language-js">run(value, scope) {
+  const prev = this.get()
+  this.set(value)
+  try {
+    return scope()
+  } finally {
+    this.set(prev)
+  }
+}
+</code></pre>
+</td></tr>
+  <tr class="msg" id="L22"><td class="ts-cell"><a class="ts" href="#L22" alt="Mon May 27 2024 11:25:13 GMT-0700 (Pacific Daylight Time)">18:25</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@stephenbelanger:matrix.org">Stephen Belanger</span>&gt;</div></td><td class="msg-cell">I think one of the hurdles we have at the implementor level is that we <em>really</em> want to think about async functions and generators as singular functions and not chains of segments of synchronous execution managed by a scheduler.</td></tr>
+  <tr class="msg" id="L23"><td class="ts-cell"><a class="ts" href="#L23" alt="Mon May 27 2024 11:25:17 GMT-0700 (Pacific Daylight Time)">18:25</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@abotella:igalia.com">Andreu Botella</span>&gt;</div></td><td class="msg-cell"><p>so IIUC:</p>
+<pre><code class="language-js">asyncVar.set("foo");
+
+await (async () =&gt; {
+	asyncVar.set("bar");
+})();
+
+console.log(asyncVar.get());  // bar
+</code></pre>
+<p>but</p>
+<pre><code class="language-js">asyncVar.set("foo");
+
+// No await!
+(async () =&gt; {
+	asyncVar.set("bar");
+})();
+
+console.log(asyncVar.get());  // foo
+</code></pre>
+</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>
