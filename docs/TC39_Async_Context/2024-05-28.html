@@ -53,6 +53,36 @@ window.addEventListener("unhandledrejection", event =&gt; {
   <tr class="msg" id="L9"><td class="ts-cell"><a class="ts" href="#L9" alt="Tue May 28 2024 03:36:49 GMT-0700 (Pacific Daylight Time)">10:36</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-7" title="@legendecas:matrix.org">Chengzhong Wu</span>&gt;</div></td><td class="msg-cell"><mx-reply><blockquote> I don't think this is a problem. Context splits are not problematic, only merges are. If you only care about one of the branched promises but not the rest, you could still want to know the source of rejection</blockquote></mx-reply>Like the example above, awaiting a promise of a different context is a merge operation in flow-through</td></tr>
   <tr class="msg" id="L10"><td class="ts-cell"><a class="ts" href="#L10" alt="Tue May 28 2024 03:37:27 GMT-0700 (Pacific Daylight Time)">10:37</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@abotella:igalia.com">Andreu Botella</span>&gt;</div></td><td class="msg-cell">I guess both p1 and p2 could be contexts you might want, it's the same pass-around vs pass-through distinction</td></tr>
   <tr class="msg" id="L11"><td class="ts-cell"><a class="ts" href="#L11" alt="Tue May 28 2024 03:38:42 GMT-0700 (Pacific Daylight Time)">10:38</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-7" title="@legendecas:matrix.org">Chengzhong Wu</span>&gt;</div></td><td class="msg-cell">yeah, it could be. I'm saying that the flow-around is not something that is not desired.</td></tr>
+  <tr class="msg" id="L12"><td class="ts-cell"><a class="ts" href="#L12" alt="Tue May 28 2024 06:36:54 GMT-0700 (Pacific Daylight Time)">13:36</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@littledan:matrix.org">littledan</span>&gt;</div></td><td class="msg-cell"><mx-reply><blockquote> <p>I think the flow-through pattern doesn't answer the similar problem of <a href="https://github.com/tc39/proposal-async-context/issues/90">https://github.com/tc39/proposal-async-context/issues/90</a>.</p>
+<p>The originating context could be a stack of contexts and use inner-most context would discard all outer contexts. Each <code>await</code> creates resolution handler on a potentially rejected promise, use the inner-most context would lose the context when the rejection was handled multiple times.</p>
+<pre><code class="language-js">let aGlobalPromise = asyncVar.run('global', () =&gt; {
+  return Promise.reject()
+})
+
+async function someAsyncApi() {
+  await asyncVar.run('async-inner', async () =&gt; {
+    try {
+      await aGlobalPromise
+    } catch (e) {
+      throw e
+    }
+  })
+}
+
+asyncVar.run("foo", async () =&gt; {
+  await someAsyncApi()
+});
+asyncVar.run("bar", async () =&gt; {
+  await someAsyncApi()
+});
+
+window.addEventListener("unhandledrejection", () =&gt; {
+  console.log(asyncVar.get());  // 'foo' or 'bar' or 'global' or 'async-inner'?
+});
+</code></pre>
+</blockquote></mx-reply>the problem is actually worse than this looks: with any stack of async functions, the unhandled rejection will be credited as throwing from the outermost one, even if there's no catch/finally clause.</td></tr>
+  <tr class="msg" id="L13"><td class="ts-cell"><a class="ts" href="#L13" alt="Tue May 28 2024 06:37:45 GMT-0700 (Pacific Daylight Time)">13:37</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@littledan:matrix.org">littledan</span>&gt;</div></td><td class="msg-cell">I'm not sure whether the resolve context change would address this; my initial intuition is that it wouldn't</td></tr>
+  <tr class="msg" id="L14"><td class="ts-cell"><a class="ts" href="#L14" alt="Tue May 28 2024 06:38:16 GMT-0700 (Pacific Daylight Time)">13:38</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@littledan:matrix.org">littledan</span>&gt;</div></td><td class="msg-cell">but maybe the context would be propagated properly through the chain of rejections?</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>

@@ -4186,3 +4186,43 @@ I guess both p1 and p2 could be contexts you might want, it's the same pass-arou
 [03:38:42.0358] <Chengzhong Wu>
 yeah, it could be. I'm saying that the flow-around is not something that is not desired.
 
+[06:36:54.0557] <littledan>
+> <@legendecas:matrix.org> I think the flow-through pattern doesn't answer the similar problem of https://github.com/tc39/proposal-async-context/issues/90.
+> 
+> The originating context could be a stack of contexts and use inner-most context would discard all outer contexts. Each `await` creates resolution handler on a potentially rejected promise, use the inner-most context would lose the context when the rejection was handled multiple times.
+> 
+> ```js
+> let aGlobalPromise = asyncVar.run('global', () => {
+>   return Promise.reject()
+> })
+> 
+> async function someAsyncApi() {
+>   await asyncVar.run('async-inner', async () => {
+>     try {
+>       await aGlobalPromise
+>     } catch (e) {
+>       throw e
+>     }
+>   })
+> }
+> 
+> asyncVar.run("foo", async () => {
+>   await someAsyncApi()
+> });
+> asyncVar.run("bar", async () => {
+>   await someAsyncApi()
+> });
+> 
+> window.addEventListener("unhandledrejection", () => {
+>   console.log(asyncVar.get());  // 'foo' or 'bar' or 'global' or 'async-inner'?
+> });
+> ```
+
+the problem is actually worse than this looks: with any stack of async functions, the unhandled rejection will be credited as throwing from the outermost one, even if there's no catch/finally clause.
+
+[06:37:45.0969] <littledan>
+I'm not sure whether the resolve context change would address this; my initial intuition is that it wouldn't
+
+[06:38:16.0087] <littledan>
+but maybe the context would be propagated properly through the chain of rejections?
+
