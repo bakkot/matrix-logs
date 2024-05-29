@@ -4364,3 +4364,13 @@ Going with registration-time by default makes these issues less pressing, but it
 [14:32:55.0254] <Andreu Botella>
 huh, I guess the print case doesn't really matter, since you can see the deferred case as it enqueuing a print task (it isn't spec'd like that, but it behaves like that), and so it'd have an async originating context
 
+[14:41:38.0402] <Steve Hicks>
+> <@littledan:matrix.org> I think there's a story where we're being consistent: we'd always be using the most specific (i.e. causally recent) relevant context
+
+I think that's tricky due to races - for example, the exact ordering of a promise resolving vs. the promise.then call would make one or the other context more recent.  But I think we probably want to run in the same context (resolution vs registration) regardless of the order.
+
+[14:43:25.0089] <Justin Ridgewell>
+> <@stephenhicks:matrix.org> I'm thinking a bit more right now about the idea of flowing _around_ `await`s (but maybe through `yield`s?), but having nearly all callbacks run in the causal context by default.  You could emulate flow-through behavior at the `await` site with a userland `promiseSnapshot = (promise) => promise.then(() => new Snapshot(), () => new Snapshot())` helper function (you'd need to `await promiseSnapshot(promise)` to get ahold of it... so maybe there's a more performant option via a builtin, or something else we could carve out of those conceptual building blocks).  And you can opt into registration context with a `Snapshot.wrap` anytime it's needed.  So this seems to provide the most expressivity, I think the mental model is pretty  self-consistent, and I don't think it runs afoul of SES requirements.
+
+I don’t understand how this snapshot would exist in a different context if we chose flows-around semantics. Are you proposing `.then()` and `await` operate differently?
+
