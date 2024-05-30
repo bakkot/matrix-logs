@@ -4727,3 +4727,26 @@ It's probably more _useful_ to think of it as flowing _forward_. Context _always
 [14:13:10.0682] <Stephen Belanger>
 Flow-around may _sometimes_ work for request-scoped data, but it needs to be set at a level which can never be merged _back_ to or subsequent execution might not have a context available. This becomes problematic if you, for example, want to create a database connection in a middleware and flow that into subsequent middlewares or routers.
 
+[14:18:55.0509] <Stephen Belanger>
+```js
+// Measure request time
+app.use(async function (ctx, next) {
+  const start = Date.now()
+  await next()
+
+  // While this happens _after_ the following middleware runs,
+  // the store value will not be set.
+  const id = store.get()
+  console.log(`Request #${id} took ${Date.now() - start}ms`)
+})
+
+// Store a request id value
+let id = 0
+app.use(async function (ctx, next) {
+  await store.run(++id, next)
+})
+```
+
+[14:20:11.0561] <Stephen Belanger>
+The further you get from the store logic, the easier it is to shoot yourself in the foot with behaviours like this.
+

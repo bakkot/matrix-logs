@@ -118,6 +118,25 @@ v.run(2, p.then(() =&gt; console.log(v.get())));
   <tr class="msg" id="L64"><td class="ts-cell"><a class="ts" href="#L64" alt="Thu May 30 2024 14:04:17 GMT-0700 (Pacific Daylight Time)">21:04</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@stephenbelanger:matrix.org">Stephen Belanger</span>&gt;</div></td><td class="msg-cell">With flow-around, the context still flows through the entire branch <em>up to</em> the point where a snapshot clobbers the value that had otherwise flowed through all the way to the resolve edge.</td></tr>
   <tr class="msg" id="L65"><td class="ts-cell"><a class="ts" href="#L65" alt="Thu May 30 2024 14:10:28 GMT-0700 (Pacific Daylight Time)">21:10</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@stephenbelanger:matrix.org">Stephen Belanger</span>&gt;</div></td><td class="msg-cell">It's probably more <em>useful</em> to think of it as flowing <em>forward</em>. Context <em>always</em> flows forward in time to any caused branches. The only question is if that context reaching the end of that branch where execution merges <em>back</em> should be raised out to <em>continue</em> flowing forward or if we want to intentionally cut that branch off for some reason. For the purpose of branch cancellation we would want a barrier where it does not raise out to unrelated execution, which is <em>somewhat</em> what the flow-around is solving. But for the purpose of flowing into <em>future</em> execution needed by tracing or most users wanting to store request-scoped data it needs to flow through backward merges all the way to the end of <em>any</em> execution caused by the initiation of that request.</td></tr>
   <tr class="msg" id="L66"><td class="ts-cell"><a class="ts" href="#L66" alt="Thu May 30 2024 14:13:10 GMT-0700 (Pacific Daylight Time)">21:13</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@stephenbelanger:matrix.org">Stephen Belanger</span>&gt;</div></td><td class="msg-cell">Flow-around may <em>sometimes</em> work for request-scoped data, but it needs to be set at a level which can never be merged <em>back</em> to or subsequent execution might not have a context available. This becomes problematic if you, for example, want to create a database connection in a middleware and flow that into subsequent middlewares or routers.</td></tr>
+  <tr class="msg" id="L67"><td class="ts-cell"><a class="ts" href="#L67" alt="Thu May 30 2024 14:18:55 GMT-0700 (Pacific Daylight Time)">21:18</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@stephenbelanger:matrix.org">Stephen Belanger</span>&gt;</div></td><td class="msg-cell"><pre><code class="language-js">// Measure request time
+app.use(async function (ctx, next) {
+  const start = Date.now()
+  await next()
+
+  // While this happens _after_ the following middleware runs,
+  // the store value will not be set.
+  const id = store.get()
+  console.log(`Request #${id} took ${Date.now() - start}ms`)
+})
+
+// Store a request id value
+let id = 0
+app.use(async function (ctx, next) {
+  await store.run(++id, next)
+})
+</code></pre>
+</td></tr>
+  <tr class="msg" id="L68"><td class="ts-cell"><a class="ts" href="#L68" alt="Thu May 30 2024 14:20:11 GMT-0700 (Pacific Daylight Time)">21:20</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@stephenbelanger:matrix.org">Stephen Belanger</span>&gt;</div></td><td class="msg-cell">The further you get from the store logic, the easier it is to shoot yourself in the foot with behaviours like this.</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>
