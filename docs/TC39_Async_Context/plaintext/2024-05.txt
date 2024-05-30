@@ -4504,3 +4504,48 @@ Instead of using the `FunctionStatementList` node
 [10:58:20.0311] <Justin Ridgewell>
 That way we’d dispose the variables after resolving
 
+[11:30:40.0288] <Stephen Belanger>
+But `using` needs to work with block scopes too, right? So it'd need to be conditional on if the block _is_ the function body or if it is nested.
+
+[11:31:07.0366] <Stephen Belanger>
+It'd add a bit of complexity.
+
+[11:31:35.0261] <Stephen Belanger>
+This is _why_ other languages like .NET went for just doing set/get and persisting until the context would _change_.
+
+[11:32:19.0000] <littledan>
+> <@stephenhicks:matrix.org> it's a little pedantic, but if you have something like
+> 
+> ```
+> const p = v.run(1, () => Promise.resolve());
+> await p;
+> // p is now fully resolved
+> v.run(2, p.then(() => console.log(v.get())));
+> ```
+> 
+> Then "the most specific (i.e. causally recent) relevant context" would presumably be the 2, since the callback was registered after the promise resolved.  Without the `await`, it would be 1.
+
+yeah I have been assuming that .then would always use the registration context, and that we were only talking about web APIs.
+
+[11:32:31.0624] <littledan>
+(so there is no await vs .then mismatch)
+
+[11:34:28.0666] <Stephen Belanger>
+> <@stephenhicks:matrix.org> it's a little pedantic, but if you have something like
+> 
+> ```
+> const p = v.run(1, () => Promise.resolve());
+> await p;
+> // p is now fully resolved
+> v.run(2, p.then(() => console.log(v.get())));
+> ```
+> 
+> Then "the most specific (i.e. causally recent) relevant context" would presumably be the 2, since the callback was registered after the promise resolved.  Without the `await`, it would be 1.
+
+In flow-through model that should _always_ be 1, as that is what was set when the _resolve_ happened. We don't much _care_ about where a continuation is attached.
+
+[11:34:45.0060] <Steve Hicks>
+> <@stephenbelanger:matrix.org> This is _why_ other languages like .NET went for just doing set/get and persisting until the context would _change_.
+
+Is there some nuance here between persisting until the context would change vs. persisting until the end of a scope?  Does the former somehow allow escaping a changed value _out_ of a scope where the latter doesn't?  I'm still trying to wrap my mind around how you can actually observe a changed value in a child scope if the change gets reverted before you resume.
+
