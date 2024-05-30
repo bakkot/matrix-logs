@@ -4549,3 +4549,37 @@ In flow-through model that should _always_ be 1, as that is what was set when th
 
 Is there some nuance here between persisting until the context would change vs. persisting until the end of a scope?  Does the former somehow allow escaping a changed value _out_ of a scope where the latter doesn't?  I'm still trying to wrap my mind around how you can actually observe a changed value in a child scope if the change gets reverted before you resume.
 
+[11:35:44.0981] <littledan>
+> <@stephenhicks:matrix.org> Is there some nuance here between persisting until the context would change vs. persisting until the end of a scope?  Does the former somehow allow escaping a changed value _out_ of a scope where the latter doesn't?  I'm still trying to wrap my mind around how you can actually observe a changed value in a child scope if the change gets reverted before you resume.
+
+I think this comes up with block scopes *within* a function, where you'd restore the previous value in the latter case and not the former
+
+[11:35:52.0982] <littledan>
+so this is the difference between using and .set
+
+[11:35:54.0432] <Steve Hicks>
+> <@stephenbelanger:matrix.org> In flow-through model that should _always_ be 1, as that is what was set when the _resolve_ happened. We don't much _care_ about where a continuation is attached.
+
+Right, but I'm imagining a world where `await` is flow-around, but `then` restores the resolution context, since that would still allow accessing all the flow-through causes as needed.
+
+[11:36:08.0491] <Stephen Belanger>
+> <@stephenhicks:matrix.org> Is there some nuance here between persisting until the context would change vs. persisting until the end of a scope?  Does the former somehow allow escaping a changed value _out_ of a scope where the latter doesn't?  I'm still trying to wrap my mind around how you can actually observe a changed value in a child scope if the change gets reverted before you resume.
+
+In flow-through model you capture _both_ at call _and_ at return. So when an async function or a promise resolves you capture and when the continuation of that begins you restore.
+
+[11:37:12.0390] <Stephen Belanger>
+> <@stephenhicks:matrix.org> Right, but I'm imagining a world where `await` is flow-around, but `then` restores the resolution context, since that would still allow accessing all the flow-through causes as needed.
+
+Yes, restoring the orphaned branch is what I was thinking `callingContext` would be helpful for there.
+
+[11:37:16.0978] <Stephen Belanger>
+It's a bit awkward though.
+
+[11:37:37.0284] <Stephen Belanger>
+And probably would have terrible performance for APMs which would need to be doing that basically _always_.
+
+[11:39:56.0081] <Steve Hicks>
+> <@stephenbelanger:matrix.org> And probably would have terrible performance for APMs which would need to be doing that basically _always_.
+
+Yes, I expected the performance to be bad, but I was wondering if we could spec out the semantics such that it's all self-consistent, and then potentially provide a builtin alternative that exposes that common operation (which can now be emulated inefficiently) in a more efficient way.
+
