@@ -4753,3 +4753,29 @@ The further you get from the store logic, the easier it is to shoot yourself in 
 [14:20:56.0818] <Stephen Belanger>
 And the whole _point_ of async context storage is that you _can_ retrieve values distant from where the store is set.
 
+
+2024-05-31
+[09:20:03.0976] <Steve Hicks>
+> <@stephenbelanger:matrix.org> ```js
+> // Measure request time
+> app.use(async function (ctx, next) {
+>   const start = Date.now()
+>   await next()
+> 
+>   // While this happens _after_ the following middleware runs,
+>   // the store value will not be set.
+>   const id = store.get()
+>   console.log(`Request #${id} took ${Date.now() - start}ms`)
+> })
+> 
+> // Store a request id value
+> let id = 0
+> app.use(async function (ctx, next) {
+>   await store.run(++id, next)
+> })
+> ```
+
+This took me a while to understand your logic as to why this _benefits_ from flowing through, rather than the other way around. It seems strange to me that you would expect to be able to use the id produced later - if you just rearrange them, then it works with flow-around, and that's the order I'd expect them to be in.
+
+But it seems like flow-through allows making it order-independent with a bit more care, at the cost of risking a catastrophic failure if somebody trashes your state, while flow-around insulates you from the risk (it's defensive programming by default, essentially), but then adds risk from structuring your middlewares incorrectly.
+
