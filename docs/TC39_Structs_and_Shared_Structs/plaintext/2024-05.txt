@@ -291,3 +291,46 @@ function doWork3(sharedObj) {
 [16:53:07.0287] <rbuckton>
 For even more artificial ceremony, you could have a llnt rule that banned `unsafe` so you would be forced to disable the rule when needed (and hopefully document why).
 
+[16:59:30.0193] <rbuckton>
+And we can make the basic Mutex easy to use with `using` if you really want/need the sledgehammer approach:
+
+```js
+const mut = new Atomics.Mutex();
+
+function doWork(sharedObj, mut) unsafe {
+  using void = new UniqueLock(mut);
+  // lock taken until unsafe block exits
+}
+```
+
+or even:
+
+```js
+shared struct SharedObj {
+  readonly mut = new Atomics.Mutex();
+  ...
+}
+
+function doWork(sharedObj) unsafe {
+  using void = new UniqueLock(sharedObj.mut);
+}
+```
+
+or
+
+```js
+shared struct SharedObj {
+  readonly #mut = new Atomics.Mutex();
+  #x;
+  #y;
+
+  // using encapsulation, all access is governed by the lock
+  doWork() unsafe {
+    using void = new UniqueLock(this.#mut);
+    const x = this.#x;
+    const y = this.#y;
+    return { x, y };
+  }
+}
+```
+
