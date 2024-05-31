@@ -4793,3 +4793,16 @@ To me, there's not really _any_ "risk" of store state being corrupted in the thr
 [10:17:28.0645] <Stephen Belanger>
 Even for the _intended_ case of only flowing inward, it's _still_ possible to mess up the state by wrapping nested calls in additional unexpected `store.run(...)` calls, if you've passed around the store, and the global snapshot concept gives _anyone_ a bunch of power to completely destroy the state of _all_ stores by binding in strange places. I've always advocated for per-store binding with global/snapshot bind only used for _very exceptional_ cases, generally managed by the runtime or some very specific userland module cases which should be _very clearly_ communicated what the risks are to modifying the global flow graph.
 
+[11:07:20.0594] <Steve Hicks>
+> <@stephenbelanger:matrix.org> To me, there's not really _any_ "risk" of store state being corrupted in the through flow, and on the contrary there is _lots_ of risk of it being corrupted by _around_ flow as it cuts off branches all over the place, often in places not desired by the consuming code.
+
+The existence of global snapshotting means that (with flow-through) a subtask you call can trash your continuation context.  Flow-around insulates you from this because it guarantees that no subtask can affect your state, but at the cost of making it more expensive to extract state you actually _want_ to get out of a subtask.  Again, it's a question of intention, assumptions, and defaults.
+
+If we get the defaults right, then it may be perfectly reasonable to say "just don't use global snapshot" because the defaults will make it so that nobody ever really needs to.  If we get it even slightly wrong, we risk a cargo cult developing where less-informed developers think they need to use it _everywhere_ and now you're stuck being ridiculously defensive about protecting your own context.
+
+[11:08:42.0132] <Stephen Belanger>
+It can't trash your state within local scope, but it definitely _can_ trash your state in descending contexts.
+
+[11:09:47.0057] <Stephen Belanger>
+As I expressed previously, around flow is actually just through flow with some extra snapshot binds layered on top. You can interfere with it in _exactly the same ways_ when messing with global snapshots.
+
