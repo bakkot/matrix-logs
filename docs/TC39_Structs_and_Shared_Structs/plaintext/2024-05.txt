@@ -389,3 +389,372 @@ here's what i want to do: i'd like to get your side to articulate a greatest low
 
 anyway the real answer is that if the prototype semantics as proposed here isn't part of this proposal, it'll be done as part of the wasm/js API because we still believe that's the best semantics to bridge the shared/unshared worlds
 
+[07:28:14.0759] <rbuckton>
+If you wanted, for example, to implement something akin to Rust's `Mutex<T>`, you could do so with a `Proxy` whether it's an opaque WASM shared object or a JS native shared struct. Assuming we could have methods and private state in a JS struct, you could accomplish something similar to [this example](https://doc.rust-lang.org/book/ch16-03-shared-state.html#sharing-a-mutext-between-multiple-threads) in the Rust docs (NOTE: uses module expressions):
+
+```js
+// main.js
+import { ThreadState } from "./thread_state.js";
+import { MutexValue } from "./mutex_value.js";
+import { Worker } from "node:worker_threads";
+
+function main() {
+  const counter = new MutexValue(0);
+  const handles = [];
+
+  for (let i = 0; i < 10; i++) {
+    const handle = new Thread(module {
+      import "./mutex_value.js"; // correlates prototype for MutexValue
+
+      export function threadStart(counter) {
+        using lck = counter.lock();
+        const num = lck.unwrap();
+
+        num.value += 1;
+      }
+
+    }, counter);
+
+    handles.push(handle);
+  }
+
+  for (const handle of handles) {
+    handle.join();
+  }
+
+  using lck = counter.lock();
+  const num = lck.unwrap();
+  console.log(`Result: ${num.value}`);
+}
+
+// thread.js
+shared struct ThreadState {
+  #mut = new Mutex();
+  #cv = new Condition();
+  #exited = false;
+
+  exit() unsafe {
+    using void = new UniqueLock(this.#mut);
+    this.#exited = true;
+    this.#cv.notify();
+  }
+
+  join() unsafe {
+    if (this.#exited) return;
+    using lck = new UniqueLock(this.#mut);
+    this.#cv.wait(lck, () => this.#exited);
+  }
+}
+
+export class Thread {
+  #state;
+  #worker;
+  constructor(body, threadData) {
+    this.#state = new ThreadState();
+    this.#worker = new Worker(module {
+      import "./thread.js"; // correlates prototype for ThreadState
+      import { workerData } from "node:worker_threads";
+      import { threadStart } from body;
+
+      const [threadState, threadData] = workerData;
+      try {
+        threadStart(threadData);
+      }
+      finally {
+        threadState.exit();
+      }
+    }, { workerData: [this.#state, threadData] });
+  }
+
+  join() {
+    this.#state.join();
+  }
+}
+
+// mutex_value.js
+
+export shared struct MutexValue {
+  static #Lock = class {
+    #stack;
+    #ref;
+
+    constructor(owner) unsafe {
+      using stack = new DisposableStack();
+      stack.use(new UniqueLock(owner.#mutex));
+      const { proxy, revoke } = Proxy.revocable({
+        get value() { return owner.#value; },
+        set value(v) { owner.#value = v; },
+      });
+      stack.defer(revoke);
+      this.#ref = proxy;
+      this.#stack = stack.move();
+    }
+
+    unwrap() {
+      if (this.#stack.disposed) throw new ReferenceError();
+      return this.#ref;
+    }
+
+    [Symbol.dispose]() {
+      using _ = this.#stack;
+    }
+  };
+
+  #mutex = new Mutex();
+  #value;
+
+  constructor(value) {
+    this.#value = value;
+  }
+
+  lock() unsafe {
+    return new MutexValue.#Lock(this);
+  }
+}
+```
+
+[07:29:33.0760] <rbuckton>
+ * If you wanted, for example, to implement something akin to Rust's `Mutex<T>`, you could do so with a `Proxy` whether it's an opaque WASM shared object or a JS native shared struct. Assuming we could have methods and private state in a JS struct, you could accomplish something similar to [this example](https://doc.rust-lang.org/book/ch16-03-shared-state.html#sharing-a-mutext-between-multiple-threads) in the Rust docs (NOTE: uses module expressions):
+
+```js
+// main.js
+import { Thread } from "./thread.js";
+import { MutexValue } from "./mutex_value.js";
+
+function main() {
+  const counter = new MutexValue(0);
+  const handles = [];
+
+  for (let i = 0; i < 10; i++) {
+    const handle = new Thread(module {
+      import "./mutex_value.js"; // correlates prototype for MutexValue
+
+      export function threadStart(counter) {
+        using lck = counter.lock();
+        const num = lck.unwrap();
+
+        num.value += 1;
+      }
+
+    }, counter);
+
+    handles.push(handle);
+  }
+
+  for (const handle of handles) {
+    handle.join();
+  }
+
+  using lck = counter.lock();
+  const num = lck.unwrap();
+  console.log(`Result: ${num.value}`);
+}
+
+// thread.js
+shared struct ThreadState {
+  #mut = new Mutex();
+  #cv = new Condition();
+  #exited = false;
+
+  exit() unsafe {
+    using void = new UniqueLock(this.#mut);
+    this.#exited = true;
+    this.#cv.notify();
+  }
+
+  join() unsafe {
+    if (this.#exited) return;
+    using lck = new UniqueLock(this.#mut);
+    this.#cv.wait(lck, () => this.#exited);
+  }
+}
+
+export class Thread {
+  #state;
+  #worker;
+  constructor(body, threadData) {
+    this.#state = new ThreadState();
+    this.#worker = new Worker(module {
+      import "./thread.js"; // correlates prototype for ThreadState
+      import { workerData } from "node:worker_threads";
+      import { threadStart } from body;
+
+      const [threadState, threadData] = workerData;
+      try {
+        threadStart(threadData);
+      }
+      finally {
+        threadState.exit();
+      }
+    }, { workerData: [this.#state, threadData] });
+  }
+
+  join() {
+    this.#state.join();
+  }
+}
+
+// mutex_value.js
+
+export shared struct MutexValue {
+  static #Lock = class {
+    #stack;
+    #ref;
+
+    constructor(owner) unsafe {
+      using stack = new DisposableStack();
+      stack.use(new UniqueLock(owner.#mutex));
+      const { proxy, revoke } = Proxy.revocable({
+        get value() { return owner.#value; },
+        set value(v) { owner.#value = v; },
+      });
+      stack.defer(revoke);
+      this.#ref = proxy;
+      this.#stack = stack.move();
+    }
+
+    unwrap() {
+      if (this.#stack.disposed) throw new ReferenceError();
+      return this.#ref;
+    }
+
+    [Symbol.dispose]() {
+      using _ = this.#stack;
+    }
+  };
+
+  #mutex = new Mutex();
+  #value;
+
+  constructor(value) {
+    this.#value = value;
+  }
+
+  lock() unsafe {
+    return new MutexValue.#Lock(this);
+  }
+}
+```
+
+[07:29:55.0528] <rbuckton>
+ * If you wanted, for example, to implement something akin to Rust's `Mutex<T>`, you could do so with a `Proxy` whether it's an opaque WASM shared object or a JS native shared struct. Assuming we could have methods and private state in a JS struct, you could accomplish something similar to [this example](https://doc.rust-lang.org/book/ch16-03-shared-state.html#sharing-a-mutext-between-multiple-threads) in the Rust docs (NOTE: uses module expressions):
+
+```js
+// main.js
+import { Thread } from "./thread.js";
+import { MutexValue } from "./mutex_value.js";
+
+function main() {
+  const counter = new MutexValue(0);
+  const handles = [];
+
+  for (let i = 0; i < 10; i++) {
+    const handle = new Thread(module {
+      import "./mutex_value.js"; // correlates prototype for MutexValue
+
+      export function threadStart(counter) {
+        using lck = counter.lock();
+        const num = lck.unwrap();
+
+        num.value += 1;
+      }
+
+    }, counter);
+
+    handles.push(handle);
+  }
+
+  for (const handle of handles) {
+    handle.join();
+  }
+
+  using lck = counter.lock();
+  const num = lck.unwrap();
+  console.log(`Result: ${num.value}`);
+}
+
+// thread.js
+shared struct ThreadState {
+  #mut = new Mutex();
+  #cv = new Condition();
+  #exited = false;
+
+  exit() unsafe {
+    using void = new UniqueLock(this.#mut);
+    this.#exited = true;
+    this.#cv.notify();
+  }
+
+  join() unsafe {
+    if (this.#exited) return;
+    using lck = new UniqueLock(this.#mut);
+    this.#cv.wait(lck, () => this.#exited);
+  }
+}
+
+export class Thread {
+  #state;
+  #worker;
+  constructor(body, threadData) {
+    this.#state = new ThreadState();
+    this.#worker = new Worker(module {
+      import "./thread.js"; // correlates prototype for ThreadState
+      import { workerData } from "node:worker_threads";
+      import { threadStart } from body;
+
+      const [threadState, threadData] = workerData;
+      try {
+        threadStart(threadData);
+      }
+      finally {
+        threadState.exit();
+      }
+    }, { workerData: [this.#state, threadData] });
+  }
+
+  join() {
+    this.#state.join();
+  }
+}
+
+// mutex_value.js
+export shared struct MutexValue {
+  static #Lock = class {
+    #stack;
+    #ref;
+
+    constructor(owner) unsafe {
+      using stack = new DisposableStack();
+      stack.use(new UniqueLock(owner.#mutex));
+      const { proxy, revoke } = Proxy.revocable({
+        get value() { return owner.#value; },
+        set value(v) { owner.#value = v; },
+      });
+      stack.defer(revoke);
+      this.#ref = proxy;
+      this.#stack = stack.move();
+    }
+
+    unwrap() {
+      if (this.#stack.disposed) throw new ReferenceError();
+      return this.#ref;
+    }
+
+    [Symbol.dispose]() {
+      using _ = this.#stack;
+    }
+  };
+
+  #mutex = new Mutex();
+  #value;
+
+  constructor(value) {
+    this.#value = value;
+  }
+
+  lock() unsafe {
+    return new MutexValue.#Lock(this);
+  }
+}
+```
+

@@ -38,6 +38,125 @@
   <tr class="msg" id="L9"><td class="ts-cell"><a class="ts" href="#L9" alt="Fri May 31 2024 07:09:37 GMT-0700 (Pacific Daylight Time)">14:09</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-8" title="@shuyuguo:matrix.org">shu</span>&gt;</div></td><td class="msg-cell">if it's possible, is that considered "enough friction"</td></tr>
   <tr class="msg" id="L10"><td class="ts-cell"><a class="ts" href="#L10" alt="Fri May 31 2024 07:13:30 GMT-0700 (Pacific Daylight Time)">14:13</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-8" title="@shuyuguo:matrix.org">shu</span>&gt;</div></td><td class="msg-cell">here's what i want to do: i'd like to get your side to articulate a greatest lower bound on what's "enough friction", then we analyze why that's considered enough. if there's a design principle there that's not "because we feel like it is", then happy to continue the discussion, otherwise not productive</td></tr>
   <tr class="msg" id="L11"><td class="ts-cell"><a class="ts" href="#L11" alt="Fri May 31 2024 07:17:22 GMT-0700 (Pacific Daylight Time)">14:17</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-8" title="@shuyuguo:matrix.org">shu</span>&gt;</div></td><td class="msg-cell"><mx-reply><blockquote> For wasm shared objects, one approach is for them to be opaque obects in JS, without any fields. Afaik, there is also no proposal for attaching prototypes to non-shared wasm refs either. So I fail to see how the complexity for this JS feature would already be there.</blockquote></mx-reply>anyway the real answer is that if the prototype semantics as proposed here isn't part of this proposal, it'll be done as part of the wasm/js API because we still believe that's the best semantics to bridge the shared/unshared worlds</td></tr>
+  <tr class="msg" id="L12"><td class="ts-cell"><a class="ts" href="#L12" alt="Fri May 31 2024 07:28:14 GMT-0700 (Pacific Daylight Time)">14:28</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell"><p>If you wanted, for example, to implement something akin to Rust's <code>Mutex&lt;T&gt;</code>, you could do so with a <code>Proxy</code> whether it's an opaque WASM shared object or a JS native shared struct. Assuming we could have methods and private state in a JS struct, you could accomplish something similar to <a href="https://doc.rust-lang.org/book/ch16-03-shared-state.html#sharing-a-mutext-between-multiple-threads">this example</a> in the Rust docs (NOTE: uses module expressions):</p>
+<pre><code class="language-js">// main.js
+import { Thread } from "./thread.js";
+import { MutexValue } from "./mutex_value.js";
+
+function main() {
+  const counter = new MutexValue(0);
+  const handles = [];
+
+  for (let i = 0; i &lt; 10; i++) {
+    const handle = new Thread(module {
+      import "./mutex_value.js"; // correlates prototype for MutexValue
+
+      export function threadStart(counter) {
+        using lck = counter.lock();
+        const num = lck.unwrap();
+
+        num.value += 1;
+      }
+
+    }, counter);
+
+    handles.push(handle);
+  }
+
+  for (const handle of handles) {
+    handle.join();
+  }
+
+  using lck = counter.lock();
+  const num = lck.unwrap();
+  console.log(`Result: ${num.value}`);
+}
+
+// thread.js
+shared struct ThreadState {
+  #mut = new Mutex();
+  #cv = new Condition();
+  #exited = false;
+
+  exit() unsafe {
+    using void = new UniqueLock(this.#mut);
+    this.#exited = true;
+    this.#cv.notify();
+  }
+
+  join() unsafe {
+    if (this.#exited) return;
+    using lck = new UniqueLock(this.#mut);
+    this.#cv.wait(lck, () =&gt; this.#exited);
+  }
+}
+
+export class Thread {
+  #state;
+  #worker;
+  constructor(body, threadData) {
+    this.#state = new ThreadState();
+    this.#worker = new Worker(module {
+      import "./thread.js"; // correlates prototype for ThreadState
+      import { workerData } from "node:worker_threads";
+      import { threadStart } from body;
+
+      const [threadState, threadData] = workerData;
+      try {
+        threadStart(threadData);
+      }
+      finally {
+        threadState.exit();
+      }
+    }, { workerData: [this.#state, threadData] });
+  }
+
+  join() {
+    this.#state.join();
+  }
+}
+
+// mutex_value.js
+export shared struct MutexValue {
+  static #Lock = class {
+    #stack;
+    #ref;
+
+    constructor(owner) unsafe {
+      using stack = new DisposableStack();
+      stack.use(new UniqueLock(owner.#mutex));
+      const { proxy, revoke } = Proxy.revocable({
+        get value() { return owner.#value; },
+        set value(v) { owner.#value = v; },
+      });
+      stack.defer(revoke);
+      this.#ref = proxy;
+      this.#stack = stack.move();
+    }
+
+    unwrap() {
+      if (this.#stack.disposed) throw new ReferenceError();
+      return this.#ref;
+    }
+
+    [Symbol.dispose]() {
+      using _ = this.#stack;
+    }
+  };
+
+  #mutex = new Mutex();
+  #value;
+
+  constructor(value) {
+    this.#value = value;
+  }
+
+  lock() unsafe {
+    return new MutexValue.#Lock(this);
+  }
+}
+</code></pre>
+</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>
