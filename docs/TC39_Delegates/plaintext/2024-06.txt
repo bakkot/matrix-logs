@@ -100,3 +100,38 @@ I hope we can first think about the problem space and what's needed for develope
 [04:02:15.0431] <rbuckton>
 With the token as a parameter, it is up to the caller to determine whether to pass the token to a function. If you had a function that invoked a REST API, you might want to allow it to be cancellable in some cases, but not others. If there is no suppression mechanism, then there is no way for the caller to make this determination. The structure of the Cancellation API (so far as that proposal was concerned) ensured an appropriate separation of concerns so that the correct level of control was available with respect to the caller and the call site. 
 
+[04:10:21.0273] <rbuckton>
+> <@littledan:matrix.org> (I guess it basically enables what your previous proposal's `new CancellationTokenSource(linkedTokens?)` does, roughly)
+
+One of the major reasons I wanted a linked cancellation graph was to address memory overhead. If cancellation sources could be intrinsically linked, and could be disposed when cancellation was no longer needed, then all of the token subscriptions could be GC'd (incl. the callbacks and closed-over variables that they held).
+
+[04:11:02.0669] <littledan>
+> <@rbuckton:matrix.org> With the token as a parameter, it is up to the caller to determine whether to pass the token to a function. If you had a function that invoked a REST API, you might want to allow it to be cancellable in some cases, but not others. If there is no suppression mechanism, then there is no way for the caller to make this determination. The structure of the Cancellation API (so far as that proposal was concerned) ensured an appropriate separation of concerns so that the correct level of control was available with respect to the caller and the call site.
+
+yes, so if we had an AsyncContext variable for the current cancel token, and then a function you could call to set that variable to a fresh token while running a callback, that would achieve suppression, right?
+
+[04:11:20.0600] <littledan>
+> <@rbuckton:matrix.org> One of the major reasons I wanted a linked cancellation graph was to address memory overhead. If cancellation sources could be intrinsically linked, and could be disposed when cancellation was no longer needed, then all of the token subscriptions could be GC'd (incl. the callbacks and closed-over variables that they held).
+
+yes, I agree this is important. Do you see AbortSignal.any as solving that issue too?
+
+[04:11:23.0772] <rbuckton>
+A fresh token, or no token.
+
+[04:11:51.0719] <rbuckton>
+I would have to think about that. IIRC, the issue with `any` is how ownership is controlled for a subgraph.
+
+[04:12:17.0977] <littledan>
+> <@rbuckton:matrix.org> I would have to think about that. IIRC, the issue with `any` is how ownership is controlled for a subgraph.
+
+I think `any` has to be used in a sort of opinionated way to make things work
+
+[04:12:48.0595] <littledan>
+and your proposed signature sort of already encapsulates that pattern
+
+[04:13:37.0431] <rbuckton>
+Let's say I receive a token and want to call another function with both that and my own token. With `any`, I can close *my* source, but since I have no control over the incoming token, the graph can't be GC'd
+
+[04:14:41.0288] <littledan>
+which graph do you mean?
+
