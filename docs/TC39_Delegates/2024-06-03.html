@@ -55,6 +55,29 @@
   <tr class="msg" id="L26"><td class="ts-cell"><a class="ts" href="#L26" alt="Mon Jun 03 2024 04:12:48 GMT-0700 (Pacific Daylight Time)">11:12</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@littledan:matrix.org">littledan</span>&gt;</div></td><td class="msg-cell">and your proposed signature sort of already encapsulates that pattern</td></tr>
   <tr class="msg" id="L27"><td class="ts-cell"><a class="ts" href="#L27" alt="Mon Jun 03 2024 04:13:37 GMT-0700 (Pacific Daylight Time)">11:13</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">Let's say I receive a token and want to call another function with both that and my own token. With <code>any</code>, I can close <em>my</em> source, but since I have no control over the incoming token, the graph can't be GC'd</td></tr>
   <tr class="msg" id="L28"><td class="ts-cell"><a class="ts" href="#L28" alt="Mon Jun 03 2024 04:14:41 GMT-0700 (Pacific Daylight Time)">11:14</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@littledan:matrix.org">littledan</span>&gt;</div></td><td class="msg-cell">which graph do you mean?</td></tr>
+  <tr class="msg" id="L29"><td class="ts-cell"><a class="ts" href="#L29" alt="Mon Jun 03 2024 04:16:43 GMT-0700 (Pacific Daylight Time)">11:16</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell"><pre><code class="language-js">function outer(signal) {
+  const myController = new AbortController();
+  const combinedSignal = AbortSignal.any([signal, myController.signal]);
+  const promise = inner(combinedSignal);
+  ...
+  // we've progressed to a point where cancellation shouldn't occur, 
+  // but we can't signal that to `inner`
+  myController.dispose(); 
+}
+</code></pre>
+</td></tr>
+  <tr class="msg" id="L30"><td class="ts-cell"><a class="ts" href="#L30" alt="Mon Jun 03 2024 04:17:58 GMT-0700 (Pacific Daylight Time)">11:17</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">Here, even if we think <code>inner</code> should keep going, if <code>signal</code> is canceled then <code>combinedSignal</code> is cancelled.</td></tr>
+  <tr class="msg" id="L31"><td class="ts-cell"><a class="ts" href="#L31" alt="Mon Jun 03 2024 04:18:18 GMT-0700 (Pacific Daylight Time)">11:18</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">If <code>any</code> returns a signal, then I can't model this relationship using it.</td></tr>
+  <tr class="msg" id="L32"><td class="ts-cell"><a class="ts" href="#L32" alt="Mon Jun 03 2024 04:19:34 GMT-0700 (Pacific Daylight Time)">11:19</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell"><p>But if <code>any</code> returns a controller, then I can exert this level of control:</p>
+<pre><code class="language-js">function outer(signal) {
+  const combinedController = AbortController.any([signal]);
+  const promise = inner(combinedController.signal);
+  ...
+  // we've progressed to a point where cancellation shouldn't occur
+  combinedController.dispose(); 
+}
+</code></pre>
+</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>

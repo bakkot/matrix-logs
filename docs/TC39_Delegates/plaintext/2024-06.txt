@@ -135,3 +135,60 @@ Let's say I receive a token and want to call another function with both that and
 [04:14:41.0288] <littledan>
 which graph do you mean?
 
+[04:16:43.0747] <rbuckton>
+```js
+function outer(signal) {
+  const myController = new AbortController();
+  const combined = AbortController.any([signal, myController.signal]);
+  const promise = inner(combined.signal);
+  ...
+  // we've progressed to a point where cancellation shouldn't occur, 
+  // but we can't signal that to `inner`
+  myController.dispose(); 
+}
+```
+
+[04:17:03.0949] <rbuckton>
+ * ```js
+function outer(signal) {
+  const myController = new AbortController();
+  const combinedSignal = AbortController.any([signal, myController.signal]);
+  const promise = inner(combinedSignal);
+  ...
+  // we've progressed to a point where cancellation shouldn't occur, 
+  // but we can't signal that to `inner`
+  myController.dispose(); 
+}
+```
+
+[04:17:22.0439] <rbuckton>
+ * ```js
+function outer(signal) {
+  const myController = new AbortController();
+  const combinedSignal = AbortSignal.any([signal, myController.signal]);
+  const promise = inner(combinedSignal);
+  ...
+  // we've progressed to a point where cancellation shouldn't occur, 
+  // but we can't signal that to `inner`
+  myController.dispose(); 
+}
+```
+
+[04:17:58.0738] <rbuckton>
+Here, even if we think `inner` should keep going, if `signal` is canceled then `combinedSignal` is cancelled.
+
+[04:18:18.0929] <rbuckton>
+If `any` returns a signal, then I can't model this relationship using it.
+
+[04:19:34.0859] <rbuckton>
+But if `any` returns a controller, then I can exert this level of control:
+```js
+function outer(signal) {
+  const combinedController = AbortController.any([signal]);
+  const promise = inner(combinedController.signal);
+  ...
+  // we've progressed to a point where cancellation shouldn't occur
+  combinedController.dispose(); 
+}
+```
+
