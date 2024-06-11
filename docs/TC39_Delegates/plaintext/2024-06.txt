@@ -957,3 +957,42 @@ yes I could do that with your wrap helper, and in fact that's how I will always 
 [04:41:30.0561] <Michael Ficarra>
 so if I always do it that way, there's no reason to expose the semaphore directly
 
+[04:46:33.0077] <Luca Casonato>
+Sure - that makes sense. But there are use cases where this doesn't work - for example if you have `execute` and `query` functions that both operate on the same database, and you want to limit both together.
+
+Another common case for this is when you want to limit the number of FS ops, but there are many different ops. For example you want to limit the number of `stat()`, `realpath()` etc all with the same limiter
+
+Another use case that wrapping is not expressive enough for is if you want to limit the number of open files. Because you "acquire" at every `open` call, but only release once a file handle is explicitly closed.
+
+Also one could propose that we make `Semaphore` sharable across agents :)
+
+[04:49:30.0204] <Luca Casonato>
+added a `wrap` method:
+
+```
+const semaphore = new Semaphore(5);
+
+const wrappedFunction = semaphore.wrap(async () => {
+  // Do some work
+});
+
+async function doWork() {
+  await wrappedFunction();
+}
+```
+
+[04:49:34.0938] <Luca Casonato>
+ * added a `wrap` method:
+
+```js
+const semaphore = new Semaphore(5);
+
+const wrappedFunction = semaphore.wrap(async () => {
+  // Do some work
+});
+
+async function doWork() {
+  await wrappedFunction();
+}
+```
+

@@ -185,6 +185,23 @@ function wrap(cb) {
   <tr class="msg" id="L113"><td class="ts-cell"><a class="ts" href="#L113" alt="Tue Jun 11 2024 04:40:57 GMT-0700 (Pacific Daylight Time)">11:40</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-14" title="@michaelficarra:matrix.org">Michael Ficarra</span>&gt;</div></td><td class="msg-cell">think about it this way: if I am currently passing a function to someone, I want to swap it out with a concurrency-limited one without them changing their implementation</td></tr>
   <tr class="msg" id="L114"><td class="ts-cell"><a class="ts" href="#L114" alt="Tue Jun 11 2024 04:41:14 GMT-0700 (Pacific Daylight Time)">11:41</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-14" title="@michaelficarra:matrix.org">Michael Ficarra</span>&gt;</div></td><td class="msg-cell">yes I could do that with your wrap helper, and in fact that's how I will always do it</td></tr>
   <tr class="msg" id="L115"><td class="ts-cell"><a class="ts" href="#L115" alt="Tue Jun 11 2024 04:41:30 GMT-0700 (Pacific Daylight Time)">11:41</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-14" title="@michaelficarra:matrix.org">Michael Ficarra</span>&gt;</div></td><td class="msg-cell">so if I always do it that way, there's no reason to expose the semaphore directly</td></tr>
+  <tr class="msg" id="L116"><td class="ts-cell"><a class="ts" href="#L116" alt="Tue Jun 11 2024 04:46:33 GMT-0700 (Pacific Daylight Time)">11:46</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-3" title="@lucacasonato:matrix.org">Luca Casonato</span>&gt;</div></td><td class="msg-cell"><p>Sure - that makes sense. But there are use cases where this doesn't work - for example if you have <code>execute</code> and <code>query</code> functions that both operate on the same database, and you want to limit both together.</p>
+<p>Another common case for this is when you want to limit the number of FS ops, but there are many different ops. For example you want to limit the number of <code>stat()</code>, <code>realpath()</code> etc all with the same limiter</p>
+<p>Another use case that wrapping is not expressive enough for is if you want to limit the number of open files. Because you "acquire" at every <code>open</code> call, but only release once a file handle is explicitly closed.</p>
+<p>Also one could propose that we make <code>Semaphore</code> sharable across agents :)</p>
+</td></tr>
+  <tr class="msg" id="L117"><td class="ts-cell"><a class="ts" href="#L117" alt="Tue Jun 11 2024 04:49:30 GMT-0700 (Pacific Daylight Time)">11:49</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-3" title="@lucacasonato:matrix.org">Luca Casonato</span>&gt;</div></td><td class="msg-cell"><p>added a <code>wrap</code> method:</p>
+<pre><code class="language-js">const semaphore = new Semaphore(5);
+
+const wrappedFunction = semaphore.wrap(async () =&gt; {
+  // Do some work
+});
+
+async function doWork() {
+  await wrappedFunction();
+}
+</code></pre>
+</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>
