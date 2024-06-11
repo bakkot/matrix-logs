@@ -767,3 +767,75 @@ like a pro
 [03:46:23.0594] <Michael Ficarra>
 @bakkot:matrix.org yes but I would prefer the concurrency-limiting function helper anyway
 
+[03:56:25.0040] <bakkot>
+> <@lucacasonato:matrix.org> I wonder if we can combine the ideas from `split`, but still not require combining  a `split`, `map` and `merge`. For example:
+> 
+> ```
+> const parallel = iter.parallelMap(5, (iter) => {
+>   return iter.map(mapFn).filter(filterFn)
+> });
+> ```
+> 
+> Would be the same as
+> 
+> ```
+> const parallel = AsyncIterator.merge(
+>   iter.split(5).map((iter) => {
+>     return iter.map(mapFn).filter(filterFn);
+>   })
+> );
+> ```
+
+yeah I was thinking about something like this. it's a very weird signature but once you learn to use it I think it does exactly what you want in many cases. a cute thing is that you can pass an async generator as the second argument:
+
+```
+iter.parallelMap(5,  async function*(vals) { for await (let item of vals) { yield item + 2 } })
+```
+or whatever
+
+[03:56:40.0843] <bakkot>
+ * yeah I was thinking about something like this. it's a very weird signature but once you learn to use it I think it does exactly what you want in many cases. a cute thing is that you can pass an async generator as the second argument:
+
+```
+iter.parallelMap(5, async function* (vals) { for await (let item of vals) { yield item + 2 } })
+```
+
+or whatever
+
+[03:58:04.0164] <bakkot>
+it does not immediately resolve the question of consuming, but I think that could just be a second function; `iter.concurrentForEach` or something
+
+[03:58:20.0562] <bakkot>
+ * it does not immediately resolve the question of consuming without producing a new iterator, but I think that could just be a second function; `iter.concurrentForEach` or something
+
+[03:59:00.0318] <Michael Ficarra>
+the note-taker is double-spacing sentences again, are we just gonna fix that up in post?
+
+[03:59:14.0950] <bakkot>
+```
+let vals = iter.concurrentMap(5, async_generator);
+
+for await (let item of vals) ...
+```
+and
+```
+let promise = iter.concurrentForEach(5, async_function);
+
+await promise;
+```
+
+[03:59:44.0754] <bakkot>
+ * ```
+let vals = iter.concurrentMap(5, async_generator_taking_iterator);
+
+for await (let item of vals) ...
+```
+
+and
+
+```
+let promise = iter.concurrentForEach(5, async_function_taking_iterator);
+
+await promise;
+```
+
