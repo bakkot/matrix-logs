@@ -4024,3 +4024,43 @@ I think nicolo-ribaudo 's handshake mechanism would also handle it fine. It's "e
 
 Yes I think so too
 
+[06:05:38.0366] <Mathieu Hofman>
+How would auto correlation work across languages in a way that doesn't require either language to hold objects specific to the other language (as each language may run without the other existing)
+
+[06:06:19.0441] <rbuckton>
+My concern with manual correlation (i.e., based on postMessage/exemplars) is that realm B could wire up a struct from realm A into a struct definition that exposes private state, so you have to guard against malicious code being able to spawn a Worker (CSP helps on the web, but not in NodeJS) that can be used to hijack a struct.
+
+[06:06:51.0455] <Mathieu Hofman>
+Aka how would 2 wasm threads correlate shared structs (to get access private data) without requiring it to know what a JS module is
+
+[06:07:03.0369] <littledan>
+> <@rbuckton:matrix.org> My concern with manual correlation (i.e., based on postMessage/exemplars) is that realm B could wire up a struct from realm A into a struct definition that exposes private state, so you have to guard against malicious code being able to spawn a Worker (CSP helps on the web, but not in NodeJS) that can be used to hijack a struct.
+
+Yes, I share these kinds of soundness concerns with a very expressive imperative API, but I think nicolo-ribaudo 's suggestion is not subject to this risk.
+
+[06:07:35.0746] <rbuckton>
+> <@mhofman:matrix.org> How would auto correlation work across languages in a way that doesn't require either language to hold objects specific to the other language (as each language may run without the other existing)
+
+Does it need to work across languages? If JS private state is a uniquely JS mechanism, then WASM could interact with the struct via FFI calls into JS.
+
+[06:08:06.0467] <shu>
+> <@rbuckton:matrix.org> Does it need to work across languages? If JS private state is a uniquely JS mechanism, then WASM could interact with the struct via FFI calls into JS.
+
+yeah exactly
+
+[06:08:16.0894] <littledan>
+> <@rbuckton:matrix.org> Does it need to work across languages? If JS private state is a uniquely JS mechanism, then WASM could interact with the struct via FFI calls into JS.
+
+some form of nominal correlation would be useful for Wasm, especially if Wasm wants to interact with JS in various threads and give prototypes to its objects
+
+[06:08:21.0446] <shu>
+you do some tearoffs that can exfiltrate private data and import them from the wasm side
+
+[06:08:38.0652] <Mathieu Hofman>
+> <@rbuckton:matrix.org> My concern with manual correlation (i.e., based on postMessage/exemplars) is that realm B could wire up a struct from realm A into a struct definition that exposes private state, so you have to guard against malicious code being able to spawn a Worker (CSP helps on the web, but not in NodeJS) that can be used to hijack a struct.
+
+if you use forgeable type description, of course. Manual correlation has to be based on non forgeable type descriptors that need to be explicitly shared with the realm in the first place
+
+[06:09:54.0973] <shu>
+Mathieu Hofman: you're engaged in the nuts & bolts of how correlation could work. great! but i'm more interested in working through the very high level, "i feel this is unsafe" objection
+
