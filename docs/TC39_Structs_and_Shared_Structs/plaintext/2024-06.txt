@@ -49,3 +49,23 @@ if you have witnesses you can have different declarations share the same identif
 [11:08:56.0253] <littledan>
 towards the end of the discussion, it felt like we were moving towards some concept of witnesses, but obviously a runtime not type-time witness
 
+[12:07:09.0066] <rbuckton>
+One way to tackle the "same code" issue might be code signing. If you're not using a custom loader you can just rely on source location (i.e., module cache key + source text position). If you want to use a custom loader, or even if you want to expose private state to WASM, you could give your shared struct a fixed identity (i.e., a UUID, URN, etc.) and sign the module. A custom loader could be given a suitable signing mechanism to sign its version of the module, or your WASM assembly could be signed in the same way. During correlation, we would compare both the fixed identity and whether both sources were signed with the same signing key. We could also have a syntactic mechanism to establish "trust" with other digital signatures.
+
+```js
+export shared struct Point {
+  with identity "uuid:191edd8d-ad62-4c5e-acec-4f2c0525e753";
+  #x;
+  #y;
+  ...
+}
+
+// SIG // Begin signature block
+// SIG // <base64 encoded signature>
+// SIG // End signature block
+```
+(NOTE: the `// SIG` comment, above, is how the Windows Scripting Host (WSH) recognizes a digitally signed script signed using `signtool.exe`)
+
+Loaders would need a way to enforce signatures at runtime, which is a bit trickier. One way this could be accomplished would be to have a syntactic mechanism to declare a dynamically generated signing key whose trust is associated with the trust of the containing module. If a loader can be locked down to prevent dynamic patching of its various resolve/fetch/link/evaluate algorithms, its methods were not generic (i.e., `this` was brand checked), and if those algorithms are trusted, then it could use the dynamic signing key to sign code as part of linking. Untrusted code wouldn't be able to create its own loader as it also wouldn't be trusted. A trusted loader could opt to not sign untrusted code, establishing a trust boundary.
+
+

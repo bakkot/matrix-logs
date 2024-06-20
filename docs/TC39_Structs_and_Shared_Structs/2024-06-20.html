@@ -39,6 +39,21 @@
   <tr class="msg" id="L10"><td class="ts-cell"><a class="ts" href="#L10" alt="Thu Jun 20 2024 10:11:08 GMT-0700 (Pacific Daylight Time)">17:11</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-14" title="@shaylew:matrix.org">shaylew</span>&gt;</div></td><td class="msg-cell">if you have witnesses you can have different declarations share the same identifier (different methods in different workers for the same struct), and subtyping/sealed witnesses provides a foundation for private fields</td></tr>
   <tr class="msg" id="L11"><td class="ts-cell"><a class="ts" href="#L11" alt="Thu Jun 20 2024 10:11:43 GMT-0700 (Pacific Daylight Time)">17:11</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-14" title="@shaylew:matrix.org">shaylew</span>&gt;</div></td><td class="msg-cell">(it's very alien to the JS world though, if it's the only place witnesses show up)</td></tr>
   <tr class="msg" id="L12"><td class="ts-cell"><a class="ts" href="#L12" alt="Thu Jun 20 2024 11:08:56 GMT-0700 (Pacific Daylight Time)">18:08</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@littledan:matrix.org">littledan</span>&gt;</div></td><td class="msg-cell">towards the end of the discussion, it felt like we were moving towards some concept of witnesses, but obviously a runtime not type-time witness</td></tr>
+  <tr class="msg" id="L13"><td class="ts-cell"><a class="ts" href="#L13" alt="Thu Jun 20 2024 12:07:09 GMT-0700 (Pacific Daylight Time)">19:07</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell"><p>One way to tackle the "same code" issue might be code signing. If you're not using a custom loader you can just rely on source location (i.e., module cache key + source text position). If you want to use a custom loader, or even if you want to expose private state to WASM, you could give your shared struct a fixed identity (i.e., a UUID, URN, etc.) and sign the module. A custom loader could be given a suitable signing mechanism to sign its version of the module, or your WASM assembly could be signed in the same way. During correlation, we would compare both the fixed identity and whether both sources were signed with the same signing key. We could also have a syntactic mechanism to establish "trust" with other digital signatures.</p>
+<pre><code class="language-js">export shared struct Point {
+  with identity "uuid:191edd8d-ad62-4c5e-acec-4f2c0525e753";
+  #x;
+  #y;
+  ...
+}
+
+// SIG // Begin signature block
+// SIG // &lt;base64 encoded signature&gt;
+// SIG // End signature block
+</code></pre>
+<p>(NOTE: the <code>// SIG</code> comment, above, is how the Windows Scripting Host (WSH) recognizes a digitally signed script signed using <code>signtool.exe</code>)</p>
+<p>Loaders would need a way to enforce signatures at runtime, which is a bit trickier. One way this could be accomplished would be to have a syntactic mechanism to declare a dynamically generated signing key whose trust is associated with the trust of the containing module. If a loader can be locked down to prevent dynamic patching of its various resolve/fetch/link/evaluate algorithms, its methods were not generic (i.e., <code>this</code> was brand checked), and if those algorithms are trusted, then it could use the dynamic signing key to sign code as part of linking. Untrusted code wouldn't be able to create its own loader as it also wouldn't be trusted. A trusted loader could opt to not sign untrusted code, establishing a trust boundary.</p>
+</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>
