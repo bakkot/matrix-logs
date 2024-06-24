@@ -32,6 +32,33 @@
   <tr class="msg" id="L3"><td class="ts-cell"><a class="ts" href="#L3" alt="Mon Jun 24 2024 06:48:47 GMT-0700 (Pacific Daylight Time)">13:48</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@abotella:igalia.com">Andreu Botella</span>&gt;</div></td><td class="msg-cell">I think the background for <span class="nick-10">littledan</span>'s comment there was that, when discussing events with Anne and other web platform folks in the Web Engines Hackfest, we agreed that the originating context should be exposed as a (maybe null) property on all events</td></tr>
   <tr class="msg" id="L4"><td class="ts-cell"><a class="ts" href="#L4" alt="Mon Jun 24 2024 06:49:56 GMT-0700 (Pacific Daylight Time)">13:49</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@abotella:igalia.com">Andreu Botella</span>&gt;</div></td><td class="msg-cell">and for <code>ErrorEvent</code>, that would just be the regular property, but it would need special tracking across the abrupt completions to be able to get the context in which the exception was thrown</td></tr>
   <tr class="msg" id="L5"><td class="ts-cell"><a class="ts" href="#L5" alt="Mon Jun 24 2024 06:50:18 GMT-0700 (Pacific Daylight Time)">13:50</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@abotella:igalia.com">Andreu Botella</span>&gt;</div></td><td class="msg-cell">but I guess for <code>PromiseRejectionEvent</code>, that property could be an array instead</td></tr>
+  <tr class="msg" id="L6"><td class="ts-cell"><a class="ts" href="#L6" alt="Mon Jun 24 2024 06:50:57 GMT-0700 (Pacific Daylight Time)">13:50</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@abotella:igalia.com">Andreu Botella</span>&gt;</div></td><td class="msg-cell"><pre><code class="language-js">function createRejectionInContext(value) {
+    ctx.run(value, () =&gt; Promise.reject());
+}
+
+ctx.run("main", () =&gt; {
+    // don't await or do anything with the result
+    Promise.all([
+        createRejectionInContext("task-0"),
+        createRejectionInContext("task-1"),
+        createRejectionInContext("task-2"),
+        createRejectionInContext("task-3"),
+    ]);
+});
+
+window.onunhandledrejection = (evt) =&gt; {
+    evt.originatingContext.run(() =&gt; {
+        // Could be task-[0123]. Can't be main.
+        console.log(ctx.get());
+    })
+}
+</code></pre>
+</td></tr>
+  <tr class="msg" id="L7"><td class="ts-cell"><a class="ts" href="#L7" alt="Mon Jun 24 2024 06:52:59 GMT-0700 (Pacific Daylight Time)">13:52</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@abotella:igalia.com">Andreu Botella</span>&gt;</div></td><td class="msg-cell">well, I guess in that example, with the current spec, it would always be <code>task-0</code></td></tr>
+  <tr class="msg" id="L8"><td class="ts-cell"><a class="ts" href="#L8" alt="Mon Jun 24 2024 06:54:05 GMT-0700 (Pacific Daylight Time)">13:54</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@abotella:igalia.com">Andreu Botella</span>&gt;</div></td><td class="msg-cell">but for <code>allSettled</code> you would definitely have a merge</td></tr>
+  <tr class="msg" id="L9"><td class="ts-cell"><a class="ts" href="#L9" alt="Mon Jun 24 2024 06:54:07 GMT-0700 (Pacific Daylight Time)">13:54</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-7" title="@legendecas:matrix.org">Chengzhong Wu</span>&gt;</div></td><td class="msg-cell">There should be only one rejection event for the promise of <code>Promise.all</code>, and the <code>evt.promise</code> is the promise of <code>Promise.all</code></td></tr>
+  <tr class="msg" id="L10"><td class="ts-cell"><a class="ts" href="#L10" alt="Mon Jun 24 2024 06:54:56 GMT-0700 (Pacific Daylight Time)">13:54</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@abotella:igalia.com">Andreu Botella</span>&gt;</div></td><td class="msg-cell">yeah, you're right</td></tr>
+  <tr class="msg" id="L11"><td class="ts-cell"><a class="ts" href="#L11" alt="Mon Jun 24 2024 06:55:10 GMT-0700 (Pacific Daylight Time)">13:55</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@abotella:igalia.com">Andreu Botella</span>&gt;</div></td><td class="msg-cell">but for <code>Promise.allSettled</code> and <code>Promise.any</code> you would have a merge</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>
