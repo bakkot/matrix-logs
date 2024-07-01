@@ -104,3 +104,66 @@ unhandledrejection isn't dispatched synchronously, so it's a little more awkward
 [13:39:29.0808] <Steve Hicks>
 ideally it could reuse the same mechanism for synchronous events (i.e. dispatchEvent captures the snapshot)
 
+[13:40:22.0246] <littledan>
+as we've previously reasoned, we could either store the context when the Promise is allocated (as in Node) or rejected (as in the current spec). I guess in either case, it could be in the Promise itself, and then it's only read by the unhandled rejection thing.
+
+[13:41:16.0861] <Stephen Belanger>
+Capturing on dispatchEvent also means we could have _anything_ be able to access both register time _and_ call time contexts. 🤔
+
+[13:41:20.0821] <littledan>
+I previously convinced myself that the rejected-time context is definitely way better, but now, with distance, I could see that either could be OK...
+
+[13:41:38.0037] <littledan>
+> <@stephenbelanger:matrix.org> Capturing on dispatchEvent also means we could have _anything_ be able to access both register time _and_ call time contexts. 🤔
+
+lots of stuff isn't dispatchEvent...
+
+[13:41:44.0945] <littledan>
+unless you mean the internal equivalent
+
+[13:41:55.0627] <Stephen Belanger>
+Yes, internal equivalent.
+
+[13:42:00.0217] <Steve Hicks>
+reject-time means you're not making as many unused snapshots
+
+[13:42:33.0598] <littledan>
+> <@stephenbelanger:matrix.org> Yes, internal equivalent.
+
+yeah so conversations with DOM people like Anne seemed to point to, we'd only get this little by little, for particular things where it made sense, since it's complicated and depends on that particular API's details
+
+[13:42:46.0476] <littledan>
+> <@stephenhicks:matrix.org> reject-time means you're not making as many unused snapshots
+
+but "making a snapshot" is copying a pointer
+
+[13:43:02.0838] <littledan>
+we're *not* doing an allocation, in particular
+
+[13:43:08.0714] <Steve Hicks>
+is there a concern about lifetime management?
+
+[13:43:31.0951] <littledan>
+> <@stephenhicks:matrix.org> is there a concern about lifetime management?
+
+well, IMO we should give a fresh object identity for the snapshot each time you use it, so we don't have to worry about that
+
+[13:43:47.0404] <littledan>
+via the getter
+
+[13:43:47.0976] <Stephen Belanger>
+> <@littledan:matrix.org> yeah so conversations with DOM people like Anne seemed to point to, we'd only get this little by little, for particular things where it made sense, since it's complicated and depends on that particular API's details
+
+I mean…that’s possibly fine? We just need to make a bunch of individual cases for each API, which it seemed like Andreu was already doing the research work for?
+
+[13:43:57.0816] <littledan>
+or maybe that's too weird and un-getter-like?
+
+[13:44:37.0878] <littledan>
+the alternative is, you eagerly stash a pointer to the underlying data structure, but somehow you can dynamically type check that, and on first access, you replace it with a snapshot in place, and subsequent accesses notice that it's already a snapshot
+
+[13:45:01.0687] <Steve Hicks>
+> <@littledan:matrix.org> well, IMO we should give a fresh object identity for the snapshot each time you use it, so we don't have to worry about that
+
+Not sure we're talking about the same thing?  IIUC there was concern about when a snapshot was no longer reachable (hence all the explicit resource management discussions) and if we've got a never-will-be-used snapshot hanging on a long-lived promise, that could confuse it
+
