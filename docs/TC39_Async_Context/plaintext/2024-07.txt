@@ -210,3 +210,55 @@ this is our use case
 
 no, the promise
 
+[13:50:13.0722] <littledan>
+> <@stephenhicks:matrix.org> no, the promise
+
+oh, right... yeah that makes sense, the unhandled rejection can only happen once. (In fact, maybe the spec doesn't even say any of this.) But this doesn't handle the error issue.
+
+[13:50:19.0719] <Justin Ridgewell>
+> <@stephenbelanger:matrix.org> For unhandledRejection we probably _would_ need the point it throws and not an Error property given you _can_ throw non-errors and unfortunately sometimes people do. 😐
+
+I’d honestly be happy saying that’s an anti-pattern and you don’t get the correct context in this case.
+
+[13:50:27.0921] <littledan>
+> <@stephenhicks:matrix.org> no, the promise
+
+ * oh, right... yeah that makes sense, the unhandled rejection can only happen once. (In fact, maybe the spec doesn't even say any of this, since it's implied by unreachability.) But this doesn't handle the error issue.
+
+[13:50:56.0132] <Justin Ridgewell>
+> <@littledan:matrix.org> as we've previously reasoned, we could either store the context when the Promise is allocated (as in Node) or rejected (as in the current spec). I guess in either case, it could be in the Promise itself, and then it's only read by the unhandled rejection thing.
+
+I don’t think this helps in Andreu’s code sample, unless we’re expecting the `”foo”` context
+
+[13:50:57.0957] <littledan>
+> <@jridgewell:matrix.org> I’d honestly be happy saying that’s an anti-pattern and you don’t get the correct context in this case.
+
+actually we care a lot about this case at Bloomberg, but maybe for reasons which don't deserve to be prioritized
+
+[13:51:23.0217] <littledan>
+> <@jridgewell:matrix.org> I don’t think this helps in Andreu’s code sample, unless we’re expecting the `”foo”` context
+
+that's right, I'm discussing strategies for getting "foo"
+
+[13:51:32.0696] <Steve Hicks>
+Google also cares about throwing non-errors, but we believe the solution is "Don't do that" rather than bloating the standards to account for it
+
+[13:52:06.0461] <littledan>
+well, maybe we can look into the "don't do that" path... maybe Chengzhong can follow up on this?
+
+[13:52:10.0625] <littledan>
+Chengzhong Wu: ^
+
+[13:53:55.0953] <Steve Hicks>
+> <@littledan:matrix.org> well, maybe we can look into the "don't do that" path... maybe Chengzhong can follow up on this?
+
+(aside) in particular, one strategy we're consider is to transpile all `throw x`s to `throw trackNonError(x)` that throws a real error with a stack trace asynchronously so as to at least get some logging in place to identify all the offenders
+
+[13:54:25.0584] <Justin Ridgewell>
+Are you suggesting we attach the context onto the error instead of just running the `unhandledRejectionHandler` in the correct context?
+
+[13:54:52.0443] <Steve Hicks>
+> <@jridgewell:matrix.org> Are you suggesting we attach the context onto the error instead of just running the `unhandledRejectionHandler` in the correct context?
+
+Yes?
+
