@@ -1,0 +1,785 @@
+2024-07-02
+[09:24:11.0008] <rbuckton>
+FYI, I have someone coming by today to repair some siding that came loose during a thunderstorm and it looks like they were delayed and will be here around 1pm EST (the start of the meeting today), so I may be delayed by a few minutes or interrupted.
+
+[10:55:35.0763] <rbuckton>
+ianhedoesit: Regarding your comment that the intuition is that "`async` affects the type", I disagree. Both `async` (and `*`) imply a _syntactic transformation in the function body_. Non `async` code can still return a `Promise`, and non `*` code can still return a generator.
+
+[10:58:15.0251] <iain>
+(I think you tagged the wrong Iain)
+
+[10:59:44.0239] <iain>
+I don't think that tracks. If I add "async" or `*` to a function definition, it returns a different sort of thing, in a way that my caller needs to know about. If I add `unsafe`, it doesn't change anything from the caller's perspective.
+
+[10:59:53.0456] <iain>
+ * I don't think that tracks. If I add `async` or `*` to a function definition, it returns a different sort of thing, in a way that my caller needs to know about. If I add `unsafe`, it doesn't change anything from the caller's perspective.
+
+[11:02:43.0333] <iain>
+Functions don't have typed signatures in raw JS, but if you return a promise or a generator from a function then that is reflected in the implicit return type. The same is not true for `unsafe`.
+
+[11:03:20.0692] <rbuckton>
+I did, oops.
+
+[11:03:38.0658] <iain>
+The distinction is whether the property is important to the caller, and since we're explicitly avoiding function colouring, I claim that `unsafe` is only relevant to the code inside the function.
+
+[11:03:42.0528] <rbuckton>
+ * iain: Regarding your comment that the intuition is that "`async` affects the type", I disagree. Both `async` (and `*`) imply a _syntactic transformation in the function body_. Non `async` code can still return a `Promise`, and non `*` code can still return a generator.
+
+[11:05:18.0661] <iain>
+My anecdotal evidence that this is potentially confusing is that I was personally confused by this while reading the explainer.
+
+[11:05:47.0215] <rbuckton>
+We tried to make this distinction in TypeScript fairly clear. While you can write `async function f(): Promise<void> { ... }` in your code, the output declaration is `declare function f(): Promise<void> { ... }`, as `async` only performs a syntactic transformation. It does certainly _inform_ the return type, but it is not part of the function signature from a type checking perspective.
+
+[11:05:49.0531] <iain>
+(Although it is certainly plausible that I am too easily confused!)
+
+[11:07:29.0684] <rbuckton>
+Decorators will further complicate that mental model, though, as a decorator could affect the return type of a function as well. At one point (after we had already shipped `async`/`await`), there were comments that we could have just used generators and `@async function* f() { ... }`.
+
+[11:08:37.0985] <rbuckton>
+Yes, `async` and `*` do imply a specific return type, but that is purely a result of the syntactic transformation. In the same way, `accessor` is also a syntactic transformation.
+
+[11:09:41.0049] <rbuckton>
+It could even be argued that `static` is a syntactic transformation insomuch as it applies to where a method or field is placed on a class. All of these potentially affect the type, but the type produced is purely a result of the transformation itself.
+
+[11:13:30.0682] <rbuckton>
+I'd also like to point out that `unsafe`, as I've proposed, is generally consistent with Rust as prior art. Rust allows `unsafe {}`, but also `unsafe fn`, `unsafe trait`, and `unsafe impl`:
+
+> By default, `unsafe fn` also acts like an `unsafe {}` block around the code inside the function. This means it is not just a signal to the caller, but also promises that the preconditions for the operations inside the function are upheld. Mixing these two meanings can be confusing, so the `unsafe_op_in_unsafe_fn` lint can be enabled to warn against that and require explicit unsafe blocks even inside `unsafe fn`.
+
+In rust, disallowing `unsafe fn` in favor of a nested unsafe block is specified as a lint rule.
+
+[11:13:33.0889] <rbuckton>
+ * I'd also like to point out that `unsafe`, as I've proposed, is generally consistent with Rust as prior art. Rust allows `unsafe {}`, but also `unsafe fn`, `unsafe trait`, and `unsafe impl`:
+
+> By default, `unsafe fn` also acts like an `unsafe {}` block around the code inside the function. This means it is not just a signal to the caller, but also promises that the preconditions for the operations inside the function are upheld. Mixing these two meanings can be confusing, so the `unsafe_op_in_unsafe_fn` lint can be enabled to warn against that and require explicit unsafe blocks even inside `unsafe fn`.
+
+In Rust, disallowing `unsafe fn` in favor of a nested unsafe block is specified as a lint rule.
+
+[11:14:05.0118] <rbuckton>
+https://doc.rust-lang.org/std/keyword.unsafe.html
+
+[11:15:05.0111] <rbuckton>
+Or am I misinterpreting? Does Rust require an `unsafe` block around an unsafe function call?
+
+[11:15:15.0179] <iain>
+In general, I would say that a function signature (broadly waving at all the parts of a function declaration outside the body) provides information that is important to the caller. This is especially true in statically typed languages, but even in JS I think it holds. By putting `unsafe` in such a prominent location, we imply that it is similarly important to the caller, which is not the case here.
+
+[11:15:30.0026] <iain>
+You are misinterpreting: Rust requires an unsafe block around calls to unsafe functions.
+
+[11:15:44.0846] <rbuckton>
+Ah, thanks. My mistake.
+
+[11:15:53.0905] <iain>
+That's a big part of why I misread your explainer.
+
+[11:17:45.0897] <iain>
+The purpose of the Rust lint is to encourage code to be precise about which parts of a function body are unsafe, even if the entire function must be called in an unsafe context.
+
+[11:17:47.0164] <rbuckton>
+An alternative to `unsafe function f() {}` that I'd also put on the explainer might be `function f() unsafe { }`. My concern is that this isn't obvious that it also affects the parameter list. Then again `function f() { "use strict"; }` affects the parameter list as well.
+
+[11:19:17.0665] <iain>
+The equivalent in JS of the Rust lint would be to have function colouring (where `unsafe function foo()` can only be called from inside an unsafe block) and also require explicit unsafe blocks inside the body of the function, which is the opposite of what you are proposing.
+
+[11:19:23.0675] <rbuckton>
+So, `class C unsafe { }` to make a class body unsafe, or `shared struct S unsafe { }` to make a shared struct body unsafe. We probably wouldn't do `unsafe const`/`unsafe let` in that case because it would be mixing up suffix vs. prefix, so we *would* need to depend on an unsafe IIFE or `unsafe do`
+
+[11:21:37.0165] <rbuckton>
+function coloring is a major DX pain. I see it as a necessity for `async` and `*` given that the syntactic transformations affect the return type, but it's not a practice I'm fond of continuing with new syntax if it isn't warranted.
+
+[11:22:22.0514] <rbuckton>
+> <@rbuckton:matrix.org> So, `class C unsafe { }` to make a class body unsafe, or `shared struct S unsafe { }` to make a shared struct body unsafe. We probably wouldn't do `unsafe const`/`unsafe let` in that case because it would be mixing up suffix vs. prefix, so we *would* need to depend on an unsafe IIFE or `unsafe do`
+
+I suppose it would be `do unsafe {}`, to maintain the suffix position
+
+[11:26:24.0021] <iain>
+Function colouring in this case allows for the more nuanced expression of safety invariants. So for example you could have `function foo() { unsafe {...} }` and `unsafe function foo_AlreadyHoldingLock() {...}`, in which case `unsafe function` does not do a syntactic transformation, but it does impose restrictions on the callers to maintain invariants.
+
+[11:27:14.0303] <iain>
+I'm not convinced we want that, and I think adding it might impose a small performance overhead on unrelated code, but it's a point in design space.
+
+[11:27:28.0921] <rbuckton>
+There is one thing about function coloring an `unsafe` function has over `async`/`await` that makes it somewhat more palatable, which is that you can introduce an `unsafe {}` block in safe code to perform the operation. That almost makes me want to have both `unsafe function` ("it is unsafe to call me and my contents are unsafe") and `function () unsafe { }` ("it is safe to call me as I have done my due diligence to ensure I am safe at the boundaries"), mostly because I really am not a fan of the namespace nesting style often seen in C++, i.e.
+```js
+function f() { unsafe { 
+  ...
+} }
+```
+
+[11:28:09.0359] <rbuckton>
+ * There is one thing about function coloring an `unsafe` function has over `async`/`await` that makes it somewhat more palatable, which is that you can introduce an `unsafe {}` block in safe code to perform the operation. That almost makes me want to have both `unsafe function` ("it is unsafe to call me and my contents are unsafe") and `function () unsafe { }` ("my contents are unsafe, but it is safe to call me as I have done my due diligence to ensure I am safe at the boundaries"), mostly because I really am not a fan of the namespace nesting style often seen in C++, i.e.
+
+```js
+function f() { unsafe { 
+  ...
+} }
+```
+
+[11:28:43.0993] <iain>
+Yeah, given my previous experience in Rust, that's what I thought you were proposing initially. The problem is that then every call that is not in an unsafe context is responsible for checking that the callee is not an unsafe function, which potentially slows down polymorphic code.
+
+[11:28:58.0366] <rbuckton>
+Where `... unsafe { }` is just syntactic sugar for `... { unsafe { } }`
+
+[11:29:32.0224] <iain>
+(Although there's a chance that we could fold it into checks that we already have to do to ensure that you don't call a derived constructor without `new`)
+
+[11:31:05.0883] <rbuckton>
+Could that slow down be handled via a function stub, such that "safe" code has no overhead (if it calls the stub, the stub throws), while "unsafe" code has overhead as it must check for the stub to step over it, or to pass the stub a flag indicating safety.
+
+[11:31:15.0109] <rbuckton>
+ * Could that slow down be handled via a function stub, such that "safe" code has no overhead (if it calls the stub, the stub throws), while "unsafe" code has overhead as it must check for the stub to step over it, or to pass the stub a flag indicating safety?
+
+[11:33:44.0340] <rbuckton>
+We already expect "unsafe" code will have some additional complexity even without the notion of an `unsafe {}` block, purely because reads and writes potentially require agent coordination
+
+[11:35:57.0145] <iain>
+At a hardware level there isn't really any way to pass a flag that doesn't require the safe caller to do at least a little bit of work to not pass it
+
+[11:37:53.0546] <iain>
+(That's maybe not true if you imagine that we have some sort of global "are we in an unsafe block" flag that gets cleared when unsafe code calls into safe code and reset when we return, but keeping that flag set correctly seems potentially complicated.)
+
+[11:38:32.0625] <rbuckton>
+So "safe code just calls the function" as normal (which throws for the stub), and "unsafe code first checks if the function is an unsafe function stub and then calls the underlying function" isn't an option?
+
+[11:38:33.0004] <iain>
+The overall performance cost here is pretty small
+
+[11:39:09.0058] <rbuckton>
+I'll admit, I'm primarily coming at this from the spec perspective, and not the perspective of an implementer or optimizin gcompiler.
+
+[11:40:00.0055] <iain>
+Yeah, I guess I can see some ways of making that work. 
+
+[11:41:03.0166] <iain>
+Although they end up adding a fair bit of complexity to some already very complicated code
+
+[11:41:05.0206] <rbuckton>
+But I wouldn't expect a global flag is necessary given that `unsafe {}` is purely syntactic and could be used to drive transformations or optimizations based on its presence in the parse tree.
+
+[11:44:44.0476] <iain>
+Taking a step back: this can all be implemented, and with sufficient elbow grease the overhead could be minimized. The question is whether coloured functions provide enough value to justify engines spending their limited elbows on this instead of the million other things we could be implementing / optimizing.
+
+[11:51:38.0938] <shu>
+i don't think function coloring is problematic from engines' perspectives, but it is pretty bad for usability, especially since we already have async/non-async
+
+[11:55:40.0735] <iain>
+Actually, now that I'm thinking through the implementation, even normal `unsafe` blocks are at least a little annoying to implement, because it means that every GetProperty needs to know its location in the source. Or else you use a global flag, and clear it around calls?
+
+[11:56:52.0924] <shu>
+i was actually imagining something even dumber, like outputting different bytecode
+
+[11:57:21.0897] <shu>
+since it's lexical
+
+[11:57:39.0753] <iain>
+Oh, yeah, maybe that works too
+
+[11:57:59.0559] <littledan>
+could still be slightly annoying maybe to maintain two types of property access, with their ICs and such
+
+[11:58:11.0811] <rbuckton>
+My biggest concern was `unsafe` having `async`/`await`-like poisoning effects. Introducing `async` to a sync function normally poisons it's callers if they must maintain sequential execution. Given that you can nest an `unsafe{}` block in safe code, the concern is lessened somewhat. In the call I said that an `unsafe function` doesn't perform any implicit synchronization or coordination, so its up to the author to implement any necessary coordination, including none at all. The "none at all" coordination was meant as a way for you to decompose an `unsafe` function into multiple `unsafe` functions without having to guard against "safe" code invoking them unintentionally by leveraging scoping. Function coloring at this level isn't quite as bad as I'd feared, and has the benefit of pushing the user to implement safety in a function not marked `unsafe`.
+
+[11:58:32.0422] <shu>
+> <@littledan:matrix.org> could still be slightly annoying maybe to maintain two types of property access, with their ICs and such
+
+V8 bytecodes at least can have immediate arguments. it could be a Get with an "in-unsafe-block" bit
+
+[11:59:06.0490] <shu>
+like, the same way "should throw" flags are threaded through for strict code
+
+[12:00:04.0837] <iain>
+SM has SetProp/StrictSetProp and so on
+
+[12:00:21.0710] <iain>
+Although most of the code is shared
+
+[12:00:26.0344] <shu>
+yeah, same
+
+[12:00:28.0175] <iain>
+It ends up being similar in practice
+
+[12:00:31.0917] <shu>
+same to "most of the code is shared"
+
+[12:01:38.0020] <rbuckton>
+In other words, this
+```js
+unsafe function readMessage(workArea) { ... }
+unsafe function writeMessage(workArea, message) { ... }
+unsafe function processMessage(message) { ... }
+
+function processWorkArea(workArea) unsafe {
+  let message;
+  while (message = readMessage(workArea)) {
+    const result = processMessage(message);
+    writeMessage(workArea, result);
+  }
+}
+```
+Doesn't seem quite so bad to me (though I still prefer `function() unsafe { }` to `function() { unsafe { } }`)
+
+[12:03:17.0239] <rbuckton>
+ * In other words, this
+
+```js
+unsafe function readMessage(lck, workArea) { ... }
+unsafe function writeMessage(workArea, message) { ... }
+unsafe function processMessage(message) { ... }
+
+function processWorkArea(mut, workArea) unsafe {
+  using lck = new UniqueLock(mut);
+  let message;
+  while (message = readMessage(lck, workArea)) {
+    const result = processMessage(message);
+    writeMessage(workArea, result);
+  }
+}
+```
+
+Doesn't seem quite so bad to me (though I still prefer `function() unsafe { }` to `function() { unsafe { } }`)
+
+[12:04:41.0124] <rbuckton>
+It has the upside of preventing users from inadvertently invoking unsafe code from safe code and allows you to declare your function as not only containing unsafe code, but also indicating that it doesn't internally perform any coordination.
+
+[12:08:57.0608] <rbuckton>
+In C#, `unsafe` can apply to a function/method, but does not affect callers: https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/keywords/unsafe
+
+[12:09:41.0438] <rbuckton>
+Though `unsafe` in C# is primarily around direct access to pointers (which Rust also shares).
+
+[12:10:01.0273] <iain>
+For me the uncertainty about the value of function colouring implies strongly that we should leave out `unsafe function` syntax for now. In the future we will have much more user experience to help determine what that syntax should mean.
+
+[12:14:02.0398] <rbuckton>
+I'd really like to be able to write conventional JS with shared structs when I know I already have exclusive access to an object. If we only have `unsafe {}`, I can't write this
+```js
+unsafe function doWork(task, timeout = task.timeout ?? 1000) { ... }
+```
+and instead must write this
+```js
+function doWork(task, timeout) {
+  unsafe {
+    timeout ??= task.timeout ?? 1000;
+    ...
+  }
+}
+```
+
+[12:16:11.0644] <rbuckton>
+However, I do see the potential value of safe code erroring if you invoke `doWork`, since `doWork` here _doesn't_ implement a coordination mechanism as it's intended to be used from another function that does. Instead, I must indicate it by convention, i.e. `function doWorkUnsafe()` to draw attention to its use.
+
+[12:21:14.0726] <rbuckton>
+Let me be clear on my position though. If we must have `unsafe`, but can only have `unsafe {}` for now, I'm fine with that. I do think the lack of an `unsafe` marker for functions and class/struct bodies is a major DX wart that will very likely need to be addressed at some point, function coloring or not. I just don't want to go down a road of allowing `import`/`export` inside of an `unsafe` block as it would likely be a long term aesthetic wart on the language *after* we introduce an `unsafe` marker in other contexts.
+
+[12:23:54.0877] <rbuckton>
+We *could* consider an alternative to make `import`/`export` work, by declaring the entire module as `unsafe` via something like `unsafe module;` (or some other incantation) at the top level.
+
+[12:25:10.0966] <rbuckton>
+Or use module blocks, i.e.:
+
+```js
+unsafe module M {
+  export shared struct AtomicValue { ... }
+}
+export * from M;
+```
+
+[12:25:18.0769] <rbuckton>
+ * Or use module blocks, e.g.:
+
+```js
+unsafe module M {
+  export shared struct AtomicValue { ... }
+}
+export * from M;
+```
+
+[12:26:49.0541] <rbuckton>
+(though that still uses `unsafe` as a prefix)
+
+[12:32:55.0316] <rbuckton>
+I'd also be fine with postfix-`unsafe` markers for declarations (`function f() unsafe { }`) and potentially allowing `unsafe` in both positions (`unsafe function f() {}` and `function f() unsafe {}`, though `unsafe function f() unsafe {}` is redundant). I'd also be fine with `unsafe` markers for parameters much like I suggested for variable and field initializers in a world where we either can't have postifx-`unsafe` or if postfix-`unsafe` can't include parameters, e.g.:
+```js
+function doWork(task, unsafe timeout = task.timeout ?? 1000) {
+  unsafe { ... }
+}
+```
+
+
+[12:35:39.0858] <rbuckton>
+IMO, only having `unsafe {}` is not ideal, though `do unsafe {}` would make that *somewhat* more bearable, e.g.:
+```js
+function doWork(task, timeout = do unsafe { task.timeout } ?? 1000) {
+  unsafe { }
+}
+```
+But for that we would need `do {}` to advance.
+
+[12:36:47.0395] <rbuckton>
+Or we would have to advance `unsafe {}` as an expression as well, which would be confusing if we do end up advancing `do`.
+
+[15:08:02.0343] <littledan>
+It would be great if someone brought do expressions back to committee. My understanding is that bakkot is leaving that for others to champion. (Maybe there is some remaining controversy but I don’t know what it is)
+
+[15:29:04.0986] <iain>
+It looks like we decided in [March 2021](https://github.com/tc39/notes/blob/main/meetings/2021-03/mar-9.md) that we were going to do some sort of user study. Did anything ever come of that?
+
+[16:24:54.0113] <Mathieu Hofman>
+> <@rbuckton:matrix.org> An alternative to `unsafe function f() {}` that I'd also put on the explainer might be `function f() unsafe { }`. My concern is that this isn't obvious that it also affects the parameter list. Then again `function f() { "use strict"; }` affects the parameter list as well.
+
+I am honestly suspicious of any code that attempts to do anything with a shared struct passed in arguments without first satisfying whatever synchronization mechanism is appropriate to access that shared struct. As such I suspect that only allowing unsafe blocks is actually a benefit as it would force authors to consider whether they've first satisfied the synchronization responsibility they're supposed to take on, and which seem hard to satisfy within the parameters list alone.
+
+[16:35:18.0270] <Mathieu Hofman>
+> <@rbuckton:matrix.org> I'd really like to be able to write conventional JS with shared structs when I know I already have exclusive access to an object. If we only have `unsafe {}`, I can't write this
+> ```js
+> unsafe function doWork(task, timeout = task.timeout ?? 1000) { ... }
+> ```
+> and instead must write this
+> ```js
+> function doWork(task, timeout) {
+>   unsafe {
+>     timeout ??= task.timeout ?? 1000;
+>     ...
+>   }
+> }
+> ```
+
+Can't you define your `doWork` function inside an unsafe block instead?
+
+[16:35:28.0469] <rbuckton>
+In an earlier example I showed how you might decompose a series of `unsafe` operations into multiple functions, where only the entrypoint function would perform any coordination, i.e.:
+```js
+unsafe function readMessage(...) { ... }
+unsafe function writeMessage(...) { ... }
+unsafe function processMessage(...) { ... }
+function processWorkArea(workArea) {
+  unsafe {
+    // performs locking
+    // calls readMessage/writeMessage/processMessage
+  }
+}
+```
+
+If we have `unsafe function`, we can enforce that safe code cannot invoke an `unsafe` function directly, or inadvertently. 
+If we do not have `unsafe function` and only have `unsafe {}`, then we cannot perform such enforcement and there is no clear delineation between a safe entrypoint and unsafe code:
+
+```js
+function readMessage(...) { unsafe { ... } }
+function writeMessage(...) { unsafe { ... } }
+function processMessage(...) { unsafe { ... } }
+function processWorkArea(workArea) {
+  unsafe {
+    // performs locking
+    // calls readMessage/writeMessage/processMessage
+  }
+}
+```
+Here, `readMessage` will not perform any independent coordination or locking as it expects to be called by `processWorkArea`, which is the function that would actually perform locking. A user could inadvertently invoke `readMessage` from "safe" code, resulting in a data race. The only way to enforce this is by convention, thus you would instead want to write this as:
+```js
+function readMessageUnsafe(...) { unsafe { ... } }
+function writeMessageUnsafe(...) { unsafe { ... } }
+function processMessageUnsafe(...) { unsafe { ... } }
+function processWorkArea(workArea) {
+  unsafe {
+    // performs locking
+    // calls readMessageUnsafe/writeMessageUnsafe/processMessageUnsafe
+  }
+}
+```
+
+[16:37:36.0948] <rbuckton>
+> <@mhofman:matrix.org> Can't you define your `doWork` function inside an unsafe block instead?
+
+It's not quite so easy if I want to make `doWork` available to code outside of the block:
+
+```js
+let doWork;
+unsafe {
+  doWork = function() { ... };
+}
+```
+
+This would be a regular frustration developers would encounter, both here and with `import`/`export`, or shared struct bodies, etc.
+
+[16:38:33.0274] <rbuckton>
+Blocks are best for localizing the transition from safe to unsafe. They're terrible for encapsulating declarations since you generally want at least one declaration to escape the block to be actually usable.
+
+[16:38:47.0903] <Mathieu Hofman>
+I do find interesting the proposition that the user could define unsafe functions that like shared struct fields do need to be called from an unsafe context. As mentioned that seems to point we could for know reserve that space in the syntax for later 
+
+[16:39:48.0661] <iain>
+Note that we could also simply allow
+```
+unsafe {
+  let doWork = ...; 
+}
+```
+
+[16:40:45.0958] <iain>
+An unsafe block doesn't have to be a separate lexical scope of its own
+
+[16:41:04.0557] <shu>
+i would strongly prefer that something that looks like `{ }` be its own lexical scope
+
+[16:41:26.0835] <rbuckton>
+lexical scoping should never escape a `{}`, that would be a terrible precedent.
+
+[16:41:29.0154] <shu>
+that is a pretty deep affordance
+
+[16:41:30.0629] <shu>
+yeah
+
+[16:41:46.0642] <rbuckton>
+We don't even let class decorators access lexically scoped private names.
+
+[16:41:56.0983] <rbuckton>
+ * We don't even let class decorators access lexically scoped private names since they're outside of the class body
+
+[16:41:59.0689] <iain>
+I point to the parallel of namespace blocks in C++, where indenting them like:
+```
+unsafe {
+
+let doWork = ...
+
+}
+```
+makes it less confusing.
+
+[16:42:11.0219] <shu>
+> <@mhofman:matrix.org> I do find interesting the proposition that the user could define unsafe functions that like shared struct fields do need to be called from an unsafe context. As mentioned that seems to point we could for know reserve that space in the syntax for later
+
+runtime enforcement of colored functions like that is probably a no-go
+
+[16:42:24.0330] <shu>
+> <@iain:mozilla.org> I point to the parallel of namespace blocks in C++, where indenting them like:
+> ```
+> unsafe {
+> 
+> let doWork = ...
+> 
+> }
+> ```
+> makes it less confusing.
+
+nty :)
+
+[16:43:17.0028] <rbuckton>
+I maintain that C++ `namespace`-like indentation is a terrible aesthetic that we should not go out of our way to replicate.
+
+[16:43:54.0732] <shu>
+there is the worse-is-worse alternative of `"use unsafe"` which doesn't imply anything about scoping
+
+[16:44:07.0686] <shu>
+however, i find directives bad precisely because of that
+
+[16:44:27.0503] <Mathieu Hofman>
+All this now makes me realize something. What is the compatibility story of shared structs (and I suppose unsafe functions in the future) with Proxy. I don't think that we should prevent constructing a proxy with such a target, but I also assume a proxy trap implementation wouldn't be exempted from unsafe checks when accessing the target, even if the trap was triggered from an unsafe block. Is the only option that proxy traps be updated to become unsafe themselves? Is there a way to dynamically test whether an object has an unsafe color?
+
+[16:44:45.0296] <shu>
+there is no function coloring
+
+[16:44:50.0457] <shu>
+proxies just work?
+
+[16:45:06.0726] <rbuckton>
+No, they wouldn't.
+
+[16:45:20.0256] <shu>
+why wouldn't proxies just work?
+
+[16:45:38.0064] <iain>
+You need to have an unsafe block inside the proxy trap, don't you?
+
+[16:45:48.0429] <rbuckton>
+They would work as long as you don't have a proxy trap for `get` or `set`
+
+[16:46:21.0580] <rbuckton>
+But I don't imagine that `unsafe` magically carries through to proxies via the `get` and `set` traps.
+
+[16:46:34.0366] <shu>
+sorry, that's what i mean. proxies "just compose", unless there's interposed user code like a trap
+
+[16:46:41.0362] <Mathieu Hofman>
+Also would the Reflect intrinsics be "forwarding" the unsafe environment? Aka throw if not called from an unsafe block when bottoming out in accessing an unsafe receiver?
+
+[16:46:43.0204] <shu>
+in which case, exactly as ron says, they'd need their own `unsafe { }` marker
+
+[16:46:58.0673] <shu>
+it works exactly like strict mode throwing
+
+[16:47:42.0701] <rbuckton>
+If you have a shared struct `s` and you need an `unsafe` block to read `s.x`, then `new Proxy(s, { get(target, key, receiver) { return Reflect.get(target, key, receiver); } }).x` would through because neither the `get` trap nor `Reflect.get` can read/write the struct's fields.
+
+[16:48:10.0572] <rbuckton>
+ * If you have a shared struct `s` and you need an `unsafe` block to read `s.x`, then `new Proxy(s, { get(target, key, receiver) { return Reflect.get(target, key, receiver); } }).x` would throw because neither the `get` trap nor `Reflect.get` can read/write the struct's fields.
+
+[16:49:23.0588] <Mathieu Hofman>
+* I do find interesting the proposition that the user could define unsafe functions that like shared struct fields do need to be called from an unsafe context. As mentioned that seems to point we could for now reserve that space in the syntax for later 
+
+[16:49:24.0846] <rbuckton>
+e.g., we might need a `Reflect.unsafeGet` and a `{ unsafeGet }` trap, or we'd need to be able to pass `unsafe` as a flag to the trap/Reflect.get
+
+[16:50:31.0048] <rbuckton>
+Would you want `Reflect.get(s, "x")` to work outside of an `unsafe` context?
+
+[16:51:16.0916] <Mathieu Hofman>
+> <@shuyuguo:matrix.org> runtime enforcement of colored functions like that is probably a no-go
+
+How is calling different from field access? Doesn't the receiver need to perform some check in both cases?
+
+[16:51:17.0715] <shu>
+i feel like it really shouldn't?
+
+[16:51:21.0331] <rbuckton>
+`"use strict"` applies mostly to `set`, and informs how to react to the boolean return value of `Reflect.set()` or the `set` trap. It doesn't impact the `get` trap at all. 
+
+[16:52:14.0849] <shu>
+> <@mhofman:matrix.org> How is calling different from field access? Doesn't the receiver need to perform some check in both cases?
+
+it's different in that Ron's sketch is completely lexical, so all property access lexically contained with `unsafe { }` can generate a different bytecode at parse time. there is no propagation from from frame to frame
+
+[16:52:31.0827] <rbuckton>
+We won't need an `unsafe` block to use `Atomics.load(s, "x")`, since that already has implications around memory order. I'm not sure where I stand on whether `Reflect.get` observes `unsafe` 
+
+[16:53:38.0771] <rbuckton>
+My design sketch is more loosely based on C#'s interpretation of `unsafe` than Rust's in that C# doesn't require `unsafe` functions be invoked from within an `unsafe` block, while Rust does.
+
+[16:54:09.0256] <shu>
+> <@rbuckton:matrix.org> We won't need an `unsafe` block to use `Atomics.load(s, "x")`, since that already has implications around memory order. I'm not sure where I stand on whether `Reflect.get` observes `unsafe`
+
+i'm not sure mark would agree to that, actually. while it's true `Atomics.load` can't exhibit a *data* race, it can still exhibit races. so if mark's desired guarantee is "no non-deterministic races arising from shared memory at all", then it should also require `unsafe`. otherwise it can be outside of `unsafe`
+
+[16:54:12.0914] <iain>
+While I'm agnostic about the value of function colouring, I don't see why you can't generate different bytecode for calls in the same way you do for property access.
+
+[16:55:19.0885] <iain>
+It is definitely unfortunate that it would require calls to perform an extra check in safe contexts (aka normal code that isn't touching any of this stuff), but it seems technically feasible to enforce.
+
+[16:55:46.0878] <shu>
+> <@iain:mozilla.org> While I'm agnostic about the value of function colouring, I don't see why you can't generate different bytecode for calls in the same way you do for property access.
+
+i guess i don't know how the unsafe propagation works. if i have `unsafe { safeFunction(); } function safeFunction() { unsafeFunction(); } unsafe unsafeFunction() { ... }`, does that work or does that throw?
+
+[16:55:51.0703] <Mathieu Hofman>
+> <@shuyuguo:matrix.org> it's different in that Ron's sketch is completely lexical, so all property access lexically contained with `unsafe { }` can generate a different bytecode at parse time. there is no propagation from from frame to frame
+
+Can't you generate a different byte code for unsafeCall? An unsafe function would throw on regular call. A safe function would accept both call and unsafeCall
+
+[16:56:27.0051] <iain>
+That throws for the same reason as anything else
+
+[16:56:40.0547] <shu>
+okay, then yes, we can also generate a different bytecode
+
+[16:56:47.0395] <shu>
+and then it comes down to do we really want another function color
+
+[16:57:11.0981] <rbuckton>
+> <@shuyuguo:matrix.org> i'm not sure mark would agree to that, actually. while it's true `Atomics.load` can't exhibit a *data* race, it can still exhibit races. so if mark's desired guarantee is "no non-deterministic races arising from shared memory at all", then it should also require `unsafe`. otherwise it can be outside of `unsafe`
+
+I don't see a way to have `Atomics.load` be aware of `unsafe` unless we start treating it like we do direct vs. indirect eval? Otherwise we essentially *would* have function coloring, but only for `Atomics` methods and only when they receive a `shared struct` argument.
+
+[16:58:29.0886] <shu>
+good point. for Atomics.load to require `unsafe` would require an `UnsafeCall` internal bytecode as we've been discussing
+
+[16:58:47.0089] <rbuckton>
+So would it be better to special case function coloring purely for the `Atomics` methods, or just make it a more general mechanism? 
+
+[16:58:57.0860] <shu>
+but that'll be an implementation detail, and is orthogonal to whether we expose that coloring to user code
+
+[16:59:17.0349] <iain>
+I don't see any backwards-compatible way to make Atomics methods usefully unsafe
+
+[16:59:36.0783] <shu>
+well, Atomics currently don't work on field names, only TAs and indices
+
+[16:59:42.0696] <shu>
+that will remain usable everywhere
+
+[16:59:49.0756] <shu>
+and there will be magic to make the new forms throw outside of `unsafe`
+
+
+2024-07-03
+[17:00:19.0016] <shu>
+(the magic from a spec perspective will be, like, look at the current parse node being evaluated, and then find the nearest enclosing block)
+
+[17:00:38.0982] <rbuckton>
+I don't necessarily think we *need* general purpose function coloring, though I do like the additional guardrail that provides. I'm primarily interested in just improving the DX of `function f() { unsafe {` and `function f(x, y = do unsafe { x.y })` since those feel very awkward 
+
+[17:01:29.0592] <rbuckton>
+> <@shuyuguo:matrix.org> (the magic from a spec perspective will be, like, look at the current parse node being evaluated, and then find the nearest enclosing block)
+
+Wouldn't we just look at the current lexical environment as part of Call?
+
+[17:01:33.0867] <Mathieu Hofman>
+To inform this intrinsics call coloring question, I think the `Reflect.get` case is interesting. Would you expect `unsafe { Reflect.get(sharedStruct, "foo") }` to work?
+
+[17:01:46.0805] <shu>
+> <@rbuckton:matrix.org> Wouldn't we just look at the current lexical environment as part of Call?
+
+oh true, it'll always have one
+
+[17:02:08.0183] <shu>
+must be nice to have an implementation that never optimizes away scopes!
+
+[17:04:12.0551] <rbuckton>
+> <@mhofman:matrix.org> To inform this intrinsics call coloring question, I think the `Reflect.get` case is interesting. Would you expect `unsafe { Reflect.get(sharedStruct, "foo") }` to work?
+
+IIRC, C#'s `unsafe` (which is primarily for working directly with pointers) does not require `unsafe` to interact with pointers via reflection, but C#'s reflection is significantly different from JS's.
+
+[17:05:07.0422] <rbuckton>
+If we did require `unsafe`, then `Reflect.get` et al would also need an UnsafeCall
+
+[17:05:36.0154] <Mathieu Hofman>
+Good point. I would expect `Reflect.get` to throw if not in an unsafe context. 
+
+[17:06:46.0054] <rbuckton>
+But there would still be no carryover of `unsafe { proxyForS.x }` through a `get` trap, and just marking every proxy trap `unsafe` is dangerous.
+
+[17:07:04.0004] <Mathieu Hofman>
+Which now means we need an unsafeCall trap for proxies if we expose this to user land. Ugh
+
+[17:08:26.0484] <shu>
+hey man i'm also happy being laissez-faire with data races
+
+[17:08:33.0529] <rbuckton>
+We could instead have `new Proxy(s, { get(target, key, receiver, unsafe) { return Reflect.get(target, key, receiver, unsafe); } })` and traffic the caller's `unsafe`-ness around as a parameter.
+
+[17:10:01.0293] <shu>
+seems fine
+
+[17:10:50.0188] <Mathieu Hofman>
+Seems not, that would effectively allow creating unsafe context without syntax
+
+[17:12:04.0108] <shu>
+maybe `unsafe` will be some unforgeable capability token?
+
+[17:12:16.0300] <shu>
+i guess we can't prevent it from being exfiltrated
+
+[17:12:22.0375] <rbuckton>
+We either have all of this complexity, or we say:
+- no function coloring
+- `Atomics` methods are internally `unsafe` (so `Atomics.load(s, "x")` doesn't require an `unsafe` block)
+- `Reflect` methods are internally `unsafe` (so `Reflect.get(s, "x")` doesn't require an `unsafe` block)
+- The fact that a shared struct field is unsafe is carried through a proxy as we do other invariants in proxies, so you can't transparently make a Proxy "safe" if its fields are unsafe.
+
+[17:13:13.0750] <rbuckton>
+For the 4th bullet, that would mean `new Proxy(s, { get() { } }).x` would throw outside of an `unsafe` block without ever invoking the `get` trap
+
+[17:13:14.0379] <shu>
+i am definitely coming around to Atomics being internally unsafe, after what i said above
+
+[17:13:21.0325] <shu>
+in fact that's basically all Atomics do, access shared memory
+
+[17:13:30.0011] <shu>
+so they have to be internally unsafe in a no function coloring world
+
+[17:14:12.0281] <rbuckton>
+> <@shuyuguo:matrix.org> in fact that's basically all Atomics do, access shared memory
+
+Access shared memory and _enforce sequential ordering of memory accesses_, which _is_ a coordination mechanism.
+
+[17:14:20.0574] <shu>
+yes, fair
+
+[17:14:38.0548] <Mathieu Hofman>
+Maybe for atomics, but I'm a lot less comfortable for reflect
+
+[17:15:15.0204] <iain>
+Atomics are grandfathered in, and it's not too bad to say "grep for 'atomics' and 'unsafe' to audit"
+
+[17:15:18.0233] <rbuckton>
+Otherwise what's the purpose of all of the happens-before and all of the other ordering relations in https://tc39.es/ecma262/#sec-relations-of-candidate-executions
+
+[17:15:22.0704] <iain>
+I agree that reflect is a harder case
+
+[17:16:04.0150] <shu>
+it could also be that `Reflect` methods are not internally `unsafe`, so they just straight up don't work in any context on shared structs
+
+[17:16:10.0855] <shu>
+*i* can live with that
+
+[17:16:17.0097] <rbuckton>
+> <@iain:mozilla.org> Atomics are grandfathered in, and it's not too bad to say "grep for 'atomics' and 'unsafe' to audit"
+
+I'm not so sure I would characterize Atomics as "grandfathered in", given they are already a complex coordination mechanism.
+
+[17:16:49.0259] <shu>
+you then have to add `Reflect.unsafeGet` and `Reflect.unsafeSet` that are internally `unsafe`
+
+[17:16:53.0472] <iain>
+What I mean is that if you want to audit potential data races in your code, you have to look at your uses of Atomics, and we can't put that horse back in the barn
+
+[17:17:07.0898] <shu>
+no, Atomics can never exhibit data races
+
+[17:17:11.0398] <shu>
+only normal races
+
+[17:17:24.0518] <iain>
+Sorry, yeah, that's what I meant
+
+[17:20:04.0549] <shu>
+i'm off for the rest of the week. good progress and discussion everyone
+
+[17:20:15.0863] <rbuckton>
+I think "no function coloring" is a far simpler approach, overall. We shouldn't buy into that complexity unless it is absolutely necessary.
+
+[17:21:08.0196] <rbuckton>
+I think it has some interesting benefits, but I don't know that they outweigh the implementation complexity.
+
+[17:21:41.0855] <iain>
+I think it is worth preserving flexibility to add it later if it does not significantly conflict with other goals
+
+[17:21:47.0989] <iain>
+But I do not want function colouring now
+
+[17:23:02.0621] <rbuckton>
+In which case, I would still argue in favor of `unsafe function f() {}` as meaning something closer to C#'s interpretation than Rust's, in that `unsafe` in this case is only tagging the declaration as having an `unsafe` lexical scope, since `unsafe` tagging readily solves issues with lifting safe entrypoints to unsafe code out of an `unsafe {}` block.
+
+[17:24:46.0671] <rbuckton>
+We already have this problem with private state, I'd like us not to repeat that mistake.
+
+[17:31:32.0588] <rbuckton>
+```js
+// c.js
+
+// expose #x to other declarations in the same lexical scope
+let getX;
+
+export class C {
+  #x;
+  static {
+    getX = c => c.#x;
+  }
+}
+
+export class FriendOfC {
+  method(c) {
+    x = getX(c); // privileged access to #x
+  }
+}
+
+// other.js
+import { C, FriendOfC } from "./c.js";
+
+// can't get to C's #x
+```
+
+While it's one of the reasons I proposed `static {}`, it's still awkward to work with.
+
