@@ -380,3 +380,37 @@ That said, PLEASE ask more questions like this. Poking at the protocol is really
 [09:13:54.0543] <caitp>
 is this a reasonable place to talk about possible incongruency with web reality in webidl and/or dom? I asked a long-ish question to ms2ger, but he's out sick. It's entirely possible that my mental math is just wrong here
 
+[09:18:50.0122] <caitp>
+Copying most of my question here, just in case it is an accurate read of the spec algorithms not reflecting the behaviour of most browsers
+
+Can you explain the logic in https://github.com/web-platform-tests/wpt/blob/master/dom/collections/HTMLCollection-supported-property-names.html#L114-L115 which results in this test being the expected behaviour?
+
+My read of this is:
+
+it's a Legacy platform object / https://webidl.spec.whatwg.org/#js-legacy-platform-objects with no unforgeables, so that simplifies things a lot.
+
+114: define a property via https://webidl.spec.whatwg.org/#legacy-platform-object-defineownproperty
+
+P is a string and O supports named properties, we aren't a [Global] interface, P ("new-id2") is not unforgeable, thus we're in 2.1.
+creating is true (2.1)
+O does not implement [LegacyOverrideBuiltIns], so skip to 3.
+O does not implement [Global], so Desc.[[Configurable]] changes from false to true -- so we define an own configurable property with a value of 5
+121: "new-id2" becomes a supported property name of O
+
+124: LegacyPlatformObjectGetOwnProperty(O, P, false) ---
+
+2.1. the result of the named property visibility algorithm is false (it's a supported property name, but we also have an own property)
+return OrdinaryGetOwnProperty(O, P) -- We get a descriptor with a [[Value]] of 5 and a [[Configurable]] of true, because of the stuff on 114
+126: [[Delete]] of a legacy platform object (https://webidl.spec.whatwg.org/#legacy-platform-object-delete)
+
+The named property visibility algorithm is false again for the reasons lsited above
+O has an own property P
+3.1 The property is configurable, becasue of the steps on line 114
+3.2 deletion is successful, and the property is removed from O
+return true --- This is NOT what the test is expecting to happen (see line 133)
+129: delete again, this time named property visibility returns true, and we have no named property deleter and thus return false -- Being in strict mode this time, we throw an exception (so this assertion would be successful)
+
+133: We try to repeat the steps on line 124 --- However, because deletion was successful in line 126, this assertion fails (at least in my read through this)
+
+However, I think all the major browsers are passing the test. So does this mean the spec is wrong, or am I just misreading this in a dumb way?
+

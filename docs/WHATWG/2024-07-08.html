@@ -57,6 +57,38 @@ Thanks for the help!</td></tr>
   <tr class="msg" id="L20"><td class="ts-cell"><a class="ts" href="#L20" alt="Mon Jul 08 2024 07:51:43 GMT-0700 (Pacific Daylight Time)">14:51</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-6" title="@jrconlin:mozilla.org">jrconlin</span>&gt;</div></td><td class="msg-cell">That said, PLEASE ask more questions like this. Poking at the protocol is really, really important and I absolutely welcome folk doing that.</td></tr>
   <tr class="msg" id="L21"><td class="ts-cell"><a class="ts" href="#L21" alt="Mon Jul 08 2024 07:53:15 GMT-0700 (Pacific Daylight Time)">14:53</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-6" title="@jrconlin:mozilla.org">jrconlin</span>&gt;</div></td><td class="msg-cell">(Honestly? I'd be fine if the UA were to limit the number of push subscriptions to something, even if it were some arbitrary number like 256.) Like I said, the bulk of the work is more on the UA than the backend server. </td></tr>
   <tr class="msg" id="L22"><td class="ts-cell"><a class="ts" href="#L22" alt="Mon Jul 08 2024 09:13:54 GMT-0700 (Pacific Daylight Time)">16:13</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-8" title="@cpotter:igalia.com">caitp</span>&gt;</div></td><td class="msg-cell">is this a reasonable place to talk about possible incongruency with web reality in webidl and/or dom? I asked a long-ish question to ms2ger, but he's out sick. It's entirely possible that my mental math is just wrong here</td></tr>
+  <tr class="msg" id="L23"><td class="ts-cell"><a class="ts" href="#L23" alt="Mon Jul 08 2024 09:18:50 GMT-0700 (Pacific Daylight Time)">16:18</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-8" title="@cpotter:igalia.com">caitp</span>&gt;</div></td><td class="msg-cell">Copying most of my question here, just in case it is an accurate read of the spec algorithms not reflecting the behaviour of most browsers
+
+Can you explain the logic in <a href="https://github.com/web-platform-tests/wpt/blob/master/dom/collections/HTMLCollection-supported-property-names.html#L114-L115">https://github.com/web-platform-tests/wpt/blob/master/dom/collections/HTMLCollection-supported-property-names.html#L114-L115</a> which results in this test being the expected behaviour?
+
+My read of this is:
+
+it's a Legacy platform object / <a href="https://webidl.spec.whatwg.org/#js-legacy-platform-objects">https://webidl.spec.whatwg.org/#js-legacy-platform-objects</a> with no unforgeables, so that simplifies things a lot.
+
+114: define a property via <a href="https://webidl.spec.whatwg.org/#legacy-platform-object-defineownproperty">https://webidl.spec.whatwg.org/#legacy-platform-object-defineownproperty</a>
+
+P is a string and O supports named properties, we aren't a [Global] interface, P ("new-id2") is not unforgeable, thus we're in 2.1.
+creating is true (2.1)
+O does not implement [LegacyOverrideBuiltIns], so skip to 3.
+O does not implement [Global], so Desc.[[Configurable]] changes from false to true -- so we define an own configurable property with a value of 5
+121: "new-id2" becomes a supported property name of O
+
+124: LegacyPlatformObjectGetOwnProperty(O, P, false) ---
+
+2.1. the result of the named property visibility algorithm is false (it's a supported property name, but we also have an own property)
+return OrdinaryGetOwnProperty(O, P) -- We get a descriptor with a [[Value]] of 5 and a [[Configurable]] of true, because of the stuff on 114
+126: [[Delete]] of a legacy platform object (<a href="https://webidl.spec.whatwg.org/#legacy-platform-object-delete">https://webidl.spec.whatwg.org/#legacy-platform-object-delete</a>)
+
+The named property visibility algorithm is false again for the reasons lsited above
+O has an own property P
+3.1 The property is configurable, becasue of the steps on line 114
+3.2 deletion is successful, and the property is removed from O
+return true --- This is NOT what the test is expecting to happen (see line 133)
+129: delete again, this time named property visibility returns true, and we have no named property deleter and thus return false -- Being in strict mode this time, we throw an exception (so this assertion would be successful)
+
+133: We try to repeat the steps on line 124 --- However, because deletion was successful in line 126, this assertion fails (at least in my read through this)
+
+However, I think all the major browsers are passing the test. So does this mean the spec is wrong, or am I just misreading this in a dumb way?</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>
