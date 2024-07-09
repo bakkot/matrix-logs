@@ -715,3 +715,28 @@ aroundEach((test) => v.run(value, test));
 
 would get the job done.
 
+[15:32:10.0938] <Steve Hicks>
+> <@devsnek:matrix.org> this is about whether the proposal should support an api like AsyncLocalStorage#enterWith? What's the reason to not support it?
+
+The reason is that it breaks encapsulation.  The current proposal means that you have strong guarantees that a variable won't change during the course of a function, but if a child task can `enterWith` a new value, then it can affect the parent task in unexpected ways.  It also runs afoul of the requirements imposed by SES, and is unlikely to be accepted by the committee.
+
+That said, if you want to make your own `enterWith`able variable, it's easy enough:
+
+```
+class EnterableVar<T> {
+  private readonly internal: AsyncContext.Variable<[T]>;
+  constructor(opts = {}) {
+    this.internal = new AsyncContext.Variable({...opts, defaultValue: [opts.defaultValue]});
+  }
+  run(val, fn) {
+    return this.internal.run([val], fn);
+  }
+  get() {
+    return this.internal.get()[0];
+  }
+  enterWith(val) {
+    this.internal.get()[0] = val;
+  }
+}
+```
+
