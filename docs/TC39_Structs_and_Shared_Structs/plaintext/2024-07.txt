@@ -1043,3 +1043,66 @@ Maybe gOPD would throw if you don’t call the unsafe one?
 [18:35:01.0125] <rbuckton>
 You need MOP operations to be reliable. What happens if I do `Object.create(sharedStruct)`? Now I have a normal JS object with a shared struct prototype. If I call [[Get]] on the result it should still throw if it tries to read a prototype field outside of `unsafe`.
 
+[18:35:11.0468] <littledan>
+Do we have unsafeDefineProperty?
+
+[18:35:22.0775] <rbuckton>
+getOPD shouldn't throw. Nothing causes it to throw today, to my knowledge.
+
+[18:35:34.0236] <rbuckton>
+No. You can't call defineProperty on a shared struct, it would fail.
+
+[18:35:39.0595] <rbuckton>
+Shared struct instances are sealed.
+
+[18:35:46.0820] <rbuckton>
+No new properties, no deleting properties.
+
+[18:35:57.0754] <littledan>
+Even if the property descriptor matches what’s already there?
+
+[18:36:06.0907] <littledan>
+> <@rbuckton:matrix.org> getOPD shouldn't throw. Nothing causes it to throw today, to my knowledge.
+
+Proxy can 
+
+[18:36:08.0243] <rbuckton>
+Normal defineProperty would just fail because of the existing integrity checks
+
+[18:36:43.0066] <littledan>
+> <@rbuckton:matrix.org> Normal defineProperty would just fail because of the existing integrity checks
+
+I don’t think that’s the case if you define it as what it’s already defined to be, but with a different value 
+
+[18:36:44.0363] <rbuckton>
+AFAIK, no developers code defensively against gOPD failing. 
+
+[18:36:54.0908] <rbuckton>
+That's fair
+
+[18:37:10.0588] <rbuckton>
+ * GetOwnPropertyDescriptor would probably throw outside of `unsafe`, or possibly would return a new descriptor that is `{ enumerable: ?, writable: ?, configurable: false, shared: true }` with no `value` property.
+
+[18:37:38.0616] <rbuckton>
+Maybe we do need `unsafeDefineProperty`. I do want to be able to change `writable`
+
+[18:37:50.0780] <rbuckton>
+But you can't create new properties with it, 
+
+[18:37:55.0905] <rbuckton>
+ * But you can't create new properties with it.
+
+[18:39:06.0279] <rbuckton>
+Maybe instead of `Reflect.unsafeX` we have `Reflect.unsafe.X` which just mirrors `Reflect`
+
+[18:39:10.0058] <littledan>
+I would start simple and omit unsafeGOPD and unsafeDP, letting these always throw on shared struct data props. That might be the only observable difference between the ways we are thinking about this.
+
+[18:39:19.0738] <rbuckton>
+(except for `deleteProperty` since that will never work?)
+
+[18:39:58.0617] <littledan>
+> <@rbuckton:matrix.org> Maybe instead of `Reflect.unsafeX` we have `Reflect.unsafe.X` which just mirrors `Reflect`
+
+I am a fan of namespace objects, but I don’t know how much of this we need to fill in
+
