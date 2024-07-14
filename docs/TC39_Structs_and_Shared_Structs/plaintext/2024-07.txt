@@ -1186,3 +1186,44 @@ If we don't have function coloring, we could just allow you to call the `Reflect
 
 How are accessors supposed to know whether they are in an unsafe block?
 
+[19:05:13.0988] <Mathieu Hofman>
+> <@littledan:matrix.org> How are accessors supposed to know whether they are in an unsafe block?
+
+Yes that's the problem. Accessor simply reduce to a single kind of problem: function calls, instead of also dealing with the other meta ops. But it remains a problem that it's hard to explain the behavior without function coloring 
+
+[19:06:12.0655] <littledan>
+Could you describe how you picture function coloring to work?
+
+[19:06:38.0697] <rbuckton>
+e.g., something like this but with proper support for `receiver`
+```js
+Reflect.unsafeGet = (obj, key) => {
+  if ({}.hasOwnProperty.call(obj, key)) {
+    unsafe {
+      return obj[key];
+    }
+  }
+  return Reflect.get(obj, key);
+}
+```
+
+[19:07:57.0255] <rbuckton>
+> <@littledan:matrix.org> How are accessors supposed to know whether they are in an unsafe block?
+
+Accessors like `get foo() { }`? They don't? They're just a function. If you expose a getter/setter on your struct you need to do your due diligence to make it safe to outside callers.
+
+[19:09:25.0858] <rbuckton>
+```js
+shared struct S {
+  #mut = new Atomics.Mutex();
+  #x;
+  get x() {
+    unsafe {
+      using lck = new Atomics.UniqueLock(this.#mut);
+      return this.#x;
+    }
+  }
+}
+```
+It's nasty, but I suppose that's the point?
+

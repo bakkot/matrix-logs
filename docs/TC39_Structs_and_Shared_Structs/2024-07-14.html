@@ -109,6 +109,33 @@
   <tr class="msg" id="L72"><td class="ts-cell"><a class="ts" href="#L72" alt="Sat Jul 13 2024 19:02:34 GMT-0700 (Pacific Daylight Time)">02:02</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@mhofman:matrix.org">Mathieu Hofman</span>&gt;</div></td><td class="msg-cell">It really feels that function coloring actually explains all this much better</td></tr>
   <tr class="msg" id="L73"><td class="ts-cell"><a class="ts" href="#L73" alt="Sat Jul 13 2024 19:02:45 GMT-0700 (Pacific Daylight Time)">02:02</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">If we don't have function coloring, we could just allow you to call the <code>Reflect.unsafeX</code> outside of an <code>unsafe</code> block. Its in the name, so it's already labeled unsafe.</td></tr>
   <tr class="msg" id="L74"><td class="ts-cell"><a class="ts" href="#L74" alt="Sat Jul 13 2024 19:03:23 GMT-0700 (Pacific Daylight Time)">02:03</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@littledan:matrix.org">littledan</span>&gt;</div></td><td class="msg-cell"><mx-reply><blockquote> Well accessors means there are no issues with any of the MOP and no special property descriptors</blockquote></mx-reply>How are accessors supposed to know whether they are in an unsafe block?</td></tr>
+  <tr class="msg" id="L75"><td class="ts-cell"><a class="ts" href="#L75" alt="Sat Jul 13 2024 19:05:13 GMT-0700 (Pacific Daylight Time)">02:05</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@mhofman:matrix.org">Mathieu Hofman</span>&gt;</div></td><td class="msg-cell"><mx-reply><blockquote> How are accessors supposed to know whether they are in an unsafe block?</blockquote></mx-reply>Yes that's the problem. Accessor simply reduce to a single kind of problem: function calls, instead of also dealing with the other meta ops. But it remains a problem that it's hard to explain the behavior without function coloring</td></tr>
+  <tr class="msg" id="L76"><td class="ts-cell"><a class="ts" href="#L76" alt="Sat Jul 13 2024 19:06:12 GMT-0700 (Pacific Daylight Time)">02:06</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@littledan:matrix.org">littledan</span>&gt;</div></td><td class="msg-cell">Could you describe how you picture function coloring to work?</td></tr>
+  <tr class="msg" id="L77"><td class="ts-cell"><a class="ts" href="#L77" alt="Sat Jul 13 2024 19:06:38 GMT-0700 (Pacific Daylight Time)">02:06</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell"><p>e.g., something like this but with proper support for <code>receiver</code></p>
+<pre><code class="language-js">Reflect.unsafeGet = (obj, key) =&gt; {
+  if ({}.hasOwnProperty.call(obj, key)) {
+    unsafe {
+      return obj[key];
+    }
+  }
+  return Reflect.get(obj, key);
+}
+</code></pre>
+</td></tr>
+  <tr class="msg" id="L78"><td class="ts-cell"><a class="ts" href="#L78" alt="Sat Jul 13 2024 19:07:57 GMT-0700 (Pacific Daylight Time)">02:07</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell"><mx-reply><blockquote> How are accessors supposed to know whether they are in an unsafe block?</blockquote></mx-reply>Accessors like <code>get foo() { }</code>? They don't? They're just a function. If you expose a getter/setter on your struct you need to do your due diligence to make it safe to outside callers.</td></tr>
+  <tr class="msg" id="L79"><td class="ts-cell"><a class="ts" href="#L79" alt="Sat Jul 13 2024 19:09:25 GMT-0700 (Pacific Daylight Time)">02:09</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell"><pre><code class="language-js">shared struct S {
+  #mut = new Atomics.Mutex();
+  #x;
+  get x() {
+    unsafe {
+      using lck = new Atomics.UniqueLock(this.#mut);
+      return this.#x;
+    }
+  }
+}
+</code></pre>
+<p>It's nasty, but I suppose that's the point?</p>
+</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>
