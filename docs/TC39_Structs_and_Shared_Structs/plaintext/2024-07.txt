@@ -1017,3 +1017,29 @@ In an unsafe block, get operations use [[UnsafeGet]]/[[UnsafeSet]] instead of [[
 [18:29:50.0003] <rbuckton>
 Even without `unsafe` we need to do something similar to handle shared memory access for shared struct fields in [[Get]] and [[Set]], so we already expect to pay this cost.
 
+[18:31:01.0615] <rbuckton>
+GetOwnPropertyDescriptor would probably throw outside of `unsafe`, or possibly would return a new descriptor that is `{ enumerable: ?, writable: false, configurable: false, shared: true }` with no `value` property.
+
+[18:31:41.0513] <littledan>
+OK, so how does Object.getOwnPropertyDescriptor know if it’s in an unsafe block?
+
+[18:31:47.0525] <rbuckton>
+But `in` and `Reflect.has` et al should work outside of unsafe because for a given reference to a shared struct, it will still have a fixed shape.
+
+[18:32:21.0828] <littledan>
+I was trying to avoid functions changing behavior based on their caller
+
+[18:33:38.0739] <littledan>
+> <@rbuckton:matrix.org> You cannot have a [[Get]] outside of `unsafe` return a prototype property if there was a struct field of the same name.
+
+I think this problem can be fixed in my suggestion without making any new MOP ops or anything
+
+[18:33:44.0042] <rbuckton>
+We could have gOPD return a new kind of descriptor both in and out of `unsafe`, and an `Reflect.unsafeGetOwnPropertyDescriptor` that has the same magic that `Reflect.unsafeGet`/`Reflect.unsafeSet` would have (if any).
+
+[18:34:49.0920] <littledan>
+Maybe gOPD would throw if you don’t call the unsafe one?
+
+[18:35:01.0125] <rbuckton>
+You need MOP operations to be reliable. What happens if I do `Object.create(sharedStruct)`? Now I have a normal JS object with a shared struct prototype. If I call [[Get]] on the result it should still throw if it tries to read a prototype field outside of `unsafe`.
+
