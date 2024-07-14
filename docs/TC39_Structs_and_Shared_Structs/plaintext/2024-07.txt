@@ -1242,3 +1242,36 @@ I'll have to follow up on any other discussion on Monday.
 [19:14:04.0005] <snek>
  * this example makes me wonder something... should a shared struct even be exposed? in rust for example you'd write your code like `struct Public(Mutex<Shared>)`, rather than `struct Shared { mutex: Mutex<()>, ...Shared }`
 
+[19:15:22.0594] <rbuckton>
+That example I gave is a bad one 
+
+[19:15:35.0083] <littledan>
+> <@mhofman:matrix.org> The way I picture function coloring is that every callable now has 2 ops: `[[Call]]` and `[[CallUnsafe]]`. If you are in an unsafe block, it's CallUnsafe that gets executed. For normal functions, CallUnsafe is the same as Call (maybe it's missing and it falls back to Call when missing?). For shared functions, Call throws (can only be called from unsafe blocks). Reflect and other intrinsics can have different Call and CallUnsafe behaviors, that effectively "forward" the unsafe state of the call site.
+
+this sounds coherent to me, but it's not what I would call "function coloring", which would apply recursively somehow, like async/await
+
+[19:15:57.0369] <rbuckton>
+But yes, we think a shared struct should be exposed. Mutex and shared struct are not strongly tied to each other.
+
+[19:17:12.0247] <rbuckton>
+Function coloring does not imply recursive application. Async/await poisoning occurs because you are taking an inherently sequential, synchronous operation and want to turn it into a sequential asynchronous operation.
+
+[19:17:49.0191] <Mathieu Hofman>
+> <@littledan:matrix.org> this sounds coherent to me, but it's not what I would call "function coloring", which would apply recursively somehow, like async/await
+
+Right, technically you can have an `CallUnsafe` implementation that is not itself an unsafe scope 
+
+[19:17:58.0110] <rbuckton>
+Async/await has function coloring (of a sort), but function coloring is not async/await.
+
+[19:18:12.0050] <snek>
+no i don't mean you should have to use mutex specifically, that's just the example here.
+
+[19:18:29.0852] <littledan>
+(I'm not criticizing the approach, it's just drastically different from what I expected when people started using the term "function coloring")
+
+[19:19:53.0814] <rbuckton>
+> <@devsnek:matrix.org> no i don't mean you should have to use mutex specifically, that's just the example here.
+
+you can organize your code however you want. My use cases have entire object graphs of shared objects with any coordination being through  lock-free concurrent collections.
+
