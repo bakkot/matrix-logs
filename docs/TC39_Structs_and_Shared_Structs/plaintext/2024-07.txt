@@ -1701,3 +1701,17 @@ If we have strong motivations and clear rationale for why we need function color
 [21:46:36.0716] <rbuckton>
 Don't get me wrong, I absolutely love `async`/`await`. It's the fact that you can't choose to synchronously wait for a promise to complete when it would be appropriate to do so that is the problem, which is something you *can* do in numerous languages with a more robust model for shared memory multi-threading.
 
+
+2024-07-15
+[22:40:02.0807] <Mathieu Hofman>
+I think I caught up on the discussion.
+1. I strongly hold that existing Reflect & co APIs should not work on writable shared structs fields in non unsafe blocks.
+  a. I understand this may break existing code that blindly try to access objects, but technically this is already a possibility with exotic objects, and I really don't want to see us modify the shape of property descriptors.
+  b. It may be acceptable for some new dedicated Reflect APIs to access writable shared struct fields in non unsafe block, but I like the idea that "unsafe" access requires new syntax. It'd be a much more consistent model for audits.
+2. I believe that existing Reflect & co APIs should work on shared struct fields inside unsafe blocks. This is especially true if we don't have new dedicated unsafe APIs
+3. At first I didn't like `function.unsafe` as it felt like a form of dynamic scoping, but I am now warming up to it. As explained it is similar to `new.target`: the unsafe block changes the semantics of the call, like `new` would, and as the callee you get to sense the semantic change through some new piece of syntax.
+  a. Unlike construct, I don't think we need `Reflect.unsafeCall`/`Reflect.unsafeContruct` and the corresponding proxy traps as long as the existing call/construct traps get to sense through `function.unsafe`, so they can use an unsafe block to trigger the change of semantics on the target.
+4. `unsafe function () { ... }` would effectively be the equivalent of `function () { if (!function.unsafe) throw TypeError(); unsafe { ... } }`
+5. I like the idea of non-writable properties of shared structs being safe to access anywhere, but since the change from writable to non-writable is intrinsically dynamic, we have to consider whether we might opening too wide a door for authors to shoot themselves in the foot: since the access may not be audited as unsafe, they might not realize that there could be a race with the freezing of the property.
+  a. even if the property becomes non-writable at init, given that you can share the struct before init completes, it is still a dynamic state change
+
