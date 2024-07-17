@@ -769,3 +769,35 @@ Is it? AsyncContext allows you to propagate some data related to a reference you
 
 Is it? AsyncContext allows you to propagate some data related to a reference you own. The web instead creates an internal reference, and exposes way to access information related to that reference to anyone. scheduler.yield is effectively equivalent to a `myInternalAsyncContextVar.get()`
 
+[10:51:39.0331] <Mathieu Hofman>
+> <@bakkot:matrix.org> IIUC, with AsyncContext you have to have a reference to the context in order to see or affect the state. it's not going to be affected by calling into random libraries. whereas with `scheduler.yield`, if I am doing some random stuff, and then I do `library.doWork()`, and the library does `scheduler.yield({ its own config })`, now _my_ future calls to `scheduler.yield` don't work how I expected. that's crazy.
+
+That is the outcome of having the equivalent of a single global asynccontext variable
+
+[10:53:30.0140] <Andreu Botella>
+> <@bakkot:matrix.org> that lists as an open question:
+> 
+> > Does `yield({priority})` set the priority to be inherited in future calls, or is the original signal used?
+> 
+> if I understand what this is saying correctly, using the original priority would be fine by me - it's only the "calling a library function can change the priority used by the rest of my code" part I'm objecting to here
+
+I think it would only set the priority to be inherited in promise reactions that flow from the returned promise
+
+[10:53:48.0004] <Andreu Botella>
+so in an async function, only for the remainder of the function
+
+[10:54:08.0075] <Andreu Botella>
+it wouldn't affect an outer function
+
+[10:54:10.0079] <Andreu Botella>
+I don't think
+
+[10:54:49.0726] <Andreu Botella>
+ * it wouldn't affect an outer async function
+
+[10:54:56.0909] <littledan>
+seems like yield does the equivalent of enterWith, which AsyncContext currently omits
+
+[10:55:06.0302] <littledan>
+ * seems like scheduler.yield does the equivalent of enterWith, which AsyncContext currently omits
+
