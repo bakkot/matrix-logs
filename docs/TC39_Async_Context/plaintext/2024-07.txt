@@ -1196,3 +1196,55 @@ async function f() {
 ```
 as long as that's maintained, I'm not worried
 
+[12:50:38.0397] <bakkot>
+obviously if `doWork` closes over an async context variable which has a mutable object or whatever then it can affect it, just like if it closed over a regular variable; that's fine
+
+[12:50:52.0778] <bakkot>
+ * specifically:
+
+```js
+async function f() {
+  await scheduler.yield();
+  await someLibrary.doWork();
+  await scheduler.yield(); // this should not be affected by the `doWork` call
+}
+```
+
+as long as that's maintained, I'm not worried
+
+[12:51:18.0563] <bakkot>
+(assuming there aren't any such which exist by default)
+
+[12:51:48.0684] <Justin Ridgewell>
+For the last few weeks, we’ve been discussion Contunation variables which behave differnetly than `AsyncContext.Variable` does: https://github.com/tc39/proposal-async-context/pull/94
+
+[12:52:00.0027] <Justin Ridgewell>
+* For the last few weeks, we’ve been discussing Contunation variables which behave differnetly than `AsyncContext.Variable` does: https://github.com/tc39/proposal-async-context/pull/94
+
+[12:54:48.0337] <Justin Ridgewell>
+```js
+const aVar = new AsyncContext.Variable();
+const cVar = new ContinuationVariable();
+
+async function foo() {
+  return aVar.run(2, () => {
+    return cVar.run(2, () => {
+      // aVar.get() === 2
+      // cVar.get() === 2
+    });
+  });
+}
+
+aVar.run(1, () => {
+  cVar.run(1, async () => {
+      // aVar.get() === 1
+      // cVar.get() === 1
+
+      await foo();
+
+      // aVar.get() === 1
+      // cVar.get() === 2
+  });
+});
+```
+

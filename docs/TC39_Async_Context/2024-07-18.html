@@ -43,7 +43,7 @@
   <tr class="msg" id="L14"><td class="ts-cell"><a class="ts" href="#L14" alt="Thu Jul 18 2024 12:10:57 GMT-0700 (Pacific Daylight Time)">19:10</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-9" title="@nicolo-ribaudo:matrix.org">nicolo-ribaudo</span>&gt;</div></td><td class="msg-cell">I've seen from the outside how much work has gone in the web integration, I think a status update on that would be very valuable </td></tr>
   <tr class="msg" id="L15"><td class="ts-cell"><a class="ts" href="#L15" alt="Thu Jul 18 2024 12:13:46 GMT-0700 (Pacific Daylight Time)">19:13</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-1" title="@jridgewell:matrix.org">Justin Ridgewell</span>&gt;</div></td><td class="msg-cell">To everyone not following the TC39 General room, there’s been some discussion on <code data-md="`">AsyncContext</code>:<br><ol data-md="-"><li><p><a href="https://matrixlogs.bakkot.com/TC39_General/2024-07-16">https://matrixlogs.bakkot.com/TC39_General/2024-07-16</a></p></li><li><p><a href="https://matrixlogs.bakkot.com/TC39_General/2024-07-17">https://matrixlogs.bakkot.com/TC39_General/2024-07-17</a></p></li><li><p><a href="https://matrixlogs.bakkot.com/TC39_General/2024-07-18">https://matrixlogs.bakkot.com/TC39_General/2024-07-18</a></p></li></ol></td></tr>
   <tr class="msg" id="L16"><td class="ts-cell"><a class="ts" href="#L16" alt="Thu Jul 18 2024 12:23:05 GMT-0700 (Pacific Daylight Time)">19:23</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-1" title="@jridgewell:matrix.org">Justin Ridgewell</span>&gt;</div></td><td class="msg-cell">In particular, @bakkot has some dislike of through-await continuation semantics in:<br><ol data-md="-"><li><p><a href="https://matrixlogs.bakkot.com/TC39_General/2024-07-17#L56">https://matrixlogs.bakkot.com/TC39_General/2024-07-17#L56</a></p></li><li><p><a href="https://matrixlogs.bakkot.com/TC39_General/2024-07-17#L67">https://matrixlogs.bakkot.com/TC39_General/2024-07-17#L67</a></p></li><li><p><a href="https://matrixlogs.bakkot.com/TC39_General/2024-07-17#L75">https://matrixlogs.bakkot.com/TC39_General/2024-07-17#L75</a></p></li></ol><br>Which had to be resolved in <a href="https://matrixlogs.bakkot.com/TC39_General/2024-07-17#L80-L81">https://matrixlogs.bakkot.com/TC39_General/2024-07-17#L80-L81</a></td></tr>
-  <tr class="msg" id="L17"><td class="ts-cell"><a class="ts" href="#L17" alt="Thu Jul 18 2024 12:49:43 GMT-0700 (Pacific Daylight Time)">19:49</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell"><p>specifically, the thing I don't want:</p>
+  <tr class="msg" id="L17"><td class="ts-cell"><a class="ts" href="#L17" alt="Thu Jul 18 2024 12:49:43 GMT-0700 (Pacific Daylight Time)">19:49</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell"><p>specifically:</p>
 <pre><code class="language-js">async function f() {
   await scheduler.yield();
   await someLibrary.doWork();
@@ -52,6 +52,33 @@
 </code></pre>
 <p>as long as that's maintained, I'm not worried</p>
 </td></tr>
+  <tr class="msg" id="L18"><td class="ts-cell"><a class="ts" href="#L18" alt="Thu Jul 18 2024 12:50:38 GMT-0700 (Pacific Daylight Time)">19:50</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell">obviously if <code>doWork</code> closes over an async context variable which has a mutable object or whatever then it can affect it, just like if it closed over a regular variable; that's fine</td></tr>
+  <tr class="msg" id="L19"><td class="ts-cell"><a class="ts" href="#L19" alt="Thu Jul 18 2024 12:51:18 GMT-0700 (Pacific Daylight Time)">19:51</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell">(assuming there aren't any such which exist by default)</td></tr>
+  <tr class="msg" id="L20"><td class="ts-cell"><a class="ts" href="#L20" alt="Thu Jul 18 2024 12:51:48 GMT-0700 (Pacific Daylight Time)">19:51</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-1" title="@jridgewell:matrix.org">Justin Ridgewell</span>&gt;</div></td><td class="msg-cell">For the last few weeks, we’ve been discussing Contunation variables which behave differnetly than <code data-md="`">AsyncContext.Variable</code> does: <a href="https://github.com/tc39/proposal-async-context/pull/94">https://github.com/tc39/proposal-async-context/pull/94</a></td></tr>
+  <tr class="msg" id="L21"><td class="ts-cell"><a class="ts" href="#L21" alt="Thu Jul 18 2024 12:54:48 GMT-0700 (Pacific Daylight Time)">19:54</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-1" title="@jridgewell:matrix.org">Justin Ridgewell</span>&gt;</div></td><td class="msg-cell"><pre data-md="```"><code class="language-js">const aVar = new AsyncContext.Variable();
+const cVar = new ContinuationVariable();
+
+async function foo() {
+  return aVar.run(2, () =&gt; {
+    return cVar.run(2, () =&gt; {
+      // aVar.get() === 2
+      // cVar.get() === 2
+    });
+  });
+}
+
+aVar.run(1, () =&gt; {
+  cVar.run(1, async () =&gt; {
+      // aVar.get() === 1
+      // cVar.get() === 1
+
+      await foo();
+
+      // aVar.get() === 1
+      // cVar.get() === 2
+  });
+});
+</code></pre></td></tr>
 
 </tbody></table></div></div></div>
 </body></html>
