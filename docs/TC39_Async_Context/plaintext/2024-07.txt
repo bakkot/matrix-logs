@@ -1571,3 +1571,96 @@ the idea is to handle that for a subset of use cases in the initial rollout
 [11:10:09.0086] <Andreu Botella>
 and then incrementally increase that set
 
+[11:10:26.0423] <littledan>
+if we always provided one, we'd want to change some of them later as we incrementally increase accuracy
+
+[11:10:42.0540] <littledan>
+but the other option is for it to be null, to say "no additional causal information to see here"
+
+[11:10:52.0589] <Steve Hicks>
+> <@littledan:matrix.org> I thought we wanted to let people know *whether* there was a more interesting causal snapshot
+
+I see where you're going with this, but I'm concerned about the consistency of whether we're in an empty snapshot or not in a snapshot at any given time
+
+[11:10:55.0755] <littledan>
+this field is not a feature that ordinary programmers should use
+
+[11:11:01.0652] <Stephen Belanger>
+> <@littledan:matrix.org> there's always a snapshot used when running the event handler, there's just not always an *additional* causal snapshot presented
+
+That's the registration time though, right? APMs need the dispatch context.
+
+[11:11:06.0035] <littledan>
+> <@stephenhicks:matrix.org> I see where you're going with this, but I'm concerned about the consistency of whether we're in an empty snapshot or not in a snapshot at any given time
+
+there is never an empty snapshot
+
+[11:11:13.0932] <Steve Hicks>
+this seems like it would be implying that the event loop runs outside of any snapshot
+
+[11:11:16.0683] <littledan>
+the event runs in the registration time snapshot
+
+[11:11:20.0121] <littledan>
+no
+
+[11:11:29.0549] <littledan>
+we're talking about the *additional* causal snapshot, which you can .run if you want
+
+[11:11:33.0119] <Steve Hicks>
+s/empty snaphot/host-created initial snapshot/ whatever
+
+[11:11:41.0361] <littledan>
+yeah that doesn't come up here
+
+[11:11:50.0981] <littledan>
+that only comes up for modules
+
+[11:12:01.0544] <Andreu Botella>
+> <@stephenbelanger:matrix.org> That's the registration time though, right? APMs need the dispatch context.
+
+I don't see making sure that the dispatch context is tracked for every single event with an asynchronous source as feasible in a short amount of time
+
+[11:12:03.0923] <Stephen Belanger>
+> <@littledan:matrix.org> we're talking about the *additional* causal snapshot, which you can .run if you want
+
+Yes, that is the one APMs need. The registration time snapshot is not useful to us.
+
+[11:12:17.0529] <littledan>
+> <@stephenbelanger:matrix.org> That's the registration time though, right? APMs need the dispatch context.
+
+right, so we're talking about the details for how to provide that information
+
+[11:12:35.0445] <Steve Hicks>
+> <@littledan:matrix.org> that only comes up for modules
+
+IIUC scripts also load an initial snapshot via the same operation
+
+[11:12:42.0979] <littledan>
+yes that too, but not events
+
+[11:13:09.0475] <Stephen Belanger>
+> <@abotella:igalia.com> I don't see making sure that the dispatch context is tracked for every single event with an asynchronous source as feasible in a short amount of time
+
+I mean, if the plan is to reserve a slot for it to _be there_ but just not having all sources _supported_ immediately, that's probably fine. Most APMs don't really do full structural tracing in the browser yet anyway. 🤷
+
+[11:13:41.0268] <littledan>
+> <@stephenbelanger:matrix.org> I mean, if the plan is to reserve a slot for it to _be there_ but just not having all sources _supported_ immediately, that's probably fine. Most APMs don't really do full structural tracing in the browser yet anyway. 🤷
+
+yes, that's the idea. Rather than getting it wrong sometimes, we'll have the value be null for cases where the browser hasn't figured out yet how to provide the information.
+
+[11:13:45.0687] <Stephen Belanger>
+I mostly just want to be sure we're going in a direction that one block us from being able to support that in the future.
+
+[11:14:00.0616] <Stephen Belanger>
+ * I mostly just want to be sure we're going in a direction that won't block us from being able to support that in the future.
+
+[11:14:30.0558] <littledan>
+I worry that if we always provide something for the sake of it, it could disrupt existing programs to change that snapshot. By contrast, the contract for "null" would be "the platform might give you something later, but not now"
+
+[11:14:56.0268] <littledan>
+because if we always give you something for the sake of it, we'd end up using the registration time snapshot as the fallback
+
+[11:15:01.0205] <Stephen Belanger>
+Yeah, that seems acceptable to me.
+
