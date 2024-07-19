@@ -1664,3 +1664,69 @@ because if we always give you something for the sake of it, we'd end up using th
 [11:15:01.0205] <Stephen Belanger>
 Yeah, that seems acceptable to me.
 
+[11:15:10.0463] <littledan>
+(but you don't need to be given that--you're already running in the registration time snapshot)
+
+[11:15:27.0482] <Steve Hicks>
+My thought here is that any given property should have a clear and easily-understandable rule for where its snapshot comes from
+
+[11:15:34.0592] <Stephen Belanger>
+For more _immediate_ term we mostly only care that async/await is handled appropriately, thus my push on through-flow.
+
+[11:15:49.0865] <Steve Hicks>
+so if it's anything other than "the snapshot when the event was (created|dispatched)" then it should be a _different_ property
+
+[11:16:08.0835] <Stephen Belanger>
+All the _other_ asynchrony is Node.js-provided, so we can just make whatever changes we need to make to Node.js to capture and restore in the correct places.
+
+[11:17:09.0850] <Steve Hicks>
+what I want to avoid is "for event X, .dispatchSnapshot comes from Y, for event Z, .dispatchSnapshot comes from W, for event U, .dispatchSnapshot is null, etc"
+
+[11:17:39.0246] <Steve Hicks>
+this would be a nightmare both to reason about and to polyfill.
+
+[11:17:50.0539] <littledan>
+The idea is, there is no property for the registration time (it just gets run in that snapshot) and there is a property for this causal one (often null, but the rules for filling it are complex and evolving)
+
+[11:17:57.0211] <littledan>
+We could also expose the registration time
+
+[11:18:01.0499] <Steve Hicks>
+On the other hand, if (say) we wanted to expose the .sendSnapshot for XHR events, that could be a different property with different rules
+
+[11:18:09.0071] <littledan>
+Causal snapshots are just inherently complex but they may be useful 
+
+[11:18:09.0622] <Stephen Belanger>
+There are some subtleties like timers which we implement and so those should probably follow the spec for how flow works, but _technically_ we implement those ourselves so we can violate the spec a bit if we need to for our use case. 😅
+
+[11:18:19.0220] <Andreu Botella>
+> <@stephenhicks:matrix.org> so if it's anything other than "the snapshot when the event was (created|dispatched)" then it should be a _different_ property
+
+For browser-internal asynchronous events, this "creation/dispatch time" would be propagated browser-internally, as if there were awaits inside the browser
+
+[11:18:24.0016] <littledan>
+* We could also expose the registration time snapshot as a property
+
+[11:18:40.0799] <Andreu Botella>
+for XHR, you could imagine `.send()` as starting a background fetch, and creating the event after that await
+
+[11:18:55.0724] <littledan>
+> <@abotella:igalia.com> For browser-internal asynchronous events, this "creation/dispatch time" would be propagated browser-internally, as if there were awaits inside the browser
+
+This is exactly the complex case where Anne is worried about trying to do too much at first
+
+[11:19:18.0274] <Steve Hicks>
+> <@abotella:igalia.com> for XHR, you could imagine `.send()` as starting a background fetch, and creating the event after that await
+
+yes, which is why I don't see it as appropriate to use the same snapshot property for this use case
+
+[11:19:38.0199] <littledan>
+We could make two properties, I was just talking about the causal one
+
+[11:19:51.0359] <Steve Hicks>
+I think "causal" is too loaded a name
+
+[11:20:13.0968] <littledan>
+Ugh I don’t care what we call it, the complex one
+
