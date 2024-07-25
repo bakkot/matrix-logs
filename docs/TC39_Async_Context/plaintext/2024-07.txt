@@ -2294,3 +2294,18 @@ Host APIs on manipulating the snapshot can definitely be optimized without stric
 [02:20:15.0922] <Chengzhong Wu>
  * Host APIs on manipulating the snapshot can definitely be optimized without strict 1:1 map to the JS built-ins. CPED extras binding is this kind of optimization that is not restricted by the ecma262
 
+[11:25:24.0715] <littledan>
+> <@stephenhicks:matrix.org> It's not zalgo because it's statically determinable from the registration site. If you register a lifecycle hook in a particular context you know for certain that it will *not* hold onto a reference of that context - that's valuable. The alternative is that it holds onto a reference in case the lifecycle event is caused externally - that's the unpredictability/inconsistency I'm worried about.
+
+the same lifecycle event might be called without a JS context (from the parser directly loading an html file after a blocking script which registers the element) or from one (calling a constructor or setting innerhtml)
+
+[11:26:08.0410] <littledan>
+> <@jasnell:matrix.org> For workers, like node.js we have lots of things that are implemented entirely in c++ that need to be able to grab and preserve and manually propagate the current context across non-javascript async boundaries. For instance, any time we perform native I/o we have to grab a reference to the current snapshot and manually restore that when we are entering back into JS to continue. We build on v8's cped API for this. It's not an optimization as there are some things we use this for that only exist at the c++ layer... That is, we effectively have a c++ API equivalent to AsyncLocalStorage for things like metrics, etc
+
+makes sense, I think browsers need the same
+
+[11:27:09.0251] <littledan>
+> <@stephenbelanger:matrix.org> Anyway, point is: it needs to be _fast_ or it doesn’t help us. Server JS environments are doing _way_ more frequent async activity than any browser environment ever would, so performance will impact us significantly.
+
+yeah, so I think we all agree on this. The question then is: does AsyncContext lend itself to fast implementation? (e.g., do we need enterWith/set to fix performance?)
+
