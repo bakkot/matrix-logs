@@ -182,3 +182,103 @@ will stamp now so you can land it once that's in
 [10:24:20.0704] <ptomato>
 many thanks!
 
+
+2024-07-25
+[06:30:16.0694] <nicolo-ribaudo>
+Hi! I'm working on the `import defer` tests, and I ended up building my own utility to be able to author multiple JS modules in the same file, so that I don't have to read across multiple files to see what a test is doing. For example, https://github.com/tc39/test262/blob/main/test/language/import/import-attributes/json-idempotency.js would be rewritten in a single file like this:
+
+````md
+Copyright (C) 2021 the V8 project authors. All rights reserved.
+This code is governed by the BSD license found in the LICENSE file.
+
+## main.js
+
+```js
+/*---
+esid: sec-parse-json-module
+description: The same object representation is returned to all import sites
+flags: [module, async]
+features: [import-attributes, json-modules, globalThis, dynamic-import]
+---*/
+
+import viaStaticImport1 from './json-idempotency_FIXTURE.json' with { type: 'json' };
+import {default as viaStaticImport2} from './json-idempotency_FIXTURE.json' with { type: 'json' };
+import './json-idempotency-indirect_FIXTURE.js';
+
+assert.sameValue(viaStaticImport1, viaStaticImport2);
+assert.sameValue(globalThis.viaSecondModule, viaStaticImport1);
+
+import('./json-idempotency_FIXTURE.json', { with: { type: 'json' } })
+  .then(function(viaDynamicImport) {
+    assert.sameValue(viaDynamicImport.default, viaStaticImport1);
+  })
+  .then($DONE, $DONE);
+```
+
+## json-idempotency_FIXTURE.json
+
+```json
+{}
+```
+
+## json-idempotency-indirect_FIXTURE.js
+
+```js
+import value from './json-idempotency_FIXTURE.json' with { type: 'json' };
+
+globalThis.viaSecondModule = value;
+```
+
+````
+
+Is this something that I could upstream in the test262 repo, similarly to how we have the scripts to generate tests based on .template/.case?
+
+[06:30:24.0431] <nicolo-ribaudo>
+ * Hi! I'm working on the `import defer` tests, and I ended up building my own utility to be able to author multiple JS modules in the same file, so that I don't have to read across multiple files to see what a test is doing. For example, https://github.com/tc39/test262/blob/main/test/language/import/import-attributes/json-idempotency.js would be rewritten in a single file like this:
+
+````markdown
+Copyright (C) 2021 the V8 project authors. All rights reserved.
+This code is governed by the BSD license found in the LICENSE file.
+
+## main.js
+
+```js
+/*---
+esid: sec-parse-json-module
+description: The same object representation is returned to all import sites
+flags: [module, async]
+features: [import-attributes, json-modules, globalThis, dynamic-import]
+---*/
+
+import viaStaticImport1 from './json-idempotency_FIXTURE.json' with { type: 'json' };
+import {default as viaStaticImport2} from './json-idempotency_FIXTURE.json' with { type: 'json' };
+import './json-idempotency-indirect_FIXTURE.js';
+
+assert.sameValue(viaStaticImport1, viaStaticImport2);
+assert.sameValue(globalThis.viaSecondModule, viaStaticImport1);
+
+import('./json-idempotency_FIXTURE.json', { with: { type: 'json' } })
+  .then(function(viaDynamicImport) {
+    assert.sameValue(viaDynamicImport.default, viaStaticImport1);
+  })
+  .then($DONE, $DONE);
+```
+
+## json-idempotency_FIXTURE.json
+
+```json
+{}
+```
+
+## json-idempotency-indirect_FIXTURE.js
+
+```js
+import value from './json-idempotency_FIXTURE.json' with { type: 'json' };
+
+globalThis.viaSecondModule = value;
+```
+
+````
+
+Is this something that I could upstream in the test262 repo, similarly to how we have the scripts to generate tests based on .template/.case?
+
