@@ -1516,3 +1516,46 @@ yeah, that's fair
 [15:00:20.0948] <littledan>
 yeah we were thinking that it'd be bad if JS code got injected into the middle whenever context merges happen (which is all the time)
 
+[15:01:09.0096] <rbuckton>
+> <@bakkot:matrix.org> If the concern is "I sometimes want to do something other than that, and I think of that other thing as being called Semaphore", that's a fair piece of feedback to support the rename, but not to support a different API.
+
+I have two concerns:
+1. The `Semaphore` API proposed depends on asynchrony and is geared for async coordination, not thread coordination. We also hope to introduce other thread coordination primitives in the future, including a `Semaphore` in line with `Mutex` and `Condition` that can be shared and does not require asynchrony. As such, we must avoid conflicting naming.
+2. Before we decide on a final API for an async coordination `Semaphore`, we must ensure we understand the full problem domain of counting semaphores, to ensure we chose an API that is consistent with intended use cases.
+
+[15:01:23.0043] <shu>
+the guidance is that you pass monotonic increasing integers as hints that you are pausing for the Nth time
+
+[15:01:35.0486] <shu>
+whatever strategy the VM chooses, it needs to understand that
+
+[15:01:36.0328] <kriskowal>
+Coming to think of it, putting a Set in an AsyncContext variable can’t be prevented, and this kind of work will be possible regardleess
+
+[15:01:38.0845] <shu>
+it can then choose whatever
+
+[15:02:08.0693] <kriskowal>
+And it’s only safe anyway if the mergers are consistent (which is enforced to a degree by ocap discipline around holding the variable)
+
+[15:02:58.0006] <rbuckton>
+For `Mutex`, we have been discussing an API design to allow `Mutex`, `Condition`, and `UniqueLock` to work in a blocking manner (when off the UI thread in the browser), and an async manner (when on the UI thread in the browser). The current design has both sync and async methods on `UniqueLock`.
+
+[15:03:54.0071] <kriskowal>
+Ah, but contexts derived from a context holding growing subsets that might contribute to the parent set is not there.
+
+[15:04:05.0011] <rbuckton>
+Were we able to consider `Semaphore` for the MVP for shared structs, it likely would be a sharable object like `Mutex`, and have both a blocking (off UI thread) and non-blocking async (on UI thread) API, that would likely make a separate `Semaphore` unnecessary.
+
+[15:04:06.0446] <snek>
+why do you draw a line between binary and counting semaphores for this api? 
+
+[15:04:13.0540] <snek>
+do you think they must have different apis?
+
+[15:04:17.0633] <kriskowal>
+Well, it’ll be fun to talk about.
+
+[15:05:11.0713] <kriskowal>
+(I for one do not think that we need to replay the history of mutual exclusion with all its conventional names.)
+
