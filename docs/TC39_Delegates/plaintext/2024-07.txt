@@ -668,3 +668,36 @@ An efficient implementation of `pause` will use the `iterationCount` to avoid th
 - issuing a `pause` more or less frequently based on how frequently we've been spinning
 - issuing a `pause` more or less frequently as you approach an amount of time since you started spinning that would be equivalent to the time spent waiting for a context switch.
 
+[13:46:06.0892] <Justin Ridgewell>
+> <@rbuckton:matrix.org> `Atomics.pause` is purely a CPU architecture dependent operation. A conforming implementation is welcome to ignore `iterationCount` and return immediately if it so chooses, though that is the least efficient approach as it most likely results in thread starvation and does not improve contention.
+> An efficient implementation of `pause` will use the `iterationCount` to avoid thread starvation and optimize contention by *periodically* introducing an asm `pause` or similar instruction based on whatever information is relevant for that architecture. The main goal is to avoid spinning longer than you would have had to wait for a context switch/kernel transition. These optimizations can include, but are not limited to:
+> - Only `pausing` every *n* iterations
+> - issuing a `pause` more or less frequently the longer we've been spinning
+> - issuing a `pause` more or less frequently based on how frequently we've been spinning
+> - issuing a `pause` more or less frequently as you approach an amount of time since you started spinning that would be equivalent to the time spent waiting for a context switch.
+
+Is this the interpretation you’re proposing, or is this a written behavior somewhere?
+
+[13:46:07.0180] <rbuckton>
+Most implementations of a `pause`-like method I've seen are heavily optimized based on OS, CPU Arch, runtime, clock speed, and other factors and as such can't be easily expressed in an algorithmic form.
+
+[13:46:41.0382] <rbuckton>
+This is my observation from looking at spin-wait mechanisms in several languages and runtimes.
+
+[13:46:52.0118] <rbuckton>
+This isn't precise copy that I would use in the spec.
+
+[13:47:33.0218] <rbuckton>
+This is more to argue that we should put a lot less into the algorithm steps and NOTEs than we currently are.
+
+[13:49:12.0568] <shu>
+i think there are only two realistic options:
+
+1. drop the hint argument entirely
+2. accept an integer as an hint and say it is implementation-defined how it is used to determine how long to pause
+
+i still think 2 is uncontroversial but clearly it _is_ controversial but not in a way i understand how to make progress on
+
+[13:49:51.0248] <rbuckton>
+We should not drop the hint argument. 
+
