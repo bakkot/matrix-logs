@@ -582,3 +582,89 @@ I think that’ll upset @msaboff ?
 [13:40:05.0408] <shu>
 Justin Ridgewell: how so?
 
+[13:40:17.0563] <shu>
+he said JSC will likely ignore it, which is certainly fine
+
+[13:40:35.0669] <shu>
+my personal intention is that until the code is in the optimizing JIT and inlined, it _is_ ignored
+
+[13:40:47.0892] <Justin Ridgewell>
+His final statement was that if there’s no note, the param will just be ignored.
+
+[13:40:49.0505] <littledan>
+> <@shuyuguo:matrix.org> he said JSC will likely ignore it, which is certainly fine
+
+presumably it'd be better for the web if you can align on this...
+
+[13:41:02.0133] <shu>
+i don't think i do...?
+
+[13:41:13.0703] <shu>
+presumably JSC will do the right thing for M-chips
+
+[13:41:25.0322] <shu>
+and V8 might do a more generic thing?
+
+[13:41:40.0341] <littledan>
+OK sure
+
+[13:42:04.0381] <littledan>
+but "just ignore it" doesn't sound like something tuned for M-chips; it sounds like not engaging with the question
+
+[13:42:27.0170] <shu>
+> <@littledan:matrix.org> but "just ignore it" doesn't sound like something tuned for M-chips; it sounds like not engaging with the question
+
+fair, but it's intended to be a hint
+
+[13:42:34.0004] <shu>
+why would we try to align on how to interpret a hint?
+
+[13:42:39.0511] <shu>
+it's supposed to give freedom to implementations!
+
+[13:42:47.0592] <nicolo-ribaudo>
+(I don't know if this is actually implementable given the perf constraints)
+
+What if instead of the iteration number we passed an object, and the engine internally counts how many times it sees that object? So that there is no possible expectation connected to "big number" vs "small number"
+
+[13:42:58.0682] <shu>
+no thanks...
+
+[13:43:00.0520] <kriskowal>
+I approve of every possible steam (locomotive, motor) metaphor as we can cram into this language.
+
+[13:43:04.0386] <littledan>
+> <@shuyuguo:matrix.org> why would we try to align on how to interpret a hint?
+
+well, we'd want to align on, engines feeling like they can interpret this as a hint, rather than that it's just something to ignore
+
+[13:43:30.0853] <shu>
+> <@littledan:matrix.org> well, we'd want to align on, engines feeling like they can interpret this as a hint, rather than that it's just something to ignore
+
+yes, i agree. but ignoring is a valid interpretation of a hint, do we agree on that?
+
+[13:44:00.0490] <Justin Ridgewell>
+I assume the CPU architecture has some semantic meaning for the hint?
+
+[13:44:03.0943] <littledan>
+yes, it is valid, but I hope that JS engines can get past the philosophical disagreement that seems to exist right now and agree that this is a potentially usable hint if it makes sense for the architecture
+
+[13:44:17.0629] <Justin Ridgewell>
+We can tell engines to ignore it, but how do they map our hint’s intention to the arch’s intention?
+
+[13:44:22.0807] <littledan>
+since msaboff's statement was not about the architecture
+
+[13:44:40.0700] <shu>
+> <@jridgewell:matrix.org> I assume the CPU architecture has some semantic meaning for the hint?
+
+not the CPU arch per se, more the VM
+
+[13:45:05.0377] <rbuckton>
+`Atomics.pause` is purely a CPU architecture dependent operation. A conforming implementation is welcome to ignore `iterationCount` and return immediately if it so chooses, though that is the least efficient approach as it most likely results in thread starvation and does not improve contention.
+An efficient implementation of `pause` will use the `iterationCount` to avoid thread starvation and optimize contention by *periodically* introducing an asm `pause` or similar instruction based on whatever information is relevant for that architecture. The main goal is to avoid spinning longer than you would have had to wait for a context switch/kernel transition. These optimizations can include, but are not limited to:
+- Only `pausing` every *n* iterations
+- issuing a `pause` more or less frequently the longer we've been spinning
+- issuing a `pause` more or less frequently based on how frequently we've been spinning
+- issuing a `pause` more or less frequently as you approach an amount of time since you started spinning that would be equivalent to the time spent waiting for a context switch.
+
