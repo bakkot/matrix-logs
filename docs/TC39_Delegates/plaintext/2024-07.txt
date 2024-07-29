@@ -823,3 +823,72 @@ That'
 [14:05:13.0262] <keith_miller>
 I guess my concern is that one workload wants longer and longer waits. And others want shorter and shorter waits
 
+[14:05:23.0431] <rbuckton>
+> <@keith_miller:matrix.org> Then we could end up in a world where one implementation does longer waits as count goes up and others do shorter
+
+ * That's perfectly acceptable. An implementation should choose the pause strategy that works best within its own requirements.
+
+[14:05:30.0551] <keith_miller>
+And there's no way to know as an implementation a priori which is better
+
+[14:05:43.0402] <shu>
+keith_miller: that's fair, and the concession is that you can't actually express that in JS code 
+
+[14:05:53.0783] <shu>
+because the call overhead is so high in the interpreter
+
+[14:06:04.0644] <ryzokuken>
+ljharb could you add yourself to the queue again?
+
+[14:06:08.0836] <bakkot>
+shu: I guess I agree that the actual API doesn't look like exactly like traditional semaphore but the way you use it is exactly the way you use a semaphore 99% of the time
+
+[14:06:11.0088] <rbuckton>
+> <@keith_miller:matrix.org> I guess my concern is that one workload wants longer and longer waits. And others want shorter and shorter waits
+
+That's not what you do with spin locking.
+
+[14:06:12.0541] <snek>
+i don't think a user of the pause api would want that. that is a concern you have to express in cpu instructions, so js would be a poor choice for that code.
+
+[14:06:45.0965] <keith_miller>
+Then we should just not have anything passed by the JS users and the JS engine can infer the loop count if they *really* want to
+
+[14:06:50.0193] <rbuckton>
+If you want longer waits, you use a mutex/condvar or futex. Spin waiting generally should be as short as possible to avoid starvation and break contention.
+
+[14:07:07.0432] <rbuckton>
+If you want longer waits, you `sleep`, not `pause`.
+
+[14:07:50.0097] <rbuckton>
+> <@keith_miller:matrix.org> Then we should just not have anything passed by the JS users and the JS engine can infer the loop count if they *really* want to
+
+How is the JS engine supposed to know when you start spinning and are under contention when that is purely driven by user code?
+
+[14:08:16.0365] <shu>
+bakkot: the API as proposed currently is about governing rate limits, not a mutual exclusion building block. i understand conceptually the core mechanism is the same.
+
+[14:08:34.0176] <rbuckton>
+"Spin lock" is also the wrong terminology. This is a "spin wait" and is generally used to write lock-free code via compare-and-swap
+
+[14:08:44.0748] <shu>
+if i were to propose a mutual exclusion Semaphore, i would not use this protocol
+
+[14:08:48.0141] <rbuckton>
+You can write a spin lock using `pause`, but that's not the goal.
+
+[14:09:01.0444] <shu>
+it may be that because of this API mismatch, neither Semaphore-like APIs should get the simple name "Semaphore"
+
+[14:09:04.0056] <Luca Casonato>
+https://docs.rs/tokio/latest/tokio/sync/struct.Semaphore.html <- thing called semaphore in a non-js language, with a broadly similar api to our proposal. we will investigate other names though! :D
+
+[14:09:05.0967] <littledan>
++1 on Stage 1
+
+[14:09:43.0610] <shu>
+it can also be perhaps more simply resolved by just namespacing
+
+[14:09:55.0139] <shu>
+`Governor.Semaphore` vs `Locks.Sempahore` or `Atomics.Semaphore` or whatever
+
