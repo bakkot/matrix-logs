@@ -1734,3 +1734,76 @@ And yes, I'd like to keep bigger-number-longer-wait but reword the note that sta
 [16:10:03.0861] <shu>
 bakkot: i did not have the capacity to fully pay attention to the governor thing and the Atomics.pause discussion, but a fully generic "unlock token" concept seems elegant. but the gut reaction i have is (wait for it) performance concerns about the allocations of these tokens in hot paths -- ideally i'd like to not bottleneck finer grained locking architectures
 
+[16:10:36.0455] <shu>
+rbuckton: i think i've been convinced on "large N is longer wait" is just fine to spec, see the PR https://github.com/tc39/proposal-atomics-microwait/pull/11
+
+[16:10:40.0409] <rbuckton>
+e.g., `spinWait.SpinOnce(sleep1Threshold)` increments the internal spin counter and uses the provided argument to indicate how often to back off to a full `Thread.Sleep(1)`.
+
+[16:11:38.0065] <shu>
+the user code can pass in linearly increasing N if they want linear backoff, exponentially increasing N if they exponential backoff, or the reverse if they want "smaller N longer wait" semantics like i originally envisioned. the JIT and interpreter can scale the wait time differently
+
+[16:11:47.0621] <rbuckton>
+Something like the `SpinWait` struct can be implemented in userland to introduce a backoff mechanism, so long as we have `Atomics.pause(iterations)` to trigger a busy loop w/o sleeping, which aligns with "large N is longer wait"
+
+[16:11:58.0232] <bakkot>
+> <@shuyuguo:matrix.org> bakkot: i did not have the capacity to fully pay attention to the governor thing and the Atomics.pause discussion, but a fully generic "unlock token" concept seems elegant. but the gut reaction i have is (wait for it) performance concerns about the allocations of these tokens in hot paths -- ideally i'd like to not bottleneck finer grained locking architectures
+
+I think that having `semaphore.acquireAndCall(fn)` for the hot paths would make sense. though I'd guess in hot paths the token objects would never leave the nursery and therefore(?) not be that expensive?
+
+[16:12:29.0535] <rbuckton>
+I think I was conflating how `SpinWait` the struct and `Thread.SpinWait()` work in my responses.
+
+[16:13:26.0951] <shu>
+> <@bakkot:matrix.org> I think that having `semaphore.acquireAndCall(fn)` for the hot paths would make sense. though I'd guess in hot paths the token objects would never leave the nursery and therefore(?) not be that expensive?
+
+one can hope hot path means critical section = very short, yes
+
+[16:13:56.0067] <bakkot>
+well, either it's short or infrequent, can't be both long and frequent
+
+[16:14:00.0017] <shu>
+and if your GC has per-thread linear allocation buffers for shared objects, then hopefully also okay
+
+[16:14:11.0547] <bakkot>
+the tokens need not be shareable
+
+[16:14:15.0060] <bakkot>
+though they could be I guess
+
+[16:14:24.0193] <shu>
+oh, these are sync tokens?
+
+[16:14:33.0673] <shu>
+i'm not clear on what's sync and what's async
+
+[16:14:59.0825] <bakkot>
+design is the same either way
+
+[16:15:26.0885] <bakkot>
+that is, it's either `acquireAsync: Promise<token>` or `acquireSync: token`, but in either case you have a sync `token.release()`
+
+[16:15:52.0108] <bakkot>
+(by "either" I mean "my ideal `Semaphore` would have both, with the sync one only available off main thread)
+
+[16:15:59.0226] <bakkot>
+ * (by "either" I mean that my ideal `Semaphore` would have both, with the sync one only available off main thread)
+
+[16:16:42.0025] <bakkot>
+but you are not generally going to need to send the tokens themselves across threads, except in very rare cases which I don't know if we'd need to support if it's expensive to do so
+
+[16:17:08.0360] <bakkot>
+so the tokens would not need to be shared objects
+
+[16:17:27.0957] <bakkot>
+would be kind of nice, if it was easy, but it's certainly not necessary
+
+[16:17:59.0992] <shu>
+but the decision on whether the token is shareable needs to be a priori
+
+[16:18:08.0368] <shu>
+unless `token` above was shorthand for 2 different types
+
+[16:18:16.0921] <shu>
+`Promise<shareable token>` and `sync token`
+
