@@ -1004,3 +1004,207 @@ I agree it does sleep periodically but `sleep` is an independent concept.
 [14:20:23.0219] <shu>
 i thought it has a protocol?
 
+[14:20:32.0647] <bakkot>
+it's string-based, at least currently
+
+[14:20:37.0772] <keith_miller>
+Which, I assume isn't intended to be part of your proposal?
+
+[14:20:43.0558] <bakkot>
+it is, there is a string-named async `acquire` method which gives you an object with a string-named sync `release` method
+
+[14:21:12.0263] <shu>
+ah, string, sorry
+
+[14:21:17.0901] <Luca Casonato>
+```
+interface Governor {
+  acquire(): Promise<GovernorToken>;
+}
+
+interface GovernorToken {
+  release(): void;
+  [Symbol.dispose](): void;
+}
+```
+
+[14:21:30.0111] <Michael Ficarra>
+yeah string vs symbol was one of the post-Stage 1 design considerations
+
+[14:21:31.0788] <Luca Casonato>
+ * ```
+interface Governor {
+  acquire(): Promise<GovernorToken>;
+}
+
+interface GovernorToken {
+  release(): void;
+  // or
+  [Symbol.dispose](): void;
+}
+```
+
+[14:21:35.0961] <Luca Casonato>
+ * ```ts
+interface Governor {
+  acquire(): Promise<GovernorToken>;
+}
+
+interface GovernorToken {
+  release(): void;
+  // or
+  [Symbol.dispose](): void;
+}
+```
+
+[14:21:39.0644] <rbuckton>
+The `Semaphore` in the slides implements the `Governor` interface, which is very iterator specific
+
+[14:21:42.0086] <bakkot>
+(`Symbol.dispose` isn't part of the protocol but should generally be there yes)
+
+[14:21:54.0461] <Michael Ficarra>
+> <@lucacasonato:matrix.org> ```ts
+> interface Governor {
+>   acquire(): Promise<GovernorToken>;
+> }
+> 
+> interface GovernorToken {
+>   release(): void;
+>   // or
+>   [Symbol.dispose](): void;
+> }
+> ```
+
+and, not or
+
+[14:22:09.0918] <shu>
+that `acquire(): Promise<GovernorToken>` is not how i would declare `acquire` if i were designing a shmem semaphore
+
+[14:22:26.0367] <snek>
+how about tryAcquire
+
+[14:22:27.0480] <Luca Casonato>
+> <@michaelficarra:matrix.org> and, not or
+
+depends on if the token is a protocol or a class
+
+[14:22:31.0651] <rbuckton>
+Well, it's listed as "non-essential", to be fair, but if it did it would pollute semaphore with unrelated functionality, IMO.
+
+[14:22:37.0021] <shu>
+like, it would be a blocking void `acquire()` that can't be called on the main thread
+
+[14:22:42.0344] <Luca Casonato>
+> <@devsnek:matrix.org> how about tryAcquire
+
+https://github.com/michaelficarra/proposal-concurrency-control/issues/2
+
+[14:23:18.0176] <Michael Ficarra>
+> <@devsnek:matrix.org> how about tryAcquire
+
+that was in the post-Stage 1 design considerations slide
+
+[14:23:23.0014] <Michael Ficarra>
+sorry it went by really fast
+
+[14:23:33.0573] <snek>
+no i was distracted, mb
+
+[14:23:44.0414] <bakkot>
+> <@shuyuguo:matrix.org> like, it would be a blocking void `acquire()` that can't be called on the main thread
+
+how attached are you to the `void` part? the fact that you can `release` a thing you didn't previously `acquire` seems like a non-essential (and bad) part of textbook C semaphore implementation
+
+[14:24:31.0205] <rbuckton>
+In my `AsyncSemaphore` implementation, you don't `acquire` and then `dispose`, as that grants a capability to the `acquire` caller that belongs on the semaphore itself
+
+[14:24:53.0414] <snek>
+i am also a fan of release tokens. you can build the meh c api on top of that if you want.
+
+[14:25:18.0084] <rbuckton>
+> <@bakkot:matrix.org> how attached are you to the `void` part? the fact that you can `release` a thing you didn't previously `acquire` seems like a non-essential (and bad) part of textbook C semaphore implementation
+
+Why is this bad? The semaphore maintains its capabilities rather than blindly handing them off to callers.
+
+[14:25:42.0954] <littledan>
+another reason why those other snapshots are not all exposed is because these are often not useful and each is complicated to define. So the idea is to add the "causal snapshots" where they are useful.
+
+[14:25:46.0969] <bakkot>
+... access to the semaphore should not imply access to the ability to cause the semaphore to think it has more resources available
+
+[14:25:55.0012] <rbuckton>
+IMO that's like putting `cancel()` on a `Promise` return value. It's the wrong separation of concerns.
+
+[14:25:58.0008] <bakkot>
+you should only be able to cause it to think it has resources if it previously told you that you owned those resources
+
+[14:26:24.0609] <bakkot>
+I have exactly the reverse intuition about who should be responsible for this capability
+
+[14:26:51.0855] <shu>
+yeah that particular implementation keeps a magic internal _count to determine
+
+[14:26:56.0169] <snek>
+wait ron you're arguing that there should be a release method that requires no previously acquired capability?
+
+[14:27:10.0484] <rbuckton>
+To use the train or ship "Semaphore" metaphor, that's like waiving a flag to let a user in, and then that user gets to waive the flag to let the next user in. 
+
+[14:27:14.0876] <snek>
+ * wait ron you're arguing that there should be a release method that does not require a acquired capability?
+
+[14:27:18.0164] <shu>
+https://github.com/dotnet/runtime/blob/4c58b5a5132cb089b23d32cafe3fcfa7e615a0da/src/libraries/System.Private.CoreLib/src/System/Threading/SpinWait.cs#L225-L230
+
+[14:27:19.0008] <snek>
+ * wait ron you're arguing that there should be a release method that does not require a previously acquired capability?
+
+[14:27:37.0215] <bakkot>
+... right, yes, that's the correct thing
+
+[14:27:40.0426] <bakkot>
+the user announces when they're done
+
+[14:27:48.0095] <shu>
+i am warming up to the idea of letting the VM do complete magic here without a userland hint
+
+[14:27:51.0602] <bakkot>
+the user does not get to say "someone is done", only "I personally am done"
+
+[14:27:53.0609] <Luca Casonato>
+> <@rbuckton:matrix.org> To use the train or ship "Semaphore" metaphor, that's like waiving a flag to let a user in, and then that user gets to waive the flag to let the next user in.
+
+It's like waving the flag, and then giving the flag to the user. And then when the user is done they have to give the flag back to whoever is waving flags so they can wave in the next person
+
+[14:27:57.0742] <rbuckton>
+> <@devsnek:matrix.org> wait ron you're arguing that there should be a release method that does not require a previously acquired capability?
+
+That's how my `AsyncSemaphore` works, though releasing an empty semaphore does nothing.
+
+[14:28:12.0706] <rbuckton>
+And I do have "release tokens" in many of the other coordination primitives in esfx
+
+[14:28:25.0387] <snek>
+i am new to someone arguing that linear types are bad
+
+[14:28:36.0261] <littledan>
+do <2 minutes remain?
+
+[14:28:51.0505] <littledan>
+Mark: Yes, that is the case
+
+[14:29:12.0380] <keith_miller>
+I guess it's also weird because all of the examples are behaviors that the particular lock implementation wants and don't seem to be architecture specific.
+
+[14:29:12.0896] <ryzokuken>
+> <@littledan:matrix.org> do <2 minutes remain?
+
+looked like a TCQ bug
+
+[14:30:10.0789] <keith_miller>
+Maybe for compile times? :P
+
+[14:30:21.0015] <snek>
+lol, fair
+
