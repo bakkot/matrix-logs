@@ -768,3 +768,58 @@ Sync retries sounds very similar to async retries…
 
 it doesn't have a known meaning, that's why it's a hint
 
+[14:01:13.0799] <shu>
+the meaning is basically, write this: `for (i; i < spinCount; i++) { TryLock(); Atomics.pause(i); }`, and know the VM will do what it thinks best
+
+[14:01:43.0569] <keith_miller>
+I think if we're going to spec something bigger number longer wait is more intuitive. If you want the opposite you can just implement your spin lock in a countdown loop rather than a count up loop
+
+[14:01:56.0954] <shu>
+do not think at a lower level, because the JS programmer has no control at that lower level given the multi-tiered execution, etc
+
+[14:02:18.0653] <shu>
+keith_miller: my proposal is to say nothing in the spec text. an implementation can simply choose to interpret it as "larger number is longer"
+
+[14:02:39.0050] <snek>
+why do people want to specify a certain relationship between loop count and pauses
+
+[14:02:43.0672] <keith_miller>
+I think that's the worst outcome
+
+[14:03:05.0526] <rbuckton>
+> <@jridgewell:matrix.org> Sync retries sounds very similar to async retries…
+
+The purpose is more like this: "Ideally we shouldn't spin for longer than it would take for a context switch resulting from putting the thread to sleep or waking it up. To help avoid contention, we should periodically `pause` the thread to give another core an opportunity to perform the operation under contention. However, the closer we get to the amount of time it should have taken to put the thread to sleep, we should `pause` less frequently to aggressively avoid that threshold."
+In some implementations, like .NET's `SpinWait`, once you reach a certain number of spins you trigger a `sleep(0)` or `sleep(1)`, which is a long wait, and then essentially restart as if the spin count was close to zero again.
+
+[14:03:11.0277] <shu>
+> <@keith_miller:matrix.org> I think that's the worst outcome
+
+can you say more?
+
+[14:03:45.0196] <littledan>
+we don't specify pauses for GC; we just trust that engines will figure out a good policy
+
+[14:03:47.0309] <keith_miller>
+Then we could end up in a world where one implementation does longer waits as count goes up and others do shorter 
+
+[14:04:17.0787] <snek>
+that's good, the implementation should do whatever is best on the given machine.
+
+[14:04:19.0840] <rbuckton>
+So the "backoff" tends to be something like: short -> shorter -> shortest -> long -> short -> shorter -> shortest -> etc.
+
+[14:04:23.0247] <snek>
+ * that's good, the implementation should do whatever is best on the machine its running on.
+
+[14:04:42.0967] <rbuckton>
+With a number of "don't even wait at all" operations thrown into the mix.
+
+[14:04:59.0905] <rbuckton>
+> <@keith_miller:matrix.org> Then we could end up in a world where one implementation does longer waits as count goes up and others do shorter
+
+That'
+
+[14:05:13.0262] <keith_miller>
+I guess my concern is that one workload wants longer and longer waits. And others want shorter and shorter waits
+
