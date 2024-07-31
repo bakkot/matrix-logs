@@ -3101,3 +3101,50 @@ what is type space information
 [15:20:52.0797] <Justin Ridgewell>
 I’m not sure they’re different from the user’s point of view.
 
+[15:30:52.0746] <waldemar>
+> <@lucacasonato:matrix.org> danielrosenwasser: I think it would be very useful if TS could enforce `immediate` callbacks are actually called immediately. It would make them even more useful. Specifically TS errors on the following cases:
+> 
+> - User passes immediate function to a function as a parameter where that callback param is not marked as immediate:
+> 
+> ```
+> function x(foo: immediate () => void) {
+>   y(foo); // error here, immediate function escapes from immediate body
+> }
+> 
+> function y(bar: () => void) {
+>   bar();
+> }
+> ```
+> 
+> - An `immediate` callback is captured by non immediate closure.
+> 
+> ```
+> function x(foo: immediate () => void) {
+>   delay(100).then(() => foo()); // error because `immediate` callback is called from a `deferred` callback
+> }
+> ```
+> 
+> - An `immediate` callback is assigned to a variable outside the "immediate" body:
+> 
+> ```
+> let cb: () => void;
+> 
+> function x(foo: immediate () => void) {
+>   cb = foo; // error because `immediate` callback is assigned to a variable outside of the immediate scope
+> }
+> ```
+
+We should come to an agreement of what "immediate" means. Consider the following cases of a function Foo that takes an immediate callback f:
+A. Foo returns without doing anything.
+B. Foo might call f immediately.
+C. Foo always calls f immediately.
+D. Foo might save f to be called later.
+E. Foo might call f immediately and might save f to call later.
+F. Foo always calls f immediately and might save f to call later.
+G. Foo always saves f to call later.
+H. Foo might call f immediately and always saves f to call later.
+I. Foo always calls f immediately and always saves f to call later.
+
+Which ones of these would be properly annotated with the "immediate" keyword?
+Bonus question: What if Foo is an async function?
+
