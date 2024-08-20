@@ -1,0 +1,42 @@
+<!DOCTYPE html><html><head>
+  <title>TC39 Async Context on 2024-08-20</title>
+  <link rel="stylesheet" href="../style.css">
+  <script>window.room = "TC39 Async Context";</script><script src="../render-roomlist.js"></script>
+  <script src="../logs.js"></script>
+</head>
+<body><div class="wrapper">
+<div class="sidebar">
+<div class="title">TC39 Async Context<br>2024-08-20<br><a href="plaintext/">plaintext logs</a></div>
+<div class="nav">
+<a href="2024-08-19" class="nav-link"><span>prev</span></a>
+<span style="float:right">next</span>
+</div>
+    <div class="all-rooms"><noscript>JavaScript is required to load the channel index, but you can go to <a href="../..">the static index</a> directly.</noscript></div>
+<div class="footer"><a href="https://github.com/bakkot/matrix-archive-bot">source on github</a></div>
+</div>
+<div class="rhs">
+<div class="rhs-header">
+<span id="error" style="color: red; display:none">error</span>
+
+<input type="text" id="query" size="25" placeholder="Search TC39 Async Context">
+<a id="search-submit" class="button icon-link" title="Search">
+  <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path d="M505 442.7L405.3 343c-4.5-4.5-10.6-7-17-7H372c27.6-35.3 44-79.7 44-128C416 93.1 322.9 0 208 0S0 93.1 0 208s93.1 208 208 208c48.3 0 92.7-16.4 128-44v16.3c0 6.4 2.5 12.5 7 17l99.7 99.7c9.4 9.4 24.6 9.4 33.9 0l28.3-28.3c9.4-9.4 9.4-24.6.1-34zM208 336c-70.7 0-128-57.2-128-128 0-70.7 57.2-128 128-128 70.7 0 128 57.2 128 128 0 70.7-57.2 128-128 128z"></path></svg>
+</a>
+</div>
+
+<div class="log"><table id="log-table"><tbody id="log-tbody">
+
+  <tr class="msg" id="L0"><td class="ts-cell"><a class="ts" href="#L0" alt="Mon Aug 19 2024 17:28:17 GMT-0700 (Pacific Daylight Time)">00:28</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@stephenhicks:matrix.org">Steve Hicks</span>&gt;</div></td><td class="msg-cell">By "opt back into" I meant <code>AsyncContext.Snapshot.wrap</code> to handle the rare exception to the default - so not "us" opting in</td></tr>
+  <tr class="msg" id="L1"><td class="ts-cell"><a class="ts" href="#L1" alt="Mon Aug 19 2024 17:31:40 GMT-0700 (Pacific Daylight Time)">00:31</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@stephenhicks:matrix.org">Steve Hicks</span>&gt;</div></td><td class="msg-cell"><mx-reply><blockquote> Is the trace on event handler agnostic to event types? In implementations where instrument known event types, it can determine either creating a new root span, or creating a child span by event type semantics.</blockquote></mx-reply>My understanding here is that we <em>do</em> fire some events synchronously via <code><a href="http://element.click">element.click</a>()</code> or <code>.focus()</code> and that those cascading cases are treated as child spans, whereas a user-initiated click (or focus) would be treated as a root span (but with the same tree of children).  In this case, having event handlers "do nothing" produces exactly the right behavior - user-initiated actions come in with an empty context, while synchronous events inherit the caller's context.</td></tr>
+  <tr class="msg" id="L2"><td class="ts-cell"><a class="ts" href="#L2" alt="Mon Aug 19 2024 23:43:29 GMT-0700 (Pacific Daylight Time)">06:43</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@littledan:matrix.org">littledan</span>&gt;</div></td><td class="msg-cell">I think the question was about something else: do you have event-specific logic in your tracing system? Do we expect this to exist generally? The answer to this has significant impact on what kinds of API shapes would or wouldn’t work (even if you have identified one which would work).</td></tr>
+  <tr class="msg" id="L3"><td class="ts-cell"><a class="ts" href="#L3" alt="Tue Aug 20 2024 01:04:55 GMT-0700 (Pacific Daylight Time)">08:04</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@stephenhicks:matrix.org">Steve Hicks</span>&gt;</div></td><td class="msg-cell">Ah, I think it is probably event-specific, but I don't know exactly. I'll ask, though can you explain why it's such a significant impact?</td></tr>
+  <tr class="msg" id="L4"><td class="ts-cell"><a class="ts" href="#L4" alt="Tue Aug 20 2024 01:08:15 GMT-0700 (Pacific Daylight Time)">08:08</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@stephenhicks:matrix.org">Steve Hicks</span>&gt;</div></td><td class="msg-cell">Though, on second thought, the specificity could easily only be in the product code, rather than in the infrastructure.</td></tr>
+  <tr class="msg" id="L5"><td class="ts-cell"><a class="ts" href="#L5" alt="Tue Aug 20 2024 06:22:51 GMT-0700 (Pacific Daylight Time)">13:22</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@littledan:matrix.org">littledan</span>&gt;</div></td><td class="msg-cell">Whether it is event-specific determines whether we could indicate important context in event-specific properties, as you had proposed, and have a bit of logic to fix things up with that information</td></tr>
+  <tr class="msg" id="L6"><td class="ts-cell"><a class="ts" href="#L6" alt="Tue Aug 20 2024 06:24:38 GMT-0700 (Pacific Daylight Time)">13:24</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@littledan:matrix.org">littledan</span>&gt;</div></td><td class="msg-cell">This is really core because we know that different variables need different kinds of information flow. So, we are trying to figure out what the requirements are for this tracing variable (which is the motivation for all of the null context and flow-through discussion as far as I can tell)</td></tr>
+  <tr class="msg" id="L7"><td class="ts-cell"><a class="ts" href="#L7" alt="Tue Aug 20 2024 06:28:19 GMT-0700 (Pacific Daylight Time)">13:28</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-10" title="@littledan:matrix.org">littledan</span>&gt;</div></td><td class="msg-cell">Also, maybe you have some other system that you have been comparing AsyncContext to, and converting an existing tracing system to be based on AsyncContext? Can you tell us about this baseline and what its semantics are?</td></tr>
+  <tr class="msg" id="L8"><td class="ts-cell"><a class="ts" href="#L8" alt="Tue Aug 20 2024 07:18:35 GMT-0700 (Pacific Daylight Time)">14:18</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@abotella:igalia.com">Andreu Botella</span>&gt;</div></td><td class="msg-cell">I was under the impression that choosing between initial context and registration context for user-sourced events would be trivial, but after thinking some more about it, I don't think it would be</td></tr>
+  <tr class="msg" id="L9"><td class="ts-cell"><a class="ts" href="#L9" alt="Tue Aug 20 2024 07:19:06 GMT-0700 (Pacific Daylight Time)">14:19</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@abotella:igalia.com">Andreu Botella</span>&gt;</div></td><td class="msg-cell">after all, you could fire an event synchronously in an inline <code>&lt;script&gt;</code>, and that would have the initial context</td></tr>
+  <tr class="msg" id="L10"><td class="ts-cell"><a class="ts" href="#L10" alt="Tue Aug 20 2024 07:19:45 GMT-0700 (Pacific Daylight Time)">14:19</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@abotella:igalia.com">Andreu Botella</span>&gt;</div></td><td class="msg-cell">so there would need to be extra browser code and spec text to somehow track when an event is user/browser-sourced</td></tr>
+
+</tbody></table></div></div></div>
+</body></html>
