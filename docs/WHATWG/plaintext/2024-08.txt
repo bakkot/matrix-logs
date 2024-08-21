@@ -417,3 +417,133 @@ I guess they feel more like explainer sections than spec sections to me. But the
 [01:34:46.0587] <annevk>
 Yeah fair. I just think that if you need these sections to get something that's good security & privacy-wise, you've likely failed. But they can be useful to add some context, e.g., https://encoding.spec.whatwg.org/#security-background
 
+[04:59:31.0895] <annevk>
+freddy: see also the somewhat painful https://github.com/whatwg/dom/issues/776 and https://github.com/whatwg/dom/issues/777 which resulted in https://dom.spec.whatwg.org/#security-and-privacy. I could see it being helpful, but I can also see it leading to people not critically thinking about it for themselves.
+
+[05:32:49.0516] <hsivonen>
+Intentional or accidental that JSON modules integration ended up with a normative reference to IETF JSON instead of using the same specification mechanisms as Fetch?
+
+[05:35:35.0208] <annevk>
+hsivonen: oh wow, that seems bogus.
+
+[05:37:33.0031] <annevk>
+I wonder if people here have a term for "hash including hash sign" and "search including question mark", as an alternative way of solving https://github.com/whatwg/url/issues/779. We could do `hasSearch` that returns a boolean, but `searchWithSyntax` (if there's a better name) that returns `?test` instead of `test` might be more convenient.
+
+[05:39:03.0288] <annevk>
+hsivonen: oh actually, I think it might be a result of where the MIME type is defined
+
+[05:40:13.0370] <hsivonen>
+I'm trying to figure out if HTML ends up allowing non-UTF-8 encodings for JSON modules...
+
+[05:40:30.0517] <annevk>
+hsivonen: because for parsing we do end up calling the same %JSON.parse% operation as far as I can tell
+
+[05:40:59.0373] <annevk>
+hsivonen: we don't, see the logic in https://html.spec.whatwg.org/#fetch-a-single-module-script
+
+[05:41:35.0912] <annevk>
+hsivonen: in particular 13.2 and then 13.9
+
+[05:42:12.0345] <hsivonen>
+> <@annevk:matrix.org> hsivonen: in particular 13.2 and then 13.9
+
+Thanks.
+
+[05:42:40.0369] <hsivonen>
+> <@annevk:matrix.org> hsivonen: oh actually, I think it might be a result of where the MIME type is defined
+
+It appears in HTML as a conformance requirement beyond the MIME type.
+
+[05:43:34.0752] <annevk>
+Yeah, there might also be some [JSON] copypasta. Seems reasonable to file an issue to address at one point.
+
+[06:10:32.0630] <hsivonen>
+Oh, the encoding requirements of this version of IETF JSON are more reasonable than past IETF JSON.
+
+[06:23:27.0800] <annevk>
+hsivonen: I think at some point I pushed them pretty hard with the XMLHttpRequest "precedent" and that we were not going to change our ways
+
+[06:34:02.0407] <easrng>
+It's funny that RFC8259 requires both encoding as utf-8 and escapes as utf-16
+
+[06:37:40.0786] <annevk>
+Yeah, JavaScript was developed in the 16-bits are enough for all characters in the world days. And I guess since JSON is frozen-in-time and happened before the 21-bit escapes were added to JavaScript everyone will have to learn about that legacy anew.
+
+[10:07:44.0890] <Vuk Stefanovic>
+Hi All!
+I need some help on how to handle backpressure for the ReadableSide of a Transform stream.
+
+For example I am trying to implement a replace text functionality, where I replace a string of text coming from a ReadableStream with text coming from a second Readable stream, so far I couldn't find any example for this using whatwg streams.
+
+This is pseudo code, so for simplicity I'm pretending like the text to replace won't span chunk boundaries
+
+```javascript
+class Transformer {
+  async transform(chunk, controller) {
+    const foundTextIndex = chunk.indexOf('text to replace');
+    
+    if (foundTextIndex === -1) {
+      controller.enqueue(chunk);
+      return;
+    }
+
+    // Enqueue text before the part that needs to be replaced
+    controller.enqueue(chunk.slice(0, foundTextIndex));
+    
+    // This is where we do the replacement, we enqueue the text from the second source 
+    // this is the part I'm not sure on how to handle, like for example what if we are adding
+    // chunks to the readable sides, but it's internal queue is full full
+    for await (const chunk of streamForReplacement) {
+     controller.enqueue(chunk.slice(0, foundTextIndex));
+     console.log(chunk);
+   }
+   
+    // Enqueue text after replacement
+    controller.enqueue(chunk.slice(foundTextIndex + 'text to replace'.length));
+  }
+}
+```
+
+One thing I saw thanks to good old `chatGTP` was to use `Promise.resolve()` to wait for the next event loop tick in case the `desiredSize` was negative.
+
+For example
+```javascript
+class Transformer {
+  async transform(chunk, controller) {
+    const foundTextIndex = chunk.indexOf('text to replace');
+    
+    if (foundTextIndex === -1) {
+      controller.enqueue(chunk);
+      return;
+    }
+
+    // Enqueue text before the part that needs to be replaced
+    controller.enqueue(chunk.slice(0, foundTextIndex));
+    
+    // Enqueue the text from the second source with backpressure support (maybe)
+    for await (const chunk of streamForReplacement) {
+     while (controller.desiredSize <= 0) {
+       await Promise.resolve(); // wait for next tick to check if we can enqueue more chunks
+     }
+     controller.enqueue(chunk.slice(0, foundTextIndex));
+   }
+   
+    // Enqueue text after replacement
+    controller.enqueue(chunk.slice(foundTextIndex));
+  }
+}
+```
+
+I'm not sure if doing `Promise.resolve();` is valid, as I couldn't find any example dealing with this problem, and I want to know if there are better alternatives? I would really appreciate if someone could help with this and point me in the right direction
+
+[10:34:08.0416] <Colin Alworth>
+Can’t help with the spec side of things, but await Promise.resolve() is only going to be a microtask, so as I understand it there won’t be time for other tasks (like IO, browser events) to take place
+
+[11:11:23.0943] <Vuk Stefanovic>
+> <@niloc132:delightfullyoffto.pics> Can’t help with the spec side of things, but await Promise.resolve() is only going to be a microtask, so as I understand it there won’t be time for other tasks (like IO, browser events) to take place
+
+This will actually be running in a Node env, not browser, it's going to be running in an edge function, where I get HTLM as streams and I need to combine main page with some other fragments and return that in the response
+
+[11:12:02.0680] <Vuk Stefanovic>
+so starving the macrotask queue is not really a concern
+
