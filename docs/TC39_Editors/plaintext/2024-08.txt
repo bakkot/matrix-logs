@@ -130,3 +130,126 @@ Michael Ficarra: are we cancelling today?
 [07:52:04.0134] <Michael Ficarra>
 yep
 
+
+2024-08-20
+[13:54:28.0971] <Michael Ficarra>
+@bakkot:matrix.org do you have an opinion on this? https://github.com/tc39/ecma262/issues/3370
+
+[14:40:25.0415] <bakkot>
+lean negative. the prose becomes hard to read without knowing the types if we do that, I think
+
+[14:44:14.0525] <shu>
+wouldn't the return type of these expressions that have "is true" or "is false" elided always be Boolean?
+
+[14:50:09.0355] <bakkot>
+well, yes, but if you're reading an english sentence it's kind of weird to encounter something which would normally be a noun and instead it's being used as a condition
+
+[14:55:38.0213] <shu>
+not sure i follow
+
+[14:56:04.0631] <shu>
+the proposal is allow elisions where it reads naturally in english, not that "is true" and "is false" be systematically dropped everywhere
+
+[15:00:48.0437] <jmdyck>
+how would you systematically drop "is false"?
+
+[15:01:08.0804] <jmdyck>
+or un-systematically?
+
+[15:02:13.0737] <jmdyck>
+like, would you change `X is false` to `it is not the case that X` ?
+
+[15:09:40.0681] <shu>
+no, you just wouldn't change it
+
+[15:10:21.0453] <jmdyck>
+So ignore mentions of eliding "is false"?
+
+[15:10:37.0224] <shu>
+i want to type e.g. "If IsFoo(foo), then" instead of "If IsFoo(foo) is true, then"
+
+[15:10:45.0471] <shu>
+oh sorry, you were specifically talking about false
+
+[15:10:49.0925] <jmdyck>
+yes
+
+[15:10:58.0969] <shu>
+hmm that's a good point, i don't see a natural way to elide "is false" at the moment
+
+[15:12:55.0841] <jmdyck>
+I'm trying out eliding "is true", modifying my pseudocode grammar to handle the result, but I'm hitting some ambiguities.
+
+[15:14:11.0418] <shu>
+ooh fun, do tell
+
+[15:17:25.0478] <jmdyck>
+later; time for food
+
+[15:20:22.0632] <bakkot>
+> <@shuyuguo:matrix.org> the proposal is allow elisions where it reads naturally in english, not that "is true" and "is false" be systematically dropped everywhere
+
+AOs return values, which are nouns
+
+[15:20:49.0416] <bakkot>
+conditions like "x is y" are not nouns
+
+[15:21:30.0561] <bakkot>
+so it cannot read naturally unless you stop seeing the AO invocation as an AO invocation and instead read it as words based on its name
+
+[15:21:52.0615] <bakkot>
+also michael did want to drop it everywhere it sounded like
+
+[15:23:42.0762] <shu>
+i also don't want to drop it everywhere i don't think
+
+[16:39:30.0627] <Michael Ficarra>
+yeah I don't see a reason not to drop it everywhere
+
+[16:39:38.0765] <Michael Ficarra>
+it can be easily explained
+
+[16:44:11.0184] <jmdyck>
+I made the ambiguities go away, but at the expense of misparsing at least one condition.
+
+[16:47:12.0028] <jmdyck>
+In `IsLessThan`, there's a step `If _nx_ or _ny_ is *NaN*, return *undefined*.`, which required me (long ago) to add a production to my pseudocode grammar `{CONDITION} : {var} or {var} is {LITERAL}`. If I leave that production in, I get tons of ambiguities. If I take it out, no ambigs, but `_nx_ or _ny_ is *NaN*` is now parsed like `(_nx_) or (_ny_ is *NaN*)`.
+
+[16:51:01.0732] <jmdyck>
+That one step has the only instance of that production in the whole spec, so if you rewrote the condition to `_nx_ is *NaN* or _ny_ is *NaN*`, I wouldn't need the production.
+
+
+2024-08-21
+[17:01:50.0100] <bakkot>
+changing that would be consistent with https://github.com/tc39/ecma262/pull/3330 etc
+
+[17:02:56.0460] <jmdyck>
+So I *think* eliding all `is *true*` is possible without ambiguities. Mind you, some things don't read as well, so you'd probably want to do some renaming.
+
+[17:02:57.0158] <bakkot>
+anyway I definitely do not want to drop this everywhere
+
+[17:03:21.0073] <bakkot>
+I am maybe pursuadable that we can drop it for specifically `If AO(...)` where AO is a predicate
+
+[17:03:29.0590] <bakkot>
+but personally I would be inclined not to
+
+[17:03:41.0552] <bakkot>
+especially since there's not a good way to do the negated case
+
+[17:04:19.0182] <shu>
+i also definitely do not want to drop this everywhere
+
+[17:04:32.0015] <shu>
+i basically just want to drop it for `If IsFoo()`
+
+[17:05:40.0716] <jmdyck>
+Personally, I don't much like dropping it anywhere, but I think I can deal with it, so shrug.
+
+[17:08:50.0485] <jmdyck>
+Note that there are already 11 places in the spec where we elide `is *true*`. E.g. `It is a Syntax Error if the <sub>[Tagged]</sub> parameter was not set and |NoSubstitutionTemplate| Contains |NotEscapeSequence|.`
+
+[17:18:20.0977] <jmdyck>
+Oh, I should have said earlier, I use a dynamic parsing algorithm, so it's possible for the grammar to have formal ambiguities that I don't know about, simply because the current pseudocode doesn't encounter them.
+
