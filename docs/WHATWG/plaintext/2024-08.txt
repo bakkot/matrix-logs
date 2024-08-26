@@ -706,3 +706,103 @@ And even just looking at it intuitively: What user benefit would there be to cha
 [00:59:24.0799] <sideshowbarker>
  * …where _“best representation of the number representing the user's selection as a floating-point number”_ is: the string obtained from running the JS _ToString(n)_ operation on the parsed number _n_.
 
+[01:49:32.0869] <annevk>
+sideshowbarker: I almost never copy a set of steps I think. So usually it's something like "and as step 3.23.1 says ..."
+
+[01:49:48.0149] <annevk>
+Domenic: is https://github.com/whatwg/html/pull/5841 back in your queue?
+
+[01:52:15.0781] <annevk>
+sideshowbarker: for the `+1` case. Are you sure it's end user input? Because that would be up to the user agent. If it's something that ends up running through https://html.spec.whatwg.org/multipage/common-microsyntaxes.html#rules-for-parsing-floating-point-number-values that algorithm would explain why `+` leads to rejection.
+
+[01:57:26.0699] <Ms2ger>
+I guess you can/should read "the number representing the user's selection" as being UA-defined - that is, if I type "+1" into an input, "the number representing the user's selection" is 1
+
+[02:00:15.0124] <Ms2ger>
+Note that the “best representation of the number representing the user's selection as a floating-point number” algorithm explicitly takes a number, not a string - so you can't pass it "+1"
+
+[02:02:33.0873] <sideshowbarker>
+> <@ms2ger:igalia.com> Note that the “best representation of the number representing the user's selection as a floating-point number” algorithm explicitly takes a number, not a string - so you can't pass it "+1"
+
+Thanks, yeah — that’s why I said the implementation would need to parse it into a double first, then run that double through JS the JS `ToString()` operation
+
+[02:06:35.0810] <sideshowbarker>
+> <@annevk:matrix.org> sideshowbarker: for the `+1` case. Are you sure it's end user input? Because that would be up to the user agent. If it's something that ends up running through https://html.spec.whatwg.org/multipage/common-microsyntaxes.html#rules-for-parsing-floating-point-number-values that algorithm would explain why `+` leads to rejection.
+
+That algorithm doesn’t reject a leading `+`, right? Instead it explicitly says to ignore the leading `+`, and not return an error, doesn’t it?
+
+[02:14:45.0828] <sideshowbarker>
+> <@ms2ger:igalia.com> Note that the “best representation of the number representing the user's selection as a floating-point number” algorithm explicitly takes a number, not a string - so you can't pass it "+1"
+
+As far as how to actually implement _“the number representing the user's selection”_, it seems like the most-likely way to get the number representing the user’s selection would be to run a double parser on the “user’s selection”, and the result of that is the number.
+
+[02:16:04.0697] <Ms2ger>
+Possibly - or do something more lenient. Note that UAs aren't required to present this as a text field
+
+[02:16:47.0862] <sideshowbarker>
+Well more concretely maybe what the spec should instead do is to explicitly say, _“…the number that results from applying the rules for parsing floating-point number values to the user’s selection”_
+
+[02:17:43.0675] <sideshowbarker>
+But if any of this is user-defined, then it seems like we should not have explicit WPT tests for it at all
+
+[02:17:59.0518] <sideshowbarker>
+ * But if any of this is UA-defined, then it seems like we should not have explicit WPT tests for it at all
+
+[02:18:42.0895] <Ms2ger>
+But wait, nothing in the wpt is actually testing what happens when a user inputs something
+
+[02:19:04.0758] <Ms2ger>
+It's just calling the `HTMLInputElement.value` setter
+
+[02:19:34.0591] <sideshowbarker>
+Ah, I see. Then I guess I need to look at the requirements for that intead
+
+[02:21:01.0729] <sideshowbarker>
+aha OK yeah
+
+[02:21:18.0600] <Ms2ger>
+Should have looked at the test first :)
+
+[02:21:18.0617] <sideshowbarker>
+sorry for the noise… the spec is actually very clear
+
+[02:21:22.0655] <sideshowbarker>
+https://html.spec.whatwg.org/multipage/input.html#number-state-(type=number):value-sanitization-algorithm
+
+[02:21:37.0207] <sideshowbarker>
+> The value sanitization algorithm is as follows: If the value of the element is not a valid floating-point number, then set it to the empty string instead.
+
+
+
+[02:22:54.0207] <Ms2ger>
+Yeah, that's somewhat harsh
+
+[02:28:04.0071] <sideshowbarker>
+Seems so yeah — I don’t see what the benefit of that is to end users. But anyway, I will uncritically implement it as spec’ed
+
+[02:53:25.0698] <Ms2ger>
+No end users involved on this code path, though - just authors
+
+[03:16:13.0519] <annevk>
+sideshowbarker: oh you're right, it's just that it's not valid when serialized, which apparently is what the specification looks it? Not sure I'd have defined it this way
+
+[03:16:42.0429] <annevk>
+ * sideshowbarker: oh you're right, it's just that it's not valid when serialized, which apparently is what the specification looks at? Not sure I'd have defined it this way
+
+[03:27:13.0229] <sideshowbarker>
+> <@annevk:matrix.org> sideshowbarker: oh you're right, it's just that it's not valid when serialized, which apparently is what the specification looks at? Not sure I'd have defined it this way
+
+Yeah I’m not sure if we’re gaining much by having any algorithm for double-parsing in the spec at all. I still wonder if we’d be better off replacing the algorithm with a statement saying to just parse it per the IEEE 754 requirements for a binary64/double…
+
+[03:27:54.0505] <sideshowbarker>
+But I guess the problem with that is, the relevant spec isn’t freely available
+
+[04:30:33.0631] <annevk>
+I could see us relying on JS, maybe. Not sure if that's been looked at closely
+
+[06:12:58.0827] <Ms2ger>
+annevk: ^
+
+[08:24:29.0754] <annevk>
+ * I could see us relying on JS, maybe. Not sure if that's been looked at closely. (Although I do vaguely recall this conversation happening every now and then.)
+
