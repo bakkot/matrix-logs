@@ -439,3 +439,48 @@ no, i’m following you.
 [13:10:09.0128] <shu>
 was responding to "confine them in a worker so you get a process boundary"
 
+[13:10:19.0361] <kriskowal>
+thank you for correcting my mental landscape :-)
+
+[13:10:39.0612] <shu>
+so, since the web security model is built on same-origin
+
+[13:10:41.0391] <kriskowal>
+yeah, i’m the MBA who thought there are penguins at the north pole in this metaphor.
+
+[13:11:25.0810] <shu>
+there are these headers that let the page say "i want different origins to be isolated (read: process boundary)"
+
+[13:11:38.0310] <kriskowal>
+oh, alright, i see i was not wrong, just `new Worker` isn’t sufficient. You need a separate origin and maybe COOP COEP, which I ought to learn more about before I make a web platform.
+
+[13:11:43.0314] <shu>
+and if you serve your page with these headers, _then_ we enable shared memory
+
+[13:12:08.0908] <kriskowal>
+kk, same page.
+
+[13:12:56.0744] <shu>
+this proposal of course follows that policy, not that we have a choice :)
+
+[13:13:07.0282] <kriskowal>
+this is coherent.
+
+[13:14:02.0553] <kriskowal>
+I assume postMessage that crosses a process boundary would be in a position to throw if you attempted to share a struct.
+
+[13:14:16.0459] <shu>
+exactly right, same as for SABs
+
+[13:14:42.0494] <rbuckton>
+> <@kriskowal:aelf.land> By a glance, it looks like this design direction hasn’t been considered or was dismissed out-of-hand:
+> ```
+> struct Foo {}
+> addEventListener('message', event => {
+>   const foo = new Foo(event.data.foo);
+> });
+> ```
+> Wherein, `Foo` is an opaque struct definition closing over the vm-specific vagaries of padding, alignment, embedding, dereferencing, &c, `event.data.foo` is an opaque handle on shared memory without behavior, and `new Foo(event.data.foo)` unites the data and behavior.
+
+This is similar to what I do for `@esfx/struct-type`, which is more like the old "typed objects" proposal and uses objects backed by `SharedArrayBuffer`. In the end, this doesn't work unless the objects are typed as you must know the type of everything in the object graph. `new Foo(event.data.foo)` just isn't sufficient on its own.
+
