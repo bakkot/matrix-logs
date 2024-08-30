@@ -56,7 +56,7 @@
   <tr class="msg" id="L25"><td class="ts-cell"><a class="ts" href="#L25" alt="Fri Aug 30 2024 12:58:27 GMT-0700 (Pacific Daylight Time)">19:58</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">I would be happy with a scenario where A) we get agent-local prototypes, but B) we can't have shared structs as WeakMap keys, since for (A) those prototypes would probably never be collected anyways since they will be retained by the shared struct constructors and the module graph.</td></tr>
   <tr class="msg" id="L26"><td class="ts-cell"><a class="ts" href="#L26" alt="Fri Aug 30 2024 14:19:56 GMT-0700 (Pacific Daylight Time)">21:19</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">Actually, having prototypes but not WeakMap support is still a problem. Since prototypes would give us behavior, we wouldn't need a membrane for Nodes, but we still need one for <code>NodeArray</code>. A TypeScript <code>NodeArray</code> is essentially an <code>Array</code> with extra <code>pos</code>/<code>end</code> properties attached. Unfortunately, the <code>SharedArray</code> type introduced in the shared structs dev trial doesn't allow for additional (non-indexed) properties. The only way to handle that transparently/incrementally would still be via a <code>Proxy</code>, which means we still have a potential memory leak if we don't have WeakMap.</td></tr>
   <tr class="msg" id="L27"><td class="ts-cell"><a class="ts" href="#L27" alt="Fri Aug 30 2024 14:24:17 GMT-0700 (Pacific Daylight Time)">21:24</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell"><p>If we have prototypes and WeakMaps, something like <code>SourceFile</code> could have a <code>statements</code> getter that could return a <code>Proxy</code> for a struct like</p>
-<pre><code class="language-js">shared struct NodeArrayStruct {
+<pre><code class="language-js">shared struct NodeArrayData {
   pos; // number
   end; // number
   items; // SharedArray&lt;Node&gt;
@@ -64,6 +64,7 @@
 </code></pre>
 <p>where the proxy emulates <code>NodeArray</code> and redirects numeric indexed access to <code>items</code>. The performance would be abysmal though.</p>
 </td></tr>
+  <tr class="msg" id="L28"><td class="ts-cell"><a class="ts" href="#L28" alt="Fri Aug 30 2024 14:26:03 GMT-0700 (Pacific Daylight Time)">21:26</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">I experimented with just creating a shared struct with properties like <code>{ length; "0"; "1"; }</code>, but the dev trial had major perf issues with struct fields whose names were integer indexes.</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>
