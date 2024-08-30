@@ -971,3 +971,9 @@ if browsers were OK with a `isWeakable` predicate - proposed for precisely this 
 [12:12:18.0615] <ljharb>
 indeed, that'd be a polyfill for it :-) but unless it's built in, the ecosystem won't use it, and there'll be tons of checks like `Object(o) === o` or `o && typeof o === 'object'` that naively check for a subset of weakable values, that will break if a non-weakable object suddenly gets passed into something
 
+[12:56:23.0471] <rbuckton>
+I'm still very concerned that shipping shared structs "fast" by dropping agent/realm-local prototypes and not supporting WeakMap is going to significantly hamper adoption for the teams actually requesting this feature. If I don't have the ability to define behavior on the prototype, then I would need to create a membrane over shared data to be able to incrementally adopt. If I can't put the shared structs in a WeakMap to ensure I only ever produce a single proxy for a given shared struct, then I have to put them in a Map. If I put them in a Map, they will leak. If I don't want them to leak, I need to force all of my API consumers to perform manual memory management, which would be a brand new requirement for *all* API consumers, so we probably just end up leaking memory. That is not a great outcome.
+
+[12:58:27.0630] <rbuckton>
+I would be happy with a scenario where A) we get agent-local prototypes, but B) we can't have shared structs as WeakMap keys, since for (A) those prototypes would probably never be collected anyways since they will be retained by the shared struct constructors and the module graph.
+
