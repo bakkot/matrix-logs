@@ -1282,3 +1282,31 @@ And I mean, assuming I figure out how to get `new Event('x')` to end up setting 
 [02:54:39.0022] <annevk>
 `static Ref<Event> create(const AtomString& type, const EventInit&, IsTrusted = IsTrusted::No);` What makes you think it defaults to true?
 
+[03:41:46.0352] <sideshowbarker>
+Because in the constructor code at  https://github.com/WebKit/WebKit/blob/e4d6852ee20ff3dfcd3a59fe241d84f662abb234/Source/WebCore/dom/Event.cpp#L45-L55 I see:
+
+```c++
+, m_isTrusted { isTrusted == IsTrusted::Yes }
+```
+
+…and the `create` signatures I see are:
+
+```
+Ref<Event> Event::create(const AtomString& type, CanBubble canBubble, IsCancelable isCancelable, IsComposed isComposed)
+{
+    return adoptRef(*new Event(EventInterfaceType::Event, type, canBubble, isCancelable, isComposed));
+}
+```
+…so if that’s called, then it defaults to `IsTrusted::Yes`
+
+And then the other `create` signature is:
+
+```
+Ref<Event> Event::create(const AtomString& type, const EventInit& initializer, IsTrusted isTrusted)
+{
+    return adoptRef(*new Event(EventInterfaceType::Event, type, initializer, isTrusted));
+}
+```
+
+…for callers that need to set `IsTrusted::No`
+
