@@ -242,3 +242,38 @@ another would be to assert that the AC produces either a throw completion or a _
 
 I'd mildly prefer the second but am fine either way. Currently we have no asserts in either direction, such that the AC used to define a built-in generator can return both normal and return completions and go down either path, which seems unnecessarily complicated.
 
+[14:25:26.0801] <bakkot>
+(I was considering joining the call to explain this but I have a sleeping baby on top of me currently so that's not happening)
+
+[14:25:50.0349] <Michael Ficarra>
+just whisper 😛
+
+[14:26:37.0222] <bakkot>
+also Michael Ficarra I addressed your comments on the remaining ecmarkup PRs
+
+[14:27:18.0531] <Michael Ficarra>
+@bakkot:matrix.org I still don't like that it's a skip annotation instead of an xfail...
+
+[14:27:53.0159] <bakkot>
+oh I thought of a way to do the xfail without requiring me to do much work, I'll see about making that change
+
+[14:28:04.0046] <Michael Ficarra>
+🙇‍♂️
+
+[14:29:51.0065] <Michael Ficarra>
+> <@bakkot:matrix.org> brief summary of that issue:
+> 
+> Recall that for a syntactic generator, a `return` statement provides the value to be used alongside the first `{ done: true }`, as in `let g = (function* (){ yield 0; return 1; })(); console.log(g.next(), g.next(), g.next())`
+> 
+> this is accomplished by, GeneratorStart evaluates the function body to completion, after which it checks whether it ends up with a return completion (in which case its value is used to give the `value` of the final iterator result) or a normal completion (in which case there was no explicit `return` statement, and it ignores the value of the normal completion and uses `undefined`)
+> 
+> built-in generators use the GeneratorStart machinery with an abstract closure instead of a function body, but I don't think it makes sense for them to use the "check for return vs normal completion" logic. there's a few ways to accomplish this.
+> 
+> one way is to have GeneratorStart assert that the AC produces either a throw completion or a normal completion containing `unused`, which would mean that GeneratorStart would go down the path for implicit returns from syntactic generators. then built-in generators could never have `{ done: true, value: "something other than undefined" }`, which seems fine though it's kind of an odd restriction to build in.
+> 
+> another would be to assert that the AC produces either a throw completion or a _return_ completion, and require the AC to explicitly return `ReturnCompletion(*undefined*)` instead of `NormalCompletion(~unused~)`. Then GeneratorStart would go down the path for _explicit_ returns from syntactic generators, and use the value of the return completion to provide the `value` slot.
+> 
+> I'd mildly prefer the second but am fine either way. Currently we have no asserts in either direction, such that the AC used to define a built-in generator can return both normal and return completions and go down either path, which seems unnecessarily complicated.
+
+I pretty strongly prefer the former until we have a need for the latter, and I've updated all my iterator proposals to do this
+
