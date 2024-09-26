@@ -186,3 +186,54 @@ for proxies i'm not entirely clear, since the `.` access in an `unsafe {}` gotta
 
 I don't see how that's relevant to the question I asked. Afaik, the default `[[UnsafeGet]]` behavior is to execute the `[[Get]]` steps, no ?
 
+[15:55:32.0943] <shu>
+i feel like the degree to which `Reflect.get` is always [[Get]] is unacceptable comes down to language compositionality concerns
+
+[15:55:41.0632] <rbuckton>
+Not quite. It carries the `[[UnsafeGet]]` down through the prototype walk in case you have someone who did `Object.create(sharedStructInstance)`.
+
+[15:56:18.0695] <shu>
+but that's still like, internal MOP operations
+
+[15:56:22.0292] <Mathieu Hofman>
+> <@shuyuguo:matrix.org> for proxies i'm not entirely clear, since the `.` access in an `unsafe {}` gotta do _something_
+
+I'm suggesting it would just trigger the `get` trap as normal, which wouldn't be able to access the target's field unless the get trap uses syntax and an unsafe block
+
+[15:56:54.0156] <Mathieu Hofman>
+so yeah a proxy would break that "carry through"
+
+[15:57:17.0387] <rbuckton>
+As to why disallowing Reflect.get/set on shared structs, I'd like to be able to benefit from Reflect.get/set's prototype walking behavior and suppot for a receiver when working with objects. 
+
+[15:57:33.0087] <rbuckton>
+We do expect shared structs will have prototypes, so I'd like for this to work.
+
+[15:57:51.0296] <rbuckton>
+ * As to why disallowing Reflect.get/set on shared structs, I'd like to be able to benefit from Reflect.get/set's prototype walking behavior and support for a receiver when working with objects. 
+
+[15:58:06.0843] <shu>
+i don't think that slows anything down AFAICT, but it's a sharp corner and i'd rather avoid because (unless i'm still missing something, Ron seems to have thought much more about this):
+
+- Atomics methods are always [[UnsafeGet]]
+- so if Reflect methods and Proxy methods are always [[Get]]...
+
+that just feels non-compositional and bad? like you're just gonna have to memorize some API entry points are unsafe, some are safe?
+
+[15:58:25.0780] <Mathieu Hofman>
+> <@rbuckton:matrix.org> We do expect shared structs will have prototypes, so I'd like for this to work.
+
+do we expect shared structs to be used as prototypes is the question
+
+[15:58:43.0044] <shu>
+probably not the common case but i don't see why not
+
+[15:59:23.0933] <shu>
+if you prohibit shared structs from being usable as prototypes that's really introducing a big new prohibition to work around a niche API
+
+[15:59:36.0199] <shu>
+like what objects can't be used as prototypes?
+
+[15:59:42.0205] <rbuckton>
+Yes. We've even discussed shared prototypes in the past as well, and would likely want them if we ever have shared functions.
+
