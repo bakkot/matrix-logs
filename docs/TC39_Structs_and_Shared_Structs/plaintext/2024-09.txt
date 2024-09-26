@@ -327,3 +327,67 @@ i don't feel like that actually slows down anything either?
 
 In the call today it was mentioned that some people do `new Proxy(obj, { ...Reflect, <whatever traps> })` for some reason, and IMO that seems like a very bad practice
 
+[16:10:13.0065] <shu>
+ * rbuckton: so i can live with proxy traps passing a bool i think and Reflect.get/set taking a bool?
+
+[16:10:19.0188] <ljharb>
+it is, and it's fine if new additions break them, but i also don't think "extra" handler methods would throw?
+
+[16:10:21.0159] <rbuckton>
+> <@shuyuguo:matrix.org> rbuckton: so i can live with proxy traps passing a bool i think and Reflect.get/set taking a bool?
+
+I mean, that's one of the three options we discussed, yes.
+
+[16:10:28.0645] <shu>
+yeah i think that seems doable
+
+[16:10:37.0569] <ljharb>
+(btw presumably there's a way to brand-check both kinds of structs?)
+
+[16:10:52.0877] <shu>
+there's no way to brand-check non-shared structs
+
+[16:10:56.0450] <shu>
+because they are "just" sealed objects
+
+[16:11:07.0768] <shu>
+so i don't know why you'd want to brand check them
+
+[16:11:34.0101] <shu>
+for shared structs, the spec draft doesn't have a predicate but you can actually write one that's kinda funny
+
+[16:12:56.0204] <rbuckton>
+1. `Proxy`/`Reflect` is permissive: treats all get/set as if in `unsafe {}`
+2. `Proxy`/`Reflect` is restrictive: treats all get/set as if outside of `unsafe {}`, so they don't work in `unsafe {}` at all
+3. `Proxy`/`Reflect` accept/pass an `unsafe` boolean argument: Existing implementations will continue to work in `unsafe {}` with normal objects, need to opt in to work with shared structs.
+
+[16:13:28.0338] <shu>
+`shared struct Tester { field; }; function IsSharedStruct(x) { let tester = new Tester(); try { unsafe { tester.field = x; } } catch (e) { return false; } return typeof x === 'object'; }`
+
+[16:13:49.0218] <rbuckton>
+> <@shuyuguo:matrix.org> for shared structs, the spec draft doesn't have a predicate but you can actually write one that's kinda funny
+
+Spec draft doesn't have one, but we did need to add one in the dev trial so we should probably add it.
+
+[16:14:06.0022] <shu>
+i dunno where to put it
+
+[16:14:10.0067] <Mathieu Hofman>
+> <@rbuckton:matrix.org> If a Proxy *can* trap `unsafeGet` and we always forward GetValue through unsafe get inside of an `unsafe` block, then Proxies stop working for regular objects inside of `unsafe`.
+
+Unless we specify the behavior of a missing `unsafeGet` trap to call the `get` trap and its target `[[Get]]` fallback (instead of falling back on the target's `[[UnsafeGet]]`)
+
+[16:14:21.0848] <rbuckton>
+On `Reflect` or `Atomics`, I suppose.
+
+[16:14:40.0364] <shu>
+hm yeah maybe `Reflect.canBeSharedAcrossAgents`?
+
+[16:14:46.0557] <rbuckton>
+> <@mhofman:matrix.org> Unless we specify the behavior of a missing `unsafeGet` trap to call the `get` trap and its target `[[Get]]` fallback (instead of falling back on the target's `[[UnsafeGet]]`)
+
+That again breaks the prototype walk behavior of [[Get]] if you have a shared struct prototype
+
+[16:14:47.0349] <shu>
+and then you can use that in conjunction with typeof == object?
+
