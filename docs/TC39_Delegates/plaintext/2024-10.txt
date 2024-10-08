@@ -863,3 +863,114 @@ unsafe {
 
 Even from a developer point of view, the construction semantics of a `struct` differ enough from `class` that making it differ purely based on a modifier would trip up developers. 
 
+[22:00:24.0756] <ljharb>
+> <@nicolo-ribaudo:matrix.org> You can try/catch around reading from a shared struct that you have, right?
+> 
+> ```js
+> shared struct Test { x }
+> 
+> {
+>   try { new Test().x } catch { console.log("not unsafe block") }
+> }
+> 
+> unsafe {
+>   try { new Test().x; console.log("unsafe block") } catch { }
+> }
+> ```
+
+ok, but can i run that try/catch inside a function that someone else invokes in, or not in, an unsafe block?
+
+[22:00:29.0272] <danielrosenwasser>
+ah I've misunderstood - so is the following disallowed?
+
+```
+function foo() {
+    unsafe {
+        bar();
+    }
+}
+
+function bar(sharedInstance) {
+    sharedInstance.property = 123;
+}
+```
+
+[22:00:42.0249] <nicolo-ribaudo>
+> <@ljharb:matrix.org> ok, but can i run that try/catch inside a function that someone else invokes in, or not in, an unsafe block?
+
+No, but that function's body is always running in "safe" mode
+
+[22:00:49.0310] <nicolo-ribaudo>
+It's like checking if your caller is strict or loose
+
+[22:00:50.0770] <nicolo-ribaudo>
+You can't
+
+[22:00:51.0220] <rbuckton>
+> <@danielrosenwasser:matrix.org> ah I've misunderstood - so is the following disallowed?
+> 
+> ```
+> function foo() {
+>     unsafe {
+>         bar();
+>     }
+> }
+> 
+> function bar(sharedInstance) {
+>     sharedInstance.property = 123;
+> }
+> ```
+
+Yes, this does not work.
+
+[22:01:04.0573] <bakkot>
+I would like to see a lot more examples what code is/is not legal `using`, somewhere
+
+[22:01:10.0568] <bakkot>
+it is probably good I just don't understand it yet
+
+[22:01:11.0335] <rbuckton>
+`bar` does not magically get colored as `unsafe` when called. it must be lexically scoped within the block.
+
+[22:01:22.0193] <rbuckton>
+`using` or `unsafe`?
+
+[22:01:23.0513] <bakkot>
+ * I would like to see a lot more examples what code is/is not legal for `unsafe`, somewhere
+
+[22:01:26.0602] <bakkot>
+`unsafe`, sorry
+
+[22:02:01.0549] <rbuckton>
+`unsafe` only controls the ability to get/set a field on a shared struct instance, and only applies to code lexically scoped within the `unsafe {}` block.
+
+[22:02:30.0989] <bakkot>
+ok, that sounds straightforward; I think I got confused by all the discussion of coloring
+
+[22:02:31.0568] <Mathieu Hofman>
+`unsafe` only changes the behavior of get/set lexically contained in the block.
+
+[22:02:43.0990] <bakkot>
+but I am confused about the discussion of the APIs, then
+
+[22:02:50.0764] <bakkot>
+like `Reflect.get` etc
+
+[22:03:20.0858] <Mathieu Hofman>
+Should `Reflect.get` have some way to access the value (regardless of where the call happens)
+
+[22:03:26.0756] <rbuckton>
+The problem with `Reflect.get` is that it either must always succeed or always throw when reading a shared struct field.
+
+[22:03:59.0156] <bakkot>
+or we thread a parameter about unsafe-ness through, per the slides
+
+[22:04:05.0247] <rbuckton>
+Which means a Proxy must also either always succeed or always fail, or passing a get through a proxy trap becomes inconsistent when it passes through Reflect.get.
+
+[22:04:10.0747] <rbuckton>
+Yes, that's the third option.
+
+[22:04:54.0371] <Mathieu Hofman>
+get/set behavior is pretty straightforward. Where it gets funky is with own prop MOPs
+
