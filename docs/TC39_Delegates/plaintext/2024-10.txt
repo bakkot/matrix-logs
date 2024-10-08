@@ -743,3 +743,123 @@ Correlation is also important even if you just have one object, and want the met
 [21:54:24.0448] <rkirsling>
 did I blink and miss an explanation of function coloring
 
+[21:55:12.0838] <rbuckton>
+> <@rkirsling:matrix.org> did I blink and miss an explanation of function coloring
+
+Function coloring is a function being aware of whether it is invoked inside of an `unsafe` block. 
+
+[21:55:16.0574] <rkirsling>
+I _think_ I understand what it means (like "an async function is fundamentally different from a sync function") but I don't see what shu is saying
+
+[21:55:18.0613] <ljharb>
+https://journal.stuffwithstuff.com/2015/02/01/what-color-is-your-function/
+
+[21:55:25.0178] <rkirsling>
+> <@rbuckton:matrix.org> Function coloring is a function being aware of whether it is invoked inside of an `unsafe` block.
+
+ohhh
+
+[21:55:36.0283] <rkirsling>
+> <@ljharb:matrix.org> https://journal.stuffwithstuff.com/2015/02/01/what-color-is-your-function/
+
+ooh a Bob post
+
+[21:55:38.0593] <bakkot>
+we should add that to the glossary
+
+[21:55:59.0607] <hax (HE Shi-Jun)>
+rbuckton: Yeah, I mean it seems we should use syntax like ` sealed class { } ` to make it clear (though `sealed` is not a correct keyword) that it's a better but restricted class. And let shared struct just use `struct {}` ...
+
+[21:56:02.0616] <ljharb>
+the queue has 13 items btw
+
+[21:56:10.0041] <danielrosenwasser>
+Basically if you have a function `f` that contains an `unsafe {}` block, callers of `f` don't need to wrap it in an `unsafe {}` block.
+
+[21:56:20.0988] <danielrosenwasser>
+ * Basically if you have a function `foo` that contains an `unsafe {}` block, callers of `foo` don't need to wrap it in an `unsafe {}` block.
+
+[21:56:33.0148] <ljharb>
+so i'd be able to write a "am i in an unsafe block" predicate?
+
+[21:56:43.0452] <ljharb>
+ * so i'd be able to write an "am i in an unsafe block" predicate?
+
+[21:56:49.0674] <rbuckton>
+> <@haxjs:matrix.org> rbuckton: Yeah, I mean it seems we should use syntax like ` sealed class { } ` to make it clear (though `sealed` is not a correct keyword) that it's a better but restricted class. And let shared struct just use `struct {}` ...
+
+Shu and the v8 team have other reasons to want `struct`, including the unique construction semantics. struct and shared struct construction differs significantly from `class`.
+
+[21:57:09.0642] <danielrosenwasser>
+> <@ljharb:matrix.org> so i'd be able to write an "am i in an unsafe block" predicate?
+
+oh no
+
+[21:57:13.0269] <rbuckton>
+> <@ljharb:matrix.org> so i'd be able to write an "am i in an unsafe block" predicate?
+
+With function coloring, yes. As specified, no and we do not think it should be added.
+
+[21:57:22.0508] <ljharb>
+gotcha thanks
+
+[21:57:23.0833] <danielrosenwasser>
+> <@danielrosenwasser:matrix.org> oh no
+
+and by that I mean "ugh yes"
+
+[21:57:28.0642] <Mathieu Hofman>
+> <@ljharb:matrix.org> so i'd be able to write an "am i in an unsafe block" predicate?
+
+as a property access on a proxy, maybe, depending on the open question
+
+[21:57:42.0973] <Mathieu Hofman>
+but as a predicate that has the shape of a function, no
+
+[21:57:58.0469] <ljharb>
+if you can't write such a predicate i'm not sure how you could virtualize shared structs
+
+[21:58:34.0055] <hax (HE Shi-Jun)>
+> <@rbuckton:matrix.org> Shu and the v8 team have other reasons to want `struct`, including the unique construction semantics. struct and shared struct construction differs significantly from `class`.
+
+I understand from the engine viewpoint (or spec viewpoint) it's true, but I guess from developer concept model, it's too different.
+
+[21:58:34.0112] <Mathieu Hofman>
+you can with proxy
+
+[21:58:42.0819] <ljharb>
+ok, then you can, and functions can be colored?
+
+[21:58:48.0514] <Mathieu Hofman>
+it'd just be a boolean flag passed to the trap
+
+[21:58:48.0984] <ljharb>
+ * ok, then you can, and functions can be colored manually?
+
+[21:59:10.0613] <hax (HE Shi-Jun)>
+> <@haxjs:matrix.org> I understand from the engine viewpoint (or spec viewpoint) it's true, but I guess from developer concept model, it's too different.
+
+Maybe TG5 could investigate it
+
+[21:59:58.0114] <nicolo-ribaudo>
+> <@ljharb:matrix.org> so i'd be able to write an "am i in an unsafe block" predicate?
+
+You can try/catch around reading from a shared struct that you have, right?
+
+```js
+shared struct Test { x }
+
+{
+  try { new Test().x } catch { console.log("not unsafe block") }
+}
+
+unsafe {
+  try { new Test().x; console.log("unsafe block") } catch { }
+}
+```
+
+[22:00:01.0225] <rbuckton>
+> <@haxjs:matrix.org> I understand from the engine viewpoint (or spec viewpoint) it's true, but I guess from developer concept model, it's too different.
+
+Even from a developer point of view, the construction semantics of a `struct` differ enough from `class` that making it differ purely based on a modifier would trip up developers. 
+
