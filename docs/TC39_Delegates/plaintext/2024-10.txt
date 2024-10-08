@@ -1282,3 +1282,88 @@ denying `postMessage` and similar sharing-across-agent capabilities works just a
 [22:39:50.0589] <yulia>
 can we do unsafe functionName () {} and just make it like async/await? (not a serious suggestion)
 
+[22:40:08.0806] <Justin Ridgewell>
+> <@rbuckton:matrix.org> Neither do I, but its far more convenient than `Reflect.getUnsafe()`.
+
+We need JSSugar to automatically transpile gets/sets into `getUnsafe()`
+
+[22:40:13.0428] <bakkot>
+(anyway I really really gotta go to sleep, will read messages in the morning and leave transcription bot running for now, later all)
+
+[22:40:14.0716] <ljharb>
+> <@bakkot:matrix.org> or just like when a `shared struct` is evaluated it checks `globalThis.canMakeSharedStructs` and then if you want to turn that off you make that nonwritable-nonconfigurable `false`
+
+ * _laughs in python's GIL_
+
+[22:40:34.0453] <rbuckton>
+> <@yulia:mozilla.org> can we do unsafe functionName () {} and just make it like async/await? (not a serious suggestion)
+
+I did propose this, but not like async/await, more as a way to avoid doubly nested blocks. Alternatively, `function foo() unsafe {}`
+
+[22:40:54.0081] <rbuckton>
+Keep in mind that unlike async/await, `unsafe` does not spread virally to your callers
+
+[22:41:08.0760] <ljharb>
+i mean, async/await doesn't directly do that either
+
+[22:41:13.0192] <ljharb>
+only indirectly by returning a promise
+
+[22:41:21.0144] <yulia>
+async/await results in very viscous refactoring situations
+
+[22:41:28.0440] <littledan>
+I think it’s good that our process allows significant questions to be open during Stage 2. It would be bad if champions were incentivized to hide debates until later. But more importantly, the signal to invest significantly in a proposal is important to be able to dedicate the work to solve the problem.
+
+[22:41:34.0147] <rbuckton>
+> <@ljharb:matrix.org> i mean, async/await doesn't directly do that either
+
+In any meaningful way, it does. 
+
+[22:41:35.0746] <yulia>
+you have to update all callers, or end up with a fire and forget situation
+
+[22:41:41.0658] <Justin Ridgewell>
+> <@rbuckton:matrix.org> I did propose this, but not like async/await, more as a way to avoid doubly nested blocks. Alternatively, `function foo() unsafe {}`
+
+Is @waldemarh:matrix.org's concern that `unsafe` exists as a concept, or that it’s implemented as a block?
+
+[22:41:45.0359] <yulia>
+so yeah unsafe would not be that viscuous
+
+[22:41:55.0424] <Justin Ridgewell>
+If the second, than unsafe functions don’t really solve it.
+
+[22:42:06.0937] <waldemar>
+> <@rbuckton:matrix.org> I don't understand what "contamination" means here
+
+`unsafe` will contaminate generic abstractions and algorithms, which will be pressured to wrap themselves inside `unsafe` blocks just so that folks can pass shared structs into them. Most don't really care about consistency and we already have the same problem with accessors, callbacs, and proxies. Wrapping one of these in `unsafe` will just become boilerplate practice.
+
+[22:42:41.0192] <yulia>
+the function solution would be implemented the same way as the block, and would have the same complexity concern i had earlier, which is why i wasn't so serious with it
+
+[22:43:07.0700] <yulia>
+so its not really a solution, we would need something else, that doesn't require marking the get/set with a flag
+
+[22:43:12.0686] <shu>
+waldemar: yulia: Mathieu Hofman (i can't find mark in this channel) ljharb PTAL at the conclusions in the notes to see if it's explicit enough for your liking
+
+[22:43:18.0248] <Justin Ridgewell>
+* If the second, then unsafe functions don’t really solve it.
+
+[22:43:21.0985] <rbuckton>
+> <@waldemarh:matrix.org> `unsafe` will contaminate generic abstractions and algorithms, which will be pressured to wrap themselves inside `unsafe` blocks just so that folks can pass shared structs into them. Most don't really care about consistency and we already have the same problem with accessors, callbacs, and proxies. Wrapping one of these in `unsafe` will just become boilerplate practice.
+
+shared memory multithreading is more of a power-user feature, I doubt every npm package is going to start enclosing their sources in `unsafe {}` at the top level as a workaround. That's just bad practice.
+
+[22:44:19.0431] <rbuckton>
+And it should be discouraged.
+
+[22:44:44.0019] <Mathieu Hofman>
+> <@waldemarh:matrix.org> `unsafe` will contaminate generic abstractions and algorithms, which will be pressured to wrap themselves inside `unsafe` blocks just so that folks can pass shared structs into them. Most don't really care about consistency and we already have the same problem with accessors, callbacs, and proxies. Wrapping one of these in `unsafe` will just become boilerplate practice.
+
+But generic abstractions and algorithms shouldn't be unsafely dealing with shared structs, that's the point. They are likely not able to operate generically on the object.
+
+[22:45:06.0828] <rbuckton>
+I would encourage anyone who has interest or concerns in the shared structs proposal to join our regularly scheduled stakeholders calls, we've been making a lot of positive progress in all areas.
+
