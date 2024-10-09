@@ -4637,3 +4637,121 @@ Because JS cannot determine this statically, the pattern matching proposal says 
 [00:04:58.0314] <rbuckton>
  * Because JS cannot determine this statically, the pattern matching proposal says an identifier in a pattern is _always_ a reference. If you intend it to be a declaration, you must use `let`/`const`/`var` to declare it.
 
+[00:05:21.0028] <Justin Ridgewell>
+> <@rbuckton:matrix.org> Regarding Rust pattern matching. Rust knows statically whether a RHS in a pattern is an existing binding or a new binding, JS does not. Any code could introduce a new global that could change the meaning of something like `match (value) { { x: x, y: y }: ... }`
+
+Because your patten matching means something different than Rust's.
+
+[00:05:30.0488] <rbuckton>
+So you would write
+```js
+match (value) {
+  { x: let x, y: let y }: doSomething(x, y),
+}
+```
+
+[00:05:38.0587] <hax (HE Shi-Jun)>
+> <@ljharb:matrix.org> tons of people still do for underscore/lodash, at least
+
+Not sure about it. I think people use `_` or `$` in no module era (before commonjs), it seems become less and less after we adopt modules, especially esm.
+
+[00:06:08.0496] <danielrosenwasser>
+The context is that you have a choice in pattern matching on whether a bare identifier denotes a new binding, or an existing binding to be checked against
+
+[00:06:27.0399] <nicolo-ribaudo>
+> <@rbuckton:matrix.org> Regarding Rust pattern matching. Rust knows statically whether a RHS in a pattern is an existing binding or a new binding, JS does not. Any code could introduce a new global that could change the meaning of something like `match (value) { { x: x, y: y }: ... }`
+
+In rust it's just syntax-based, right? i.e. in this case you are introducing a new binding `x`:
+
+```rust
+fn main() {
+    let x = 42;
+    let y = Some(3);
+    match y {
+        Some(x) => println!("Some"),
+        _ => println!("Other")
+    }
+}
+```
+
+[00:06:29.0208] <rbuckton>
+> <@jridgewell:matrix.org> Because your patten matching means something different than Rust's.
+
+It only really differs in how bindings are declared, by necessity.
+
+[00:06:59.0061] <ljharb>
+> <@haxjs:matrix.org> Not sure about it. I think people use `_` or `$` in no module era (before commonjs), it seems become less and less after we adopt modules, especially esm.
+
+123K results on github alone https://github.com/search?q=%22import+*+as+_+from+%27lodash%27%22&type=code
+
+[00:07:32.0282] <Justin Ridgewell>
+> <@nicolo-ribaudo:matrix.org> In rust it's just syntax-based, right? i.e. in this case you are introducing a new binding `x`:
+> 
+> ```rust
+> fn main() {
+>     let x = 42;
+>     let y = Some(3);
+>     match y {
+>         Some(x) => println!("Some"),
+>         _ => println!("Other")
+>     }
+> }
+> ```
+
+You are always introducing a new binding `x`, you are never matching a value `y === Some(x)`
+
+[00:08:03.0771] <Justin Ridgewell>
+To match a value, you use an `if` check on the case
+
+[00:08:22.0791] <rbuckton>
+> <@nicolo-ribaudo:matrix.org> In rust it's just syntax-based, right? i.e. in this case you are introducing a new binding `x`:
+> 
+> ```rust
+> fn main() {
+>     let x = 42;
+>     let y = Some(3);
+>     match y {
+>         Some(x) => println!("Some"),
+>         _ => println!("Other")
+>     }
+> }
+> ```
+
+`Some(x):` may seem obvious, but what about just `{ x: Number }`. Should I be declaring a new variable named `Number` or referencing the `Number` constructor?
+
+[00:08:35.0807] <Ashley Claymore>
+> <@yulia:mozilla.org> yeah this looks pretty minor to me as well
+
+would there be any (tiny) advantage to engines, to immediately know the binding is a discard as opposed to discovering that only once the parse finished? Potentially keeping the set of names to track smaller
+
+[00:08:41.0318] <hax (HE Shi-Jun)>
+> <@ljharb:matrix.org> 123K results on github alone https://github.com/search?q=%22import+*+as+_+from+%27lodash%27%22&type=code
+
+ok, let me write a bot to send PRs 😂
+
+[00:08:55.0463] <ljharb>
+lol, careful github doesn't autoban you :-p
+
+[00:09:22.0107] <rbuckton>
+> <@aclaymore:matrix.org> would there be any (tiny) advantage to engines, to immediately know the binding is a discard as opposed to discovering that only once the parse finished? Potentially keeping the set of names to track smaller
+
+Do implementations need to declare the number of locals within a function? That increases the memory size of a function at runtime.
+
+[00:09:28.0815] <yulia>
+> <@aclaymore:matrix.org> would there be any (tiny) advantage to engines, to immediately know the binding is a discard as opposed to discovering that only once the parse finished? Potentially keeping the set of names to track smaller
+
+erm. maybe i am sleep deprived, how would we do this before parse?
+
+[00:09:37.0706] <yulia>
+> <@rbuckton:matrix.org> Do implementations need to declare the number of locals within a function? That increases the memory size of a function at runtime.
+
+yep
+
+[00:09:59.0305] <yulia>
+> <@rbuckton:matrix.org> Do implementations need to declare the number of locals within a function? That increases the memory size of a function at runtime.
+
+ * yep (we do anyway)
+
+[00:10:09.0258] <rbuckton>
+So yes, there is probably a tiny benefit to implementations since they don't need to hold onto a local for those variables.
+
