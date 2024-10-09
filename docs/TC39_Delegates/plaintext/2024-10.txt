@@ -3434,3 +3434,181 @@ that seems good to me
 [21:19:47.0317] <shu>
 their verbosity gives a hint to the work they're doing
 
+[21:20:15.0108] <ljharb>
+i'm not sure the point of programming languages is to have verbosity correlate to cost?
+
+[21:20:18.0272] <nicolo-ribaudo>
+> <@shuyuguo:matrix.org> i'll be somewhat blunt: i continue to see the line of argument from extractor-proponents to be "for these technical reasons it's unrealistic to do this in tools"
+> 
+> that's fine! but that doesn't imply "engines will do it"
+
+Extractors are actually something that would be easy to do in Babel, just not fast/small
+
+[21:20:22.0451] <rbuckton>
+Pattern matching results in far more readable code than the current approach.
+
+[21:20:33.0782] <shu>
+if a terser and more readable thing can be a near zero-cost abstraction, that's great
+
+[21:20:39.0889] <rbuckton>
+The verbosity makes it harder to reason over.
+
+[21:20:45.0582] <shu>
+if it can't be, we gave our position yesterday on the cost to users
+
+[21:21:20.0108] <Bradford Smith>
+My concern with Extractors is that they seem overly clever to me. They hide what's happening from the developer too much, leading them to incorrect ideas about how expensive they are.
+
+[21:21:29.0115] <shu>
+> <@ljharb:matrix.org> i'm not sure the point of programming languages is to have verbosity correlate to cost?
+
+the point of programming languages is to write applications that have some value to users of the applications
+
+[21:21:33.0908] <ljharb>
+indeed
+
+[21:21:38.0196] <rbuckton>
+pattern matching can be more efficient than the alternative if we have sufficient caching and reuse across multiple branches of the pattern.
+
+[21:21:39.0266] <keith_miller>
+Sure but that's still 48 byte codes in JSC today:
+```
+[x, y] = Optional.some[Symbol.customMatcher](Point[Symbol.customMatcher](p, 'list'), 'list');
+<global>#BS5CtO:[0x130538130->0x10e071188, NoneGlobal, 265]: 48 instructions (0 16-bit instructions, 0 32-bit instructions, 27 instructions with metadata); 361 bytes (96 metadata bytes); 1 parameter(s); 20 callee register(s); 5 variable(s); scope at loc4
+
+bb#1
+Predecessors: [ ]
+[   0] enter
+[   1] mov                dst:loc5, src:Undefined(const0)
+[   4] resolve_scope      dst:loc7, scope:loc4, var:0, resolveType:GlobalProperty, localScopeDepth:0
+[  11] get_from_scope     dst:loc8, scope:loc7, var:0, getPutInfo:2048<ThrowIfNotFound|GlobalProperty|NotInitialization|NotStrictMode>, localScopeDepth:0, offset:0, valueProfile:1
+[  20] get_by_id          dst:loc6, base:loc8, property:1, valueProfile:2
+[  26] resolve_scope      dst:loc8, scope:loc4, var:2, resolveType:GlobalProperty, localScopeDepth:0
+[  33] get_from_scope     dst:loc9, scope:loc8, var:2, getPutInfo:2048<ThrowIfNotFound|GlobalProperty|NotInitialization|NotStrictMode>, localScopeDepth:0, offset:0, valueProfile:3
+[  42] get_by_id          dst:loc7, base:loc9, property:3, valueProfile:4
+[  48] get_by_val         dst:loc5, base:loc6, property:loc7, valueProfile:5
+[  54] mov                dst:loc10, src:loc6
+[  57] resolve_scope      dst:loc11, scope:loc4, var:4, resolveType:GlobalProperty, localScopeDepth:0
+[  64] get_from_scope     dst:loc11, scope:loc11, var:4, getPutInfo:2048<ThrowIfNotFound|GlobalProperty|NotInitialization|NotStrictMode>, localScopeDepth:0, offset:0, valueProfile:6
+[  73] resolve_scope      dst:loc13, scope:loc4, var:2, resolveType:GlobalProperty, localScopeDepth:0
+[  80] get_from_scope     dst:loc14, scope:loc13, var:2, getPutInfo:2048<ThrowIfNotFound|GlobalProperty|NotInitialization|NotStrictMode>, localScopeDepth:0, offset:0, valueProfile:7
+[  89] get_by_id          dst:loc12, base:loc14, property:3, valueProfile:8
+[  95] get_by_val         dst:loc9, base:loc11, property:loc12, valueProfile:9
+[ 101] mov                dst:loc14, src:loc11
+[ 104] resolve_scope      dst:loc13, scope:loc4, var:5, resolveType:GlobalProperty, localScopeDepth:0
+[ 111] get_from_scope     dst:loc13, scope:loc13, var:5, getPutInfo:2048<ThrowIfNotFound|GlobalProperty|NotInitialization|NotStrictMode>, localScopeDepth:0, offset:0, valueProfile:10
+[ 120] mov                dst:loc12, src:String (atomic),8Bit:(1),length:(4): list, StructureID: 16976(const1)
+[ 123] call               dst:loc9, callee:loc9, argc:3, argv:20, valueProfile:11
+[ 130] mov                dst:loc8, src:String (atomic),8Bit:(1),length:(4): list, StructureID: 16976(const1)
+[ 133] call               dst:loc5, callee:loc5, argc:3, argv:16, valueProfile:12
+[ 140] get_by_id          dst:loc8, base:loc5, property:6, valueProfile:13
+[ 146] mov                dst:loc10, src:loc5
+[ 149] iterator_open      iterator:loc6, next:loc7, symbolIterator:loc8, iterable:loc10, stackOffset:16, iterableValueProfile:14, iteratorValueProfile:15, nextValueProfile:16
+[ 159] mov                dst:loc10, src:loc6
+[ 162] iterator_next      done:loc8, value:loc9, iterable:loc5, next:loc7, iterator:loc10, stackOffset:16, nextResultValueProfile:17, doneValueProfile:18, valueValueProfile:19
+[ 173] jfalse             condition:loc8, targetLabel:6(->179)
+Successors: [ #3 #2 ]
+
+bb#2
+Predecessors: [ #1 ]
+[ 176] mov                dst:loc9, src:Undefined(const0)
+Successors: [ #3 ]
+
+bb#3
+Predecessors: [ #1 #2 ]
+[ 179] resolve_scope      dst:loc10, scope:loc4, var:7, resolveType:GlobalProperty, localScopeDepth:0
+[ 186] put_to_scope       scope:loc10, var:7, value:loc9, getPutInfo:1050624<DoNotThrowIfNotFound|GlobalProperty|NotInitialization|NotStrictMode>, symbolTableOrScopeDepth:0, offset:0
+[ 194] jtrue              condition:loc8, targetLabel:20(->214)
+Successors: [ #5 #4 ]
+
+bb#4
+Predecessors: [ #3 ]
+[ 197] mov                dst:loc10, src:loc6
+[ 200] iterator_next      done:loc8, value:loc9, iterable:loc5, next:loc7, iterator:loc10, stackOffset:16, nextResultValueProfile:20, doneValueProfile:21, valueValueProfile:22
+[ 211] jfalse             condition:loc8, targetLabel:6(->217)
+Successors: [ #6 #5 ]
+
+bb#5
+Predecessors: [ #3 #4 ]
+[ 214] mov                dst:loc9, src:Undefined(const0)
+Successors: [ #6 ]
+
+bb#6
+Predecessors: [ #4 #5 ]
+[ 217] resolve_scope      dst:loc10, scope:loc4, var:8, resolveType:GlobalProperty, localScopeDepth:0
+[ 224] put_to_scope       scope:loc10, var:8, value:loc9, getPutInfo:1050624<DoNotThrowIfNotFound|GlobalProperty|NotInitialization|NotStrictMode>, symbolTableOrScopeDepth:0, offset:0
+[ 232] jtrue              condition:loc8, targetLabel:31(->263)
+Successors: [ #10 #7 ]
+
+bb#7
+Predecessors: [ #6 ]
+[ 235] get_by_id          dst:loc9, base:loc6, property:9, valueProfile:23
+[ 241] jundefined_or_null value:loc9, targetLabel:22(->263)
+Successors: [ #10 #8 ]
+
+bb#8
+Predecessors: [ #7 ]
+[ 244] mov                dst:loc12, src:loc6
+[ 247] call               dst:loc10, callee:loc9, argc:1, argv:18, valueProfile:24
+[ 254] is_object          dst:loc13, operand:loc10
+[ 257] jtrue              condition:loc13, targetLabel:6(->263)
+Successors: [ #10 #9 ]
+
+bb#9
+Predecessors: [ #8 ]
+[ 260] throw_static_error message:String (atomic),8Bit:(1),length:(43): Iterator result interface is not an object., StructureID: 16976(const2), errorType:TypeError
+Successors: [ ]
+
+bb#10
+Predecessors: [ #6 #7 #8 ]
+[ 263] end                value:loc5
+Successors: [ ]
+
+
+Identifiers:
+  id0 = Optional
+  id1 = some
+  id2 = Symbol
+  id3 = customMatcher
+  id4 = Point
+  id5 = p
+  id6 = Symbol.iterator
+  id7 = x
+  id8 = y
+  id9 = return
+
+Constants:
+   k0 = Undefined
+   k1 = String (atomic),8Bit:(1),length:(4): list, StructureID: 16976
+   k2 = String (atomic),8Bit:(1),length:(43): Iterator result interface is not an object., StructureID: 16976
+```
+
+[21:21:50.0798] <ljharb>
+and readable code correlates to that value, imo often more highly than the performance of that application
+
+[21:21:59.0292] <shu>
+i disagree _so_ strongly on that point
+
+[21:22:04.0261] <ljharb>
+that is clear :-)
+
+[21:23:09.0305] <bakkot>
+I might believe that claim in C, which is hard to write correctly and where bugs can do arbitrarily bad things, but I certainly do not agree with that claim for web apps written in JS
+
+[21:24:04.0529] <keith_miller>
+> <@bakkot:matrix.org> I might believe that claim in C, which is hard to write correctly and where bugs can do arbitrarily bad things, but I certainly do not agree with that claim for web apps written in JS
+
+Are you agreeing with Jordan or Shu? lol
+
+[21:24:07.0033] <ljharb>
+it's not a claim that it's always the case, to be clear, and obv _some_ threshold of slowness will always cancel out the other benefits,
+
+[21:24:11.0830] <ljharb>
+ * it's not a claim that it's always the case, to be clear, and obv _some_ threshold of slowness will always cancel out the other benefits.
+
+[21:24:37.0036] <keith_miller>
+Which is a *lot* by JSC standards 
+
+[21:24:52.0696] <keith_miller>
+This function would be invalid for inlining from one binding alone
+
