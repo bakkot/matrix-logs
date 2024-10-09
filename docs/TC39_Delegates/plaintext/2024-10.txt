@@ -3308,3 +3308,81 @@ I expect most destructuring is array to array, but I don't have metrics to back 
 [21:09:54.0290] <rbuckton>
 I'd be perfectly happy with Array being fast and other iterators being slower, since the alternative is both are slower.
 
+[21:10:43.0238] <shu>
+yeah i agree it's worth optimizing that?
+
+[21:10:48.0839] <rbuckton>
+React alone should be enough of a reason to optimize array to array destructuring, but I'm working on some benchmarking to get and understanding of the actual effect it has.
+
+[21:10:55.0789] <rbuckton>
+ * React alone should be enough of a reason to optimize array to array destructuring, but I'm working on some benchmarking to get an understanding of the actual effect it has.
+
+[21:11:02.0800] <keith_miller>
+It is very optimized in JSC (modulo the iterator object itself being allocated)
+
+[21:11:25.0197] <Rob Palmer>
+I thought V8 had already done that
+
+[21:11:40.0031] <justingrant>
+> <@rkirsling:matrix.org> 7 years, wow
+
+You think it's wow from the outside, imagine feeling those years from the inside!  Although I only joined the Temporal champion 4.5 years ago so I'm still a fresh n00b. 😀
+
+[21:11:43.0117] <shu>
+i don't actually know, lemme see
+
+[21:11:44.0522] <littledan>
+> <@bakkot:matrix.org> transpilers can't do this without type information
+
+Yes they can—tsc does it in some emit modes unconditionally!
+
+[21:12:03.0357] <bakkot>
+sorry, without also breaking some other code
+
+[21:12:07.0113] <Jack Works>
+> <@rbuckton:matrix.org> How many people use `for..of` over arrays today? I assume that still isn't optimized for Array vs other iterators.
+
+almost all of my code is `for..of` even it might be slow. readibility > performance when the code is not in a hot path
+
+[21:12:11.0255] <Ashley Claymore>
+https://docs.google.com/document/d/1hWb-lQW4NSG9yRpyyiAA_9Ktytd5lypLnVLhPX9vamE/edit?tab=t.0#heading=h.9ss45aibqpw2
+
+[21:12:16.0065] <rbuckton>
+TSC only does that for `--target ES5` where there is no expectation of `Symbol.iterator`.
+
+[21:12:37.0013] <littledan>
+> <@bakkot:matrix.org> sorry, without also breaking some other code
+
+If you care about breaking other code, then you might need runtime support to check that no one messed with Array.prototype
+
+[21:12:39.0579] <rbuckton>
+And we have `--downevelIteration` to emulate actual ES2015+ semantics.
+
+[21:13:03.0479] <littledan>
+> <@bakkot:matrix.org> transpilers can't do this without type information
+
+ * Yes they can—tsc does it in some emit modes unconditionally! (When emitting es5)
+
+[21:13:22.0545] <littledan>
+Yes sorry that wasn’t meant as a tsc critique
+
+[21:13:59.0873] <littledan>
+But generally: if we want transpilers to do unsound things (like around TDZ) that is something we as a committee can say
+
+[21:14:14.0651] <rbuckton>
+Even in the `--downlevelIteration` case we use a runtime helper to emulate an iterator over an array, rather than bake that into the actual loop.
+
+[21:14:30.0357] <rbuckton>
+so the emit remains the same regardless as to the type of the iterated object
+
+[21:14:41.0441] <shu>
+> <@aclaymore:matrix.org> https://docs.google.com/document/d/1hWb-lQW4NSG9yRpyyiAA_9Ktytd5lypLnVLhPX9vamE/edit?tab=t.0#heading=h.9ss45aibqpw2
+
+oh cool. looks like we didn't actually land any of the talked about solutions though? the bytecode still looks pretty bad to me
+
+[21:14:48.0418] <littledan>
+I dunno if we should do such unsound downlevelings but I don’t know what else would actually meet what the browsers seem to be expecting
+
+[21:14:59.0685] <shu>
+the quickest way to make sure that happens is to make it show up in speedometer or the new jetstream
+
