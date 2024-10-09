@@ -3661,3 +3661,355 @@ A lot of that is resolving the various properties needed though not the array de
 [21:34:15.0866] <keith_miller>
 I encourage you to look at that bytecode sequence and *really* think about all the subtle work that has to happen to resolve that binding.
 
+[21:35:24.0583] <shu>
+i feel like folks haven't really internalized the "complexity is moved, not removed" point we tried to make yet
+
+[21:36:18.0508] <rbuckton>
+And the bytecode for `const [[[x, y]]] = foo` given it results in three lookups to `Symbol.iterator`? I understand extractors do that as well, I'm just curious.
+
+[21:36:36.0702] <Michael Ficarra>
+@shuyuguo:matrix.org this could literally be a special form that *does* remove the complexity, different from `const window.Array(a, b, c) = ...`
+
+[21:37:02.0068] <keith_miller>
+```
+
+[21:37:08.0249] <keith_miller>
+ * >>> const [[[x, y]]] = foo
+<global>#CzC5ob:[0x130538220->0x10e071488, NoneGlobal, 285]: 59 instructions (0 16-bit instructions, 0 32-bit instructions, 22 instructions with metadata); 381 bytes (96 metadata bytes); 1 parameter(s); 26 callee register(s); 5 variable(s); scope at loc4
+
+bb#1
+Predecessors: [ ]
+[   0] enter
+[   1] mov                dst:loc5, src:Undefined(const0)
+[   4] resolve_scope      dst:loc6, scope:loc4, var:0, resolveType:GlobalProperty, localScopeDepth:0
+[  11] get_from_scope     dst:loc6, scope:loc6, var:0, getPutInfo:2048<ThrowIfNotFound|GlobalProperty|NotInitialization|NotStrictMode>, localScopeDepth:0, offset:0, valueProfile:1
+[  20] get_by_id          dst:loc9, base:loc6, property:1, valueProfile:2
+[  26] mov                dst:loc10, src:loc6
+[  29] iterator_open      iterator:loc7, next:loc8, symbolIterator:loc9, iterable:loc10, stackOffset:16, iterableValueProfile:3, iteratorValueProfile:4, nextValueProfile:5
+[  39] mov                dst:loc12, src:loc7
+[  42] iterator_next      done:loc9, value:loc10, iterable:loc6, next:loc8, iterator:loc12, stackOffset:18, nextResultValueProfile:6, doneValueProfile:7, valueValueProfile:8
+[  53] jfalse             condition:loc9, targetLabel:6(->59)
+Successors: [ #3 #2 ]
+
+bb#2
+Predecessors: [ #1 ]
+[  56] mov                dst:loc10, src:Undefined(const0)
+Successors: [ #3 ]
+
+bb#3
+Predecessors: [ #1 #2 ]
+[  59] get_by_id          dst:loc13, base:loc10, property:1, valueProfile:9
+[  65] mov                dst:loc14, src:loc10
+[  68] iterator_open      iterator:loc11, next:loc12, symbolIterator:loc13, iterable:loc14, stackOffset:20, iterableValueProfile:10, iteratorValueProfile:11, nextValueProfile:12
+[  78] mov                dst:loc16, src:loc11
+[  81] iterator_next      done:loc13, value:loc14, iterable:loc10, next:loc12, iterator:loc16, stackOffset:22, nextResultValueProfile:13, doneValueProfile:14, valueValueProfile:15
+[  92] jfalse             condition:loc13, targetLabel:6(->98)
+Successors: [ #5 #4 ]
+
+bb#4
+Predecessors: [ #3 ]
+[  95] mov                dst:loc14, src:Undefined(const0)
+Successors: [ #5 ]
+
+bb#5
+Predecessors: [ #3 #4 ]
+[  98] get_by_id          dst:loc17, base:loc14, property:1, valueProfile:16
+[ 104] mov                dst:loc18, src:loc14
+[ 107] iterator_open      iterator:loc15, next:loc16, symbolIterator:loc17, iterable:loc18, stackOffset:24, iterableValueProfile:17, iteratorValueProfile:18, nextValueProfile:19
+[ 117] mov                dst:loc20, src:loc15
+[ 120] iterator_next      done:loc17, value:loc18, iterable:loc14, next:loc16, iterator:loc20, stackOffset:26, nextResultValueProfile:20, doneValueProfile:21, valueValueProfile:22
+[ 131] jfalse             condition:loc17, targetLabel:6(->137)
+Successors: [ #7 #6 ]
+
+bb#6
+Predecessors: [ #5 ]
+[ 134] mov                dst:loc18, src:Undefined(const0)
+Successors: [ #7 ]
+
+bb#7
+Predecessors: [ #5 #6 ]
+[ 137] resolve_scope      dst:loc19, scope:loc4, var:2, resolveType:GlobalProperty, localScopeDepth:0
+[ 144] put_to_scope       scope:loc19, var:2, value:loc18, getPutInfo:1049600<DoNotThrowIfNotFound|GlobalProperty|ConstInitialization|NotStrictMode>, symbolTableOrScopeDepth:0, offset:0
+[ 152] jtrue              condition:loc17, targetLabel:20(->172)
+Successors: [ #9 #8 ]
+
+bb#8
+Predecessors: [ #7 ]
+[ 155] mov                dst:loc20, src:loc15
+[ 158] iterator_next      done:loc17, value:loc18, iterable:loc14, next:loc16, iterator:loc20, stackOffset:26, nextResultValueProfile:23, doneValueProfile:24, valueValueProfile:25
+[ 169] jfalse             condition:loc17, targetLabel:6(->175)
+Successors: [ #10 #9 ]
+
+bb#9
+Predecessors: [ #7 #8 ]
+[ 172] mov                dst:loc18, src:Undefined(const0)
+Successors: [ #10 ]
+
+bb#10
+Predecessors: [ #8 #9 ]
+[ 175] resolve_scope      dst:loc19, scope:loc4, var:3, resolveType:GlobalProperty, localScopeDepth:0
+[ 182] put_to_scope       scope:loc19, var:3, value:loc18, getPutInfo:1049600<DoNotThrowIfNotFound|GlobalProperty|ConstInitialization|NotStrictMode>, symbolTableOrScopeDepth:0, offset:0
+[ 190] jtrue              condition:loc17, targetLabel:31(->221)
+Successors: [ #14 #11 ]
+
+bb#11
+Predecessors: [ #10 ]
+[ 193] get_by_id          dst:loc18, base:loc15, property:4, valueProfile:26
+[ 199] jundefined_or_null value:loc18, targetLabel:22(->221)
+Successors: [ #14 #12 ]
+
+bb#12
+Predecessors: [ #11 ]
+[ 202] mov                dst:loc20, src:loc15
+[ 205] call               dst:loc19, callee:loc18, argc:1, argv:26, valueProfile:27
+[ 212] is_object          dst:loc21, operand:loc19
+[ 215] jtrue              condition:loc21, targetLabel:6(->221)
+Successors: [ #14 #13 ]
+
+bb#13
+Predecessors: [ #12 ]
+[ 218] throw_static_error message:String (atomic),8Bit:(1),length:(43): Iterator result interface is not an object., StructureID: 16976(const1), errorType:TypeError
+Successors: [ ]
+
+bb#14
+Predecessors: [ #10 #11 #12 ]
+[ 221] jtrue              condition:loc13, targetLabel:31(->252)
+Successors: [ #18 #15 ]
+
+bb#15
+Predecessors: [ #14 ]
+[ 224] get_by_id          dst:loc14, base:loc11, property:4, valueProfile:28
+[ 230] jundefined_or_null value:loc14, targetLabel:22(->252)
+Successors: [ #18 #16 ]
+
+bb#16
+Predecessors: [ #15 ]
+[ 233] mov                dst:loc16, src:loc11
+[ 236] call               dst:loc15, callee:loc14, argc:1, argv:22, valueProfile:29
+[ 243] is_object          dst:loc17, operand:loc15
+[ 246] jtrue              condition:loc17, targetLabel:6(->252)
+Successors: [ #18 #17 ]
+
+bb#17
+Predecessors: [ #16 ]
+[ 249] throw_static_error message:String (atomic),8Bit:(1),length:(43): Iterator result interface is not an object., StructureID: 16976(const1), errorType:TypeError
+Successors: [ ]
+
+bb#18
+Predecessors: [ #14 #15 #16 ]
+[ 252] jtrue              condition:loc9, targetLabel:31(->283)
+Successors: [ #22 #19 ]
+
+bb#19
+Predecessors: [ #18 ]
+[ 255] get_by_id          dst:loc10, base:loc7, property:4, valueProfile:30
+[ 261] jundefined_or_null value:loc10, targetLabel:22(->283)
+Successors: [ #22 #20 ]
+
+bb#20
+Predecessors: [ #19 ]
+[ 264] mov                dst:loc12, src:loc7
+[ 267] call               dst:loc11, callee:loc10, argc:1, argv:18, valueProfile:31
+[ 274] is_object          dst:loc13, operand:loc11
+[ 277] jtrue              condition:loc13, targetLabel:6(->283)
+Successors: [ #22 #21 ]
+
+bb#21
+Predecessors: [ #20 ]
+[ 280] throw_static_error message:String (atomic),8Bit:(1),length:(43): Iterator result interface is not an object., StructureID: 16976(const1), errorType:TypeError
+Successors: [ ]
+
+bb#22
+Predecessors: [ #18 #19 #20 ]
+[ 283] end                value:loc5
+Successors: [ ]
+
+
+Identifiers:
+  id0 = foo
+  id1 = Symbol.iterator
+  id2 = x
+  id3 = y
+  id4 = return
+
+Constants:
+   k0 = Undefined
+   k1 = String (atomic),8Bit:(1),length:(43): Iterator result interface is not an object., StructureID: 16976
+
+
+[21:37:23.0489] <keith_miller>
+ *  const \[\[\[x, y\]\]\] = foo
+\<global>#CzC5ob:\[0x130538220->0x10e071488, NoneGlobal, 285\]: 59 instructions (0 16-bit instructions, 0 32-bit instructions, 22 instructions with metadata); 381 bytes (96 metadata bytes); 1 parameter(s); 26 callee register(s); 5 variable(s); scope at loc4
+
+bb#1
+Predecessors: \[ \]
+\[   0\] enter
+\[   1\] mov                dst:loc5, src:Undefined(const0)
+\[   4\] resolve\_scope      dst:loc6, scope:loc4, var:0, resolveType:GlobalProperty, localScopeDepth:0
+\[  11\] get\_from\_scope     dst:loc6, scope:loc6, var:0, getPutInfo:2048\<ThrowIfNotFound|GlobalProperty|NotInitialization|NotStrictMode>, localScopeDepth:0, offset:0, valueProfile:1
+\[  20\] get\_by\_id          dst:loc9, base:loc6, property:1, valueProfile:2
+\[  26\] mov                dst:loc10, src:loc6
+\[  29\] iterator\_open      iterator:loc7, next:loc8, symbolIterator:loc9, iterable:loc10, stackOffset:16, iterableValueProfile:3, iteratorValueProfile:4, nextValueProfile:5
+\[  39\] mov                dst:loc12, src:loc7
+\[  42\] iterator\_next      done:loc9, value:loc10, iterable:loc6, next:loc8, iterator:loc12, stackOffset:18, nextResultValueProfile:6, doneValueProfile:7, valueValueProfile:8
+\[  53\] jfalse             condition:loc9, targetLabel:6(->59)
+Successors: \[ #3 #2 \]
+
+bb#2
+Predecessors: \[ #1 \]
+\[  56\] mov                dst:loc10, src:Undefined(const0)
+Successors: \[ #3 \]
+
+bb#3
+Predecessors: \[ #1 #2 \]
+\[  59\] get\_by\_id          dst:loc13, base:loc10, property:1, valueProfile:9
+\[  65\] mov                dst:loc14, src:loc10
+\[  68\] iterator\_open      iterator:loc11, next:loc12, symbolIterator:loc13, iterable:loc14, stackOffset:20, iterableValueProfile:10, iteratorValueProfile:11, nextValueProfile:12
+\[  78\] mov                dst:loc16, src:loc11
+\[  81\] iterator\_next      done:loc13, value:loc14, iterable:loc10, next:loc12, iterator:loc16, stackOffset:22, nextResultValueProfile:13, doneValueProfile:14, valueValueProfile:15
+\[  92\] jfalse             condition:loc13, targetLabel:6(->98)
+Successors: \[ #5 #4 \]
+
+bb#4
+Predecessors: \[ #3 \]
+\[  95\] mov                dst:loc14, src:Undefined(const0)
+Successors: \[ #5 \]
+
+bb#5
+Predecessors: \[ #3 #4 \]
+\[  98\] get\_by\_id          dst:loc17, base:loc14, property:1, valueProfile:16
+\[ 104\] mov                dst:loc18, src:loc14
+\[ 107\] iterator\_open      iterator:loc15, next:loc16, symbolIterator:loc17, iterable:loc18, stackOffset:24, iterableValueProfile:17, iteratorValueProfile:18, nextValueProfile:19
+\[ 117\] mov                dst:loc20, src:loc15
+\[ 120\] iterator\_next      done:loc17, value:loc18, iterable:loc14, next:loc16, iterator:loc20, stackOffset:26, nextResultValueProfile:20, doneValueProfile:21, valueValueProfile:22
+\[ 131\] jfalse             condition:loc17, targetLabel:6(->137)
+Successors: \[ #7 #6 \]
+
+bb#6
+Predecessors: \[ #5 \]
+\[ 134\] mov                dst:loc18, src:Undefined(const0)
+Successors: \[ #7 \]
+
+bb#7
+Predecessors: \[ #5 #6 \]
+\[ 137\] resolve\_scope      dst:loc19, scope:loc4, var:2, resolveType:GlobalProperty, localScopeDepth:0
+\[ 144\] put\_to\_scope       scope:loc19, var:2, value:loc18, getPutInfo:1049600\<DoNotThrowIfNotFound|GlobalProperty|ConstInitialization|NotStrictMode>, symbolTableOrScopeDepth:0, offset:0
+\[ 152\] jtrue              condition:loc17, targetLabel:20(->172)
+Successors: \[ #9 #8 \]
+
+bb#8
+Predecessors: \[ #7 \]
+\[ 155\] mov                dst:loc20, src:loc15
+\[ 158\] iterator\_next      done:loc17, value:loc18, iterable:loc14, next:loc16, iterator:loc20, stackOffset:26, nextResultValueProfile:23, doneValueProfile:24, valueValueProfile:25
+\[ 169\] jfalse             condition:loc17, targetLabel:6(->175)
+Successors: \[ #10 #9 \]
+
+bb#9
+Predecessors: \[ #7 #8 \]
+\[ 172\] mov                dst:loc18, src:Undefined(const0)
+Successors: \[ #10 \]
+
+bb#10
+Predecessors: \[ #8 #9 \]
+\[ 175\] resolve\_scope      dst:loc19, scope:loc4, var:3, resolveType:GlobalProperty, localScopeDepth:0
+\[ 182\] put\_to\_scope       scope:loc19, var:3, value:loc18, getPutInfo:1049600\<DoNotThrowIfNotFound|GlobalProperty|ConstInitialization|NotStrictMode>, symbolTableOrScopeDepth:0, offset:0
+\[ 190\] jtrue              condition:loc17, targetLabel:31(->221)
+Successors: \[ #14 #11 \]
+
+bb#11
+Predecessors: \[ #10 \]
+\[ 193\] get\_by\_id          dst:loc18, base:loc15, property:4, valueProfile:26
+\[ 199\] jundefined\_or\_null value:loc18, targetLabel:22(->221)
+Successors: \[ #14 #12 \]
+
+bb#12
+Predecessors: \[ #11 \]
+\[ 202\] mov                dst:loc20, src:loc15
+\[ 205\] call               dst:loc19, callee:loc18, argc:1, argv:26, valueProfile:27
+\[ 212\] is\_object          dst:loc21, operand:loc19
+\[ 215\] jtrue              condition:loc21, targetLabel:6(->221)
+Successors: \[ #14 #13 \]
+
+bb#13
+Predecessors: \[ #12 \]
+\[ 218\] throw\_static\_error message:String (atomic),8Bit:(1),length:(43): Iterator result interface is not an object., StructureID: 16976(const1), errorType:TypeError
+Successors: \[ \]
+
+bb#14
+Predecessors: \[ #10 #11 #12 \]
+\[ 221\] jtrue              condition:loc13, targetLabel:31(->252)
+Successors: \[ #18 #15 \]
+
+bb#15
+Predecessors: \[ #14 \]
+\[ 224\] get\_by\_id          dst:loc14, base:loc11, property:4, valueProfile:28
+\[ 230\] jundefined\_or\_null value:loc14, targetLabel:22(->252)
+Successors: \[ #18 #16 \]
+
+bb#16
+Predecessors: \[ #15 \]
+\[ 233\] mov                dst:loc16, src:loc11
+\[ 236\] call               dst:loc15, callee:loc14, argc:1, argv:22, valueProfile:29
+\[ 243\] is\_object          dst:loc17, operand:loc15
+\[ 246\] jtrue              condition:loc17, targetLabel:6(->252)
+Successors: \[ #18 #17 \]
+
+bb#17
+Predecessors: \[ #16 \]
+\[ 249\] throw\_static\_error message:String (atomic),8Bit:(1),length:(43): Iterator result interface is not an object., StructureID: 16976(const1), errorType:TypeError
+Successors: \[ \]
+
+bb#18
+Predecessors: \[ #14 #15 #16 \]
+\[ 252\] jtrue              condition:loc9, targetLabel:31(->283)
+Successors: \[ #22 #19 \]
+
+bb#19
+Predecessors: \[ #18 \]
+\[ 255\] get\_by\_id          dst:loc10, base:loc7, property:4, valueProfile:30
+\[ 261\] jundefined\_or\_null value:loc10, targetLabel:22(->283)
+Successors: \[ #22 #20 \]
+
+bb#20
+Predecessors: \[ #19 \]
+\[ 264\] mov                dst:loc12, src:loc7
+\[ 267\] call               dst:loc11, callee:loc10, argc:1, argv:18, valueProfile:31
+\[ 274\] is\_object          dst:loc13, operand:loc11
+\[ 277\] jtrue              condition:loc13, targetLabel:6(->283)
+Successors: \[ #22 #21 \]
+
+bb#21
+Predecessors: \[ #20 \]
+\[ 280\] throw\_static\_error message:String (atomic),8Bit:(1),length:(43): Iterator result interface is not an object., StructureID: 16976(const1), errorType:TypeError
+Successors: \[ \]
+
+bb#22
+Predecessors: \[ #18 #19 #20 \]
+\[ 283\] end                value:loc5
+Successors: \[ \]
+
+Identifiers:
+id0 = foo
+id1 = Symbol.iterator
+id2 = x
+id3 = y
+id4 = return
+
+Constants:
+k0 = Undefined
+k1 = String (atomic),8Bit:(1),length:(43): Iterator result interface is not an object., StructureID: 16976
+
+[21:37:43.0672] <Michael Ficarra>
+please don't dump walls of text into Matrix, make a gist or something
+
+[21:38:44.0059] <keith_miller>
+I put it in a thread for that reason?
+
+[21:39:30.0308] <rbuckton>
+Does the bytecode for the `Optional.some[Symbol.customMatcher]` include the cost of looking up `customMatcher` on Symbol? A native implementation would be able to avoid that because it would be using a known symbol.
+
+[21:39:56.0742] <Michael Ficarra>
+> <@keith_miller:matrix.org> I put it in a thread for that reason?
+
+oh I think my client doesn't do threads
+
