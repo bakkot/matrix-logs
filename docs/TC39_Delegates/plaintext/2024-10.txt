@@ -2427,3 +2427,136 @@ people will write ()=>0
 [18:59:56.0937] <Michael Ficarra>
 @shuyuguo:matrix.org @bakkot:matrix.org when it's `[]`, you're creating tons of thrown-away arrays instead of just not calling a callback
 
+[19:00:08.0752] <shu>
+when what is []?
+
+[19:00:08.0878] <bakkot>
+but at least you don't have to call anything
+
+[19:00:19.0680] <ljharb>
+in Iterator.concat the throwaway arrays were supposed to be nbd
+
+[19:00:20.0117] <bakkot>
+> <@shuyuguo:matrix.org> when what is []?
+
+when that's the default value
+
+[19:00:24.0435] <Michael Ficarra>
+people who care about perf already know to lift regexps outside of loops for example, this is the same thing
+
+[19:00:27.0647] <hax (HE Shi-Jun)>
+> <@ljharb:matrix.org> because sometimes the default is expensive to compute.
+
+But current `map.set` has similar issue?
+
+[19:00:29.0954] <shu>
+if the default value is [], presumably you want a different empty array?
+
+[19:00:55.0533] <ljharb>
+> <@haxjs:matrix.org> But current `map.set` has similar issue?
+
+currently you'd have to do your own has/get/set, and the set would be conditionally evaluated, so it'd always be the same as a callback (or better)
+
+[19:01:01.0725] <Michael Ficarra>
+> <@ljharb:matrix.org> in Iterator.concat the throwaway arrays were supposed to be nbd
+
+we're talking about vastly different numbers of throwaway arrays here
+
+[19:01:07.0954] <hax (HE Shi-Jun)>
+> <@shuyuguo:matrix.org> if the default value is [], presumably you want a different empty array?
+
+map.setdefault(key, []) already give u a diff empty array?
+
+[19:01:19.0518] <shu>
+yes
+
+[19:01:28.0161] <shu>
+that's why i don't understand michael's point
+
+[19:01:28.0726] <Eli Grey>
+insert should be the value and use a getter for the function use case in emplace imo
+
+[19:01:35.0897] <shu>
+you _can't_ have a single [] be the default
+
+[19:01:39.0783] <shu>
+unless you have copy-on-write []
+
+[19:01:59.0833] <Michael Ficarra>
+@shuyuguo:matrix.org I'm talking about doing this operation in a loop
+
+[19:02:14.0748] <shu>
+how can you lift out a default [] out of a loop?
+
+[19:02:25.0222] <shu>
+you want all the default empty arrays to be the literal same array object, which can be mutated?
+
+[19:02:35.0768] <Michael Ficarra>
+@shuyuguo:matrix.org you can't, that's the point, you make it a callback and lift that out
+
+[19:02:43.0875] <shu>
+wat
+
+[19:02:48.0806] <shu>
+why would you make a callback at all
+
+[19:02:55.0846] <shu>
+setdefault(k, []) does the right thing?
+
+[19:03:27.0696] <Michael Ficarra>
+@shuyuguo:matrix.org it would be more performant
+
+[19:03:34.0289] <shu>
+_what_
+
+[19:03:48.0999] <Jack Works>
+(joke) I guess we have to materialize ParseNode.
+
+```
+.emplace(key, complexExpression)
+function emplace(key, value) { if (!this.has(key)) this.set(key, eval value); return this.get(key) }
+```
+
+[19:03:52.0005] <shu>
+are you saying doing a call on a const function that returns [] is faster than directly passing in []?
+
+[19:03:55.0959] <Michael Ficarra>
+a shared callback that is almost never called is more performant than tons of empty arrays that end up getting GC'd
+
+[19:03:59.0080] <Jack Works>
+* (joke) I guess we have to materialize ParseNode.
+
+```
+.emplace(key, complexExpression)
+function emplace(key, value) {if (!this.has(key)) this.set(key, eval value); return this.get(key) }
+```
+
+[19:04:12.0345] <Jack Works>
+* (joke) I guess we have to materialize ParseNode.
+
+```js
+.emplace(key, complexExpression)
+function emplace(key, value) {
+    if (!this.has(key)) this.set(key, eval value);
+    return this.get(key)
+}
+```
+
+[19:04:13.0505] <shu>
+oh, i see, i missed the assumption that it's rarely a hit
+
+[19:04:20.0704] <shu>
+or, rarely a miss
+
+[19:04:40.0852] <shu>
+that depends on whether your loop mostly hits or mostly misses, right?
+
+[19:04:47.0042] <ljharb>
+that's the benefit of using a callback in the API as well; that the default fn would almost never be called, for when it's expensive
+
+[19:04:51.0436] <Michael Ficarra>
+correct @shuyuguo:matrix.org
+
+[19:05:04.0947] <shu>
+but a callback version would be more expensive when it is mostly misses
+
