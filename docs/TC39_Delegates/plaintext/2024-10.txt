@@ -5165,3 +5165,590 @@ and interestingly, it also has an utf-8 parser which is used during streaming co
 
 I don't know if WTF-16 is the right term for that (https://simonsapin.github.io/wtf-8/#ill-formed-utf-16)
 
+[18:26:32.0031] <Chris de Almeida>
+please add your name to the attendees list of today's notes doc
+
+[18:26:37.0291] <Richard Gibson>
+> <@abotella:igalia.com> I don't know if WTF-16 is the right term for that (https://simonsapin.github.io/wtf-8/#ill-formed-utf-16)
+
+yeah, pretty much
+
+[18:28:25.0185] <Justin Ridgewell>
+> <@abotella:igalia.com> a Latin-1 string representation is identical to a byte array, where the Unicode character values would just be the byte values
+
+Verified, you are correct. If you stay below 0xff, you’ll keep `ONE_BYTE_STRING` representation.
+
+[18:28:40.0878] <Justin Ridgewell>
+> <@marjakh:matrix.org> and interestingly, it also has an utf-8 decoder which is used during streaming parsing, it can do stuff like pause mid-character if we need to wait for more data from the network. so in that case we don't use chromium's utf-8 decoder but our own
+
+I wrote that!
+
+[18:29:30.0758] <bakkot>
+if you do it in the next 10 seconds i don't have to redact the logs
+
+[18:29:39.0503] <bakkot>
+yay
+
+[18:29:39.0971] <Marja Hölttä>
+Justin Ridgewell: no, not that one. maybe there is another one you wrote :)
+
+[18:29:46.0706] <ryzokuken>
+🙇‍♂️
+
+[18:29:55.0075] <Marja Hölttä>
+too many utf-8 decoders
+
+[18:30:02.0534] <canadahonk>
+sorry 🙈
+
+[18:30:08.0627] <Chris de Almeida>
+/me shows `canadahonk` to the shamecube
+
+[18:30:24.0998] <Michael Ficarra>
+we need regular reminders that this is a public channel
+
+[18:30:46.0287] <Justin Ridgewell>
+> <@marjakh:matrix.org> Justin Ridgewell: no, not that one. maybe there is another one you wrote :)
+
+https://source.chromium.org/chromium/chromium/src/+/main:v8/src/third_party/utf8-decoder/;l=1;bpv=1;bpt=0 ?
+
+[18:32:12.0332] <bakkot>
+2017-12-11, nice
+
+[18:32:19.0166] <Marja Hölttä>
+Justin Ridgewell: nope, this one: https://source.chromium.org/chromium/chromium/src/+/main:v8/src/parsing/scanner-character-streams.cc;l=507  .. and... i wrote it :D
+
+[18:32:42.0849] <Marja Hölttä>
+we can unify these if your version can also pause mid-character to wait for more data
+
+[18:32:57.0493] <Chris de Almeida>
+bakkot: the notes link made it to the archive 😭😭😭
+
+[18:33:31.0075] <bakkot>
+sadness
+
+[18:35:09.0302] <Justin Ridgewell>
+> <@marjakh:matrix.org> we can unify these if your version can also pause mid-character to wait for more data
+
+That’s just a small wrapper around my code: https://source.chromium.org/chromium/chromium/src/+/main:v8/src/parsing/scanner-character-streams.cc;l=622-623;drc=a9777d919551975bd1208221a8ba8c012c03bc56
+
+[18:35:09.0665] <Marja Hölttä>
+based on very quick googling it seems that the difference between UCS-2 and UTF-16 is more than treating the ill-formed strings but my knowledge level is getting very shaky here
+
+[18:35:42.0534] <Marja Hölttä>
+ahh it has been rewritten since, okay that's good, i think 2 utf-8 decoders are enough for chromium
+
+[18:35:58.0097] <Justin Ridgewell>
+UCS-2 allows lone surrogates, UTF-16 doesn't
+
+[18:36:03.0921] <Justin Ridgewell>
+They’re the same otherwise
+
+[18:38:17.0588] <Marja Hölttä>
+google says "UCS-2 is fixed width, UTF-16 is variable width with a minimum of two bytes and a maximum of four bytes." << what about this part? no idea what v8 does here
+
+[18:38:24.0925] <littledan>
+A related interesting API proposal https://gist.github.com/domenic/a9343fa787ba54b4ba3a60882c49cc32?permalink_comment_id=4394695#gistcomment-4394695
+
+[18:38:55.0936] <Rob Palmer>
+Can anyone dialled in share the TCQ on Teams?
+
+[18:39:20.0233] <jkup>
+It was up for a second
+
+[18:39:41.0088] <littledan>
+IMO it’s more parsimonious to have a separate method
+
+[18:40:06.0955] <Justin Ridgewell>
+> <@marjakh:matrix.org> google says "UCS-2 is fixed width, UTF-16 is variable width with a minimum of two bytes and a maximum of four bytes." << what about this part? no idea what v8 does here
+
+That’s if you want to combine surrogates into a single UTF char (u32). The streams themselves are the same.
+
+[18:41:13.0061] <littledan>
+I think the meaning of ucs2 has changed over time. It was designed in the days when all code points fit in 16 bits. Since then, it has been redefined to mean, potentially ill-formed utf16
+
+[18:41:59.0912] <Justin Ridgewell>
+Yah, baseically that ^
+
+[18:42:10.0356] <Justin Ridgewell>
+* Yah, basically that ^
+
+[18:42:12.0369] <littledan>
+JS generally does not check for well-formed-ness so you could (informally) say it works in the ucs2 encoding rather than utf16
+
+[18:46:11.0503] <Marja Hölttä>
+oh, and wtf-16 says it's the name kinda corresponding to that evolved usage of ucs-2. yess, not confusing at all. okay.
+
+[18:50:09.0967] <Marja Hölttä>
+ok how did we end up here? what does "Strings will deoptimize pretty quickly once you store non-utf8 bytes" mean? one thing that's not great about onebyte vs twobyte is that if you have one non-onebyte character in your string, the whole string has to be stored as a twobyte and it's slightly unnecessary overhead.
+
+[18:50:56.0863] <Marja Hölttä>
+(but i don't see a way around it in the current world unless we add utf-8 strings and... i don't think anyone wants to... strings are incredibly complex as is)
+
+[18:52:58.0744] <Michael Ficarra>
+@marjakh:matrix.org ropes of mixed 1-byte and 2-byte sections
+
+[18:53:41.0836] <Marja Hölttä>
+true, could also do that!
+
+[18:53:53.0338] <littledan>
+No I wasn’t talking about volatile read-only views on an underlying changing ArrayBuffee
+
+[18:53:55.0251] <Justin Ridgewell>
+> <@marjakh:matrix.org> ok how did we end up here? what does "Strings will deoptimize pretty quickly once you store non-utf8 bytes" mean? one thing that's not great about onebyte vs twobyte is that if you have one non-onebyte character in your string, the whole string has to be stored as a twobyte and it's slightly unnecessary overhead.
+
+I mistakenly though that `String.fromCharCode(0x80)` returned a 2-byte string representation
+
+[18:53:59.0996] <littledan>
+* No I wasn’t talking about volatile read-only views on an underlying changing ArrayBuffer
+
+[18:54:19.0377] <Justin Ridgewell>
+`0x80` being an illegal UTF-8 lead byte
+
+[18:55:01.0194] <Justin Ridgewell>
+You can construct strings in memory that holds any byte sequence, you just can’t transfer that string over the wire
+
+[18:55:47.0574] <Justin Ridgewell>
+A UTF-8 parser on the other end will replace bad byte sequences with the Replacement Char
+
+[18:56:31.0453] <littledan>
+I am also OK keeping the rw lock stuff outside of this proposal but I think it could make it more usable for certain cases, which could allow some more zero copy in practice. Not needed for the motivating embedded case though.
+
+[18:57:15.0490] <Andreu Botella (at TC39, 🕐 JST)>
+> <@marjakh:matrix.org> (but i don't see a way around it in the current world unless we add utf-8 strings and... i don't think anyone wants to... strings are incredibly complex as is)
+
+Some hosts work with UTF-8 strings and would benefit from not having to convert when making them into JS string primitives. Whether that is offset by the cost of adding UTF-8 strings to the engine is a different question though
+
+[18:59:02.0088] <littledan>
+I am very happy that the wasm memory control stuff is getting attention 
+
+[19:00:35.0850] <Mathieu Hofman>
+I took a quick look, and it looks like it's basically trying to specify a full MMU ?
+
+[19:01:02.0804] <shu>
+it's a pretty open question but in the limit, yeah, systems people are gonna want full control
+
+[19:01:10.0034] <shu>
+i haven't heard anything _too_ concrete yet
+
+[19:01:54.0669] <yulia>
+yeah i think they are still exploring quite a bit.
+
+[19:03:03.0558] <littledan>
+I hope we get memory protection for the first page so I can get a segfault in Wasm for derefencing a null pointer
+
+[19:03:34.0342] <littledan>
+* I hope we get the capability to set up memory protection for the first page so I can get a segfault in Wasm for derefencing a null pointer
+
+[19:04:45.0718] <shu>
+As a... Unix user, I want my programs to SIGSEV, so th
+
+bus error
+
+[19:11:10.0446] <littledan>
+It would be really interesting to hear a presentation about how various approaches to polyfills work, since it seems to drive a lot of our designs
+
+[19:15:07.0446] <littledan>
+In general it’s good to find reasons which could be motivating for others, but it also is interesting to learn what the proponents are motivated by.
+
+[19:19:29.0453] <keith_miller>
+Isn't the clamping just `value & 256`?
+
+[19:19:35.0878] <shu>
+yeah i am confused
+
+[19:19:39.0273] <keith_miller>
+Or is there some other part that's not quite that?
+
+[19:20:27.0303] <Justin Ridgewell>
+> <@keith_miller:matrix.org> Isn't the clamping just `value & 256`?
+
+`value & 255`
+
+[19:20:34.0044] <keith_miller>
+Err sorry
+
+[19:20:35.0788] <keith_miller>
+Yeah
+
+[19:20:57.0425] <Andreu Botella (at TC39, 🕐 JST)>
+or `value % 256`
+
+[19:21:14.0158] <littledan>
+That’s how normal uint8arrays work; I thought clamped was different 
+
+[19:21:41.0709] <littledan>
+What if we added a Math.clamp method? I think that would be a broadly useful utility.
+
+[19:21:56.0946] <Justin Ridgewell>
+^CSS did, not us
+
+[19:21:59.0800] <yulia>
+right but what are we solving exactly rn?
+
+[19:22:02.0698] <ljharb>
+so the spec logic is https://tc39.es/ecma262/#sec-touint8clamp
+
+[19:22:24.0465] <ljharb>
+if all those steps are just `value & 255` then an editorial cleanup would certainly have helped :-)
+
+[19:22:25.0986] <shu>
+wait, why isn't that algorithm steps?
+
+[19:22:32.0438] <shu>
+you said it wans't described in algo steps
+
+[19:22:40.0956] <rbuckton>
+Is that clamping or does that allow overflow/underflow?
+
+[19:22:41.0536] <Justin Ridgewell>
+> <@ljharb:matrix.org> if all those steps are just `value & 255` then an editorial cleanup would certainly have helped :-)
+
+No, it won’t round
+
+[19:22:44.0705] <ljharb>
+yes, my mistake, it is algorithm steps
+
+[19:22:58.0204] <littledan>
+> <@yulia:mozilla.org> right but what are we solving exactly rn?
+
+Is this asking about Math.clamp? That is just saving a couple lines of code, making everyday things slightly nicer. Also fine by me to not do.
+
+[19:23:44.0071] <Michael Ficarra>
+FYI we also didn't get a summary for the previous topic
+
+[19:24:03.0616] <yulia>
+is math.clamp more general than the dataview methods? i'm not opposed to it, would be good to see which everyday things are being improved
+
+[19:24:22.0673] <yulia>
+i think the spec has a oneliner note using modulo
+
+[19:24:24.0318] <keith_miller>
+Wait sorry it's not `value & 255` lol I'm too tired it's ```if (number > 255) return 255; if (number < 0) return 0; return number;```
+
+[19:24:27.0674] <shu>
+wait taking a step back
+
+[19:24:28.0139] <yulia>
+https://tc39.es/ecma262/#clamping
+
+[19:24:43.0860] <shu>
+why did we add uint8clamp TAs to begin with?
+
+[19:24:47.0783] <shu>
+something textures?
+
+[19:24:55.0727] <keith_miller>
+I think for textures or something yeah
+
+[19:25:05.0370] <keith_miller>
+ * I think for textures/colors or something yeah
+
+[19:25:34.0407] <Justin Ridgewell>
+> <@keith_miller:matrix.org> Wait sorry it's not `value & 255` lol I'm too tired it's ```if (number > 255) return 255; if (number < 0) return 0; return number;```
+
+Ahh, I forgot about negaties. But you’re missing the rounding, too.
+
+[19:25:39.0496] <canadahonk>
+> <@yulia:mozilla.org> is math.clamp more general than the dataview methods? i'm not opposed to it, would be good to see which everyday things are being improved
+
+written it at least a few times for webapps in the past
+
+[19:25:42.0559] <littledan>
+> <@yulia:mozilla.org> is math.clamp more general than the dataview methods? i'm not opposed to it, would be good to see which everyday things are being improved
+
+Yeah it doesn’t really have to do with data views, it’s just like you give a min and max and return one of those if you are out of bounds
+
+[19:26:03.0588] <yulia>
+sure, that sounds fine
+
+[19:26:17.0527] <shu>
+> <@canadahonk:matrix.org> written it at least a few times for webapps in the past
+
+what was it for?
+
+[19:26:40.0797] <rbuckton>
+yulia: I have code that could make use of consistent names for data view methods for the purpose of dynamic dispatch, were it to be rewritten to use dynamic dispatch: https://github.com/esfx/esfx/blob/main/packages/struct-type/src/internal/numbers.ts#L122-L133 one data point may not necessarily be compelling, however.
+
+[19:26:57.0663] <ljharb>
+here's my summary:
+> - In order to advance, champion needs to provide use cases that are actually solved by the proposal; polyfilling is not solved by it.
+> - Current proposal is get + set; based on future presented use cases, other alternatives may include “just set”, or “just a clamp helper”
+
+lmk if i'm missing anything
+
+[19:27:13.0103] <canadahonk>
+there is a ~new math.clamp proposal that lacks a champion btw
+
+[19:27:27.0333] <ljharb>
+> <@littledan:matrix.org> Yeah it doesn’t really have to do with data views, it’s just like you give a min and max and return one of those if you are out of bounds
+
+Math.clamp is nice but wouldn't give me the rounding i need
+
+[19:27:49.0535] <canadahonk>
+> <@canadahonk:matrix.org> there is a ~new math.clamp proposal that lacks a champion btw
+
+https://github.com/Richienb/proposal-math-clamp which I may if no one else wants :^)
+
+[19:28:05.0311] <yulia>
+if you had math.clamp you could use math.floor with it, no?
+
+[19:28:58.0625] <Michael Ficarra>
+> <@canadahonk:matrix.org> https://github.com/Richienb/proposal-math-clamp which I may if no one else wants :^)
+
+discourse thread: https://es.discourse.group/t/math-clamp-strawman/1059
+
+[19:29:04.0195] <ljharb>
+and ceil if negative, sure. Math.clamp helps me compose the logic for sure.
+
+[19:29:04.0253] <shu>
+`Number.setFPUControlWord` so we can change the rounding mode to round half to even
+
+[19:31:57.0926] <keith_miller>
+Is `Math.clamp` sufficiently more powerful than `Math.min(Math.max(x, upper), lower)`?
+
+[19:32:27.0508] <keith_miller>
+ * Is `Math.clamp` sufficiently more powerful than `Math.min(Math.max(x, lower), upper)`?
+
+[19:32:36.0691] <rbuckton>
+It's sufficiently easier to get right the first time
+
+[19:33:10.0796] <canadahonk>
+also something something performance probably better?
+
+[19:33:27.0198] <keith_miller>
+Ehh, I think I'd screw up the argument order too though
+
+[19:33:37.0365] <keith_miller>
+On 8 hours of sleep over 3 days
+
+[19:33:46.0738] <keith_miller>
+Performance is probably the same
+
+[19:33:56.0244] <canadahonk>
+2 func calls vs 1?
+
+[19:34:12.0326] <keith_miller>
+It would be inlined and optimized in most JIT engines anyway
+
+[19:35:21.0005] <rbuckton>
+I imagine signature help in an IDE is more reliable for something that reads `Math.clamp(value: number, min: number, max: number)` then trying to figure out the correct order for `Math.min(x: number, y: number)` and `Math.max(x: number, y: number)`.
+
+[19:35:27.0219] <littledan>
+Yeah I don’t think this is a thing to decide on perf but rather developer mental model 
+
+[19:35:50.0562] <canadahonk>
+> <@littledan:matrix.org> Yeah I don’t think this is a thing to decide on perf but rather developer mental model
+
+agree, but I mean it definitely wouldn't be a downside at least
+
+[19:36:07.0814] <canadahonk>
+> <@littledan:matrix.org> Yeah I don’t think this is a thing to decide on perf but rather developer mental model
+
+ * agree, but I mean it definitely wouldn't be a downside at least, only possible benefit (afaik)
+
+[19:37:59.0938] <jkup>
+clamp seems nice, especially combining it with round/floor
+
+[19:51:56.0985] <ljharb>
+liquid volume remains solidly imperial for cooking
+
+[19:52:02.0839] <ljharb>
+ * liquid volume remains solidly imperial for cooking, in the US
+
+[19:52:11.0235] <ljharb>
+also gasoline
+
+[19:52:12.0103] <rbuckton>
+> <@ljharb:matrix.org> liquid volume remains solidly imperial for cooking, in the US
+
+unless you are baking
+
+[19:52:16.0378] <ljharb>
+ * also gasoline and milk
+
+[19:52:39.0096] <ljharb>
+hm, maybe i don't bake with the newest recipes, but i still see them all in imperial
+
+[19:52:40.0757] <rbuckton>
+> <@ljharb:matrix.org> also gasoline and milk
+
+Or buying soda
+
+[19:52:51.0854] <shu>
+wait what
+
+[19:52:56.0301] <shu>
+liter is an imperial unit?
+
+[19:53:06.0682] <ljharb>
+soda is non-imperial
+
+[19:53:12.0376] <ljharb>
+gas/milk is imperial
+
+[19:53:13.0015] <rbuckton>
+No, I'm saying soda is not imperial
+
+[19:53:14.0366] <shu>
+oh i got it reversed
+
+[19:53:17.0425] <shu>
+right
+
+[19:53:19.0952] <rbuckton>
+ * No, I'm saying soda is not generally measured in imperial units
+
+[19:53:22.0076] <Chris de Almeida>
+you don't use volume in baking
+
+[19:53:38.0091] <rkirsling>
+what a plot twist that soda is an unamerican drink
+
+[19:53:46.0963] <ljharb>
+like a teaspoon of oil or something?
+
+[19:54:13.0768] <ljharb>
+a cup of water, etc
+
+[19:54:14.0274] <rbuckton>
+> <@softwarechris:matrix.org> you don't use volume in baking
+
+I suppose it's by weight if you're using a kitchen scale for measuring
+
+[19:54:22.0701] <Michael Ficarra>
+I think the british baking show has rubbed off on americans and now they all use metric units when baking
+
+[19:54:39.0032] <Chris de Almeida>
+it's always by weight if you're doing it right...  but it does help that 1ml === 1g
+
+[19:54:48.0373] <ljharb>
+maybe yall are doing fancier baking than me, but ive not yet heard americans using metric for baking
+
+[19:54:48.0377] <ryzokuken>
+for water
+
+[19:54:52.0925] <Chris de Almeida>
+yes
+
+[19:55:47.0213] <rbuckton>
+I'm finding myself using metric more and more as I venture deeper and deeper into the 3D printing world
+
+[19:55:47.0692] <Chris de Almeida>
+if you see a baking recipe and it's giving volume measurements, throw it in the trash
+
+[19:57:12.0676] <ljharb>
+/me nervously glances at literally every cake box in safeway
+
+[19:57:20.0429] <ljharb>
+/me  * nervously glances at literally every cake mix box in safeway
+
+[19:57:49.0618] <Chris de Almeida>
+cake mix?!  `/scoff`
+
+[19:57:54.0563] <Michael Ficarra>
+A BOX?!
+
+[19:57:59.0725] <Michael Ficarra>
+jesus
+
+[19:58:09.0023] <shu>
+what, you want your cake box in a paper bag?
+
+[19:58:14.0707] <shu>
+ * what, you want your cake mix in a paper bag?
+
+[19:58:42.0270] <Chris de Almeida>
+unserious cake mixers itc
+
+[20:00:41.0047] <ljharb>
+wait what else would cake mix come in but a bo
+
+[20:00:42.0016] <ljharb>
+ * wait what else would cake mix come in but a box
+
+[20:01:08.0682] <kriskowal>
+50# sacks
+
+[20:01:09.0254] <ljharb>
+i mean it's bagged inside the box ofc, like cereal
+
+[20:01:23.0342] <canadahonk>
+usage="cake-mix"
+
+[20:01:25.0375] <ptomato>
+> <@ljharb:matrix.org> wait what else would cake mix come in but a box
+
+a cake mix tureen, what else
+
+[20:01:27.0890] <canadahonk>
+ * `usage="cake-mix"`
+
+[20:01:28.0211] <Richard Gibson>
+aluminum cans
+
+[20:01:38.0552] <Michael Ficarra>
+it wouldn't be cake mix and it wouldn't be in a box, it would be raw ingredients
+
+[20:01:56.0316] <Chris de Almeida>
+the rawest
+
+[20:01:58.0439] <ljharb>
+ok, calm down, you baking elitists
+
+[20:02:09.0687] <Chris de Almeida>
+if you're not milling your own flour are you really a baker?
+
+[20:02:21.0981] <kriskowal>
+that would be a miller
+
+[20:03:05.0415] <ljharb>
+https://abcnews.go.com/Lifestyle/man-spends-months-1500-make-sandwich-scratch/story?id=33802231
+
+[20:03:10.0386] <kriskowal>
+…molar, müller, mollino, etc
+
+[20:03:58.0905] <kriskowal>
+> <@ljharb:matrix.org> https://abcnews.go.com/Lifestyle/man-spends-months-1500-make-sandwich-scratch/story?id=33802231
+
+to bake a cake from scratch one must first create the universe
+
+[20:39:16.0948] <Chris de Almeida>
+looking for folks to help with the notes starting in 20 mins
+
+[20:58:33.0391] <Chris de Almeida>
+👀
+
+[20:59:10.0178] <Chengzhong Wu>
++1
+
+[21:01:46.0246] <Chengzhong Wu>
+do we need consensus for stage 0?
+
+[21:01:55.0259] <Ashley Claymore>
+could someone on the team's call copy the link to the slides? I'm assuming if I join I won't be able to see previous chat history
+
+[21:02:40.0485] <Chris de Almeida>
+https://docs.google.com/presentation/d/1yakKCsS3pR0T7eJcaJD2ZUzK6xG6FcoFnrmngkJUcEo/edit#slide=id.g2fa19dd416b_0_181
+
+[21:04:00.0119] <Ashley Claymore>
+ta
+
+[21:04:51.0238] <Chris de Almeida>
+We regret to inform that the `Observable` topic has been withdrawn due to availability issues.
+
+[21:17:36.0297] <rkirsling>
+"30m stage 0 update" is a pretty wild concept
+
+[21:18:22.0905] <ljharb>
+if we're getting an item more than once at committee then it's really not stage 0, it's stage 1
+
+[21:18:29.0159] <ljharb>
+because we're spending time exploring the problem
+
+[21:19:06.0324] <Ross Kirsling>
+that is also how I feel
+
+[21:19:29.0638] <Chris de Almeida>
+> delegates HATE it.. circumvent the process with this one neat trick!
+
