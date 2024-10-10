@@ -6481,3 +6481,61 @@ we are doing this by default for all features, so anything that compiles down to
 [00:46:17.0389] <yulia>
 because again, JS0 = current js
 
+[00:50:35.0393] <keith_miller>
+I recall one of places where classes were slow for no apparent benefit was empty constructors invoke the iterator protocol on `arguments` to forward them so you can't elide the call without a lot of optimizations. But maybe I'm misremembering that?
+
+[00:50:55.0693] <Justin Ridgewell>
+We fixed that
+
+[00:51:00.0276] <shu>
+i think we managed to fix that for default iterators
+
+[00:51:10.0466] <shu>
+the point marja was talking about is the `this` TDZ basically
+
+[00:51:14.0788] <shu>
+`super()` _must_ be there
+
+[00:51:26.0466] <shu>
+this is not true for ES5-style classes, so Closure can just straight up elide it
+
+[00:51:35.0341] <keith_miller>
+Ah right ok
+
+[00:51:47.0877] <shu>
+ * i think we managed to fix that for default constructor
+
+[00:52:06.0577] <Andrew Paprocki>
+> <@robpalme:matrix.org> Side note:  Do we know which old features are slow?  I only know of the TDZ issue.  We run most of our production code using very modern untranspiled ES2023/ES2024.  Performance has not been problematic, and is obviously is much faster than if we downlevelled private field usage or async usage.
+
+while this is true, we're also huge TS -> ES5 users
+
+[00:52:07.0121] <shu>
+we didn't fix that if you typed `super(...arguments)` in _your_ constructor though
+
+[00:53:06.0674] <rbuckton>
+no `this` before `super()` is important to maintain expectations about superclass state. The fact you can run *any* statements before `super()` is perhaps a failing of the class syntax. 
+
+[00:53:15.0103] <shu>
+right
+
+[00:53:26.0644] <shu>
+and we've chatted about this before, but we should have designed it to be more static so the elision optiimzation can still apply
+
+[00:53:30.0512] <shu>
+while maintaining that guardrail
+
+[00:53:35.0676] <shu>
+not the dynamic thing we have for ES6 classes
+
+[00:54:00.0129] <Andrew Paprocki>
+> <@shuyuguo:matrix.org> and we've chatted about this before, but we should have designed it to be more static so the elision optiimzation can still apply
+
+isn't this an example where features should be designed w/ engine optimization up front?
+
+[00:54:42.0539] <shu>
+no, the `super()` can't be elided thing is actually directly shown by a transpiler optimization that can no longer apply to ES6 classes that used to apply to ES5 classes
+
+[00:55:04.0077] <rbuckton>
+The fact you can forget to invoke the superclass constructor in an ES5-style class is a huge footgun, even if it is more performant.
+
