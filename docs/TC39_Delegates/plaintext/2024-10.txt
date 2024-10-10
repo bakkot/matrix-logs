@@ -5957,3 +5957,16 @@ Import source + import() covers some of these cases though
 [22:24:52.0274] <littledan>
 The problem is the function coloring…
 
+[22:30:00.0509] <nicolo-ribaudo>
+> <@bakkot:matrix.org> I assumed the idea was that you'd know the names before triggering evaluation
+
+There are two possible implementations of this proposal:
+- one (trivial) is that you follow the spec to the word, and eagerly pre-load and pre-parse the module and its dependencies. In this case, you always have access to the list of export names before evaluation.
+- the other one is that you only collect some minimal metadata (does it have a dep with TLA? does it have syntax errors?) about modules before executing the app, and then skip loading/parsing entirely. You obviously cannot do this if you need to fetch files from the network, but that's often not the case (Node.js, the various edge runtimes, browser caches). This is the approach that gives the most benefits.
+
+With the second approach you _can_ get the list of exports in this pre-execution phase, but it's more metadata you have to maintain.
+
+Bundlers are very similar to to the second case, except that they currently need _no metadata_: the way to bundle deferred modules is to wrap them in a function, and thus:
+- you already are protected against syntax errors
+- there is no TLA, because that's handled by injecting the async module outside of the deferred function
+
