@@ -39,6 +39,64 @@ I feel like this is one of those "has a very concrete meaning in practice and ne
   <tr class="msg" id="L8"><td class="ts-cell"><a class="ts" href="#L8" alt="Thu Oct 10 2024 23:30:16 GMT-0700 (Pacific Daylight Time)">06:30</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-6" title="@ljharb:matrix.org">ljharb</span>&gt;</div></td><td class="msg-cell">they do count when web compat isn’t a concern</td></tr>
   <tr class="msg" id="L9"><td class="ts-cell"><a class="ts" href="#L9" alt="Thu Oct 10 2024 23:31:10 GMT-0700 (Pacific Daylight Time)">06:31</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-6" title="@ljharb:matrix.org">ljharb</span>&gt;</div></td><td class="msg-cell">i have an open PR on the process doc that suggests we should define “risk areas” for each proposal, and use those to inform what counts - ie, what reassurances are most needed</td></tr>
   <tr class="msg" id="L10"><td class="ts-cell"><a class="ts" href="#L10" alt="Thu Oct 10 2024 23:33:04 GMT-0700 (Pacific Daylight Time)">06:33</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-9" title="@nicolo-ribaudo:matrix.org">nicolo-ribaudo</span>&gt;</div></td><td class="msg-cell">Process proposal to make a proposal's title blink if it changes Array.prototype</td></tr>
+  <tr class="msg" id="L11"><td class="ts-cell"><a class="ts" href="#L11" alt="Fri Oct 11 2024 02:01:28 GMT-0700 (Pacific Daylight Time)">09:01</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-9" title="@nicolo-ribaudo:matrix.org">nicolo-ribaudo</span>&gt;</div></td><td class="msg-cell"><p><code>Weak{Set,Map}.prototype.clone()</code> -- does anybody see any obvious problem with the idea?</p>
+<p>My use case is that I need an immutable weakset. For <code>Set</code> it's easy (just do <code>new Set(oldSet).add(newElement)</code>), but for weak collections it's quite complex to do it and it involves manually duplicating the contents in a list of WeakRefs</p>
+</td></tr>
+  <tr class="msg" id="L12"><td class="ts-cell"><a class="ts" href="#L12" alt="Fri Oct 11 2024 02:02:28 GMT-0700 (Pacific Daylight Time)">09:02</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-9" title="@nicolo-ribaudo:matrix.org">nicolo-ribaudo</span>&gt;</div></td><td class="msg-cell"><p>My <code>ClonableWeakSet</code> implementation:</p>
+<pre><code class="language-js">class ClonableWeakSet extends WeakSet {
+  #contents = [];
+    
+  #indexes = new WeakMap();
+
+  #cleanup = new FinalizationRegistry(() =&gt; {
+    if (Math.random() &lt; 0.1) this.#compact();
+  });
+
+  #compact() {
+    let oldIndex = 0, newIndex = 0;
+    while (oldIndex &lt; this.#contents.length) {
+      const obj = this.#contents[oldIndex]?.deref();
+      if (obj !== undefined) {
+        this.#contents[newIndex] = this.#contents[oldIndex];
+        this.#indexes.set(obj, newIndex);
+        newIndex++;
+      }
+      oldIndex++;
+    }
+    this.#contents.length = newIndex;
+  }
+
+  add(value) {
+    super.add(value);
+    if (!this.#indexes.has(value)) {
+      this.#indexes.set(value, this.#contents.length);
+      this.#contents.push(new WeakRef(value))
+      this.#cleanup.register(value);
+    }
+    return this;
+  }
+
+  delete(value) {
+    const res = super.delete(value);
+    if (this.#indexes.has(value)) {
+      this.#contents[this.#indexes.get(value)] = null;
+      this.#indexes.delete(value);
+      this.#cleanup.unregister(value);
+    }
+    return res;
+  }
+
+  clone() {
+    const cloned = new ClonableWeakSet();
+    this.#contents.forEach(ref =&gt; {
+      const obj = ref.deref();
+      if (obj !== undefined) cloned.add(obj);
+    });
+    return cloned;
+  }
+}
+</code></pre>
+</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>

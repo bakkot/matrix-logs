@@ -6862,3 +6862,129 @@ Process proposal to make a proposal's title blink it it changes Array.prototype
 [23:33:11.0205] <nicolo-ribaudo>
 * Process proposal to make a proposal's title blink if it changes Array.prototype
 
+[02:01:28.0440] <nicolo-ribaudo>
+`Weak{Set,Map}.prototype.clone()` -- does anybody see any obvious problem with the idea?
+
+My use case is that I need an immutable weakset. For `Set` it's easy (just do `new Set(oldSet).add(newElement)`, but for weak collections it's quite complex to do it and it involves manually duplicating the contents in a list of WeakRefs
+
+[02:01:47.0112] <nicolo-ribaudo>
+ * `Weak{Set,Map}.prototype.clone()` -- does anybody see any obvious problem with the idea?
+
+My use case is that I need an immutable weakset. For `Set` it's easy (just do `new Set(oldSet).add(newElement)`), but for weak collections it's quite complex to do it and it involves manually duplicating the contents in a list of WeakRefs
+
+[02:02:28.0076] <nicolo-ribaudo>
+My `ClonableWeakSet` implementation:
+
+```js
+class ClonableWeakSet extends WeakSet {
+  #contents = [];
+    
+  #indexes = new WeakMap();
+
+  #cleanup = new FinalizationRegistry(() => {
+    if (Math.random() < 0.1) this.#compact();
+  });
+
+  #compact() {
+    let oldIndex = 0, newIndex = 0;
+    while (oldIndex < this.#contents.length) {
+      const obj = this.#contents[oldIndex]?.deref();
+      if (obj !== undefined) {
+        this.#contents[newIndex] = this.#contents[oldIndex];
+        this.#indexes.set(obj, newIndex);
+        newIndex++;
+      }
+      oldIndex++;
+    }
+    this.#contents.length = newIndex;
+  }
+
+  add(value) {
+    super.add(value);
+    if (!this.#indexes.has(value)) {
+      this.#indexes.set(value, this.#contents.length);
+      this.#contents.push(new WeakRef(value))
+      this.#cleanup.register(value);
+    }
+    return this;
+  }
+
+  delete(value) {
+    const res = super.delete(value);
+    if (this.#indexes.has(value)) {
+      this.#contents[this.#indexes.has(value)] = null;
+      this.#indexes.delete(value);
+      this.#cleanup.unregister(value);
+    }
+    return res;
+  }
+
+  clone() {
+    const cloned = new ClonableWeakSet();
+    this.#contents.forEach(ref => {
+      const obj = ref.deref();
+      if (obj !== undefined) cloned.add(obj);
+    });
+    return cloned;
+  }
+}
+```
+
+[02:04:10.0081] <nicolo-ribaudo>
+ * My `ClonableWeakSet` implementation:
+
+```js
+class ClonableWeakSet extends WeakSet {
+  #contents = [];
+    
+  #indexes = new WeakMap();
+
+  #cleanup = new FinalizationRegistry(() => {
+    if (Math.random() < 0.1) this.#compact();
+  });
+
+  #compact() {
+    let oldIndex = 0, newIndex = 0;
+    while (oldIndex < this.#contents.length) {
+      const obj = this.#contents[oldIndex]?.deref();
+      if (obj !== undefined) {
+        this.#contents[newIndex] = this.#contents[oldIndex];
+        this.#indexes.set(obj, newIndex);
+        newIndex++;
+      }
+      oldIndex++;
+    }
+    this.#contents.length = newIndex;
+  }
+
+  add(value) {
+    super.add(value);
+    if (!this.#indexes.has(value)) {
+      this.#indexes.set(value, this.#contents.length);
+      this.#contents.push(new WeakRef(value))
+      this.#cleanup.register(value);
+    }
+    return this;
+  }
+
+  delete(value) {
+    const res = super.delete(value);
+    if (this.#indexes.has(value)) {
+      this.#contents[this.#indexes.get(value)] = null;
+      this.#indexes.delete(value);
+      this.#cleanup.unregister(value);
+    }
+    return res;
+  }
+
+  clone() {
+    const cloned = new ClonableWeakSet();
+    this.#contents.forEach(ref => {
+      const obj = ref.deref();
+      if (obj !== undefined) cloned.add(obj);
+    });
+    return cloned;
+  }
+}
+```
+
