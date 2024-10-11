@@ -728,3 +728,56 @@ I'd rather do that than be required to write `accessor` or `get`, the behavior o
 [15:09:45.0558] <shu>
 unless we decide it's worth inlining into struct declarations with special syntax, like `atomic #foo` or `atomic foo`
 
+[15:10:08.0396] <shu>
+but even then i don't know how to avoid reifying it into an actual object if the goal is to do Atomics access on them
+
+[15:10:36.0067] <shu>
+ * but even then i don't know how to avoid materializing it into an actual object if the goal is to do Atomics access on them
+
+[15:10:44.0475] <rbuckton>
+> <@shuyuguo:matrix.org> i.e. `#privateFoo = Atomics.Value()` or something, which you can then use `Atomics.load` on
+
+I'm doing something similar in the shared structs experiment in the TS compiler, mostly to work around TypeScript's soft `private`. The `AtomicValue` isn't strictly necessary, but it type checks better than a bunch of `// @ts-ignore` comments.
+
+[15:11:06.0196] <shu>
+i think ergonomically the idea is pretty good and fits well with the language
+
+[15:11:08.0811] <rbuckton>
+In the case of the `AtomicValue` I wrote, it has all of the atomics methods itself.
+
+[15:11:13.0431] <shu>
+right
+
+[15:11:32.0305] <shu>
+but indirection and the always on-heap boxing are antithetical to the performance needs of lock-free algs
+
+[15:11:45.0607] <shu>
+so if we can thread that needle somehow that also sidesteps the problem
+
+[15:11:48.0654] <rbuckton>
+Agreed
+
+[15:12:50.0368] <shu>
+i _think_ it's probably doable if we have special syntax marker like `atomic #foo`
+
+[15:13:19.0224] <shu>
+then it can be treated like primitive prototype lookups when you access, say, `42.toString` or whatever
+
+[15:13:30.0303] <shu>
+you don't _really_ need to materialize the box in all cases
+
+[15:13:44.0323] <rbuckton>
+If Mark's concern is that volatile fields on a shared struct could be be surfaced as part of a public API, could that not be guarded against via a type-aware linter like `eslint` w/`ts-eslint` instead?
+
+[15:14:15.0044] <shu>
+perhaps, that's up to mark and i think the highest order thing we should talk through before we return to investigating correlation
+
+[15:14:26.0439] <rbuckton>
+i.e., if you are concerned about it, you lint for it?
+
+[15:14:55.0312] <shu>
+i guess it comes down to how is mark running the linter?
+
+[15:15:00.0158] <shu>
+like since the concern is about other libraries
+
