@@ -1,0 +1,113 @@
+<!DOCTYPE html><html><head>
+  <title>TC39 Async Context on 2024-10-24</title>
+  <link rel="stylesheet" href="../style.css">
+  <script>window.room = "TC39 Async Context";</script><script src="../render-roomlist.js"></script>
+  <script src="../logs.js"></script>
+</head>
+<body><div class="wrapper">
+<div class="sidebar">
+<div class="title">TC39 Async Context<br>2024-10-24<br><a href="plaintext/">plaintext logs</a></div>
+<div class="nav">
+<a href="2024-10-11" class="nav-link"><span>prev</span></a>
+<span style="float:right">next</span>
+</div>
+    <div class="all-rooms"><noscript>JavaScript is required to load the channel index, but you can go to <a href="../..">the static index</a> directly.</noscript></div>
+<div class="footer"><a href="https://github.com/bakkot/matrix-archive-bot">source on github</a></div>
+</div>
+<div class="rhs">
+<div class="rhs-header">
+<span id="error" style="color: red; display:none">error</span>
+
+<input type="text" id="query" size="25" placeholder="Search TC39 Async Context">
+<a id="search-submit" class="button icon-link" title="Search">
+  <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path d="M505 442.7L405.3 343c-4.5-4.5-10.6-7-17-7H372c27.6-35.3 44-79.7 44-128C416 93.1 322.9 0 208 0S0 93.1 0 208s93.1 208 208 208c48.3 0 92.7-16.4 128-44v16.3c0 6.4 2.5 12.5 7 17l99.7 99.7c9.4 9.4 24.6 9.4 33.9 0l28.3-28.3c9.4-9.4 9.4-24.6.1-34zM208 336c-70.7 0-128-57.2-128-128 0-70.7 57.2-128 128-128 70.7 0 128 57.2 128 128 0 70.7-57.2 128-128 128z"></path></svg>
+</a>
+</div>
+
+<div class="log"><table id="log-table"><tbody id="log-tbody">
+
+  <tr class="msg" id="L0"><td class="ts-cell"><a class="ts" href="#L0" alt="Thu Oct 24 2024 06:11:46 GMT-0700 (Pacific Daylight Time)">13:11</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-9" title="@nicolo-ribaudo:matrix.org">nicolo-ribaudo</span>&gt;</div></td><td class="msg-cell"><p><span class="nick-1">Justin Ridgewell</span> As you asked last time, here is an example where there is a significant difference between keeping the fallback stack and not doing it.</p>
+<pre><code class="language-js">Event.captureFallbackContext(() =&gt; { // this establishes the "root context",
+                                     // which is actually implicitly done by the
+                                     // browser. This call is just to show it
+                                     // explicitly.
+
+  const appID = new AsyncContext.Variable();
+
+  appID.run("Red", () =&gt; Event.captureFallbackContext(red));
+  appID.run("Blue", () =&gt; Event.captureFallbackContext(blue));
+
+  addEventListener('unhandledrejection', () =&gt; {
+    console.log(`There has been an unhandled promise rejection in app ${appID.get()}`);
+  });
+});
+</code></pre>
+<p>where <code>red</code> is defined as</p>
+<pre><code class="language-js">export function red() {
+  document.addEventListener("click", () =&gt; { Promise.reject() });
+}
+</code></pre>
+<p><strong>With the current "stack" proposal</strong></p>
+<ul>
+<li>when the user clicks on the document, it logs <code>There has been an unhandled promise rejection in app Red</code>.</li>
+<li>if Blue runs <code><a href="http://document.click">document.click</a>()</code>, it logs <code>There has been an unhandled promise rejection in app Red</code>.</li>
+</ul>
+<p><strong>Without the stack, only using the fallback for browser-dispatched events</strong></p>
+<ul>
+<li>when the user clicks on the document, it logs <code>There has been an unhandled promise rejection in app Red</code>.</li>
+<li>if Blue runs <code><a href="http://document.click">document.click</a>()</code>, it logs <code>There has been an unhandled promise rejection in app Blue</code>.</li>
+</ul>
+<p><strong>Without the stack, using the fallback when the event not dispatched from within the same "fallback zone"</strong></p>
+<ul>
+<li>when the user clicks on the document, it logs <code>There has been an unhandled promise rejection in app undefined</code>.</li>
+<li>if Blue runs <code><a href="http://document.click">document.click</a>()</code>, it logs <code>There has been an unhandled promise rejection in app undefined</code>.</li>
+</ul>
+</td></tr>
+  <tr class="msg" id="L1"><td class="ts-cell"><a class="ts" href="#L1" alt="Thu Oct 24 2024 06:14:49 GMT-0700 (Pacific Daylight Time)">13:14</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-9" title="@nicolo-ribaudo:matrix.org">nicolo-ribaudo</span>&gt;</div></td><td class="msg-cell"><p>Also, I'm seeing in the notes a question about how long the bootstrap context lives.</p>
+<p>The effects on that of</p>
+<pre><code class="language-js">Event.captureFallbackContext(() =&gt; { addEventListener("foo", () =&gt; {}); });
+</code></pre>
+<p>are the same as</p>
+<pre><code class="language-js">addEventListener("foo", AsyncContext.Snapshot.wrap(() =&gt; {}));
+</code></pre>
+<ul>
+<li><code>Event.captureFallbackContext</code> only holds the context alive if there are event listeners registered inside it</li>
+<li>differently from the other "let's always go with the registration context" approach, this only captures the context when explicitly asked to (through the <code>.captureFallbackContext</code> API)</li>
+</ul>
+</td></tr>
+  <tr class="msg" id="L2"><td class="ts-cell"><a class="ts" href="#L2" alt="Thu Oct 24 2024 06:21:25 GMT-0700 (Pacific Daylight Time)">13:21</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-9" title="@nicolo-ribaudo:matrix.org">nicolo-ribaudo</span>&gt;</div></td><td class="msg-cell"><mx-reply><blockquote> <p>Also, I'm seeing in the notes a question about how long the bootstrap context lives.</p>
+<p>The effects on that of</p>
+<pre><code class="language-js">Event.captureFallbackContext(() =&gt; { addEventListener("foo", () =&gt; {}); });
+</code></pre>
+<p>are the same as</p>
+<pre><code class="language-js">addEventListener("foo", AsyncContext.Snapshot.wrap(() =&gt; {}));
+</code></pre>
+<ul>
+<li><code>Event.captureFallbackContext</code> only holds the context alive if there are event listeners registered inside it</li>
+<li>differently from the other "let's always go with the registration context" approach, this only captures the context when explicitly asked to (through the <code>.captureFallbackContext</code> API)</li>
+</ul>
+</blockquote></mx-reply><p>Also, a big difference is that the use case of <code>captureFallbackContext</code> is to call it "a few times" and "close to the top-level", while event listeners are used all over the place. So the number of different snapshots captured is in general significantly smaller. Example:</p>
+<pre><code class="language-js">Event.captureFallbackContext(() =&gt; {
+  varOne.run(1, () =&gt; addEventListener("foo", () =&gt; {}));
+  varTwo.run(2, () =&gt; addEventListener("foo", () =&gt; {}));
+});
+</code></pre>
+<p>only captures one context, while the approach where we use the registration context by default would capture two different contexts</p>
+</td></tr>
+  <tr class="msg" id="L3"><td class="ts-cell"><a class="ts" href="#L3" alt="Thu Oct 24 2024 14:31:45 GMT-0700 (Pacific Daylight Time)">21:31</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@stephenhicks:matrix.org">Steve Hicks</span>&gt;</div></td><td class="msg-cell"><p>I had a question about the interaction between this and other non-event systems - suppose a framework provides lifecycle callbacks and it makes sense to have a similar treatment - do we end up nesting <code>Event.captureFallbackContext(() =&gt; Framework.captureFallbackContext(() =&gt; ...))</code>?  Or does it make sense to generalize via (strawman)</p>
+<pre><code class="language-javascript">namespace AsyncContext {
+  const fallbackSnapshot = new Variable({defaultValue: new Snapshot()});
+  export function captureFallback(fn) {
+    return fallbackSnapshot.run(new Snapshot(), fn);
+  }
+  export function wrapFallback(fn) {
+    const savedFallback = fallbackSnapshot.get();
+    return () =&gt; savedFallback.isParentOfCurrentContext() ? fn() : savedFallback.run(fn);
+  }
+}
+</code></pre>
+<p>and then frameworks (or other specs) can piggyback on the same boundaries?</p>
+</td></tr>
+
+</tbody></table></div></div></div>
+</body></html>

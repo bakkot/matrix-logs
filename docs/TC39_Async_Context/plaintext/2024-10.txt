@@ -18,3 +18,252 @@ I don't know if I will be able to join the meeting on Tuesday (and if I will, I'
 
 https://hackmd.io/@nicolo-ribaudo/rJhdk8HyJe
 
+
+2024-10-24
+[06:11:46.0655] <nicolo-ribaudo>
+Justin Ridgewell As you asked last time, here is an example where there is a significant difference between keeping the fallback stack and not doing it.
+
+```js
+const appID = new AsyncContext.Variable();
+
+appID.run("Red", () => Event.captureFallbackContext(red));
+appID.run("Blue", () => Event.captureFallbackContext(blue));
+
+addEventListener('unhandledrejection', () => {
+  console.log(`There has been an unhandled promise rejection in app ${appID.get()}`);
+});
+```
+
+where `red` is defined as
+
+```js
+export function red() {
+  document.addEventListener("click", () => { Promise.reject() });
+}
+```
+
+when the user clicks on the document, this logs `There has been an unhandled promise rejection in app Red`.
+
+If instead `Blue` runs `document.click()`:
+- with the current proposal, it would log `There has been an unhandled promise rejection in app Red`
+- if we don't save the stack and just use the fallback when the event comes from the browser, it would log `There has been an unhandled promise rejection in app Blue`
+
+[06:14:49.0554] <nicolo-ribaudo>
+Also, I'm seeing in the notes a question about how long the bootstrap context lives.
+
+The effects on that of
+```js
+Event.captureFallbackContext(() => { addEventListener("foo", () => {}); });
+```
+are the same as
+```js
+addEventListener("foo", AsyncContext.Snapshot.wrap(() => {}));
+```
+
+- `Event.captureFallbackContext` only holds the context alive if there are event listeners registered inside it
+- differently from the other "let's always go with the registration context" approach, this only captures the context when explicitly asked to (through the `.captureFallbackContext` API)
+
+[06:21:25.0879] <nicolo-ribaudo>
+> <@nicolo-ribaudo:matrix.org> Also, I'm seeing in the notes a question about how long the bootstrap context lives.
+> 
+> The effects on that of
+> ```js
+> Event.captureFallbackContext(() => { addEventListener("foo", () => {}); });
+> ```
+> are the same as
+> ```js
+> addEventListener("foo", AsyncContext.Snapshot.wrap(() => {}));
+> ```
+> 
+> - `Event.captureFallbackContext` only holds the context alive if there are event listeners registered inside it
+> - differently from the other "let's always go with the registration context" approach, this only captures the context when explicitly asked to (through the `.captureFallbackContext` API)
+
+Also, a big difference is that the use case of `captureFallbackContext` is to call it "a few times" and "close to the top-level", while event listeners are used all over the place. So the number of different snapshots captured is in general significantly smaller. Example:
+
+```js
+Event.captureFallbackContext(() => {
+  varOne.run(1, () => addEventListener("foo", () => {}));
+  varTwo.run(2, () => addEventListener("foo", () => {}));
+});
+```
+only captures one context, while the approach where we use the registration context by default would capture two different contexts
+
+[06:30:32.0278] <nicolo-ribaudo>
+ * Justin Ridgewell As you asked last time, here is an example where there is a significant difference between keeping the fallback stack and not doing it.
+
+```js
+Event.captureFallbackContext(() => { // this establishes the "root context", which is actually implicitly done by the browser
+
+  const appID = new AsyncContext.Variable();
+
+  appID.run("Red", () => Event.captureFallbackContext(red));
+  appID.run("Blue", () => Event.captureFallbackContext(blue));
+
+  addEventListener('unhandledrejection', () => {
+    console.log(`There has been an unhandled promise rejection in app ${appID.get()}`);
+  });
+});
+```
+
+where `red` is defined as
+
+```js
+export function red() {
+  document.addEventListener("click", () => { Promise.reject() });
+}
+```
+
+**With the current "stack" proposal**
+
+- when the user clicks on the document, it logs `There has been an unhandled promise rejection in app Red`.
+- if Blue runs `document.click()`, it logs `There has been an unhandled promise rejection in app Red`.
+
+**Without the stack, only using the fallback for browser-dispatched events**
+
+- when the user clicks on the document, it logs `There has been an unhandled promise rejection in app Red`.
+- if Blue runs `document.click()`, it logs `There has been an unhandled promise rejection in app Blue`.
+
+**Without the stack, using the fallback when the event not dispatched from within the same "fallback zone"**
+
+- when the user clicks on the document, it logs `There has been an unhandled promise rejection in app undefined`.
+- if Blue runs `document.click()`, it logs `There has been an unhandled promise rejection in app undefined`.
+
+[06:31:19.0552] <nicolo-ribaudo>
+ * Justin Ridgewell As you asked last time, here is an example where there is a significant difference between keeping the fallback stack and not doing it.
+
+```js
+Event.captureFallbackContext(() => { // this establishes the "root context",
+                                     // which is actually implicitly done by the
+                                     // browser. This call is just to show it
+                                     // explicitly.
+  const appID = new AsyncContext.Variable();
+
+  appID.run("Red", () => Event.captureFallbackContext(red));
+  appID.run("Blue", () => Event.captureFallbackContext(blue));
+
+  addEventListener('unhandledrejection', () => {
+    console.log(`There has been an unhandled promise rejection in app ${appID.get()}`);
+  });
+});
+```
+
+where `red` is defined as
+
+```js
+export function red() {
+  document.addEventListener("click", () => { Promise.reject() });
+}
+```
+
+**With the current "stack" proposal**
+
+- when the user clicks on the document, it logs `There has been an unhandled promise rejection in app Red`.
+- if Blue runs `document.click()`, it logs `There has been an unhandled promise rejection in app Red`.
+
+**Without the stack, only using the fallback for browser-dispatched events**
+
+- when the user clicks on the document, it logs `There has been an unhandled promise rejection in app Red`.
+- if Blue runs `document.click()`, it logs `There has been an unhandled promise rejection in app Blue`.
+
+**Without the stack, using the fallback when the event not dispatched from within the same "fallback zone"**
+
+- when the user clicks on the document, it logs `There has been an unhandled promise rejection in app undefined`.
+- if Blue runs `document.click()`, it logs `There has been an unhandled promise rejection in app undefined`.
+
+[06:31:25.0396] <nicolo-ribaudo>
+ * Justin Ridgewell As you asked last time, here is an example where there is a significant difference between keeping the fallback stack and not doing it.
+
+```js
+Event.captureFallbackContext(() => { // this establishes the "root context",
+                                     // which is actually implicitly done by the
+                                     // browser. This call is just to show it
+                                     // explicitly.
+
+  const appID = new AsyncContext.Variable();
+
+  appID.run("Red", () => Event.captureFallbackContext(red));
+  appID.run("Blue", () => Event.captureFallbackContext(blue));
+
+  addEventListener('unhandledrejection', () => {
+    console.log(`There has been an unhandled promise rejection in app ${appID.get()}`);
+  });
+});
+```
+
+where `red` is defined as
+
+```js
+export function red() {
+  document.addEventListener("click", () => { Promise.reject() });
+}
+```
+
+**With the current "stack" proposal**
+
+- when the user clicks on the document, it logs `There has been an unhandled promise rejection in app Red`.
+- if Blue runs `document.click()`, it logs `There has been an unhandled promise rejection in app Red`.
+
+**Without the stack, only using the fallback for browser-dispatched events**
+
+- when the user clicks on the document, it logs `There has been an unhandled promise rejection in app Red`.
+- if Blue runs `document.click()`, it logs `There has been an unhandled promise rejection in app Blue`.
+
+**Without the stack, using the fallback when the event not dispatched from within the same "fallback zone"**
+
+- when the user clicks on the document, it logs `There has been an unhandled promise rejection in app undefined`.
+- if Blue runs `document.click()`, it logs `There has been an unhandled promise rejection in app undefined`.
+
+[14:31:45.0241] <Steve Hicks>
+I had a question about the interaction between this and other non-event systems - suppose a framework provides lifecycle callbacks and it makes sense to have a similar treatment - do we end up nesting `Event.captureFallbackContext(() => Framework.captureFallbackContext(() => ...))`?  Or does it make sense to generalize via (strawman)
+
+```
+namespace AsyncContext {
+  const fallbackSnapshot = new Variable({defaultValue: new Snapshot()});
+  export function captureFallback(fn) {
+    return fallbackSnapshot.run(new Snapshot(), fn);
+  }
+  export function wrapFallback(fn) {
+    const savedFallback = fallbackSnapshot.get();
+    return () => savedFallback.isParentOfCurrentContext() ? fn() : savedFallback.run(fn);
+  }
+}
+```
+
+and then frameworks can piggyback on the same boundaries?
+
+[14:31:54.0384] <Steve Hicks>
+ * I had a question about the interaction between this and other non-event systems - suppose a framework provides lifecycle callbacks and it makes sense to have a similar treatment - do we end up nesting `Event.captureFallbackContext(() => Framework.captureFallbackContext(() => ...))`?  Or does it make sense to generalize via (strawman)
+
+```javascript
+namespace AsyncContext {
+  const fallbackSnapshot = new Variable({defaultValue: new Snapshot()});
+  export function captureFallback(fn) {
+    return fallbackSnapshot.run(new Snapshot(), fn);
+  }
+  export function wrapFallback(fn) {
+    const savedFallback = fallbackSnapshot.get();
+    return () => savedFallback.isParentOfCurrentContext() ? fn() : savedFallback.run(fn);
+  }
+}
+```
+
+and then frameworks can piggyback on the same boundaries?
+
+[14:32:36.0079] <Steve Hicks>
+ * I had a question about the interaction between this and other non-event systems - suppose a framework provides lifecycle callbacks and it makes sense to have a similar treatment - do we end up nesting `Event.captureFallbackContext(() => Framework.captureFallbackContext(() => ...))`?  Or does it make sense to generalize via (strawman)
+
+```javascript
+namespace AsyncContext {
+  const fallbackSnapshot = new Variable({defaultValue: new Snapshot()});
+  export function captureFallback(fn) {
+    return fallbackSnapshot.run(new Snapshot(), fn);
+  }
+  export function wrapFallback(fn) {
+    const savedFallback = fallbackSnapshot.get();
+    return () => savedFallback.isParentOfCurrentContext() ? fn() : savedFallback.run(fn);
+  }
+}
+```
+
+and then frameworks (or other specs) can piggyback on the same boundaries?
+

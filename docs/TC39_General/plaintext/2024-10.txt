@@ -541,3 +541,325 @@ I tried WinterCG first but from initial interactions, it seemed like their bias 
 
  * I tried WinterCG first but from initial interactions, it seemed like their bias was (understandable) towards runtimes, not \[build\] tools. I'm not sure how much engagement there would be from tooling authors. But I just created https://matrix.to/#/#tc39-tools:matrix.org and I'll see if I can get this into the tools ecosystem outreach group scope, maybe.
 
+[10:28:11.0174] <bakkot>
+oh hey someone's doing a new coffeescript https://civet.dev/
+
+[10:47:11.0820] <Chris de Almeida>
+kopi luwak is not for everyone
+
+[12:42:22.0987] <Michael Ficarra>
+cool! there were so many of them back in the day and then people just kinda stopped
+
+[12:50:52.0007] <Michael Ficarra>
+oh my, I even see a familiar face in the contributors list! ❤️
+
+[13:00:31.0402] <ljharb>
+civet's been around for years i thought
+
+[14:15:28.0654] <Chris de Almeida>
+> <@jkrems:matrix.org> I tried WinterCG first but from initial interactions, it seemed like their bias was (understandable) towards runtimes, not \[build\] tools. I'm not sure how much engagement there would be from tooling authors. But I just created https://matrix.to/#/#tc39-tools:matrix.org and I'll see if I can get this into the tools ecosystem outreach group scope, maybe.
+
+sorry -- the link is: #tc39-tools-:matrix.org
+
+
+2024-10-23
+[17:17:06.0364] <bakkot>
+why aren't generator functions iterable?
+
+[17:17:16.0668] <bakkot>
+you have to manually call it
+
+[17:17:25.0573] <bakkot>
+ * you have to manually call a generator
+
+[17:17:42.0768] <bakkot>
+the result is iterable, but... `[Symbol.iterator]` is already a call
+
+[17:18:01.0028] <bakkot>
+I don't see any reason why `function* f(){}; for (a of f) { /* ... */ }` couldn't work
+
+[17:19:44.0037] <bakkot>
+```
+(function* (){}).__proto__[Symbol.iterator] = function(){ return this(); };
+function* f(){ yield 0; yield 1; }
+for (let x of f) console.log(x);
+```
+
+[18:56:24.0785] <Mathieu Hofman>
+My generators often take arguments. Curious what your use case is where it doesn't
+
+[19:05:28.0034] <Meghan Denny>
+the call makes it usable more than once
+
+[19:06:12.0435] <Meghan Denny>
+`x[Symbol.iterator]()` or `for (const a of f())` makes a usable Iterator
+
+[19:08:34.0427] <Meghan Denny>
+Mathieu Hofman: `document.querySelectorAll()[Symbol.iterator]().toArray()` vs `[...document.querySelectorAll()]` is the main one i can think of, i wonder how comparable the perf is of these variations
+
+[19:24:47.0234] <Mathieu Hofman>
+> <@meghanbun:matrix.org> the call makes it usable more than once
+
+I'm confused. A generator call result is an iterable iterator. It's not usable more than once.
+
+[19:25:55.0167] <Mathieu Hofman>
+I think it would be equivalent of saying `[...document.querySelectorAll]` should work, which I'd find confusing.
+
+[19:27:17.0853] <Mathieu Hofman>
+Now what I don't know is if the Iterable iterator result returned by generator calls contain all the iterator helpers. Aka if you can do `document.querySelectorAll().toArray()`. You likely should be able to.
+
+[19:28:38.0517] <Mathieu Hofman>
+ * I think it would be equivalent of saying `[...someGenerator]` should work, which I'd find confusing.
+
+[19:28:47.0296] <Mathieu Hofman>
+ * Now what I don't know is if the Iterable iterator result returned by generator calls contain all the iterator helpers. Aka if you can do `someGenerator().toArray()`. You likely should be able to.
+
+[19:30:22.0306] <Mathieu Hofman>
+I just checked, iterator helpers are available on generator results
+
+[19:31:13.0260] <Mathieu Hofman>
+It's just that `document.querySelectorAll()` returns a NodeList, which is an iterable, not an iterator
+
+[19:38:05.0998] <Mathieu Hofman>
+Ok I think I see what the ask is. Is it to be able to have a value that is iterable multiple times and backed by a generator? In which case I suppose you can do `{[Symbol.iterator]: function *() { yield 1; yield 2; }` ? I just don't really want to encourage a value that's both a callable and an iterable, that feels confusing.
+
+[19:39:41.0496] <bakkot>
+I just sometimes have 0-arity generators, and am annoyed that I need two calls to use them when one call would do just fine
+
+[19:40:41.0640] <bakkot>
+the main reason that this actually matters is that if some API takes an iterable, I have to pass it the opened generator, and the API might not close it
+
+[19:41:03.0546] <bakkot>
+it would be better if the API opened it itself, so that it would be responsible for closing it
+
+[19:42:10.0823] <bakkot>
+but we only have a built-in notion of opening iterables, not generators, and generators are not iterables so it doesn't apply
+
+[19:43:55.0934] <bakkot>
+I would also accept a `Generator.prototype.bindGenerator` which gave you a bound generator object which had `[Symbol.iterator]`, I guess
+
+[19:47:55.0135] <bakkot>
+concretely: how do you correctly pass a generator to (e.g.)
+
+```js
+function take(n, iterable) {
+  if (typeof n !== 'number' || n < 0) throw new TypeError;
+  let result = [];
+  for (let item of iterable) {
+    if (result.length >= n) break;
+    result.push(item);
+  }
+  return result;  
+}
+```
+?
+
+Just doing `take(n, gen())` is wrong: if you do that the generator will never get closed if `n` is invalid. So... `take(n, { [Symbol.iterator]: () => gen() })`, I guess? that's dumb. 
+
+[20:20:04.0856] <Mathieu Hofman>
+Afaik a generator starts suspended so really there isn't any harm in dropping it before the first `.next()` call, right (well except for the weird sync arguments processing)
+
+[20:21:25.0391] <Mathieu Hofman>
+That said I do see the use case now. A "bind to use once iterable" might be a solution.
+
+[20:24:54.0566] <Mathieu Hofman>
+It's not obvious that such an iterable should support multiple iterations unless explicitly allowed.
+
+[23:28:10.0139] <Ashley Claymore>
+how many things do we think could break if the spec changed it so generator argument processing was also deferred?
+
+[02:46:17.0043] <nicolo-ribaudo>
+I notice a mention of a JavaScriptCore bug at https://github.com/lydell/js-tokens?tab=readme-ov-file#safari-warning, and I wonder if it's even possible to test it in test262.
+
+When running `let res = /(#)(?:a|b)+/.exec("#" + "a".repeat(1e7)); print(res?.length)`,
+- V8 and SM throw a RangeError (maximum call stack exceeded)
+- XS correctly prints 2
+- JSC incorrectly prints `null`
+
+It is possible to test something in test262 that in practice in half of the engines throws due to the call stack size?
+
+[02:46:21.0927] <nicolo-ribaudo>
+ * I notice a mention of a JavaScriptCore bug at https://github.com/lydell/js-tokens?tab=readme-ov-file#safari-warning, and I wonder if it's even possible to test it in test262.
+
+When running `let res = /(#)(?:a|b)+/.exec("#" + "a".repeat(1e7)); print(res?.length)`,
+
+- V8 and SM throw a RangeError (maximum call stack exceeded)
+- XS correctly prints 2
+- JSC incorrectly prints undefined
+
+It is possible to test something in test262 that in practice in half of the engines throws due to the call stack size?
+
+[02:56:11.0845] <nicolo-ribaudo>
+ * I notice a mention of a JavaScriptCore bug at https://github.com/lydell/js-tokens?tab=readme-ov-file#safari-warning, and I wonder if it's even possible to test it in test262.
+
+When running `let res = /(#)(?:a|b)+/.exec("#" + "a".repeat(1e7)); print(res?.length)`,
+
+- V8 and SM throw an error (maximum call stack exceeded)
+- XS correctly prints 2
+- JSC incorrectly prints undefined
+
+It is possible to test something in test262 that in practice in half of the engines throws due to the call stack size?
+
+[07:17:57.0141] <Richard Gibson>
+I would say that it's practical with try..catch that admits only success or RangeError, but also unnecessary here if the scale is reduced a bit:
+```
+$ eshost -sx '
+  let res = /(#)(?:a|b)+/.exec("#" + "a".repeat(1e6)); 
+  if (Array.isArray(res)) {
+    print(JSON.stringify(res.map(s => s.length > 9 ? s.slice(0, 3) + "…" + s.slice(-3) : s)));
+  } else {
+    print(res);
+  }
+'
+#### engine262
+
+RangeError: Maximum call stack size exceeded
+
+#### GraalJS, Hermes, Moddable XS, QuickJS, SpiderMonkey, V8
+["#aa…aaa","#"]
+
+#### JavaScriptCore
+null
+```
+
+[07:26:22.0590] <nicolo-ribaudo>
+Oh thanks, I'll open a PR with that 
+
+
+2024-10-24
+[11:38:23.0267] <akaster>
+Is HostPromiseRejectionTracker supposed to be handling Promises, or PromiseCapabilties? https://tc39.es/ecma262/#sec-host-promise-rejection-tracker
+
+HTML expects to use the passed-in promise argument to index sets of `Promise`, which in HTML is actually WebIDL's Promise, which is actually a PromiseCapability. https://html.spec.whatwg.org/multipage/webappapis.html#the-hostpromiserejectiontracker-implementation
+
+HTML also wants to insert the promise into a PromiseRejectionEventInit, which holds a WebIDL Promise explicitly. Alternatively I suppose I could start my impl of HostPromiseRejectionTracker by creating "a Promise resolved with promise" and doge the entire disconnect...
+
+[11:43:53.0080] <akaster>
+wait maybe I'm supposed to do that Promise resolved with promise dance anyway per "converting a javascript value to an IDL promise type" https://webidl.spec.whatwg.org/#js-promise 🤔. 🦆
+
+[11:44:25.0484] <nicolo-ribaudo>
+HTML expects Promise objects too. It links to https://webidl.spec.whatwg.org/#idl-promise, which is not the webidl promise capability 
+
+[11:46:31.0163] <akaster>
+wait what? but `3.2.23. Promise types — Promise<T>` says "IDL promise type values are represented by JavaScript PromiseCapability records."
+which links to your link there in 2.13.30 https://webidl.spec.whatwg.org/#dfn-promise-type
+
+[11:47:04.0695] <akaster>
+I'm interpreting that to mean that HTML doesn't ever want to see a PromiseCapabiltiy's [[Promise]] Slot, and only wants to traffic in PromiseCapabilities
+
+[11:48:11.0649] <akaster>
+... probably should have asked this in whatwg matrix pinging domenic come to think of it 😅
+
+[11:55:31.0335] <Mathieu Hofman>
+> <@akaster:serenityos.org> wait maybe I'm supposed to do that Promise resolved with promise dance anyway per "converting a javascript value to an IDL promise type" https://webidl.spec.whatwg.org/#js-promise 🤔. 🦆
+
+I don't think so as that would handle the promise, and just create another rejected promise?
+
+[11:59:04.0511] <akaster>
+hmm. and that would be 'observable' as a stack overflow constantly creating new rejected promises and passing them to the HostPromiseRejectionTracker? 🤔
+
+[12:04:56.0847] <Mathieu Hofman>
+the point of the unhandled and handled rejection events is to be able to associate them to the promise that is unhandled and possibly later becomes handled
+
+[12:06:09.0701] <Mathieu Hofman>
+Arguably you could "map" them to another promise value, but you'd have to make that mapping stable, and I'd say you shouldn't handle the original promise in the first place
+
+[12:06:48.0702] <Mathieu Hofman>
+There's actually an open question in HTML of how to report unhandled promise events from other realms (ShadowRealm or Worker)
+
+[12:07:16.0052] <akaster>
+hmm. so in that case, <https://html.spec.whatwg.org/multipage/webappapis.html#outstanding-rejected-promises-weak-set> telling me that they are Promises, and linking to both https://webidl.spec.whatwg.org/#idl-promise and https://webidl.spec.whatwg.org/#js-promise is misleading
+
+[12:07:56.0426] <akaster>
+it should say that they are ... "promises", or something, and make it clear that these are not WebIDL Promises represented by a PromiseCapability, but the actual JS value of the promise...
+
+[12:08:18.0464] <akaster>
+man. sideshowbarker told me to be careful with WebIDL issues. I see what he means now, there's a bunch of ambiguity here
+
+[12:11:11.0999] <Mathieu Hofman>
+I can't speak to the HTML spec, just about the intent of these features
+
+[12:11:39.0429] <akaster>
+yeah, I'll probably open an HTML issue so domenic et al can comment at their liesure
+
+
+2024-10-25
+[12:00:15.0467] <bakkot>
+fun use case for ShadowRealms: running code generated by an LLM https://simonwillison.net/2024/Oct/24/claude-analysis-tool/
+
+[12:00:29.0113] <bakkot>
+this didn't actually use ShadowRealms, presumably because they don't exist yet
+
+[12:00:45.0031] <bakkot>
+but same use case:
+
+> it executes that JavaScript directly in your browser—in a locked down Web Worker that communicates back to the main page by intercepting messages sent to console.log()
+
+[12:01:12.0705] <bakkot>
+though I guess you'd really also need the ability to kill long-running code, which means you'd need to use a realm in a worker, or something like that
+
+[12:07:28.0060] <shu>
+yeah the early termination use case is surprisingly common i think
+
+[12:07:35.0609] <shu>
+shadowrealms make that impossible because of the sync-ness
+
+[12:10:45.0823] <bakkot>
+wonder if we could have something in the language for that... like, it is already the case that you might OOM at any point, so it probably isn't that destructive to the semantics of the language if we had a function that was like "if, after this call, execution has not yet yielded, throw an exception wherever we currently are"
+
+[12:12:58.0149] <bakkot>
+I guess that would be bad for engines though, since they do keep track of which things might oom more carefully
+
+[12:19:29.0911] <shu>
+don't think i understand how that API works for something synchronous
+
+[12:19:36.0486] <shu>
+are you envisioning a timeout?
+
+[12:59:24.0887] <bakkot>
+yes, a timeout
+
+[12:59:44.0092] <bakkot>
+which when reached interrupts the currently executing thing
+
+[12:59:59.0023] <bakkot>
+and which gets automatically cleared whenever control is yielded to the event loop
+
+[13:00:02.0268] <shu>
+ah okay, yeah, i would not be against
+
+[13:00:17.0646] <shu>
+in practice engines already have to bake in interrupt checks for GC if nothing else
+
+[13:00:46.0066] <shu>
+the more intrusive change is to actually ensure there's such a thing a way to propagate termination
+
+[13:01:33.0470] <shu>
+every engine needs to propagate exceptions for throwing, but the default assumption is that such exceptions are catchable
+
+[13:01:55.0263] <shu>
+ * the more intrusive change is to actually ensure there's a way to propagate termination
+
+[13:06:02.0748] <littledan>
+Yeah I agree that this termination/timeout part is a common requirement; it came up when I was discussing ShadowRealm with Jason Miller of Shopify (I think they were working on a QuickJS-based thing because of ShadowRealms not existing + this termination requirement + a requirement to be synchronous)
+
+[13:08:25.0192] <littledan>
+* Yeah I agree that this termination/timeout part is a common requirement
+
+
+2024-10-26
+[05:58:25.0304] <Mathieu Hofman>
+Yeah there are no availability guarantees in ShadowRealm or Compartments. In general anything running in the same agent. Preempting a drain of the promise jobs queue is an interesting idea, but I feel very unsure about letting any code running in the same agent after that. It's like catching an OOM but worse, the program can't really make any assumption in what state it's in anymore.
+
+[06:02:40.0577] <Mathieu Hofman>
+I suppose if you could prove that only some of the shadow realms had any jobs on the queue, or calls on the stack when preempted you could just condemn those realms, but I'm not sure that's sufficient. At the very least you'd still need some way to trigger execution in that isolated realm without letting your own realm become collateral damage, and know when/if that realm becomes condemned.
+
+[06:05:02.0099] <Mathieu Hofman>
+* I suppose if you could prove that only some of the shadow realms had any jobs on the queue, or calls on the stack when preempted you could just condemn those realms, but I'm not sure that's sufficient. At the very least you'd need some way to trigger execution in that isolated realm without letting your own realm become collateral damage if it gets preempted, and know when/if that realm becomes condemned.
+
+[06:06:57.0962] <Mathieu Hofman>
+I think by definition that makes the trigger of execution asynchronous, and prevents you from having any of the triggering realm's functions interleaved on the stack. At which point you might as well run in a different agent.
+
+[06:11:15.0236] <Mathieu Hofman>
+FYI, Moddable implemented metering in XS for us. It does a deterministic measurement of work done in the agent, and can interrupt execution if it passes a given threshold. All this is on the embedder side however, and there are only minimal host APIs exposed to JS to temporarily suspend metering.
+

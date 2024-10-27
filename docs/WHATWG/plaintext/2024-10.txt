@@ -971,3 +971,293 @@ Yea, it should be the same document you create in https://html.spec.whatwg.org/m
 [09:40:03.0786] <akaster>
 "inventing" a fictional document-like object that behaves as-if it is an about:blank initial document would be an unfortunate way to spec that. hopefully there's a clearer and easier to implement way to describe the desired behavior
 
+[10:39:48.0761] <annevk>
+Alan Stearns: heya, could you add weinig to the group of people that can add labels to w3c/csswg-drafts? He is independent at the moment and does a lot of CSS value work.
+
+[10:43:47.0139] <Alan Stearns>
+annevk: I could once they get added to the W3C org by some team member with access. sideshowbarker ?
+
+
+2024-10-23
+[23:25:00.0659] <scott_michaud_riv>
+Hello! Regarding the FS Living Standard (https://fs.spec.whatwg.org/#files-and-directories) I notice that there's no direct mention of maximum path length. Is that expected to be a non-issue? Or should app developers keep the total directories below some threshold for cross-platform compatibility? (Crossing fingers that I don't need to keep things under 256/260 chars for MAX_PATH lol.)
+
+[23:25:15.0804] <scott_michaud_riv>
+ * Hello! Regarding the FS Living Standard (https://fs.spec.whatwg.org/#files-and-directories) I notice that there's no direct mention of maximum path length. Is that expected to be a non-issue? Or should app developers keep the total nesting of directories below some threshold for cross-platform compatibility? (Crossing fingers that I don't need to keep things under 256/260 chars for MAX\_PATH lol.)
+
+[03:38:37.0007] <Noam Rosenthal>
+We're already using this fictional document when navigating a new tab... so it would be a consistent unfortunate way to spec this
+
+[03:39:31.0736] <Noam Rosenthal>
+There are probably clearer ways to describe the desired behavior but I'm not convinced about "easier"
+
+[03:41:30.0125] <Noam Rosenthal>
+We can probably create something like a reserved environment that's not a document to be the fetch client in this case, but I'm not sure it's easier in anyway (or substantially different from an `initial about:blank`)
+
+[03:49:34.0171] <Noam Rosenthal>
+In any case, the result should be equivalent in the web observable sense
+
+[04:03:07.0106] <Noam Rosenthal>
+I think the other option is actually to have a request client of `null`. It would have a `reserved client` created in https://html.spec.whatwg.org/multipage/browsing-the-web.html#create-navigation-params-by-fetching. `fetch` can work fine without a request client. 
+
+[04:03:35.0385] <Noam Rosenthal>
+Looking at chromium code for this, it's kind of more equivalent to what's happening in a UI-initiated navigation
+
+[05:39:53.0851] <Noam Rosenthal>
+Heh in `Sec-Fetch-Site`: 
+
+"If r is a navigation request that was explicitly caused by a user’s interaction with the user agent (by typing an address into the user agent directly, for example, or by clicking a bookmark, etc.), then set header’s value to none."
+
+https://w3c.github.io/webappsec-fetch-metadata/#sec-fetch-site-header
+
+[05:40:51.0482] <Noam Rosenthal>
+So so far I can't see one place where it matters whether the origin of the navigation request is opaque or the new navigation URL, also service workers don't expose this
+
+[09:14:41.0706] <annevk>
+scott_michaud_riv: not sure. But https://infra.spec.whatwg.org/#algorithm-limits might help.
+
+[14:20:59.0603] <akaster>
+When WebIDL says:
+
+N. Return PerformPromiseThen(promise.[[Promise]], onFulfilled, onRejected, newCapability).
+
+should the steps actually be:
+
+N. PerformPromiseThen(promise.[[Promise]], onFulfilled, onRejected, newCapability).
+N+1. Return newCapability.
+
+?
+
+
+[14:21:49.0159] <akaster>
+PerformPromiseThen will return newCapability.[[Promise]] if newCapability is not undefined. but the actual [[Promise]] slot of a PromiseCapability is kind of useless to WebIDL
+
+[14:22:01.0194] <akaster>
+you can't re-wrap it in another PromiseCapability for example
+
+[14:30:27.0564] <annevk>
+akaster: seems likely from what is done elsewhere, though not exactly an expert. You could wait for Domenic but seems reasonable to preemptively file an issue to at least get it clarified if it's intentional.
+
+[14:32:03.0976] <akaster>
+thanks! I'm looking at our implementation of converting JS values to WebIDL Promises and back, and it seems we had quite a lot of confusion about the use of a Promise vs a PromiseCapability back when we wrote that part of the code generator. Cleaning this up is requiring some hard looks at the WebIDL spec. (side yak from implementing https://webassembly.github.io/spec/web-api/#compile-a-potential-webassembly-response, which both takes and returns a Promise<T>)
+
+[14:41:34.0527] <akaster>
+https://github.com/whatwg/webidl/issues/1443
+
+
+2024-10-24
+[02:30:37.0473] <Ms2ger>
+akaster: I make no claims that the current wasm spec is optimal or agrees with browsers in all edge cases on this point :)
+
+[10:45:40.0675] <Sam Sneddon [:gsnedders]>
+https://infra.spec.whatwg.org/#algorithm-limits would arguably cover this; I'd _hope_ this isn't a problem with major browsers given you can with modern APIs on Windows not be concerned about that.
+
+[11:52:09.0686] <akaster>
+Domenic: When implementing HostPromiseRejectionTracker, https://html.spec.whatwg.org/multipage/webappapis.html#the-hostpromiserejectiontracker-implementation, are we expecting that the `promise` object is the actual JS Promise object? or should it be converted to a WebIDL Promise<T> before doing anything with it in the algorithm per the conversion steps in https://webidl.spec.whatwg.org/#js-promise ? I'm not sure if it is observable whether we e.g. fire a PromiseRejectionEvent with "a PromiseCapability resolved with promise" vs the JS Promise object itself
+
+[12:23:12.0327] <akaster>
+hm. rephrased this question in <https://github.com/whatwg/html/issues/10721>
+
+[14:17:34.0140] <akaster>
+heh. `let e = new PromiseRejectionEvent('eventName', { promise: 42 });` only throws in Firefox. seems everyone else allows synthetic PromiseRejectionEvents to have a `promise` property of any type
+
+[14:22:44.0326] <annevk>
+WebKit has `required Promise<any> promise;` there, which seems kinda what you'd expect?
+
+[14:24:13.0512] <annevk>
+I wonder if this got changed post implementation. It does seem a little wonky that the `promise` getter can return a non-promise.
+
+[14:54:30.0114] <akaster>
+🤷I'm adding logic to our IDL generator to convert any Promise<T> properties of IDL interfaces into PromiseCapabiltiies before sending them along to our web engine
+
+[14:55:09.0688] <akaster>
+so in that case, doing so for PromiseRejectionEvent is likely incorrect (pending that issue I posted). So  it seems like copying firefox and pretending that it's supposed to be `required object promise` is easiest to keep moving fwd with the change
+
+[15:10:34.0043] <annevk>
+I would do whatever is easiest as it's just synthetic events that are impacted here and they're a rather niche use case.
+
+[15:11:06.0434] <annevk>
+Though we should also figure out what this should do longer term. :-) Maybe object is reasonable though, just seems odd.
+
+
+2024-10-25
+[17:11:08.0636] <Domenic>
+The spec changed from `Promise<any>` to `object` in https://github.com/whatwg/html/pull/9897. Referring to my just-written comment in https://github.com/whatwg/html/issues/10721#issuecomment-2436548874 , we lost (3) but gained (2) in that change.
+
+[03:47:25.0238] <annevk>
+It seems that Chrome and Safari have 2 and 3 today.
+
+[04:54:04.0001] <sideshowbarker>
+Any chance somebody’s around who understands the https://w3c.github.io/accname/#computation-steps spec and the test at https://github.com/web-platform-tests/wpt/blob/master/accname/name/comp_embedded_control.html and https://github.com/web-platform-tests/wpt/blob/master/wai-aria/scripts/aria-utils.js#L133 ?
+
+What I don’t understand about the test is: Given the following:
+
+```
+<label>
+  <input type="checkbox" data-expectedlabel="Flash the screen 3 times" data-testname="checkbox label with embedded textfield" class="ex">
+  Flash the screen
+  <input value="3" aria-label="number of times" data-expectedlabel="number of times" data-testname="label of embedded textfield inside checkbox label" class="ex"> times
+</label>
+```
+…the test expects `test_driver.get_computed_label()` for that first `input` element to be `Flash the screen 3 times`.
+
+But I don’t understand how, from the spec, the computed label for that `input` element ends up being the concatenation of:
+
+1. the `Flash the screen ` text node that follows that `input`
+2. the value of the second `input` element
+3. the value of the ` times` text node which follows the second `input` element
+
+I mean, that all seems like what that instead would be is: the computed label would be for the `label` element that contains those other elements and those text nodes.
+
+But that `label` element is not what the test is actually checking, as far as can see — the test is instead just checking, one by one, the computed label for each of the elements that have a `class="ex"` attribute. And not concatenating those.
+
+But Gecko, WebKit, and Blink pass all those tests. So clearly their must be something I’m missing
+
+[04:55:03.0447] <sideshowbarker>
+ * Any chance somebody’s around who understands the https://w3c.github.io/accname/#computation-steps spec and the test at https://github.com/web-platform-tests/wpt/blob/master/accname/name/comp\_embedded\_control.html and https://github.com/web-platform-tests/wpt/blob/master/wai-aria/scripts/aria-utils.js#L133 ?
+
+What I don’t understand about the test is: Given the following:
+
+```
+<label>
+  <input type="checkbox" data-expectedlabel="Flash the screen 3 times" data-testname="checkbox label with embedded textfield" class="ex">
+  Flash the screen
+  <input value="3" aria-label="number of times" data-expectedlabel="number of times" data-testname="label of embedded textfield inside checkbox label" class="ex"> times
+</label>
+```
+
+…the test expects `test_driver.get_computed_label()` for that first `input` element to be `Flash the screen 3 times`.
+
+But I don’t understand how, from the spec, the computed label for that `input` element ends up being the concatenation of:
+
+1. the `Flash the screen ` text node that follows that `input`
+2. the value of the second `input` element
+3. the value of the ` times` text node which follows the second `input` element
+
+I mean, that all seems like what that instead would be is: the computed label for the `label` element that contains those other elements and those text nodes.
+
+But that `label` element is not what the test is actually checking, as far as can see — the test is instead just checking, one by one, the computed label for each of the elements that have a `class="ex"` attribute. And not concatenating those.
+
+But Gecko, WebKit, and Blink pass all those tests. So clearly their must be something I’m missing
+
+[04:55:31.0454] <sideshowbarker>
+ * Any chance somebody’s around who understands the https://w3c.github.io/accname/#computation-steps spec and the test at https://github.com/web-platform-tests/wpt/blob/master/accname/name/comp\_embedded\_control.html and https://github.com/web-platform-tests/wpt/blob/master/wai-aria/scripts/aria-utils.js#L133 ?
+
+What I don’t understand about the test is: Given the following:
+
+```
+<label>
+  <input type="checkbox" data-expectedlabel="Flash the screen 3 times" data-testname="checkbox label with embedded textfield" class="ex">
+  Flash the screen
+  <input value="3" aria-label="number of times" data-expectedlabel="number of times" data-testname="label of embedded textfield inside checkbox label" class="ex"> times
+</label>
+```
+
+…the test expects `test_driver.get_computed_label()` for that first `input` element to be `Flash the screen 3 times`.
+
+But I don’t understand how, from the spec, the computed label for that `input` element ends up being the concatenation of:
+
+1. the `Flash the screen ` text node that follows that `input`
+2. the value of the second `input` element
+3. the value of the ` times` text node which follows the second `input` element
+
+I mean, that all seems like what that instead would be is: the computed label for the `label` element that contains those other elements and those text nodes.
+
+But that `label` element is not what the test is actually checking, as far as can see — the test is instead just checking, one by one, the computed label for each of the elements that have a `class="ex"` attribute. And not concatenating those.
+
+But Gecko, WebKit, and Blink pass all those tests. So clearly, there must be something I’m missing
+
+[05:03:59.0129] <sideshowbarker>
+ * Any chance somebody’s around who understands the https://w3c.github.io/accname/#computation-steps spec and the test at https://github.com/web-platform-tests/wpt/blob/master/accname/name/comp\_embedded\_control.html and https://github.com/web-platform-tests/wpt/blob/master/wai-aria/scripts/aria-utils.js#L133 ?
+
+What I don’t understand about the test is: Given the following:
+
+```
+<label>
+  <input type="checkbox" data-expectedlabel="Flash the screen 3 times" data-testname="checkbox label with embedded textfield" class="ex">
+  Flash the screen
+  <input value="3" aria-label="number of times" data-expectedlabel="number of times" data-testname="label of embedded textfield inside checkbox label" class="ex"> times
+</label>
+```
+
+…the test expects `test_driver.get_computed_label()` for that first `input` element to be `Flash the screen 3 times`.
+
+But I don’t understand how, from the spec, the computed label for that `input` element ends up being the concatenation of:
+
+1. the `Flash the screen ` text node that follows that `input`
+2. the value of the second `input` element
+3. the value of the ` times` text node which follows the second `input` element
+
+I mean, it seems like what that all instead would be is: the computed label for the `label` element that contains those other elements and those text nodes.
+
+But that `label` element is not what the test is actually checking, as far as can see — the test is instead just checking, one by one, the computed label for each of the elements that have a `class="ex"` attribute. And not concatenating those.
+
+But Gecko, WebKit, and Blink pass all those tests. So clearly, there must be something I’m missing
+
+[05:42:11.0444] <sideshowbarker>
+ah nevermind, I see now I just need to implement **E. Host Language Label** from the spec correctly — https://w3c.github.io/accname/#step2E:
+
+> if the current node's native markup provides an attribute (e.g. alt) or element (e.g. HTML label or SVG title) that defines a text alternative, return that alternative in the form of a flat string
+
+since there’s a `label` wrapped around that `input`, the computed label is the that actual label textcontent
+
+[06:13:48.0843] <zcorpan>
+ sideshowbarker the integration between accname and <hostlanguage>-aam are not great
+
+[06:18:10.0908] <zcorpan>
+sideshowbarker: though where does it say to use the `value`? i.e. where does the "3" come from? https://w3c.github.io/html-aam/#input-type-text-input-type-password-input-type-number-input-type-search-input-type-tel-input-type-email-input-type-url-and-textarea-element-accessible-name-computation
+
+[08:22:52.0729] <Lea Verou>
+Question: Certain elements, such as `<li>` or `<option>` are only permitted within certain element types. Should this perhaps be expanded to custom elements? Many use cases where a custom element may reasonably want to slot these, and currently they need to invent their own elements that mirror the API of these.
+(I can file an issue, just wanted a sanity check)
+
+[09:00:21.0544] <annevk>
+Lea Verou: if there is no HTML parser weirdness that might be okay. Might be tricky to correctly update everything that needs to be updated (and find it all).
+
+[10:06:48.0417] <Lea Verou>
+> <@annevk:matrix.org> Lea Verou: if there is no HTML parser weirdness that might be okay. Might be tricky to correctly update everything that needs to be updated (and find it all).
+
+No need to do all at once, it could be done one at a time
+
+[10:11:02.0526] <Lea Verou>
+> <@annevk:matrix.org> Lea Verou: if there is no HTML parser weirdness that might be okay. Might be tricky to correctly update everything that needs to be updated (and find it all).
+
+Ok, issue filed: https://github.com/whatwg/html/issues/10722 Thanks!
+
+[12:02:35.0197] <akaster>
+Should specs be directly referencing the "promise-calling" concept in spec steps? WebDriver's Execute Script AO https://w3c.github.io/webdriver/#execute-script says:
+
+> 8. Let scriptPromise be the result of promise-calling execute a function body, with arguments body and arguments. 
+
+Reading into https://www.w3.org/2001/tag/doc/promises-guide#should-promise-call, which is linked from that step, it sounds like specification writers are supposed to 'achieve' promise calling, rather than telling implementers to make it happen?
+
+
+2024-10-26
+[14:25:15.0130] <akaster>
+Am I bikeshedding wrong or is there an issue with the WebIDL spec? <https://github.com/whatwg/webidl/issues/1444>
+
+[14:25:19.0580] <akaster>
+ * Am I bikeshedding wrong or is there an issue with the WebIDL spec build? https://github.com/whatwg/webidl/issues/1444
+
+
+2024-10-27
+[00:01:42.0659] <annevk>
+Lea Verou: well we do try to atomically update the HTML standard so I think we should try to identify all places in advance
+
+[00:03:24.0782] <annevk>
+akaster: looks like ECMAScript removed %IteratorPrototype% and nobody filed an upstream PR? (This is how we detect a subset of cross-specification "compilation" issues.)
+
+[00:35:08.0479] <sideshowbarker>
+> <@zcorpan:mozilla.org> sideshowbarker: though where does it say to use the `value`? i.e. where does the "3" come from? https://w3c.github.io/html-aam/#input-type-text-input-type-password-input-type-number-input-type-search-input-type-tel-input-type-email-input-type-url-and-textarea-element-accessible-name-computation
+
+Yeah I guess that `3` can only come from using the `input` value. If the spec doesn’t clearly require doing that, I guess it’s possible that other implementors — in order to get that test case to pass — may have just made an assumption about what the spec _intended_.
+
+
+[00:40:30.0012] <sideshowbarker>
+I mean, that test case is basically the same as what’s in Example 4 in the spec at https://w3c.github.io/accname/#example-4 — a `<input type="checkbox">` element — but nowhere in that algorithm can I find any step that states requirements for role=checkbox (for `<input type="checkbox">`).
+
+I guess it’s possible that the spec _used to_ state such requirements, but then they got inadvertently dropped in a later revision.
+
+[00:44:41.0124] <sideshowbarker>
+I’m intentionally avoiding to look at the existing code for any other implementations — so I can make sure it’s actually implementable as specced (without needing to make any assumptions that aren’t actually requirements)
+

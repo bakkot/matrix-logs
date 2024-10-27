@@ -7064,3 +7064,477 @@ periodic reminder to Stage 0/1 proposal champions: please do not name your propo
 [09:59:53.0115] <Michael Ficarra>
 * periodic reminder to Stage 0/1 proposal champions: please do not name your proposal after a specific solution/API, name it after the problem space
 
+
+2024-10-22
+[10:10:16.0488] <Michael Ficarra>
+> <@marjakh:matrix.org> Michael Ficarra: the most chrome / v8 bugs are not because our C++ is doing memory management wrong, they are because we have a logic bug in generating machine code or because our invariants are extremely complex and one part might make a change which violates an invariant somewhere else. happy to talk more about this. interestingly, a huge proportion of the CVEs listed on shu's slide were in my code, and none of my bugs were because of C++, and would've happened even if V8 was written in a memory safe language.
+
+GraalJS takes an approach that ensures JIT-produced code is memory-safe by construction without sacrificing perf: https://medium.com/graalvm/writing-truly-memory-safe-jit-compilers-f79ad44558dd
+
+[14:00:06.0978] <shu>
+i'm not sure why there's a connection between partial evaluation and the heap sandbox?
+
+[14:01:36.0823] <shu>
+the thesis of the article is that because graal partially evaluates an interpreter, this class of bugs is avoided
+
+[14:02:35.0645] <shu>
+but a heap sandbox is about protecting memory representation being exploited by an attacker, which _can_ arise from type confusion bugs due to JIT bugs, but can also just arise through other vectors
+
+[14:04:55.0259] <shu>
+a partial evaluator doesn't avoid that by construction. it can avoid some of the attack surface, though, and is a cool technique
+
+[14:07:42.0328] <shu>
+the heap sandbox would need to exist at the JVM or the native codegen layer in the GC runtime if you're bundling a GC, not really at the compilation layer. the graal thesis still requires that your interpreter is correct, or all the object runtime code that deal with actual representation of your objects are bug-free, right? the point of the heap sandbox is that it's another containment layering assuming that the VM is already pwned, which is... closer to reality imo
+
+[14:08:39.0840] <shu>
+also caveats about "without sacrificing performance" which seems to be about peak performance yada yada yada
+
+[14:18:27.0761] <Michael Ficarra>
+yes, see this quote:
+
+> This architecture is standard — both the JVM and V8 use it — but viewed from a security perspective the design has a flaw: it’s error prone. The language semantics are implemented twice, once for the interpreter and again for the JIT compiler. It’s critical not only that both places are fully correct but also that they exactly match. Otherwise, the VM becomes exploitable.
+
+[14:19:15.0290] <Michael Ficarra>
+assuming you have a correct interpreter, you don't have a second implementation (the JIT) which introduces its own bugs or just differences in behaviour
+
+[14:27:31.0800] <shu>
+but that's a narrower class of bugs than the heap sandbox is designed for
+
+[14:28:26.0017] <shu>
+i.e., the heap sandbox is defense in depth assuming several class of bugs. this blogpost is saying, our technique can sidestep one such class of bugs
+
+
+2024-10-23
+[18:47:30.0627] <Mathieu Hofman>
+I suppose it's easier to prove that an interpreter can only affect the heap of the interpreted language in the first place? At that point an explicit heap sandbox may be redundant? 
+
+[18:49:33.0716] <Mathieu Hofman>
+That's possibly where writing an interpreter in a memory safe language would help: you can reason that the only memory you can reach is the one allocated to represent the heap of the language you're interpreting.
+
+[18:51:26.0824] <Mathieu Hofman>
+of course you can still have bugs in the interpreter that would break the memory safety of the language you're interpreting. but you can't escape out to affect the memory of the rest of the process.
+
+[20:03:46.0086] <shu>
+> <@mhofman:matrix.org> That's possibly where writing an interpreter in a memory safe language would help: you can reason that the only memory you can reach is the one allocated to represent the heap of the language you're interpreting.
+
+if the memory safe language is a GCed language you still want a sandbox around *that* heap
+
+[20:03:58.0319] <shu>
+like, the target GCed language's GC heap
+
+[20:04:19.0489] <shu>
+> <@mhofman:matrix.org> of course you can still have bugs in the interpreter that would break the memory safety of the language you're interpreting. but you can't escape out to affect the memory of the rest of the process.
+
+why not?
+
+[20:04:32.0244] <shu>
+it depends on how the underlying memory safe language's memory safety is implemented, right?
+
+[20:06:45.0063] <Mathieu Hofman>
+Right that assumes the interpreter is implemented in a memory safe language 
+
+[20:07:56.0875] <Mathieu Hofman>
+But I don't see how the fact the interpreted language is GCed is relevant here. 
+
+[20:10:34.0713] <Mathieu Hofman>
+And if it's the language of the interpreter that is GCed, of course it assumes that language is memory safe, including its GC
+
+[20:17:35.0091] <Michael Ficarra>
+I would really love to have the GraalJS people actually come talk to us sometimes
+
+[20:29:25.0685] <bakkot>
+they've been to at least one meeting!
+
+[22:16:42.0257] <snek>
+I feel like I don't quite understand the proposed separation as it relates specifically to browsers. when I added nullish things to V8, the changes were purely in the parser and bytecode generator. I had a separate change later to the lower down parts to add a new "is null or undefined" op. isn't this already basically jssugar/js0?
+
+[22:18:51.0596] <snek>
+* I feel like I don't quite understand the proposed separation as it relates specifically to browsers. when I added nullish things to V8, the changes were purely in the parser and bytecode generator. I had a separate change later to the lower down parts to add a new "is null or undefined" op. isn't this already basically jssugar/js0? why does it need to be externalized to tooling rather than a separation within browser's internals?
+
+[22:19:11.0139] <snek>
+* I feel like I don't quite understand the proposed separation as it relates specifically to browsers. when I added nullish things to V8, the changes were purely in the parser and bytecode generator. I had a separate change later to the lower down parts to add a new "is null or undefined" op. isn't this already basically jssugar/js0? why does it need to be externalized to tooling rather than a separation within browser internals?
+
+[00:44:26.0754] <Marja Hölttä (not here, use marja@google.com)>
+Michael Ficarra: i skimmed it and what i gathered was that their JIT is an automagic transformation of the interpreter plus some speculative optimizations. i guess how practically applicable that is depends on [among other things] whether we can express all the needed speculative optimizations (object shapes and such) via their API or not.
+
+[09:41:47.0965] <Mathieu Hofman>
+bakkot: looks like the Matrix log archives are not updating
+
+[09:43:21.0280] <bakkot>
+Mathieu Hofman: ugh, thanks, looks like they changed the API or I'm running into an edge case I hadn't before
+
+[09:43:36.0867] <bakkot>
+will fix it sometime in the next couple of days and it'll catch up
+
+[09:44:14.0787] <bakkot>
+I have alerting for this sort of thing but it's on a 24hr lag
+
+[10:24:14.0179] <ljharb>
+lol the notes say "U4 of" instead of "you for-of"
+
+[10:54:14.0701] <rkirsling>
+could go a step further and make it "U4've"
+
+
+2024-10-24
+[17:18:42.0783] <Anthony Bullard>
+shu: the JS0/JSSugar presentation is already making some waves for sure.  This video and its comments might be useful to ingest for feedback:
+
+https://youtu.be/onCHSujPlfg?si=76ar9kWMy-GmI-JJ
+
+[17:19:46.0858] <Anthony Bullard>
+There seems to be some confusion from the slides on what JS0 is, with some suggesting it’s a new bytecode format for engines. 😂
+
+[18:57:48.0903] <shu>
+sigh
+
+[18:57:51.0802] <shu>
+it's in the slides...
+
+[18:58:46.0034] <shu>
+> <@devsnek:matrix.org> I feel like I don't quite understand the proposed separation as it relates specifically to browsers. when I added nullish things to V8, the changes were purely in the parser and bytecode generator. I had a separate change later to the lower down parts to add a new "is null or undefined" op. isn't this already basically jssugar/js0? why does it need to be externalized to tooling rather than a separation within browser internals?
+
+those components can have bugs, and those bugs can lead to RCE or data corruption or whatever
+
+[18:58:51.0022] <Anthony Bullard>
+I know. I was actually surprised at how people have reacted to it
+
+[18:59:23.0799] <shu>
+it's hard to have any actual discussion if people are riding the outrage wave
+
+[19:00:47.0435] <shu>
+Anthony Bullard: if you've watched that video, can you summarize if there're any useful signals? i'd rather save myself the stress
+
+[19:01:05.0397] <Anthony Bullard>
+To be clear, the creator here was going off an unsympathetic article discussing it and the slides with no talk track.  And he is generally ambivalent towards JS particularly the tooling - which this proposal would lean into
+
+[19:02:57.0387] <Anthony Bullard>
+My main takeaway:  people are worried about two main things - a further increase in the role of tooling in the JS ecosystem (an already complex landscape), and the impact that pushing desugaring into the packaging layer will have on bundle sizes.
+
+[19:04:20.0134] <Anthony Bullard>
+Also debugging is always a talking point with this (compilation/transpilation) as many source map tools in practice are found wanting.
+
+[19:06:16.0889] <Anthony Bullard>
+Lastly, there is for many a philosophical objection to a official separation of the language into a superset for users willing/able to leverage these tools and those people who just want to write JS and run it.  Relatedly, some disgruntlement on how all this is necessary for a nominally interpreted language.
+
+[19:06:28.0255] <shu>
+thanks for your thoughts
+
+[19:07:13.0152] <Anthony Bullard>
+I sympathize with some of these, but understand the broader context that you are approaching this from.
+
+[19:08:22.0222] <shu>
+there is a definitely disconnect with JS-that-i-grew-up-with and JS-in-the-world-today, and i also feel bad that JS-that-i-grew-up-with and how many people learned to is no longer the use case being solved for
+
+[19:08:36.0543] <Anthony Bullard>
+I’ve been trying to convince some delegates to be proactive and discuss these proposals (at the appropriate time) with hese massively influential creators and have a discussion early
+
+[19:08:48.0650] <shu>
+oh i don't know if that's a good idea
+
+[19:08:55.0325] <shu>
+you think we should actively engage influencers?
+
+[19:09:40.0193] <Anthony Bullard>
+Absolutely. If we don’t explain and contextualize early, they and there audience can take the narrative in any direction
+
+[19:10:06.0358] <Anthony Bullard>
+And poison the well so to speak 
+
+[19:10:20.0516] <shu>
+but we aren't a direct democracy
+
+[19:10:35.0875] <Anthony Bullard>
+They don’t have decision making power
+
+[19:11:03.0002] <Anthony Bullard>
+We should just say “this is what we are actually talking about doing and why”
+
+[19:11:19.0305] <shu>
+good luck getting people to also volunteer time for PR, i guess
+
+[19:11:31.0345] <Anthony Bullard>
+But I can understand why that may not be desirable for some delegates and in some cases
+
+[19:11:51.0498] <Anthony Bullard>
+For sure, you are way too busy for that
+
+[19:12:38.0868] <Anthony Bullard>
+Maybe having a comms role within the committee , or at least an official protocol around it, is a good idea?
+
+[21:12:45.0774] <kriskowal>
+Axel Rauschmeyer has been running TC39’s entire PR division solo pro bono for a while. A useful email address to have. 
+
+[22:46:53.0740] <snek>
+> <@shuyuguo:matrix.org> those components can have bugs, and those bugs can lead to RCE or data corruption or whatever
+
+i mean the parsing and bytecode generation step is theoretically pure, no? like if you could generate an RCE with a change to it, you could also generate an RCE with a specially crafted input without that change.
+
+[06:07:30.0305] <littledan>
+> <@shuyuguo:matrix.org> good luck getting people to also volunteer time for PR, i guess
+
+TC39 and web standards are all about broad consensus-building. We don't really have a private back room where deals can be made that don't align with the rest of the JavaScript community, because we are all part of it and listening to each other. If one person doesn't have time for some parts of this consensus-building, then they can work with other allies/co-champions to help explain things broadly. I haven't watched any of the videos but I agree with a lot of the points of criticism that have been raised, including Anthony's summary above.
+
+[06:09:45.0746] <littledan>
+I think we need to examine some more concrete proposals and how they are affected by the concerns raised in the JSSugar presentation. I don't think we actually have a lot of non-trivial sugar proposals coming up [if the trivial ones like void aren't considered have a lot of cost]--mostly it's just pattern matching and extractors. So let's go deeper into examining that one and see how these concerns are related.
+
+[06:10:39.0524] <littledan>
+The biggest problem I heard with extractors was that array destructuring is slow. What if we can change the semantics of array destructuring to always do the original iteration semantics if it's given an actual Array? That would make it much easier to optimize.
+
+[06:10:47.0788] <littledan>
+(tbd if that is web-compatible)
+
+[06:12:42.0005] <littledan>
+we also need to strengthen critical analysis of proposals in general, if people feel like we're letting things through which aren't worth it. Such proposals probably shouldn't be included in sugar either. I hope TG5 can help, though past efforts have held themselves to a very high level of scientific rigor, preventing them from drawing conclusions.
+
+[06:16:59.0883] <rbuckton>
+> <@littledan:matrix.org> The biggest problem I heard with extractors was that array destructuring is slow. What if we can change the semantics of array destructuring to always do the original iteration semantics if it's given an actual Array? That would make it much easier to optimize.
+
+What does "original iteration semantics" mean here? 
+
+[06:19:14.0913] <littledan>
+> <@rbuckton:matrix.org> What does "original iteration semantics" mean here?
+
+I mean, the behavior of the original Array.prototype[Symbol.iterator] and %ArrayIterator%.prototype.next
+
+[06:19:23.0523] <littledan>
+i.e. the ES5 downleveling semantics
+
+[06:19:43.0100] <littledan>
+so it'd check IsArray and branch to that, otherwise eagerly convert it to an array and do the same
+
+[06:20:07.0592] <littledan>
+ * so it'd check IsArray and branch to that, otherwise eagerly convert it to an array (via the actual iteration protocol) and do the same
+
+[06:20:24.0955] <littledan>
+(we'd only do this for destructuring, and leave for-of loops intact)
+
+[06:21:25.0840] <littledan>
+so the hard part will be checking web compatibility. (I hope we can avoid getting stuck like the recent Mozilla species investigation, finding a non-answer and not feeling like it's worth it to allocate resources to keep going.)
+
+[06:26:20.0653] <littledan>
+any thoughts on that idea?
+
+[06:58:52.0347] <bakkot>
+not sure why we'd special-case destructuring and not all other uses of the iteration protocol
+
+[06:59:12.0686] <bakkot>
+but I would be happy to make array iteration special, in whatever way
+
+[07:00:03.0664] <littledan>
+well, this is a simpler use case of it, with no early return, and especially easy to implement an eager conversion function for the slow path without changing semantics. But yeah I'd be happy to generalize it to all iteration if we find that that's web-compatible
+
+[07:00:20.0087] <littledan>
+arguably we already special-cased it for the default subclass constructor, so...
+
+[07:15:37.0914] <littledan>
+> <@bakkot:matrix.org> not sure why we'd special-case destructuring and not all other uses of the iteration protocol
+
+how do you feel about special-casing random cases of iteration when it's especially easy/useful/proven to be web-compatible? does it seem too unprincipled?
+
+[07:16:55.0977] <bakkot>
+eh... it's not that I'm opposed on principle, but in practice, I would be kinda surprised if those random cases are web-compat and other cases aren't, and if we're going to run the risk of trying it seems a shame not to get all the wins we can
+
+[07:17:24.0450] <littledan>
+fair, yeah let's see if we can do it
+
+[07:48:13.0758] <Mathieu Hofman>
+> <@littledan:matrix.org> I mean, the behavior of the original Array.prototype[Symbol.iterator] and %ArrayIterator%.prototype.next
+
+I don't understand why this can't be a transparent optimization when the [Symbol.Iterator] function === %Array.prototype.values% ?
+
+[07:51:00.0101] <Mathieu Hofman>
+In general, if we know that the iterator making function is an intrinsic, we know what behavior the iterator will have and it doesn't need to actually be created if the spec itself is doing the iterating, no?
+
+[07:52:06.0803] <Mathieu Hofman>
+I mean sure we can spell it out in the spec, but that wouldn't be observable, and usually we don't spell out things that are unobservable optimizations
+
+[08:34:35.0348] <bakkot>
+the proposal would be to change the spec so that implementations don't have to do the quite complicated bookkeeping to ensure that all the array iterator machinery is intac
+
+[08:34:36.0528] <bakkot>
+ * the proposal would be to change the spec so that implementations don't have to do the quite complicated bookkeeping to ensure that all the array iterator machinery is intact
+
+[08:34:43.0281] <bakkot>
+ * the proposal would be to change the spec so that implementations don't have to do the quite complicated bookkeeping to ensure that all the array iterator machinery is intact before they can do that optimization
+
+[08:35:25.0312] <bakkot>
+"it is ok for this to be uselessly complicated because a sufficiently smart engine could make it fast anyway" is not that compelling of an argument
+
+[08:36:34.0029] <bakkot>
+if you're just writing an interpreter that sort of optimization is fairly easy but once you're trying to do codegen it gets pretty complicated
+
+[08:38:51.0668] <littledan>
+also this optimization has the cool property that you can also implement it in a desugaring (with a small support library). And you have to desugar destructuring if you want to, e.g., implement extractors in a transpiler.
+
+[08:39:42.0983] <littledan>
+and you have to check for two things: whether Array.prototype[Symbol.iterator] is the original value, and whether %ArrayIteratorPrototype%.next is the original value
+
+[08:39:59.0338] <littledan>
+it's not free to maintain a bit in advance for this check
+
+[09:28:10.0061] <shu>
+> <@littledan:matrix.org> TC39 and web standards are all about broad consensus-building. We don't really have a private back room where deals can be made that don't align with the rest of the JavaScript community, because we are all part of it and listening to each other. If one person doesn't have time for some parts of this consensus-building, then they can work with other allies/co-champions to help explain things broadly. I haven't watched any of the videos but I agree with a lot of the points of criticism that have been raised, including Anthony's summary above.
+
+i strongly disagree that broad consensus building at the level of committee delegates itself (on the order of 40 people) is somehow the same kind of work as broadcasting with influencers to on social media. is that really what you're saying?
+
+[09:28:47.0117] <shu>
+> <@littledan:matrix.org> TC39 and web standards are all about broad consensus-building. We don't really have a private back room where deals can be made that don't align with the rest of the JavaScript community, because we are all part of it and listening to each other. If one person doesn't have time for some parts of this consensus-building, then they can work with other allies/co-champions to help explain things broadly. I haven't watched any of the videos but I agree with a lot of the points of criticism that have been raised, including Anthony's summary above.
+
+ * i strongly disagree that broad consensus building at the level of committee delegates itself (on the order of 40 people) is somehow the same kind of work as broadcasting with influencers on social media. is that really what you're saying?
+
+[09:31:49.0203] <shu>
+and we definitionally have a back room. people on twitter and youtube comments can't come and break consensus in tc39!
+
+[09:50:48.0718] <littledan>
+they can't break consensus, but it's all the same broader conversation, and points of view from outside of committee can influence committee members. We purposely operate in the open.
+
+[09:52:04.0502] <littledan>
+"broad consensus-building" doesn't mean everyone in that broad group vetoes things. As Michael Saboff has pointed out, consensus doesn't always mean this veto-driven thing that we do.
+
+[09:59:29.0272] <shu>
+i'm still unclear what you're getting at
+
+[09:59:58.0411] <shu>
+we're not running public campaigns for proposals
+
+[10:01:06.0975] <shu>
+i'm assuming you don't assume private fields were a giant mistake given the negative public reaction
+
+[10:01:11.0558] <shu>
+ * i'm assuming you don't think private fields were a giant mistake given the negative public reaction
+
+[10:02:56.0698] <littledan>
+yeah that's a good example of where we definitely did have a public conversation with mixed views from outside and we drew a conclusion in committee. I'm not talking about external groups having a veto, but I did make a specific effort to explain outwardly what it was about, and work with non-committee-members and people doing public-facing communication/education.
+
+[10:03:46.0126] <littledan>
+I don't think all proposal champions need to do this, but it's good to have people in the coalition working on a proposal who want to interact with people outside of committee.
+
+[10:04:18.0074] <littledan>
+it's a normal activity for TC39. But there are lots of normal activities that only a subset of us do, because there's just so much to do.
+
+[10:05:46.0348] <littledan>
+private fields took longer because we made an honest attempt to understand and engage with this external feedback. It was frustrating for me at the time, but I think we should continue to do that (though maybe somehow timeboxed where it makes sense)
+
+[10:08:53.0865] <shu>
+i think we drew pretty different conclusions from that episode
+
+[10:09:05.0832] <shu>
+and i disagree that it should be a normal activity for tc39
+
+[10:09:23.0012] <shu>
+there's the abstract problem of "developer signal" which _should_ be a normal activity for tc39
+
+[10:09:28.0420] <shu>
+but this particular form of it, most definitely not
+
+[10:11:37.0173] <littledan>
+Yeah I think we can leave this as, we agree that we want to get developer signals. I didn’t mean to make a bigger point than that.
+
+[11:59:45.0453] <Mathieu Hofman>
+> <@littledan:matrix.org> and you have to check for two things: whether Array.prototype[Symbol.iterator] is the original value, and whether %ArrayIteratorPrototype%.next is the original value
+
+If people mess with `%ArrayIteratorPrototype%.next` I'd say they immediately lose rights to any optimization
+
+[12:07:10.0096] <littledan>
+> <@mhofman:matrix.org> If people mess with `%ArrayIteratorPrototype%.next` I'd say they immediately lose rights to any optimization
+
+but... do they retain rights to have that messing-with be respected by iteration? I'd say no
+
+[12:07:24.0555] <littledan>
+the extra work that engines would have to do would be to retain those rights. and that's not trivial.
+
+[12:11:38.0414] <rbuckton>
+I wonder if we could freeze array iterator instances and make `%AIP%. next` non-writable, non-configurable
+
+[12:17:02.0298] <Mathieu Hofman>
+> <@littledan:matrix.org> but... do they retain rights to have that messing-with be respected by iteration? I'd say no
+
+I mean we'd be changing the semantics. If someone overwrites `%ArrayIteratorPrototype%.next` to observe every array iteration, I think it's their expectation it'd work given how we currently specified it. Would that break someone is another question. So yeah I suppose that is where you need a normative / observable change if that's something you want to stop supporting.
+
+[12:18:31.0941] <Mathieu Hofman>
+Of course frozen intrinsics would solve all this mess ;) Once the environment is locked down, your optimizer would know what it can permanently rely on or not.
+
+[12:20:41.0725] <littledan>
+> <@mhofman:matrix.org> I mean we'd be changing the semantics. If someone overwrites `%ArrayIteratorPrototype%.next` to observe every array iteration, I think it's their expectation it'd work given how we currently specified it. Would that break someone is another question. So yeah I suppose that is where you need a normative / observable change if that's something you want to stop supporting.
+
+yeah, this is an observable change, the question is whether this would break any actual reasonable and widely-deployed program. We don't give people the ability to observe object destructuring, and we shouldn't add that; this is more of an accidental capability IMO.
+
+[12:21:27.0363] <littledan>
+> <@mhofman:matrix.org> Of course frozen intrinsics would solve all this mess ;) Once the environment is locked down, your optimizer would know what it can permanently rely on or not.
+
+we are not operating in a frozen intrinsics world; even if we're there sometimes, we need extractors to be reasonably efficient outside of that.
+
+[12:23:22.0312] <Mathieu Hofman>
+But it'd be such a nice carrot for the environment to move to frozen intrinsics if there was a perf benefit to gain from it.
+
+[12:24:02.0282] <littledan>
+that doesn't seem like a great reason by itself to not do this sort of integrity enhancement for array iteration (or just destructuring) if it's otherwise web-compatible.
+
+[13:42:37.0614] <Mathieu Hofman>
+Oh sure one doesn't prevent the other. But in general, I would be hopeful that frozen object and frozen intrinsics should allow engines to do some optimizations instead of making things slower (as it seems to be the case currently). We hear stories of people liking hardened environments but being unhappy with the performance impact, which is a blocker for adoption in production.
+
+[13:43:06.0554] <Mathieu Hofman>
+ * Oh sure one doesn't prevent the other. But in general, I would be hopeful that frozen objects and frozen intrinsics should allow engines to do some optimizations instead of making things slower (as it seems to be the case currently). We hear stories of people liking hardened environments for the integrity guarantees, but being unhappy with the performance impact, which is a blocker for adoption in production.
+
+[13:43:25.0788] <Mathieu Hofman>
+ * Oh sure one doesn't prevent the other. But in general, I would be hopeful that frozen objects and frozen intrinsics should allow engines to do some optimizations instead of making things slower (as it seems to be the case currently). We hear stories of people liking hardened environments for the integrity guarantees, but being unhappy with the performance impact, which is a blocker for adoption in production in some cases.
+
+[15:56:10.0336] <Justin Ridgewell>
+> <@littledan:matrix.org> well, this is a simpler use case of it, with no early return, and especially easy to implement an eager conversion function for the slow path without changing semantics. But yeah I'd be happy to generalize it to all iteration if we find that that's web-compatible
+
+I mentioned this in Tokyo, I want to spec the fast path like we did with `await`. Just turn it into `arr[i]` access internally
+
+[16:02:08.0945] <littledan>
+> <@jridgewell:matrix.org> I mentioned this in Tokyo, I want to spec the fast path like we did with `await`. Just turn it into `arr[i]` access internally
+
+Yeah that’s what I’m saying
+
+
+2024-10-25
+[00:12:48.0850] <Rob Palmer>
+> <@mhofman:matrix.org> Oh sure one doesn't prevent the other. But in general, I would be hopeful that frozen objects and frozen intrinsics should allow engines to do some optimizations instead of making things slower (as it seems to be the case currently). We hear stories of people liking hardened environments for the integrity guarantees, but being unhappy with the performance impact, which is a blocker for adoption in production in some cases.
+
+Do you know of any concrete cases where frozen objects are slower than u frozen objects in V8? We investigated this 3 years ago and found nothing useful. Links to bugs or repros would be useful. 
+
+
+2024-10-26
+[19:36:11.0554] <Richard Gibson>
+> <@robpalme:matrix.org> Do you know of any concrete cases where frozen objects are slower than u frozen objects in V8? We investigated this 3 years ago and found nothing useful. Links to bugs or repros would be useful.
+
+here's a rather stark example:
+```
+const unfrozen = Array.from({ length: 10000 }, (_, i) => i);
+const frozen = Object.freeze([...unfrozen]);
+fn = arr => arr.slice().concat("FIN");
+let result;
+
+result = fn(unfrozen); // 10.787 ops/ms
+result = fn(frozen); // 1.427 ops/ms
+```
+
+[05:50:09.0421] <Mathieu Hofman>
+Looks like JS Conf announced dates for next year. Not sure how it fits in our plenary calendar.
+https://openjsf.org/blog/why-attend-jsconf-na-2025
+
+
+2024-10-27
+[00:33:34.0141] <rkirsling>
+oooh I love that having a fall meeting in Tokyo is becoming tradition
+
+[05:51:32.0567] <ljharb>
+> <@mhofman:matrix.org> Looks like JS Conf announced dates for next year. Not sure how it fits in our plenary calendar.
+> https://openjsf.org/blog/why-attend-jsconf-na-2025
+
+no conflict there - but jsconf LatAm was also just announced yesterday for sometime in November. I’ve already let them know about tc39’s dates to hopefully avoid a conflict.
+
+[05:52:13.0293] <Mathieu Hofman>
+Do we have dates setup for next year already?
+
+[05:53:25.0154] <Mathieu Hofman>
+Oh my bad we do https://github.com/tc39/agendas#future-meeting-locations-and-hosts
+
+[06:06:44.0021] <Mathieu Hofman>
+Ah 12h ago it wasn't. I'm not crazy.
+https://github.com/tc39/agendas/commit/01b38105fed488bc8923d1ee92d03e823a208cc9
+
