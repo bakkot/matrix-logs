@@ -73,3 +73,19 @@ or are you thinking of something else entirely?
 
 or are you thinking of something else entirely?
 
+[10:49:55.0649] <Steve Hicks>
+That said, we're currently thinking about the impact of whether `yield` preserves context (i.e. the initialization context from the initial generator call), or whether it brings in the context from the surrounding `next()` caller (i.e. the dispatch context).  If it uses initialization context then context is sensibly block-scoped, and `using` makes a lot more sense.  If context might change across a `yield` then it's a lot less clear that `using` is at all viable, since the state to clean up at the end of the block scope may have changed out from under it.  So if `yield` exposes the dispatch context, then we're back to reconsidering what an `enterWith` or `set` semantics might look like.  In particular is the question of whether `set` in an inner/outer function body should change the value out from under an outer/inner function.  I.e.
+```javascript
+async function f() {
+  g();  // n.b. not awaited
+  x.set(2);
+  await 1;
+  console.log(y.get()); // 3 ?
+}
+async function g() {
+  await 1;
+  console.log(x.get()); // 2 ?
+  y.set(3);
+}
+```
+
