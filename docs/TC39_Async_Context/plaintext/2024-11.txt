@@ -228,3 +228,37 @@ Not sure what you mean about context leaking out of suspends - IIUC this is alre
 [13:05:04.0720] <snek>
 yes i mean if this functionality exists
 
+[13:05:34.0962] <ljharb>
+as a separate topic, i don't really grok the details of the proposal personally, but it seems like a number of node core collaborators are unhappy with the design of the proposal (in ways i also don't understand). i don't think it would be appropriate to advance an implementation that isn't also useful in node, so before seeking advancement, can yall please ensure their concerns are explained and hopefully addressed?
+
+[13:06:39.0045] <nicolo-ribaudo>
+As far as I understand, the "problem with Node.js" is that they have to APIs for setting the context, and this proposal is only defining one leaving the second one as a follow-up proposal
+
+[13:06:45.0270] <Steve Hicks>
+> <@nicolo-ribaudo:matrix.org> I did have concerns with `using` because the proposal makes it trivial to just forget `using`. However, `using` with some check that you actually get Symbol.dispose would be much better than enterWith, since it makes it hard to *accidentally* forget to close the context
+
+At the time we were talking about forcing the use of `using` so that it was syntactically guaranteed to be correct - but Ron Buckton had an issue with composability.  snek's example of `tracer.createSpan()` exactly demonstrates the composability problem, since `createSpan` would need to call `[Symbol.enter]` and `[Symbol.dispose]` directly rather than syntactically.
+
+[13:06:53.0714] <nicolo-ribaudo>
+* As far as I understand, the "problem with Node.js" is that they have two APIs for setting the context, and this proposal is only defining one leaving the second one as a follow-up proposal
+
+[13:07:52.0249] <nicolo-ribaudo>
+> <@stephenhicks:matrix.org> but it still leaves the question of what happens if you write
+> ```
+> const d1 = v.enter(1);
+> d1[Symbol.enter]();
+> const d2 = v.enter(2);
+> d2[Symbol.enter]();
+> d1[Symbol.dispose]();
+> d2[Symbol.dispose]();
+> ```
+> ?
+
+In this example, I'm hoping we can make it throw at the second call somehow 
+
+[13:08:05.0072] <nicolo-ribaudo>
+* In this example, I'm hoping we can make it throw at the second dispose call somehow
+
+[13:08:33.0762] <nicolo-ribaudo>
+I haven't thought about it enough to say how
+
