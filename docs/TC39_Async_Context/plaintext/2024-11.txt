@@ -534,3 +534,87 @@ and it couldn't use `using` syntax for that.
 [09:07:46.0146] <Steve Hicks>
  * Case in point: `Span.prototype[Symbol.enter]` would need to call `AsyncContext.Mutation.prototype[Symbol.enter]` transitively.
 
+[09:27:56.0589] <nicolo-ribaudo>
+For `using` with `Symbol.enter`/`Symbol.dispose`, I don't think we need to enforce it syntactically. Does this provide enough guarantees, or are there still ways to mess up the context and not get an explicit error about it?
+
+```js
+function enterWith(variable, value) {
+  let oldContext;
+
+  return {
+    [Symbol.enter]() {
+      if (oldContext) throw new Error("Cannot enter twice");
+      oldContext = AsyncContextSnapshot();
+
+      AsyncContextSwap({ ...oldContext, [variable]: value });
+    },
+    [Symbol.dispose]() {
+      if (!oldContext) throw new Error("Cannot dispose before entering");
+
+      const current = AsyncContextSnapshot();
+      if (current !== oldContext) {
+        throw new Error("Cannot dispose, as it's not the current context");
+      }
+
+      AsyncContextSwap(oldContext);
+    }
+  }
+}
+
+AsyncContext.Variable.prototype.run = function (value, callback) {
+  const oldContext = AsyncContextSnapshot();
+
+  AsyncContextSwap({ ...oldContext, [this]: value });
+  try {
+    return callback();
+  } finally {
+    const current = AsyncContextSnapshot();
+    AsyncContextSwap(oldContext);
+
+    if (current !== oldContext) {
+      throw new Error(".run ended before that its context was restored");
+    }
+  }
+}
+
+{
+  // context: root
+
+  x1[Symbol.enter]();
+  // context: x1
+
+  x2[Symbol.enter]();
+  // context: x2
+
+  x1[Symbol.dispose](); // error: "Cannot dispose, as it's not the current context"
+}
+
+
+{
+  // context: root
+
+  x1[Symbol.enter]();
+  // context: x1
+
+  myVar.run("foo", () => {
+    // context: foo
+
+    x1[Symbol.dispose](); // error: "Cannot dispose, as it's not the current context"
+  })
+}
+
+{
+  // context: root
+
+  x1[Symbol.enter]();
+  // context: x1
+
+  myVar.run("foo", () => {
+    // context: foo
+
+    x1[Symbol.enter]();
+    // context: x1
+  }); // closes the foo context, then error: ".run ended before that its context was restored"
+}
+```
+

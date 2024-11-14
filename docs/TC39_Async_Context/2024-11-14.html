@@ -45,6 +45,87 @@
   <tr class="msg" id="L7"><td class="ts-cell"><a class="ts" href="#L7" alt="Thu Nov 14 2024 09:06:08 GMT-0800 (Pacific Standard Time)">17:06</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@stephenhicks:matrix.org">Steve Hicks</span>&gt;</div></td><td class="msg-cell">This is the <code>disposable[Symbol.enter]()</code> idea, but AIUI, it's a non-starter if it only works syntactically - i.e. you still need to be able to call it reflectively for composability.</td></tr>
   <tr class="msg" id="L8"><td class="ts-cell"><a class="ts" href="#L8" alt="Thu Nov 14 2024 09:07:12 GMT-0800 (Pacific Standard Time)">17:07</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@stephenhicks:matrix.org">Steve Hicks</span>&gt;</div></td><td class="msg-cell">Case in point: <code>Span.prototype[Symbol.enter]</code> would need to call <code>AsyncContext.Mutation.prototype[Symbol.enter]</code> transitively.</td></tr>
   <tr class="msg" id="L9"><td class="ts-cell"><a class="ts" href="#L9" alt="Thu Nov 14 2024 09:07:20 GMT-0800 (Pacific Standard Time)">17:07</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@stephenhicks:matrix.org">Steve Hicks</span>&gt;</div></td><td class="msg-cell">and it couldn't use <code>using</code> syntax for that.</td></tr>
+  <tr class="msg" id="L10"><td class="ts-cell"><a class="ts" href="#L10" alt="Thu Nov 14 2024 09:27:56 GMT-0800 (Pacific Standard Time)">17:27</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-9" title="@nicolo-ribaudo:matrix.org">nicolo-ribaudo</span>&gt;</div></td><td class="msg-cell"><p>For <code>using</code> with <code>Symbol.enter</code>/<code>Symbol.dispose</code>, I don't think we need to enforce it syntactically. Does this provide enough guarantees, or are there still ways to mess up the context and not get an explicit error about it?</p>
+<pre><code class="language-js">function enterWith(variable, value) {
+  let oldContext;
+
+  return {
+    [Symbol.enter]() {
+      if (oldContext) throw new Error("Cannot enter twice");
+      oldContext = AsyncContextSnapshot();
+
+      AsyncContextSwap({ ...oldContext, [variable]: value });
+    },
+    [Symbol.dispose]() {
+      if (!oldContext) throw new Error("Cannot dispose before entering");
+
+      const current = AsyncContextSnapshot();
+      if (current !== oldContext) {
+        throw new Error("Cannot dispose, as it's not the current context");
+      }
+
+      AsyncContextSwap(oldContext);
+    }
+  }
+}
+
+AsyncContext.Variable.prototype.run = function (value, callback) {
+  const oldContext = AsyncContextSnapshot();
+
+  AsyncContextSwap({ ...oldContext, [this]: value });
+  try {
+    return callback();
+  } finally {
+    const current = AsyncContextSnapshot();
+    AsyncContextSwap(oldContext);
+
+    if (current !== oldContext) {
+      throw new Error(".run ended before that its context was restored");
+    }
+  }
+}
+
+{
+  // context: root
+
+  x1[Symbol.enter]();
+  // context: x1
+
+  x2[Symbol.enter]();
+  // context: x2
+
+  x1[Symbol.dispose](); // error: "Cannot dispose, as it's not the current context"
+}
+
+
+{
+  // context: root
+
+  x1[Symbol.enter]();
+  // context: x1
+
+  myVar.run("foo", () =&gt; {
+    // context: foo
+
+    x1[Symbol.dispose](); // error: "Cannot dispose, as it's not the current context"
+  })
+}
+
+{
+  // context: root
+
+  x1[Symbol.enter]();
+  // context: x1
+
+  myVar.run("foo", () =&gt; {
+    // context: foo
+
+    x1[Symbol.enter]();
+    // context: x1
+  }); // closes the foo context, then error: ".run ended before that its context was restored"
+}
+</code></pre>
+</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>
