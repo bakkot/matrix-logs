@@ -72,15 +72,16 @@
 
 AsyncContext.Variable.prototype.run = function (value, callback) {
   const oldContext = AsyncContextSnapshot();
+  const updatedContext = { ...oldContext, [this]: value };
 
-  AsyncContextSwap({ ...oldContext, [this]: value });
+  AsyncContextSwap(updatedContext);
   try {
     return callback();
   } finally {
     const current = AsyncContextSnapshot();
     AsyncContextSwap(oldContext);
 
-    if (current !== oldContext) {
+    if (current !== updatedContext) {
       throw new Error(".run ended before that its context was restored");
     }
   }
@@ -132,7 +133,26 @@ AsyncContext.Variable.prototype.run = function (value, callback) {
 </td></tr>
   <tr class="msg" id="L12"><td class="ts-cell"><a class="ts" href="#L12" alt="Thu Nov 14 2024 09:33:39 GMT-0800 (Pacific Standard Time)">17:33</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-9" title="@nicolo-ribaudo:matrix.org">nicolo-ribaudo</span>&gt;</div></td><td class="msg-cell">And the error could point to the stack trace of where you did <code>enter</code> without then disposing it</td></tr>
   <tr class="msg" id="L13"><td class="ts-cell"><a class="ts" href="#L13" alt="Thu Nov 14 2024 09:34:17 GMT-0800 (Pacific Standard Time)">17:34</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@stephenhicks:matrix.org">Steve Hicks</span>&gt;</div></td><td class="msg-cell">I think you need to store two locals - one for <code>oldContext</code> and one for <code>updatedContext</code> and then line 15 wants to compare <code>current !== updatedContext</code></td></tr>
-  <tr class="msg" id="L14"><td class="ts-cell"><a class="ts" href="#L14" alt="Thu Nov 14 2024 09:34:40 GMT-0800 (Pacific Standard Time)">17:34</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-9" title="@nicolo-ribaudo:matrix.org">nicolo-ribaudo</span>&gt;</div></td><td class="msg-cell">True, right</td></tr>
+  <tr class="msg" id="L14"><td class="ts-cell"><a class="ts" href="#L14" alt="Thu Nov 14 2024 09:34:40 GMT-0800 (Pacific Standard Time)">17:34</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-9" title="@nicolo-ribaudo:matrix.org">nicolo-ribaudo</span>&gt;</div></td><td class="msg-cell">True, right (updated)</td></tr>
+  <tr class="msg" id="L15"><td class="ts-cell"><a class="ts" href="#L15" alt="Thu Nov 14 2024 09:37:57 GMT-0800 (Pacific Standard Time)">17:37</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@stephenhicks:matrix.org">Steve Hicks</span>&gt;</div></td><td class="msg-cell"><p>And then the idea is that</p>
+<pre><code class="language-javascript">async function f() {
+  using _ = enterWith(v, 2);
+  await 1;
+}
+{
+  using _ = enterWith(v, 1);
+  f();
+}
+</code></pre>
+<p>would work because the suspension would restore the entry context?  But if <code>f</code> were an ordinary function that leaked then the dispose after <code>f()</code> would fail.</p>
+</td></tr>
+  <tr class="msg" id="L16"><td class="ts-cell"><a class="ts" href="#L16" alt="Thu Nov 14 2024 09:38:43 GMT-0800 (Pacific Standard Time)">17:38</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-9" title="@nicolo-ribaudo:matrix.org">nicolo-ribaudo</span>&gt;</div></td><td class="msg-cell">Yes and yes</td></tr>
+  <tr class="msg" id="L17"><td class="ts-cell"><a class="ts" href="#L17" alt="Thu Nov 14 2024 09:38:50 GMT-0800 (Pacific Standard Time)">17:38</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@stephenhicks:matrix.org">Steve Hicks</span>&gt;</div></td><td class="msg-cell">And any non-syntactic access to the protocol <em>should</em> still at least be sound</td></tr>
+  <tr class="msg" id="L18"><td class="ts-cell"><a class="ts" href="#L18" alt="Thu Nov 14 2024 09:39:14 GMT-0800 (Pacific Standard Time)">17:39</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-9" title="@nicolo-ribaudo:matrix.org">nicolo-ribaudo</span>&gt;</div></td><td class="msg-cell">And the whole program should also have a check at the end that checks you didn't forget to close anything</td></tr>
+  <tr class="msg" id="L19"><td class="ts-cell"><a class="ts" href="#L19" alt="Thu Nov 14 2024 09:39:16 GMT-0800 (Pacific Standard Time)">17:39</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@stephenhicks:matrix.org">Steve Hicks</span>&gt;</div></td><td class="msg-cell">I don't think you strictly need <code>Symbol.enter</code> for these checks.</td></tr>
+  <tr class="msg" id="L20"><td class="ts-cell"><a class="ts" href="#L20" alt="Thu Nov 14 2024 09:39:29 GMT-0800 (Pacific Standard Time)">17:39</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-9" title="@nicolo-ribaudo:matrix.org">nicolo-ribaudo</span>&gt;</div></td><td class="msg-cell">So that even a program that just does <code>x1[Symbol.enter]()</code> throws when it ends</td></tr>
+  <tr class="msg" id="L21"><td class="ts-cell"><a class="ts" href="#L21" alt="Thu Nov 14 2024 09:39:49 GMT-0800 (Pacific Standard Time)">17:39</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@stephenhicks:matrix.org">Steve Hicks</span>&gt;</div></td><td class="msg-cell">though it would certainly be nicer to have</td></tr>
+  <tr class="msg" id="L22"><td class="ts-cell"><a class="ts" href="#L22" alt="Thu Nov 14 2024 09:39:52 GMT-0800 (Pacific Standard Time)">17:39</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-9" title="@nicolo-ribaudo:matrix.org">nicolo-ribaudo</span>&gt;</div></td><td class="msg-cell"><mx-reply><blockquote> I don't think you strictly need <code>Symbol.enter</code> for these checks.</blockquote></mx-reply>Yeah, you can also just have two functions that you call to activate and deactivate the context</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>

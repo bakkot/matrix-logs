@@ -795,3 +795,126 @@ AsyncContext.Variable.prototype.run = function (value, callback) {
 }
 ```
 
+[09:37:00.0175] <nicolo-ribaudo>
+ * True, right (updated)
+
+[09:37:38.0040] <nicolo-ribaudo>
+ * For `using` with `Symbol.enter`/`Symbol.dispose`, I don't think we need to enforce it syntactically. Does this provide enough guarantees, or are there still ways to mess up the context and not get an explicit error about it?
+
+```js
+function enterWith(variable, value) {
+  let oldContext, updatedContext
+
+  return {
+    [Symbol.enter]() {
+      if (oldContext) throw new Error("Cannot enter twice");
+      oldContext = AsyncContextSnapshot();
+      updatedContext = { ...oldContext, [variable]: value };
+
+      AsyncContextSwap(updatedContext);
+    },
+    [Symbol.dispose]() {
+      if (!oldContext) throw new Error("Cannot dispose before entering");
+
+      const current = AsyncContextSnapshot();
+      if (current !== updatedContext) {
+        throw new Error("Cannot dispose, as it's not the current context");
+      }
+
+      AsyncContextSwap(oldContext);
+    }
+  }
+}
+
+AsyncContext.Variable.prototype.run = function (value, callback) {
+  const oldContext = AsyncContextSnapshot();
+  const updatedContext = { ...oldContext, [this]: value };
+
+  AsyncContextSwap(updatedContext);
+  try {
+    return callback();
+  } finally {
+    const current = AsyncContextSnapshot();
+    AsyncContextSwap(oldContext);
+
+    if (current !== updatedContext) {
+      throw new Error(".run ended before that its context was restored");
+    }
+  }
+}
+
+{
+  // context: root
+
+  x1[Symbol.enter]();
+  // context: x1
+
+  x2[Symbol.enter]();
+  // context: x2
+
+  x1[Symbol.dispose](); // error: "Cannot dispose, as it's not the current context"
+}
+
+
+{
+  // context: root
+
+  x1[Symbol.enter]();
+  // context: x1
+
+  myVar.run("foo", () => {
+    // context: foo
+
+    x1[Symbol.dispose](); // error: "Cannot dispose, as it's not the current context"
+  })
+}
+
+{
+  // context: root
+
+  myVar.run("foo", () => {
+    // context: foo
+
+    x1[Symbol.enter]();
+    // context: x1
+  }); // closes the foo context, then error: ".run ended before that its context was restored"
+}
+```
+
+[09:37:57.0551] <Steve Hicks>
+And then the idea is that
+```javascript
+async function f() {
+  using _ = enterWith(v, 2);
+  await 1;
+}
+{
+  using _ = enterWith(v, 1);
+  f();
+}
+```
+would work because the suspension would restore the entry context?  But if `f` were an ordinary function that leaked then the dispose after `f()` would fail.
+
+[09:38:43.0663] <nicolo-ribaudo>
+Yes and yes
+
+[09:38:50.0631] <Steve Hicks>
+And any non-syntactic access to the protocol _should_ still at least be sound
+
+[09:39:14.0439] <nicolo-ribaudo>
+And the whole program should also have a check at the end that checks you didn't forget to close anything
+
+[09:39:16.0891] <Steve Hicks>
+I don't think you strictly need `Symbol.enter` for these checks.
+
+[09:39:29.0648] <nicolo-ribaudo>
+So that even a program that just does `x1[Symbol.enter]()` throws when it ends
+
+[09:39:49.0027] <Steve Hicks>
+though it would certainly be nicer to have
+
+[09:39:52.0019] <nicolo-ribaudo>
+> <@stephenhicks:matrix.org> I don't think you strictly need `Symbol.enter` for these checks.
+
+Yeah, you can also just have two functions that you call to activate and deactivate the context
+
