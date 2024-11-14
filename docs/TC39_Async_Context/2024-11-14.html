@@ -47,20 +47,21 @@
   <tr class="msg" id="L9"><td class="ts-cell"><a class="ts" href="#L9" alt="Thu Nov 14 2024 09:07:20 GMT-0800 (Pacific Standard Time)">17:07</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@stephenhicks:matrix.org">Steve Hicks</span>&gt;</div></td><td class="msg-cell">and it couldn't use <code>using</code> syntax for that.</td></tr>
   <tr class="msg" id="L10"><td class="ts-cell"><a class="ts" href="#L10" alt="Thu Nov 14 2024 09:27:56 GMT-0800 (Pacific Standard Time)">17:27</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-9" title="@nicolo-ribaudo:matrix.org">nicolo-ribaudo</span>&gt;</div></td><td class="msg-cell"><p>For <code>using</code> with <code>Symbol.enter</code>/<code>Symbol.dispose</code>, I don't think we need to enforce it syntactically. Does this provide enough guarantees, or are there still ways to mess up the context and not get an explicit error about it?</p>
 <pre><code class="language-js">function enterWith(variable, value) {
-  let oldContext;
+  let oldContext, updatedContext
 
   return {
     [Symbol.enter]() {
       if (oldContext) throw new Error("Cannot enter twice");
       oldContext = AsyncContextSnapshot();
+      updatedContext = { ...oldContext, [variable]: value };
 
-      AsyncContextSwap({ ...oldContext, [variable]: value });
+      AsyncContextSwap(updatedContext);
     },
     [Symbol.dispose]() {
       if (!oldContext) throw new Error("Cannot dispose before entering");
 
       const current = AsyncContextSnapshot();
-      if (current !== oldContext) {
+      if (current !== updatedContext) {
         throw new Error("Cannot dispose, as it's not the current context");
       }
 
@@ -114,9 +115,6 @@ AsyncContext.Variable.prototype.run = function (value, callback) {
 {
   // context: root
 
-  x1[Symbol.enter]();
-  // context: x1
-
   myVar.run("foo", () =&gt; {
     // context: foo
 
@@ -126,6 +124,15 @@ AsyncContext.Variable.prototype.run = function (value, callback) {
 }
 </code></pre>
 </td></tr>
+  <tr class="msg" id="L11"><td class="ts-cell"><a class="ts" href="#L11" alt="Thu Nov 14 2024 09:33:10 GMT-0800 (Pacific Standard Time)">17:33</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-9" title="@nicolo-ribaudo:matrix.org">nicolo-ribaudo</span>&gt;</div></td><td class="msg-cell"><p>And you can still leak <em>a little bit</em>, but:</p>
+<ul>
+<li><code>.run</code> is a hard boundary you cannot leak accross</li>
+<li>if you leak, basically as soon as some other context ends you'll get an error</li>
+</ul>
+</td></tr>
+  <tr class="msg" id="L12"><td class="ts-cell"><a class="ts" href="#L12" alt="Thu Nov 14 2024 09:33:39 GMT-0800 (Pacific Standard Time)">17:33</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-9" title="@nicolo-ribaudo:matrix.org">nicolo-ribaudo</span>&gt;</div></td><td class="msg-cell">And the error could point to the stack trace of where you did <code>enter</code> without then disposing it</td></tr>
+  <tr class="msg" id="L13"><td class="ts-cell"><a class="ts" href="#L13" alt="Thu Nov 14 2024 09:34:17 GMT-0800 (Pacific Standard Time)">17:34</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@stephenhicks:matrix.org">Steve Hicks</span>&gt;</div></td><td class="msg-cell">I think you need to store two locals - one for <code>oldContext</code> and one for <code>updatedContext</code> and then line 15 wants to compare <code>current !== updatedContext</code></td></tr>
+  <tr class="msg" id="L14"><td class="ts-cell"><a class="ts" href="#L14" alt="Thu Nov 14 2024 09:34:40 GMT-0800 (Pacific Standard Time)">17:34</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-9" title="@nicolo-ribaudo:matrix.org">nicolo-ribaudo</span>&gt;</div></td><td class="msg-cell">True, right</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>

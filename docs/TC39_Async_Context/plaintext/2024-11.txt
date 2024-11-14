@@ -618,3 +618,180 @@ AsyncContext.Variable.prototype.run = function (value, callback) {
 }
 ```
 
+[09:32:22.0352] <nicolo-ribaudo>
+ * For `using` with `Symbol.enter`/`Symbol.dispose`, I don't think we need to enforce it syntactically. Does this provide enough guarantees, or are there still ways to mess up the context and not get an explicit error about it?
+
+```js
+function enterWith(variable, value) {
+  let oldContext;
+
+  return {
+    [Symbol.enter]() {
+      if (oldContext) throw new Error("Cannot enter twice");
+      oldContext = AsyncContextSnapshot();
+
+      AsyncContextSwap({ ...oldContext, [variable]: value });
+    },
+    [Symbol.dispose]() {
+      if (!oldContext) throw new Error("Cannot dispose before entering");
+
+      const current = AsyncContextSnapshot();
+      if (current !== oldContext) {
+        throw new Error("Cannot dispose, as it's not the current context");
+      }
+
+      AsyncContextSwap(oldContext);
+    }
+  }
+}
+
+AsyncContext.Variable.prototype.run = function (value, callback) {
+  const oldContext = AsyncContextSnapshot();
+
+  AsyncContextSwap({ ...oldContext, [this]: value });
+  try {
+    return callback();
+  } finally {
+    const current = AsyncContextSnapshot();
+    AsyncContextSwap(oldContext);
+
+    if (current !== oldContext) {
+      throw new Error(".run ended before that its context was restored");
+    }
+  }
+}
+
+{
+  // context: root
+
+  x1[Symbol.enter]();
+  // context: x1
+
+  x2[Symbol.enter]();
+  // context: x2
+
+  x1[Symbol.dispose](); // error: "Cannot dispose, as it's not the current context"
+}
+
+
+{
+  // context: root
+
+  x1[Symbol.enter]();
+  // context: x1
+
+  myVar.run("foo", () => {
+    // context: foo
+
+    x1[Symbol.dispose](); // error: "Cannot dispose, as it's not the current context"
+  })
+}
+
+{
+  // context: root
+
+  myVar.run("foo", () => {
+    // context: foo
+
+    x1[Symbol.enter]();
+    // context: x1
+  }); // closes the foo context, then error: ".run ended before that its context was restored"
+}
+```
+
+[09:33:10.0763] <nicolo-ribaudo>
+And you can still leak _a little bit_, but:
+- `.run` is a hard boundary you cannot leak accross
+- if you leak, basically as soon as some other context ends you'll get an error
+
+[09:33:39.0991] <nicolo-ribaudo>
+And the error could point to the stack trace of where you did `enter` without then disposing it
+
+[09:34:17.0835] <Steve Hicks>
+I think you need to store two locals - one for `oldContext` and one for `updatedContext` and then line 15 wants to compare `current !== updatedContext`
+
+[09:34:40.0577] <nicolo-ribaudo>
+True, right
+
+[09:35:16.0663] <nicolo-ribaudo>
+ * For `using` with `Symbol.enter`/`Symbol.dispose`, I don't think we need to enforce it syntactically. Does this provide enough guarantees, or are there still ways to mess up the context and not get an explicit error about it?
+
+```js
+function enterWith(variable, value) {
+  let oldContext, updatedContext
+
+  return {
+    [Symbol.enter]() {
+      if (oldContext) throw new Error("Cannot enter twice");
+      oldContext = AsyncContextSnapshot();
+      updatedContext = { ...oldContext, [variable]: value };
+
+      AsyncContextSwap(updatedContext);
+    },
+    [Symbol.dispose]() {
+      if (!oldContext) throw new Error("Cannot dispose before entering");
+
+      const current = AsyncContextSnapshot();
+      if (current !== updatedContext) {
+        throw new Error("Cannot dispose, as it's not the current context");
+      }
+
+      AsyncContextSwap(oldContext);
+    }
+  }
+}
+
+AsyncContext.Variable.prototype.run = function (value, callback) {
+  const oldContext = AsyncContextSnapshot();
+
+  AsyncContextSwap({ ...oldContext, [this]: value });
+  try {
+    return callback();
+  } finally {
+    const current = AsyncContextSnapshot();
+    AsyncContextSwap(oldContext);
+
+    if (current !== oldContext) {
+      throw new Error(".run ended before that its context was restored");
+    }
+  }
+}
+
+{
+  // context: root
+
+  x1[Symbol.enter]();
+  // context: x1
+
+  x2[Symbol.enter]();
+  // context: x2
+
+  x1[Symbol.dispose](); // error: "Cannot dispose, as it's not the current context"
+}
+
+
+{
+  // context: root
+
+  x1[Symbol.enter]();
+  // context: x1
+
+  myVar.run("foo", () => {
+    // context: foo
+
+    x1[Symbol.dispose](); // error: "Cannot dispose, as it's not the current context"
+  })
+}
+
+{
+  // context: root
+
+  myVar.run("foo", () => {
+    // context: foo
+
+    x1[Symbol.enter]();
+    // context: x1
+  }); // closes the foo context, then error: ".run ended before that its context was restored"
+}
+```
+
