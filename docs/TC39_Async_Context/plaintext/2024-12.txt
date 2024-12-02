@@ -65,3 +65,21 @@ It's kind of built on Kotlin's `CoroutineContext`, which is basically the same a
 [09:20:35.0382] <Jan Olaf Martin>
 After a chat about async context with Steve Hicks, I was wondering if other (non-fetch/non-xhr) async network operations should also preserve context? E.g. image and/or script loading triggers and their `onload` handlers.
 
+[10:22:49.0798] <Steve Hicks>
+> <@abotella:igalia.com> (completely disconnected topic:) I'm wondering if we should also have a `resetFallbackContext` API, to isolate inner scopes
+
+What would `resetFallbackContext` do?  Would it escape out of whatever fallback context it was previously in?  That seems problematic, if fallback contexts were supposed to be able to isolate entire (transitive) chunks of code?  Though, I'm very skeptical of the security implications of AsyncContext at all - specifically, I don't think we can confidently guarantee that isolated inner code can never access outer/root/empty contexts - it seems too easy to smuggle a foreign context.  (For instance, we've talked about how `addEventListener` interacts with `runWithFallbackContext`, but would `onclick` setters also respect the same fallback?  If they're not _all_ currently implemented as setter properties, then this might be extremely infeasible to change)
+
+[10:23:33.0994] <Andreu Botella>
+I was thinking that it would reset to the empty context
+
+[10:24:33.0885] <Steve Hicks>
+> <@taral:matrix.org> Yeah, that's weird. It's basically like putting `var.run` around the _entire continuation_.
+
+As we talk about more and more callback-accepting APIs (`runWithFallbackContext`, `resetFallbackContext`, etc, on top of `Variable#run` and `Snapshot#run`), will all of these be rendered obsolete if we end up exposing a `set`/`enterWith` API?
+
+[10:25:29.0916] <Steve Hicks>
+> <@abotella:igalia.com> I was thinking that it would reset to the empty context
+
+This maybe suggests it's worth making it explicit that empty context should never be considered privileged?
+
