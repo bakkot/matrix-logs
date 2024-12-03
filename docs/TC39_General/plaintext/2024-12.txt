@@ -820,3 +820,39 @@ I'm trying to work out if it composes with https://github.com/tc39/proposal-conc
 [13:49:19.0213] <snek>
 ljharb: https://gc.gy/5787c068-7972-4c5b-bc38-dc39b7704308.png
 
+[14:01:46.0432] <Michael Ficarra>
+> <@aclaymore:matrix.org> I'm trying to work out if it composes with https://github.com/tc39/proposal-concurrency-control, but it's been a long day
+
+I have a secret prototype task queue that I will share some day
+
+[14:02:42.0151] <bakkot>
+> <@aclaymore:matrix.org> I'm trying to work out if it composes with https://github.com/tc39/proposal-concurrency-control, but it's been a long day
+
+I think so? Something like
+
+```
+let governor = new CountingGovernor(5);
+
+let tasks = data.map(x => Promise.resolve(x).lazyThen(async () => { using _ = await governor.acquire(); return await doWork(x); });
+```
+this gives you: task are not started until first polled, and no matter how many are being polled no more than 5 can be doing work at a time
+
+[14:02:59.0535] <bakkot>
+but a real task queue would still be better I expect
+
+[14:04:03.0738] <bakkot>
+> <@aclaymore:matrix.org> I'm trying to work out if it composes with https://github.com/tc39/proposal-concurrency-control, but it's been a long day
+
+ * I think so? Something like
+
+```
+let governor = new CountingGovernor(5);
+
+let tasks = data.map(
+  x => Promise.resolve(x)
+    .lazyThen(async () => { using _ = await governor.acquire(); return await doWork(x); }
+);
+```
+
+this gives you: task are not started until first polled, and no matter how many are being polled no more than 5 can be doing work at a time
+
