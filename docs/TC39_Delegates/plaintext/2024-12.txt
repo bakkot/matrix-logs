@@ -635,3 +635,59 @@ disableTraps();
 [10:24:56.0435] <Mathieu Hofman>
 I am really worried that people out there, possibly in libraries, did build WeakMap equivalent widgets that use the return override private field stamping trick, and that it would break if we unilaterally prevented return overrides proxy stamping. It's possible that non extensible objects are currently rare enough that they wouldn't break any deployed code. 
 
+[10:25:57.0890] <bakkot>
+> <@aclaymore:matrix.org> I have been wondering if we could have a way to disable proxy hooks, and if that would allow proxies to get a stable shape for ICs.
+> like
+> const [proxy, disableTraps] = Proxy.temporary(target, handler);
+> ...
+> disableTraps();
+
+I would prefer we just tell people to stop using proxies ever, instead of adding new methods which try to make them a little bit more performant
+
+[10:27:03.0534] <Jack Works>
+> <@aclaymore:matrix.org> I have been wondering if we could have a way to disable proxy hooks, and if that would allow proxies to get a stable shape for ICs.
+> like
+> const [proxy, disableTraps] = Proxy.temporary(target, handler);
+> ...
+> disableTraps();
+
+you can remove proxy traps after the creation.
+
+```js
+const trap = { ... }
+const proxy = new Proxy(obj, trap)
+// after some time
+delete trap.get
+```
+
+[10:27:32.0583] <ljharb>
+yeah that live binding behavior is bonkers to me
+
+[10:27:48.0515] <ljharb>
+i wonder if it'd be web compatible to eagerly cache the traps at proxy creation time
+
+[10:28:45.0915] <Mathieu Hofman>
+Proxies are an integral part of being able to construct transparent membranes.
+
+[10:29:13.0143] <ljharb>
+sure but that's a thing that likely only double digits of humans on the planet ever need to think about
+
+[10:29:17.0075] <Ashley Claymore>
+Yeah. But engines wouldn't know that the trap isn't going to be added back. Even if it has prevent extensions the handler itself could be a proxy with a get trap 🙁
+
+[10:29:43.0813] <ljharb>
+ * sure but that's a thing that likely only double digits of humans on the planet ever need to think about (not that we'd remove proxies, just tell the majority not to use them)
+
+[10:29:46.0436] <bakkot>
+> <@mhofman:matrix.org> Proxies are an integral part of being able to construct transparent membranes.
+
+I am aware of that and nevertheless strongly stand by my position.
+
+[10:30:04.0564] <Mathieu Hofman>
+Guilty of making the handler a proxy. However the engine does know if the handler is a proxy and could opt out of optimizations in that case
+
+[10:30:39.0092] <Jack Works>
+> <@ljharb:matrix.org> sure but that's a thing that likely only double digits of humans on the planet ever need to think about
+
+I use proxy to trap `[[Get]]` to provide object that every property is defined and functional based on their name
+
