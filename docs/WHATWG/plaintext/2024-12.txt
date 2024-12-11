@@ -574,3 +574,34 @@ Dominic Farolino: there's also pre-removing steps. Should that be pre-remove ste
 [23:57:16.0449] <annevk>
 sideshowbarker: there's an open issue on standardizing [Reflect] and I think we're pretty close after the refactoring I did on reflection a while back, but not quite there yet
 
+[02:08:08.0811] <Jake Archibald>
+annevk Domenic: Atomics & SAB let you 'sleep' workers waiting _something_, but that requires an isolated origin, and it's not trivial to pack data into an SAB. Could message ports have a `postMessage` type thing that synchronously waits for a response from the other side? Like atomics, the sleeping side must be a worker.
+
+API sketch:
+
+In a worker:
+
+```js
+console.log(
+  self.postSyncCall({ action: 'sum', numbers: [2, 2] })
+);
+```
+
+In a page:
+
+```js
+worker.addEventListener('synccall', (event) => {
+  if (event.data.action === 'sum') {
+    event.respondWith(async () => {
+      const result = await someAsyncMathsSupercomputer.sum(event.data.numbers);
+      return result;
+    });
+  }
+});
+```
+
+Is this is stupid idea?
+
+[02:08:50.0004] <Jake Archibald>
+Our usecase is a DOM polyfill in a worker, and in some cases we want getters to get their result from some other thread
+
