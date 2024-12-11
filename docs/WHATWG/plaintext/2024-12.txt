@@ -605,3 +605,36 @@ Is this is stupid idea?
 [02:08:50.0004] <Jake Archibald>
 Our usecase is a DOM polyfill in a worker, and in some cases we want getters to get their result from some other thread
 
+[02:11:36.0246] <Jake Archibald>
+ * annevk Domenic: Atomics & SAB let you 'sleep' workers waiting _something_, but that requires an isolated origin, and it's not trivial to pack data into an SAB. Could message ports have a `postMessage` type thing that synchronously waits for a response from the other side? Like atomics, the sleeping side must be a worker.
+
+API sketch:
+
+In a worker:
+
+```js
+console.log(
+  self.postSyncCall({ action: 'sum', numbers: [2, 2] })
+);
+```
+
+…logs `4`.
+
+In a page:
+
+```js
+worker.addEventListener('synccall', (event) => {
+  if (event.data.action === 'sum') {
+    event.respondWith(async () => {
+      const result = await someAsyncMathsSupercomputer.sum(event.data.numbers);
+      return result;
+    });
+  }
+});
+```
+
+Is this is stupid idea?
+
+[02:12:43.0204] <sideshowbarker>
+HTML spec issue, or WebIDL issue? I looked in both places, but didn’t manage to find what I was looking for…
+
