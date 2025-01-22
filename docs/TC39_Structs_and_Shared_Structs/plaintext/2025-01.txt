@@ -197,3 +197,60 @@ i see the developer surprise point but i don't see why it's unreliable
 [09:53:58.0890] <rbuckton>
 Even NodeJS would run afoul of a built-in `Symbol` carveout due to the common practice of saving off primordials
 
+[09:56:22.0672] <rbuckton>
+https://github.com/nodejs/node/blob/01dd7c4f6450ac5f092f98a5a85f00d0a7f489b2/lib/internal/per_context/primordials.js#L300
+
+[09:56:54.0965] <shu>
+yeaaah, i see
+
+[09:57:07.0664] <rbuckton>
+So a `Symbol` carve-out would preclude a common security pattern, unless you are also doing some kind of whole-program static analysis
+
+[09:57:52.0121] <littledan>
+do you mean you want soundness?
+
+[09:58:11.0188] <littledan>
+"by construction" sounds sound
+
+[09:58:21.0856] <shu>
+i mean i don't care about soundness
+
+[09:58:50.0102] <shu>
+but it's sounding more and more like there's no good way to allow for the Symbol use case, which is important, without allowing everything
+
+[09:59:21.0578] <littledan>
+OK so one simple solution (aside from what's discussed above) is for the language to allow random computed properties, and the static analysis can reject things which are not `Symbol.*` and assume that everything which is `Symbol.*` is what you're guessing
+
+[09:59:31.0770] <shu>
+there's what decorators do with `@MemberExpression` but even there you can escape it via `@ParenthesizedExpression`
+
+[09:59:42.0176] <littledan>
+yeah but your analysis can just reject those things
+
+[09:59:47.0809] <littledan>
+even if the language accepts them
+
+[10:00:04.0771] <littledan>
+(or the analysis just gives up and accept it but refuses to analyze)
+
+[10:00:08.0592] <shu>
+oh you mean the compiler? right
+
+[10:00:44.0178] <shu>
+i'm coming around to that's the right approach -- because no more runtime guarantees are needed. this is just about making assumptions at parse time of the declaration
+
+[10:01:02.0405] <ljharb>
+oh i guess nvm, it's only symbols since you don't need brackets for strings
+
+[10:01:29.0246] <shu>
+right, both strings and indexed strings already have a bare form in the syntax
+
+[10:01:38.0675] <shu>
+indexed strings meaning the numbers
+
+[10:01:54.0149] <shu>
+of course you _could_ do ["foo"] but why
+
+[10:04:15.0469] <iain>
+To be clear: we still intend to prohibit computed properties for shared structs, right?
+
