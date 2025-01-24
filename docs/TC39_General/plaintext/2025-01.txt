@@ -682,3 +682,85 @@ const forceCollectionP = (async () => {
 const forceGC = await forceCollectionP;
 ```
 
+[08:39:09.0671] <Richard Gibson>
+* ljharb: I have a not-yet-committed version of what you're looking for; the ultimate fallback really is memory allocations. Simplified version:
+
+```js
+const enqueueTask = callback => {
+  const id = setTimeout(callback);
+  return () => clearTimeout(id);
+};
+const gcWatches = new FinalizationRegistry(([callback, data]) => void callback(data));
+const whenCollected = (target, data = undefined) =>
+  new Promise(resolve => gcWatches.register(target, [resolve, data]));
+const watchGC = (target, data = undefined) => {
+  const collected = whenCollected(target, data);
+  let retained = true;
+  collected.then(() => { retained = false; });
+  // Return a new promise that waits for GC plus a turn (in case the GC promise
+  // of the new sentinel object fulfills before that of the target) and then
+  // fulfills with the then-current retention status of the target.
+  const isRetained = () => whenCollected({}).then().then(() => retained);
+  return { collected, isRetained };
+};
+const forceCollectionP = (async () => {
+  let garbageScale = 2 ** 16;
+  const tryTriggerGC = () => void new Uint8Array(garbageScale);
+  const forceGC = async (patience = 1000) => {
+    const sentinelCollectedP = whenCollected({});
+
+    // Wait a turn to clear the stack, then add pressure in a sequence of prompt jobs.
+    await null;
+    let reject;
+    const pressureP = new Promise((...resolvers) => { reject = resolvers[1]; });
+    void pressureP.catch(() => {});
+    let jobCount = 0;
+    let abortNextJob = () => {};
+    const abort = () => {
+      abortNextJob();
+      reject();
+      patience = 0;
+    };
+    (function startNextJob() {
+      if (!(jobCount < patience)) return reject(Error(`failed to GC after ${jobCount} attempts`));
+      tryTriggerGC();
+      jobCount++;
+      abortNextJob = enqueueTask(startNextJob);
+    })();
+    await Promise.race([sentinelCollectedP, pressureP]);
+    abort();
+
+    // Try to tune garbageScale for forcing GC in one job.
+    if (jobCount > 1 && garbageScale > 0 && garbageScale < 2 ** 28) garbageScale *= 2;
+
+    return { jobCount };
+  };
+
+  // Run sanity checks before releasing the function.
+  await forceGC();
+  const weakmap = new WeakMap();
+  let { fastKeyWatch, slowKeyWatch, slowKey } = (() => {
+    const fastKey = {};
+    const slowKey = {};
+    weakmap.set(fastKey, 'fast-gc sanity check');
+    weakmap.set(slowKey, 'slow-gc sanity check');
+    const fastKeyWatch = watchGC(fastKey);
+    const slowKeyWatch = watchGC(slowKey);
+    return { fastKeyWatch, slowKeyWatch, slowKey };
+  })();
+  const fastKeyRetainedP = fastKeyWatch.isRetained();
+  const slowKeyRetainedP = slowKeyWatch.isRetained();
+  await forceGC();
+  if (await fastKeyRetainedP) throw Error('fast-gc key was not collected!');
+  if (!(await slowKeyRetainedP)) throw Error('slow-gc key was collected early!');
+  const slowKeyStillRetainedP = slowKeyWatch.isRetained();
+  slowKey = null;
+  await forceGC();
+  if (await slowKeyStillRetainedP) throw Error('slow-gc key was not collected!');
+
+  return forceGC;
+})();
+
+const forceGC = await forceCollectionP;
+```
+
