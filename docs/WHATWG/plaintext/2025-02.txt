@@ -231,3 +231,12 @@ After 3, it seems to expect the promise to equal the readyPromise on the writer,
 
 
 
+[01:53:02.0818] <Gregory Terzian>
+But, it appears to me that the readyPromise would have already been resolved in [`set-up-writable-stream-default-writer`](https://streams.spec.whatwg.org/#set-up-writable-stream-default-writer), at step 5.2("Otherwise, set writer.[[readyPromise]] to a promise resolved with undefined."). 
+
+Then the promise assigned to the variable at 3 is in fact already resolved, and then the abort call at 4 will end-up calling into [`ensure-ready-promise-rejected`](https://streams.spec.whatwg.org/#writable-stream-default-writer-ensure-ready-promise-rejected), which replaces writer.readyPromise with a new rejected promise(because the promise is not pending anymore). 
+
+On way this would be false would be if the write(or the setup) would reach "If backpressure is true, set writer.[[readyPromise]] to a new promise." of [`update-backpressure`](https://streams.spec.whatwg.org/#writable-stream-update-backpressure), but this would require backpressure to be true, and the test does not seem to provide any such backpressure other than the default one where the desired size is 1, and then that single write should not trigger backpressure. 
+
+The test passes in all implementation, so I'm wondering what I'm missing, or if perhaps the spec was updated to fail the test, and this wasn't reflected in any implementation. 
+
