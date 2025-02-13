@@ -511,3 +511,34 @@ While with the split it's easier to say "this class has more metadata, while thi
 [23:19:57.0396] <Jesse>
 one thing that's nice about having decimal as the underlying data for measure/amount (and, looking forward, for smart units), is that things like reciporcals, squaring & cubing, multiplication arise quite naturally. Decimal128 is a good fit because it offers a lot of precision in the face of these operations
 
+[03:57:41.0000] <eemeli>
+Mostly I'm trying to estimate complexity in terms of the conceptual load we're introducing. Right now we have two types in the spec that hold a numerical value (number and bigint), and with Amount we're due to introduce a third one. The core pitch with Decimal (as I understand it) is to represent decimal numbers, i.e. ones coming from the real world. But don't those almost always have some implicit unit attached? Its stated primary use case is for monetary values, so why not include the currency code with the value? I would think that it would be a very positive feature for something like
+```
+new Amount(42, { currency: 'USD' }).add(new Amount(13, { currency: 'BTC' }))
+```
+to throw an error.
+
+So from a JS developer point of view, I would think that it'd be simpler to understand a single Amount as being the thing to use for values coming from the real world, rather than needing to decide between an Amount and a Decimal, depending on what sort of operations might need to be done with the value.
+
+[04:01:30.0149] <eemeli>
+Let's say I start with two values
+```
+const foo = new Amount(42, { currency: 'EUR' })
+const bar = new Amount(13, { currency: 'EUR' })
+```
+
+With an amount that did decimal math, I could add those up as
+```
+foo.add(bar)
+```
+but if their values were Decimal instances, then I'd need to do
+```
+const sum = foo.value.add(bar.value)
+new Amount(sum, { currency: foo.currency })
+```
+
+To me that seems clumsier, more verbose, and it skips all the validation fo the former about `foo` and `bar` being addable.
+
+[04:03:55.0303] <eemeli>
+Are there many use cases for decimal values that do not have an implicit unit or currency attached to them?
+
