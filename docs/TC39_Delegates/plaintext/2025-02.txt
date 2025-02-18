@@ -551,3 +551,69 @@ Are firefox use counters public, with a list of example websites, like Chrome's?
 [13:55:04.0843] <Mathieu Hofman>
 I basically want to make this check into a "SafePromiseResolve" that fast path promises that do not re-enter, and delay by one tick the ones that may. Then anyone can use that operation, possibly even `await`.
 
+[13:55:51.0309] <Mathieu Hofman>
+That's not sufficient if someone overrides `%PromisePrototype%` properties
+
+[13:56:01.0662] <bakkot>
+isn't it?
+
+[13:56:03.0529] <Mathieu Hofman>
+* That's not sufficient if someone overrides `%PromisePrototype%` `then` and `constructor` properties
+
+[13:56:14.0226] <bakkot>
+Promise.resolve does not do a lookup of `.then` on things which pass that check
+
+[13:56:39.0235] <Mathieu Hofman>
+It does for `constructor` if I recall.
+
+[13:56:54.0383] <bakkot>
+Right, it does `IsPromise(p) && p.constructor === Promise`
+
+[13:57:21.0737] <bakkot>
+but if we make it `IsPromise(p) && GetPrototypeOf(p) === C.prototype` then it would not do anything user-observable (on real promises)
+
+[13:57:29.0433] <bakkot>
+and I bet we can get away with that
+
+[13:57:50.0359] <bakkot>
+this also applies to `await` since it uses the same machinery
+
+[13:58:22.0574] <bakkot>
+and `await`  also does not do an actual `.then` lookup at all, it just does a PromiseResolve and then uses the built-in PerformPromiseThen
+
+[13:58:28.0766] <Mathieu Hofman>
+`defineProperty(`Promise.prototype`, 'constructor', {get() {} }})`
+
+[13:58:38.0140] <Mathieu Hofman>
+* `defineProperty(Promise.prototype, 'constructor', {get() {} }})`
+
+[13:58:45.0710] <Mathieu Hofman>
+* `defineProperty(Promise.prototype, 'constructor', {get() {} })`
+
+[13:58:55.0400] <bakkot>
+I don't know what that's intended to be a response to
+
+[13:59:08.0031] <bakkot>
+I am proposing to change the machinery so nothing ever looks at `.constructor`
+
+[13:59:23.0394] <snek>
+what constitutes a brand check
+
+[13:59:32.0831] <snek>
+like what granularity 
+
+[13:59:36.0838] <snek>
+there are so many ways to organize objects
+
+[13:59:49.0756] <nicolo-ribaudo>
+A sync side-effect-free way to tell wether an object has a particular internal slot or not
+
+[13:59:51.0093] <Mathieu Hofman>
+Oh, if you think that's web compatible
+
+[14:00:01.0075] <nicolo-ribaudo>
+* A sync side-effect-free way to tell wether an object has a particular internal slot or not, for any slot
+
+[14:00:11.0227] <snek>
+for *every* internal slot?
+
