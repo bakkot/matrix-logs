@@ -1436,3 +1436,66 @@ TextEncode encodeInto is another
 [16:05:01.0699] <shu>
 i guess the nuance here is the assert tells a story about the intended property of the spec. if it doesn't hold, we say the spec is malformed in the sense that the intention doesn't hold. it could be brought back into well-formedness by changing the intent (which is necessarily not reflectable within the text, only tacit). more often, we don't change the intention doesn't change, and it turns out the there is a bug in the spec
 
+[16:05:19.0318] <shu>
+* i guess the nuance here is the assert tells a story about the intended property of the spec. if it doesn't hold, we say the spec is malformed in the sense that the intention doesn't hold. it could be brought back into well-formedness by changing the intent (which is necessarily not reflectable within the text, only tacit). more often, we don't change the intention, and it turns out the there is a bug in the spec
+
+[16:05:26.0834] <shu>
+* i guess the nuance here is the assert tells a story about the intended property of the spec. if it doesn't hold, we say the spec is malformed in the sense that the intention doesn't hold. it could be brought back into well-formedness by changing the intent (which is necessarily not reflectable within the text, only tacit). more often, we don't change the intention, and it turns out there is a bug in the spec
+
+[16:06:11.0200] <bakkot>
+those fall out to SetValueInBuffer, so probably the fix is to update WebIDL to do something else? or make SetValueInBuffer fallible, though that would be a shame
+
+[16:06:17.0622] <bakkot>
+https://webidl.spec.whatwg.org/#arraybuffer-write is the relevant thing I think
+
+[16:06:29.0249] <bakkot>
+but we definitely need tests as well
+
+[16:06:53.0979] <littledan>
+I hope web integration can look into where immutable arraybuffers can be a benefit in some cases, e.g., by avoiding certain cloning when used.
+
+[16:07:03.0513] <shu>
+yes, WebIDL is good to call out to see how they want to go
+
+[16:07:13.0279] <shu>
+maybe they want an attribute to require buffer sources to be immutable
+
+[16:07:39.0586] <bakkot>
+also there are places which take a buffer as an argument and they do a defensive copy
+
+[16:07:42.0969] <bakkot>
+and should be updated to not do that
+
+[16:08:16.0689] <shu>
+though that's... mostly fine
+
+[16:08:20.0609] <shu>
+you can just as-if that away
+
+[16:08:23.0590] <snek>
+if an immutable arraybuffer can't be detached, copying it can just be not-copying it
+
+[16:08:28.0785] <snek>
+* if an immutable arraybuffer can't be detached, copying it can just be implemented as not-copying it
+
+[16:08:38.0855] <TabAtkins>
+Like I said, Python gets by without this happening explicitly, because it has *args and **kwargs, and it's common practice for decorators to make the wrapper function they return take `(*args, **kwargs)` and then call the inner function with the same. That preserves passed function names, without needing the runtime to actually track function names across decorator boundaries. We'd need to add the same to JS, I think, to do named args.
+
+[16:09:10.0211] <littledan>
+yes, I think this is important. Even if it's formally just an editorial change, calling out in various specs where they can avoid work in the case of immutable ArrayBuffers makes it more likely that browsers will implement the optimization.
+
+[16:09:28.0948] <bakkot>
+I think probably this consists of finding the places which refer to https://webidl.spec.whatwg.org/#dfn-get-buffer-source-copy and updating them
+
+[16:09:31.0115] <rbuckton>
+Python also has explicit syntax in the parameter list to denote named vs positional arguments
+
+[16:09:34.0681] <shu>
+also agreed there. the amount of as-if optimizations happening on the web spec side is surprisingly little, compared to JS algorithms
+
+[16:09:58.0386] <littledan>
+right, people are more likely to implement line-by-line there
+
+[16:10:02.0691] <TabAtkins>
+only recently (by default, all args are passable by both index and name), and that doesn't affect the pattern I mentioned anyway
+
