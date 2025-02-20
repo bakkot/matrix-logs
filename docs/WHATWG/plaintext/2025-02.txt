@@ -814,3 +814,37 @@ Yeah apologies. That auto state change seemed to break things a bit and not get 
 [04:11:08.0809] <Luke Warlow>
 * Yeah apologies. That auto state change seemed to break things a bit and not get caught. + Some last minute feedback about desired behaviours also meant a slightly bigger normative change in that last PR I've put up
 
+[10:01:10.0658] <annevk>
+I wonder if folks here can help me with some IDL. Say I have a method `importNode` that takes a `Node` _node_ and a boolean or a dictionary _options_. The dictionary has two members: `subtree` and `customElements`.
+
+I want the semantics to be like this:
+
+- `importNode(node, false)` == `importNode(node, { subtree: false })`
+- `importNode(node, true)` == `importNode(node, { subtree: true })`
+- `importNode(node)` == `importNode(node, { subtree: false })`
+- `importNode(node, undefined)` == `importNode(node, { subtree: false })`
+- `importNode(node, { customElements })` == `importNode(node, { subtree: true, customElements })`
+- `importNode(node, { })` == `importNode(node, { subtree: true })`
+- `importNode(node, aRandomObject)` == `importNode(node, { subtree: true })` (I think this is the same case as `{ }`)
+
+At least that would generally match how it behaves today when an object is passed instead of a boolean.
+
+The path of least resistance is probably to not handle empty dictionary differently from undefined, but curious if people have thoughts. (Opinions are fine too.) cc smaug Domenic keithamus
+
+[10:03:11.0345] <keithamus>
+So `subtree` would default to `true` unless explicitly set to `false`?
+
+[10:10:07.0488] <keithamus>
+So it would be defined something a bit like...
+
+```
+dictionary ImportNodeOptions {
+  boolean subtree = true;
+  CustomElementRegistry customElements = null;
+};
+
+importNode(Node node, optional (ImportNodeOptions or boolean) options = false)
+```
+
+I think?
+
