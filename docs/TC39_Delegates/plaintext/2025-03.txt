@@ -200,3 +200,150 @@ but yeah, overriding `String.prototype[Symbol.match]` does make core-js's `Strin
 [13:10:56.0317] <Andreu Botella>
 * but yeah, defining `String.prototype[Symbol.match]` so it throws does make core-js's `String.prototype.match` polyfill throw
 
+
+2025-03-27
+[03:07:56.0679] <nicolo-ribaudo>
+I'm looking at the agenda for April, and Mark's proposals could as well be song titles.
+
+[09:20:00.0451] <ryzokuken>
+rishipal hi!
+
+[09:40:58.0151] <rishipal>
+Hi :) 
+
+[11:23:34.0118] <shu>
+oh man we found some in-the-wild uses of extending non-extensible objects with private names
+
+[11:23:49.0906] <littledan>
+how big are they?
+
+[11:23:55.0784] <shu>
+it doesn't look like a library though, but i can't tell
+
+[11:24:04.0385] <littledan>
+maybe time for a reverse origin trial?
+
+[11:24:16.0433] <shu>
+# of page loads is still very low
+
+[11:24:20.0231] <shu>
+haha, markdown
+
+[11:24:27.0427] <shu>
+* no. of page loads is still very low
+
+[11:24:51.0313] <shu>
+https://gis.bvl.bund.de/ has this snippet somewhere:
+
+[11:25:29.0640] <shu>
+```
+class _ {
+  // stuff ...
+ static #t = void (Object.keys(_).forEach((t) => {
+          _[t].type = t;
+        }), Object.freeze(_));
+}
+```
+
+[11:26:56.0170] <shu>
+oh it must be this https://www.disy.net/en/products/disy-cadenza/overview/
+
+[11:52:53.0994] <TabAtkins>
+What in tarnation
+
+[11:55:01.0716] <shu>
+the other broken sites are worse, actually
+
+[11:55:09.0674] <shu>
+https://chromestatus.com/metrics/feature/timeline/popularity/5209
+
+[11:55:57.0582] <shu>
+#2 and #6 are non-Cadenza breakages, and they break in the same way. they both seem to have identically structured source, which looks like some proprietary framework (i can't find any references to it on GH)
+
+[11:56:04.0600] <shu>
+#2 and #6 actually do something like
+
+[11:56:22.0942] <shu>
+```
+class t extends EventTarget {
+  constructor() {
+    super();
+    Object.freeze(this);
+  }
+}
+
+class h extends t {
+  #foo;
+  #bar;
+  constructor() {
+    super();
+    this.#foo = ...;
+  }
+}
+```
+
+[11:56:41.0945] <shu>
+still, very low page load
+
+[13:02:56.0370] <Jack Works>
+🤔 I wonder why they are freezing EventTarget
+
+[13:04:55.0073] <Jack Works>
+my personal use of extending private names on objects I do not own, is to add a mark to any object I have seen, so I can easily debug them in the console
+
+[13:06:12.0342] <shu>
+the framework seems to be called "Axial", but i can't find any references to it on github
+
+[13:06:56.0017] <shu>
+it's not this thing: https://www.npmjs.com/package/axial
+
+[13:07:04.0176] <shu>
+if anyone has any idea what Axial is, please lmk
+
+[14:49:23.0289] <Ashley Claymore>
+Is this a terrible idea: still allow private fields to be installed if the new object wasn't replaced by the call to super and it only made it non-extensible 
+
+[14:50:36.0719] <Ashley Claymore>
+I.e return override private field trick is removed 
+
+[14:51:15.0164] <shu>
+but doesn't achieve what we want, which is the fixed shape guarantee
+
+[14:51:19.0544] <shu>
+* but that doesn't achieve what we want, which is the fixed shape guarantee
+
+[14:55:10.0353] <Ashley Claymore>
+Gotcha. I was focusing too much on the desire to remove the secret  weakmap
+
+[15:00:23.0996] <shu>
+we can probably do outreach here
+
+[15:01:27.0763] <Ashley Claymore>
+And we also wanted to reduce new MOP predicates too which  we get by expanding the meaning of non-extensible 
+
+[15:02:49.0118] <Ashley Claymore>
+I guess if a class wants to freeze but not block subclass for having private fields they would only freeze based on a check to new.target and expect the subclass to do the same 
+
+[15:03:17.0046] <Ashley Claymore>
+* I guess if a class wants to freeze but not block subclass from having private fields they would only freeze based on a check to new.target and expect the subclass to do the same 
+
+[15:06:38.0981] <shu>
+yeah, if you freeze in a class constructor, you gotta freeze in the leaves of the inheritance hierarchy
+
+[15:06:44.0630] <Ashley Claymore>
+* I guess if a class wants to freeze but not block subclass from having private fields they would only freeze based on a check to new.target and expect the subclass to do the same 
+
+[15:14:35.0310] <littledan>
+yes, good plan
+
+[15:20:39.0237] <shu>
+we can simply go to their office https://www.disy.net/en/company/contact/#:~:text=Google%20Maps-,approach,-By%20public%20transport
+
+[15:20:41.0037] <littledan>
+this is what Yehuda was proposing decorator instance finalizers for!
+
+
+2025-03-28
+[17:05:00.0302] <Mathieu Hofman>
+Yeah there are no good way in the language to do "init finalization".
+
