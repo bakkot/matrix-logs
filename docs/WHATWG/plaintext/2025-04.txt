@@ -813,3 +813,41 @@ iter.return();
 This was originally raised in Node.js here:
 https://github.com/nodejs/node/issues/57679
 
+[08:57:41.0637] <Shima Ryuhei>
+* Hey, I have a question about this part of the Streams spec.
+
+In the spec, there's this assertion during return():
+https://streams.spec.whatwg.org/#rs-asynciterator
+
+> Assert: reader.\[\[readRequests\]\] is empty, as the async iterator machinery guarantees that any previous calls to next() have settled before this is called.
+
+But it seems like this assumption can be broken if you call return() directly before the previous next() settles.
+
+Here’s a minimal example:
+
+```
+let controller;
+const stream = new ReadableStream({
+  start(c) {
+    controller = c;
+  }
+});
+
+const iter = stream[Symbol.asyncIterator]();
+let next1Promise = iter.next();
+let next2Promise = iter.next();
+
+controller.enqueue("Hello");
+
+await next1Promise;
+
+iter.return();  
+```
+
+This was originally raised in Node.js here:
+https://github.com/nodejs/node/issues/57679
+
+In this section of the Web IDL spec, should the return method call the asynchronous iterator return steps only after the previous next call has settled?
+
+Or am I missing something?
+
