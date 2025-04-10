@@ -748,3 +748,68 @@ Please tell me to what case this condition is applicable? What example satisfies
 > 13. Let targetNavigable and windowType be the result of applying [the rules for choosing a navigable](https://html.spec.whatwg.org/multipage/document-sequences.html#the-rules-for-choosing-a-navigable) given target, sourceDocument's node navigable, and noopener.
 > 14. If noopener is true or windowType is "new with no opener", then return null.
 
+[08:51:07.0789] <Shima Ryuhei>
+Hey, I have a question about this part of the Streams spec.
+
+In the spec, there's this assertion during return():
+
+Assert: reader.[[readRequests]] is empty, as the async iterator machinery guarantees that any previous calls to next() have settled before this is called.
+
+But it seems like this assumption can be broken if you call return() directly before the previous next() settles.
+
+Here’s a minimal example:
+```
+let controller;
+const stream = new ReadableStream({
+  start(c) {
+    controller = c;
+  }
+});
+
+const iter = stream[Symbol.asyncIterator]();
+let next1Promise = iter.next();
+let next2Promise = iter.next();
+
+controller.enqueue("Hello");
+
+await next1Promise;
+
+iter.return();  
+```
+
+This was originally raised in Node.js here:
+https://github.com/nodejs/node/issues/57679
+
+[08:54:00.0915] <Shima Ryuhei>
+* Hey, I have a question about this part of the Streams spec.
+
+In the spec, there's this assertion during return():
+
+> Assert: reader.\[\[readRequests\]\] is empty, as the async iterator machinery guarantees that any previous calls to next() have settled before this is called.
+
+But it seems like this assumption can be broken if you call return() directly before the previous next() settles.
+
+Here’s a minimal example:
+
+```
+let controller;
+const stream = new ReadableStream({
+  start(c) {
+    controller = c;
+  }
+});
+
+const iter = stream[Symbol.asyncIterator]();
+let next1Promise = iter.next();
+let next2Promise = iter.next();
+
+controller.enqueue("Hello");
+
+await next1Promise;
+
+iter.return();  
+```
+
+This was originally raised in Node.js here:
+https://github.com/nodejs/node/issues/57679
+
