@@ -196,3 +196,33 @@ pretty much. we have a tool now which transforms sourcemap urls to CDN hosted on
 [01:12:06.0305] <James>
 ill see if i can pester someone who knows more about node devtools than i do. i.e. any limits on requests etc, what origin it is
 
+[01:55:06.0575] <Simon Zünd>
+DevTools basically first attempts to call the `Network.loadNetworkResource` CDP method https://chromedevtools.github.io/devtools-protocol/tot/Network/#method-loadNetworkResource
+
+[01:55:14.0537] <Simon Zünd>
+So it depends whether Node implements that or not
+
+[01:55:43.0477] <Simon Zünd>
+If that fails, we try a different approach by attempting to fetch it ourselves but with some of the target permissions applied
+
+[01:55:49.0222] <Simon Zünd>
+Let me dig up the code
+
+[01:56:37.0101] <Simon Zünd>
+https://source.chromium.org/chromium/chromium/src/+/main:chrome/browser/devtools/devtools_ui_bindings.cc;l=1116;drc=e005c381337ad6a2312cafa0202f80b7950afbe1
+
+[01:56:48.0843] <Simon Zünd>
+That is the fallback if going through the inspected page fails
+
+[01:57:03.0656] <Simon Zünd>
+e.g. DevTools can load source maps from `file:///` URLs and it uses the fallback for that
+
+[01:57:27.0952] <Simon Zünd>
+I imagine that because Node.js only recently started implementing the CDP `Network` domain, we always used the fallback for node.js debugging
+
+[02:01:27.0244] <Simon Zünd>
+Note that cross-origin source maps are somewhat common, but the server serving the source maps needs to have CORS configured to allow fetching from cross-origins
+
+[02:04:11.0524] <James>
+so its possible node/devtools just never attempts to load external maps? thanks so much for the info too. was looking for that c file for a while 😅
+
