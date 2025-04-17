@@ -4410,3 +4410,65 @@ please advance the queue
 [08:49:41.0099] <ryzokuken>
 done
 
+[08:50:20.0403] <bakkot>
+speaking of web platform ergonomics I really want disposable AbortController
+
+[08:50:41.0895] <snek>
+just convince the whatwg editor and you can have it
+
+[08:50:49.0345] <bakkot>
+it seems like it is impossible to propose new features in WHATWG unless you work on Chrome
+
+[08:51:03.0394] <bakkot>
+there's not even a "convince them" step
+
+[08:51:07.0631] <bakkot>
+you will just get ignored mostly
+
+[08:51:14.0282] <rbuckton>
+AbortController/Signal have a number of issues:
+- Dependence on EventTarget
+- Poor separation of concerns
+- Privileged signaling for natives vs user-defined cancellation
+- User-defined cancellation can be triggered multiple times (i.e., if you forget `{ once: true }`)
+- User-defined cancellation leaks
+- Composition leaks
+
+[08:52:14.0894] <snek>
+yeah making the WebSocket constructor take relative urls was literally just the chrome network stack guy had to be convinced. i had opened implementation prs in all 3 browsers and written tests and spec text and that didn't matter :)
+
+[08:53:13.0334] <snek>
+we have a very special setup here at tc39 and i hope folks appreciate it
+
+[08:53:41.0988] <bakkot>
+maybe instead of the DOJ making Google sell Chrome they could just make it so Chrome is no longer allowed to propose new features or ship features which are not standardized elsewhere
+
+[08:54:11.0134] <rbuckton>
+IMO, poor separation of concerns is the worst offender:
+```js
+const ctl = new AbortController();
+f1(ctl.signal);
+f2(ctl.signal);
+
+function f1(signal) {
+  signal.addEventListener("abort", () => { ... }, { once: true });
+}
+
+function f2(signal) {
+   ...
+   signal.raiseEvent("abort"); // triggers user cancellation w/o access to controller
+}
+```
+
+[08:54:46.0700] <rbuckton>
+AbortSignal should never have been event based.
+
+[08:54:48.0752] <nicolo-ribaudo>
+I wish they could actually listen to you
+
+[08:55:00.0431] <snek>
+i still think a chrome foundation would be ideal. but then google wouldn't get money from selling it so 🤷
+
+[08:55:01.0796] <bakkot>
+uhhh signals do not have a raiseEvent method, do they?
+
