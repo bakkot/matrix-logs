@@ -389,3 +389,38 @@ Hello, welcome to the TC39 General Matrix channel.
 [10:55:14.0626] <Aapo Alasuutari>
 Regarding this, I think I figured out another place where `%TypedArray%.prototype.sort` implicitly relies on canonicalisation: if I'm not badly mistaken, the CompareTypedArrayElements AO is designed to invoke the "usual" total ordering for floats (convert to uint64, compare by value), but with the assumption that all NaNs are the usual canonical positive NaNs. If the sentence about canonicalisation is dropped, then the sorting algorithm is no longer the usual total ordering but instead something more custom with presumably a branch for NaNs needed.
 
+[10:59:25.0856] <littledan>
+there's "one" NaN value at the JS level, but then when you write it to a TypedArray, it gets the chance to choose a new value. so the de-canonicalization is happening after the code you're talking about.
+
+[10:59:59.0503] <littledan>
+the spec is pretty editorially confusing, and we should make that point more clear
+
+[11:00:18.0278] <Aapo Alasuutari>
+```js
+const b = BigInt64Array.of(-2251795519242240n, -4616189618054758400n, 0n, 4607182418800017408n, 9221120237041090774n);
+const a = new Float64Array(b.buffer);
+a[3] = 1;
+console.log(`${b[0]} ${b[1]} ${b[2]} ${b[3]} ${b[4]}`);
+console.log(`${a[0]} ${a[1]} ${a[2]} ${a[3]} ${a[4]}`);
+a.sort();
+console.log(`${b[0]} ${b[1]} ${b[2]} ${b[3]} ${b[4]}`);
+console.log(`${a[0]} ${a[1]} ${a[2]} ${a[3]} ${a[4]}`);
+a.sort(() => Math.random() ? -1 : 1);
+console.log(`${b[0]} ${b[1]} ${b[2]} ${b[3]} ${b[4]}`);
+console.log(`${a[0]} ${a[1]} ${a[2]} ${a[3]} ${a[4]}`);
+```
+
+[11:00:27.0535] <Aapo Alasuutari>
+* ```js
+const b = BigInt64Array.of(-2251795519242240n, -4616189618054758400n, 0n, 4607182418800017408n, 9221120237041090774n);
+const a = new Float64Array(b.buffer);
+console.log(`${b[0]} ${b[1]} ${b[2]} ${b[3]} ${b[4]}`);
+console.log(`${a[0]} ${a[1]} ${a[2]} ${a[3]} ${a[4]}`);
+a.sort();
+console.log(`${b[0]} ${b[1]} ${b[2]} ${b[3]} ${b[4]}`);
+console.log(`${a[0]} ${a[1]} ${a[2]} ${a[3]} ${a[4]}`);
+a.sort(() => Math.random() ? -1 : 1);
+console.log(`${b[0]} ${b[1]} ${b[2]} ${b[3]} ${b[4]}`);
+console.log(`${a[0]} ${a[1]} ${a[2]} ${a[3]} ${a[4]}`);
+```
+
