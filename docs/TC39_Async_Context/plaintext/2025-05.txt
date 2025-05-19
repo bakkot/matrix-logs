@@ -109,3 +109,21 @@ IIRC, CF Workers implements some browser web APIs (as what WinterTC covers). May
 [09:47:57.0622] <Chengzhong Wu>
 * IIRC, CF Workers implement some browser web APIs (as what WinterTC covers). Maybe you'd have thoughts about how the web APIs listed in the slides are implemented with AsyncContext/AsyncLocalStorage on CF Workers? 
 
+[09:51:02.0505] <James M Snell>
+yes we do. Currently we don't do anything special for some of the more complicated cases. On `setTimeout`, `setInterval`, and `queueMicrotask` we capture the current context and propagate it, as well as in any promise-based apis. But for the higher level apis like `EventTarget`, streams, etc we have been intentionally waiting on see how this conversation in the committee plays out
+
+[09:51:38.0127] <James M Snell>
+fortunately for us we are not heavily dependent on `EventTarget` and we haven't hit many cases with other standard apis where it matters much
+
+[09:51:55.0674] <James M Snell>
+oh... we also capture and restore the context for unhandled promise rejections
+
+[09:52:08.0480] <Andreu Botella>
+For what is worth, I think although WinterTC includes events and EventTarget, the only specific events it includes are `error`/`unhandledrejection`/`rejectionhandled`
+
+[09:52:36.0848] <Andreu Botella>
+well, and AbortSignal's abort event, which doesn't need propagation because it's fired synchronously
+
+[09:53:53.0089] <James M Snell>
+for `UnderlyingSink` and `UnderlyingSource` in streams, it is possible to polyfill using `AsyncContext.snapshot` (I've done similar with `AsyncLocalStorage`).  It's not all that difficult to get close to exactly what you want there
+
