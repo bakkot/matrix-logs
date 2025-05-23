@@ -1,0 +1,65 @@
+<!DOCTYPE html><html><head>
+  <meta charset="UTF-8">
+  <title>TC39 Test262 Maintainers on 2025-05-22</title>
+  <link rel="stylesheet" href="../style.css">
+  <script>window.room = "TC39 Test262 Maintainers";</script><script src="../render-roomlist.js"></script>
+  <script src="../logs.js"></script>
+</head>
+<body><div class="wrapper">
+<div class="sidebar">
+<div class="title">TC39 Test262 Maintainers<br>2025-05-22<br><a href="plaintext/">plaintext logs</a></div>
+<div class="nav">
+<a href="2025-05-16" class="nav-link"><span>prev</span></a>
+<span style="float:right">next</span>
+</div>
+    <div class="all-rooms"><noscript>JavaScript is required to load the channel index, but you can go to <a href="../..">the static index</a> directly.</noscript></div>
+<div class="footer"><a href="https://github.com/bakkot/matrix-archive-bot">source on github</a></div>
+</div>
+<div class="rhs">
+<div class="rhs-header">
+<span id="error" style="color: red; display:none">error</span>
+
+<input type="text" id="query" size="25" placeholder="Search TC39 Test262 Maintainers">
+<a id="search-submit" class="button icon-link" title="Search">
+  <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path d="M505 442.7L405.3 343c-4.5-4.5-10.6-7-17-7H372c27.6-35.3 44-79.7 44-128C416 93.1 322.9 0 208 0S0 93.1 0 208s93.1 208 208 208c48.3 0 92.7-16.4 128-44v16.3c0 6.4 2.5 12.5 7 17l99.7 99.7c9.4 9.4 24.6 9.4 33.9 0l28.3-28.3c9.4-9.4 9.4-24.6.1-34zM208 336c-70.7 0-128-57.2-128-128 0-70.7 57.2-128 128-128 70.7 0 128 57.2 128 128 0 70.7-57.2 128-128 128z"></path></svg>
+</a>
+</div>
+
+<div class="log"><table id="log-table"><tbody id="log-tbody">
+
+  <tr class="msg" id="L0"><td class="ts-cell"><a class="ts" href="#L0" alt="Thu May 22 2025 16:56:16 GMT-0700 (Pacific Daylight Time)">23:56</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-7" title="@hanslarsen:matrix.org">Hans</span>&gt;</div></td><td class="msg-cell">Hello maintainers. I have an issue with a staging test (specifically <code>is-subset-of</code>) and I think either the test or the spec is wrong somehow. I'll paste my findings and questions in this thread.</td></tr>
+  <tr class="msg" id="L1"><td class="ts-cell"><a class="ts" href="#L1" alt="Thu May 22 2025 16:59:11 GMT-0700 (Pacific Daylight Time)">23:59</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-7" title="@hanslarsen:matrix.org">Hans</span>&gt;</div></td><td class="msg-cell"><p>Here's the spec for <code>Set.prototype.isSubsetOf</code>:</p>
+<pre><code>5. Let thisSize be the number of elements in O.[[SetData]].
+6. Let index be 0.
+7. Repeat, while index &lt; thisSize,
+       a. Let e be O.[[SetData]][index].
+       b. Set index to index + 1.
+       c. If e is not empty, then
+              i. Let inOther be ToBoolean(? Call(otherRec.[[Has]], otherRec.[[SetObject]], « e »)).
+              ii. If inOther is false, return false.
+              iii. NOTE: The number of elements in O.[[SetData]] may have increased during execution of otherRec.[[Has]].
+              iv. Set thisSize to the number of elements in O.[[SetData]].
+</code></pre>
+<p>The test does the following;</p>
+<ol>
+<li>create a Set with [1,2,3]</li>
+<li>create a SetLike that, everytime we check if it has a value v, deletes that value from the first set.</li>
+<li>asserts there's no values left after the call to <code>isSubsetOf</code></li>
+</ol>
+<p>This seems to make sense, but according to the algorithm, that would only work if we make a copy of the set elements in the first place. No such copy is required.</p>
+<h2>Explanation:</h2>
+<p>So what happens is:</p>
+<ol>
+<li>index = 0, set = [1,2,3], size = 3, e = 1, Call other.<a href="e">[Has]</a></li>
+<li>The SetLike, removes 1 from the original set</li>
+<li>index = 1, set = [2,3], size = 2, e = 3. &lt;&lt; - WE SKIPPED AN ELEMENT BY INCREMENTING INDEX</li>
+<li>The element we skipped will remain in the set at the end.</li>
+</ol>
+<p>The test thus fails because we use indexing and skipped an element, and it asserts that we're going through all elements.</p>
+<p>I'm assuming V8/SpiderMonkey/etc are doing something different than the spec that passes that test?</p>
+<p>Also, <code>isSupersetOf</code>, strangely, uses an iterator, not indexing.</p>
+<p>I can't make a copy of the set's element because its elements might change during the call (there's a test for it too).</p>
+</td></tr>
+
+</tbody></table></div></div></div>
+</body></html>

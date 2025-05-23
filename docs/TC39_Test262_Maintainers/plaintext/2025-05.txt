@@ -100,3 +100,51 @@ anyone else have other suggestions?
 [14:30:20.0375] <ljharb>
 no i think that seems like the right approach
 
+
+2025-05-22
+[16:56:16.0524] <Hans>
+Hello maintainers. I have an issue with a staging test (specifically `is-subset-of`) and I think either the test or the spec is wrong somehow. I'll paste my findings and questions in this thread.
+
+[16:59:11.0685] <Hans>
+Here's the spec for `Set.prototype.isSubsetOf`:
+
+```
+5. Let thisSize be the number of elements in O.[[SetData]].
+6. Let index be 0.
+7. Repeat, while index < thisSize,
+       a. Let e be O.[[SetData]][index].
+       b. Set index to index + 1.
+       c. If e is not empty, then
+              i. Let inOther be ToBoolean(? Call(otherRec.[[Has]], otherRec.[[SetObject]], « e »)).
+              ii. If inOther is false, return false.
+              iii. NOTE: The number of elements in O.[[SetData]] may have increased during execution of otherRec.[[Has]].
+              iv. Set thisSize to the number of elements in O.[[SetData]].
+```
+
+The test does the following;
+
+1. create a Set with [1,2,3]
+2. create a SetLike that, everytime we check if it has a value v, deletes that value from the first set.
+3. asserts there's no values left after the call to `isSubsetOf`
+
+This seems to make sense, but according to the algorithm, that would only work if we make a copy of the set elements in the first place. No such copy is required.
+
+Explanation:
+----
+
+So what happens is:
+
+1. index = 0, set = [1,2,3], size = 3, e = 1, Call other.[[Has]](e)
+2. The SetLike, removes 1 from the original set
+3. index = 1, set = [2,3], size = 2, e = 3. << - WE SKIPPED AN ELEMENT BY INCREMENTING INDEX
+4. The element we skipped will remain in the set at the end.
+
+The test thus fails because we use indexing and skipped an element, and it asserts that we're going through all elements.
+
+I'm assuming V8/SpiderMonkey/etc are doing something different than the spec that passes that test?
+
+Also, `isSupersetOf`, strangely, uses an iterator, not indexing.
+
+I can't make a copy of the set's element because its elements might change during the call (there's a test for it too). 
+
+
