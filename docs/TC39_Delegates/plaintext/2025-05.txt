@@ -501,3 +501,374 @@ i've been there the whole time 🥷
 [21:41:29.0314] <rkirsling>
 okay sam
 
+
+2025-05-27
+[03:04:53.0133] <Luca Casonato>
+what are people's opinons on changing the `Map` and `Set` constructor to not call `Symbol.iterator` on the passed value if the passed value brand checks as a Map/Set? So `new Map(new Map())` would not call `Map.prototype[Symbol.iterator] ` anymore
+
+[03:44:54.0506] <Ashley Claymore>
+We didn't do this for `Set.prototype.union` and co
+
+[03:51:57.0744] <Ashley Claymore>
+Do any engines have a faster path for this already, the value is a real Map and the iterator hasn't been modified 
+
+[03:54:18.0046] <Ashley Claymore>
+I am interested how much benefit there would be if we can modify array destructuring to avoid the iterator when destructuring an array
+
+[05:45:27.0041] <yulia>
+Is the draft schedule up yet?
+
+[06:48:03.0600] <Chris de Almeida>
+nearlyu
+
+[06:48:05.0653] <Chris de Almeida>
+* nearly
+
+[07:13:06.0908] <Chris de Almeida>
+draft schedule now available via reflector issue:  https://github.com/tc39/Reflector/issues/558
+
+[08:20:49.0233] <Luca Casonato>
+> <@aclaymore:matrix.org> I am interested how much benefit there would be if we can modify array destructuring to avoid the iterator when destructuring an array
+
+Yes this was the next thing I was going to ask
+
+[08:22:41.0447] <ljharb>
+engines can already do that unobservably when they know the map/set isn't modified
+
+[08:38:10.0263] <snek>
+I don't think any engine does it for these, it's very annoying to track
+
+[08:38:20.0662] <snek>
+having the spec change would definitely help
+
+[08:41:45.0955] <mgaudet>
+Agreed with snek; while heroics are possible and sometimes happen, any place we can specify that no heroics re needed is appreciated 
+
+[08:41:50.0322] <mgaudet>
+* Agreed with snek; while heroics are possible and sometimes happen, any place we can specify that no heroics are needed is appreciated 
+
+[09:12:48.0478] <iain>
+We actually [already optimize this path](https://searchfox.org/mozilla-central/source/js/src/builtin/MapObject.cpp#789-800)
+
+[09:13:41.0966] <iain>
+Although it would be nice if we didn't have to do all the careful plumbing to make sure it's a valid transformation
+
+[09:14:33.0868] <ljharb>
+(tbc i'm fully on board with having explicit fast paths for things that pass brand-checks)
+
+[09:25:03.0839] <bakkot>
+at least the map iterator isn't side-effecting
+
+[09:25:16.0169] <bakkot>
+array iteration is probably the most common case and the iterator has side effects all over the place
+
+[09:36:03.0086] <Ashley Claymore>
+Array iterstor side-effecting in that it triggers MOP methods?
+
+[09:36:25.0195] <Ashley Claymore>
+* Array iterator side-effecting in that it triggers MOP methods?
+
+[09:40:56.0155] <bakkot>
+sure and also getters
+
+[09:42:47.0087] <bakkot>
+also this is a good place for me to beat my drum of "iterating built ins does not need allocations" https://docs.google.com/document/d/1M5S-u3N3vQkVBGFCoaYt_ABPGl0EW16QQrvDBaY2FiE/edit
+
+[12:11:25.0760] <shu>
+Rob Palmer Chris de Almeida please accommodate https://github.com/tc39/agendas/pull/1889 if possible. i know that AsyncContext is held up on web integration stuff, and Scott represents the web side of it for Chrome, so i think it's important to get his input during plenary
+
+[12:13:07.0617] <shu>
+could a chair please ping me if the constraint could (or not) be accommodated?
+
+[12:13:26.0037] <shu>
+(in case of not, would try to find a secondary)
+
+[14:33:57.0288] <James M Snell>
+Hey all... had some feedback come up with regards to Explicit Resource Management today that I wanted to surface and get some input on. The question specifically is, "I think explicit resource management is missing a really important feature: The ability to transfer ownership. I need a way to "release" a variable I declared with using, especially to return it." ... essentially treating the ERM/using as similar to an RAII that can be moved away.
+
+```
+function foo() {
+  using foo = new Foo();
+  using bar = new Bar();
+  // I only want foo or bar disposed if they are not returned
+  if (someCondition()) return bar; 
+  else return foo;
+}
+```
+
+[14:35:15.0819] <James M Snell>
+Unfortunately, since both are declared with `using`, both are going to be disposed when the function returns. The ask from the feedback is whether it would make sense to have some generalized "release" or "move" capability.. like `return move bar`, etc
+
+[14:37:33.0207] <James M Snell>
+obviously we can follow a pattern similar to `DisposableStack` and have the disposable object itself declare a `move()` method but that means allocating a new object or having to keep track of the moved state manually
+
+[14:37:54.0500] <Duncan MacGregor>
+So I think one of the good things about explicit resource management is its simplicity, there isn't much of an ownership or lifetime model to think about or to get wrong.
+
+[14:38:01.0726] <James M Snell>
+we can also null/undefined out the original decl and assign it to a regular scoped variable but that's also a bit wonky
+
+[14:38:18.0541] <James M Snell>
+100% agree
+
+[14:38:41.0455] <Duncan MacGregor>
+I think I'd prefer seeing people declaring `move()` themselves rather than trying to design something in the language.
+
+[14:39:49.0340] <Duncan MacGregor>
+But now I'm curious if typescript could layer a full borrow checker on top and do this automatically. :-)
+
+[14:40:06.0676] <James M Snell>
+* we can also null/undefined out the original decl and assign it to a regular scoped variable but that's also a bit wonky .... actually, nevermind, I don't think this works
+
+[14:52:24.0608] <James M Snell>
+Making every disposable object declare a `move()` is a bit ... difficult.  From the conversation I'm having in another channel on this, "It has to allocate a new instance of itself and move all the contents over to it. This is a lot of work to write for every type. And if anything else in the world holds a (presumably non-owning) reference to the object, those references are now invalid, so it might not even be possible to implement move() correctly, at least without adding a layer of indirection."
+
+[15:16:03.0682] <Duncan MacGregor>
+I think I need to sleep on it. I've started writing an reply about 5 times, and deleted them 5 times. My essential concern is that both the 'other non-owning references becoming invalid' and the return of the resource suggest that it is leaking in ways that probably aren't good for an explicit allocated and released resource (the former because we seem to have lost ownership during the method's lifetime, and the latter because we can't require the result is allocated to a variable declared with `using`).
+
+[15:19:54.0155] <James M Snell>
+yeah, it's a tricky one
+
+[15:21:04.0175] <James M Snell>
+I prefer the simplicity of ERM as it is but compared to the typical RAII pattern in c++, etc it's a bit *over* simplified... and that's there the questions here are coming from. We have a code base that is quite heavy in RAII mechanisms and the c++ level with no equivalent at the JS level
+
+[15:22:49.0638] <nicolo-ribaudo>
+If we get Symbol.enter/exit, then you'd be able to declare a function `movable` that you'd use as `using x = movable(foo)`
+
+[15:23:03.0858] <James M Snell>
+Another example to stew on... 
+```
+function foo() {
+  using bar = new MyDisposable();
+  if (someCondition()) throw new Error('boom'); // I want bar disposed in this case
+  return bar;  // I don't want it disposed in this case
+}
+```
+
+[15:23:40.0794] <James M Snell>
+Is there an open proposal for this?
+
+[15:23:49.0896] <James M Snell>
+and is it functions only?
+
+[15:25:24.0444] <nicolo-ribaudo>
+Actually maybe you don't need .enter? (Sorry my element client is refusing to format markdown)
+
+Instead of
+```
+using foo = getObj()
+```
+you can do
+```
+const foo = getObj();
+using move = movable(foo)
+
+...
+
+move()
+```
+
+Where movable returns a function move that returns foo and has its own dispose method, deactivated by move.
+
+[15:25:49.0068] <nicolo-ribaudo>
+* Actually maybe you don't need .enter? (Sorry my element client is refusing to format markdown)
+
+Instead of
+```
+using foo = getObj()
+```
+you can do
+```
+const foo = getObj();
+using move = movable(foo)
+
+...
+
+move()
+```
+
+Where movable returns a function move that returns foo and has its own dispose method forwarded to foo, deactivated by move.
+
+[15:26:38.0190] <James M Snell>
+ah, ok, so it's essentially like declaring a disposable boxed type similar to `DisposableStack`
+
+[15:26:40.0467] <nicolo-ribaudo>
+> <@jasnell:matrix.org> Is there an open proposal for this?
+
+We have https://github.com/tc39/proposal-explicit-resource-management/issues/195
+
+[15:26:59.0782] <nicolo-ribaudo>
+It was also discussed in the context of async context, maybe Chengzhong Wu knows if we actually have a proposal
+
+[15:27:48.0287] <James M Snell>
+Interesting ok
+
+[15:45:55.0830] <Chengzhong Wu>
+https://github.com/tc39/proposal-using-enforcement for Symbol.enter
+
+[16:32:49.0546] <bakkot>
+```js
+function movable(foo) {
+  let dispose = foo[Symbol.dispose];
+  if (typeof dispose !== 'function') throw new Error('not disposable');
+  return {
+    resource: foo,
+    moved: false,
+    [Symbol.dispose]() {
+      if (this.moved) return;
+      dispose.call(foo);
+    },
+    move() {
+      this.moved = true;
+    },
+  }
+}
+```
+
+[16:33:06.0219] <bakkot>
+```js
+// usage:
+function makeDisposable() {
+  return {
+    [Symbol.dispose]() {
+      console.log('disposed');
+    },
+  };
+}
+{
+  using movableFoo = movable(makeDisposable());
+  const { resource: foo } = movableFoo;
+  console.log('normal exit');
+  // disposed
+}
+{
+  using movableFoo = movable(makeDisposable());
+  const { resource: foo } = movableFoo;
+  movableFoo.move();
+  console.log('moved before exit');
+  // not disposed
+}
+```
+
+[16:33:22.0913] <bakkot>
+this seems like it's fine to leave to userland
+
+[16:33:49.0125] <bakkot>
+it's a little boilerplate I guess
+
+[16:49:27.0664] <Ashley Claymore>
+Could make .move return a new movable in the same way DisposableStack.p.move returns a new Stack
+
+[16:50:29.0127] <Ashley Claymore>
+or maybe just return the resource after nulling it out 
+
+[16:52:51.0103] <Ashley Claymore>
+though need to be careful moving in a _tearable_ hand over 
+
+[16:55:03.0859] <bakkot>
+* ```js
+function movable(foo) {
+  let dispose = foo[Symbol.dispose];
+  if (typeof dispose !== 'function') throw new Error('not disposable');
+  return {
+    resource: foo,
+    moved: false,
+    [Symbol.dispose]() {
+      if (this.moved) return;
+      dispose.call(foo);
+    },
+    move() {
+      this.moved = true;
+      return foo;
+    },
+  }
+}
+```
+
+[16:55:43.0900] <bakkot>
+I think just returning the resource is better for the cases described above; presumably the caller is not expecting this wrapped thing and _a priori_ there is no reason to expect them to want to move it again
+
+[16:56:02.0094] <Ashley Claymore>
+```
+return {
+  p: moveable.move(),
+  q: mightThrow()
+}
+```
+
+
+
+[16:56:14.0635] <bakkot>
+but good idea, returning the resource is a nice convenience, updated
+
+[16:56:21.0550] <bakkot>
+yeah it's easy to hold this wrong
+
+[16:56:31.0827] <bakkot>
+although this is also true of `disposableStack.move()`
+
+[16:56:49.0493] <bakkot>
+boundaries are always tricky
+
+[16:56:59.0144] <bakkot>
+not much to be done about that though without linear types
+
+[16:57:05.0321] <Ashley Claymore>
+Yeah, the point of stack.move is that it should be the very last expression 
+
+[16:57:22.0752] <Ashley Claymore>
+to ensure the time to move has truly arrived 
+
+[16:58:02.0659] <shu>
+if you return the resource and not a new movable, isn't that more like release()
+
+[16:58:23.0318] <bakkot>
+I guess but I liked the symmetry with `disposableStack.move()`
+
+[16:58:39.0469] <shu>
+but DS does return a new movable DS
+
+[16:59:44.0420] <Ashley Claymore>
+one difference is that the resource is itself a disposable, so it can be _used_ by the caller
+
+
+2025-05-28
+[17:00:10.0941] <Ashley Claymore>
+only needs to remain a movable if the intention is to move again
+
+[17:02:08.0414] <rbuckton>
+Wouldn't you just use `DisposableStack` itself for this?
+
+[17:03:07.0202] <Ashley Claymore>
+Yeah I would 
+
+[17:03:08.0832] <bakkot>
+only if it's all-or-nothing
+
+[17:03:15.0538] <James M Snell>
+DS was my initial response on the discussion on this side but the feedback is that it just *feels* cumbersome 
+
+[17:03:22.0798] <bakkot>
+making one stack per resource is kinda annoying
+
+[17:03:33.0665] <bakkot>
+though I guess not really any different than the wrapper, in practice
+
+[17:03:36.0180] <rbuckton>
+Maybe, but it works.
+
+[17:03:55.0206] <James M Snell>
+More context from the discussion I've been having on this side. It should give more context
+
+[17:03:58.0688] <rbuckton>
+Changing ownership should be rare.
+
+[17:04:35.0170] <James M Snell>
+Keeping in mind that this is coming from someone who is super familiar with RAII patterns and move semantics in C++
+
+[17:04:38.0339] <bakkot>
+yeah but it takes one more line than my little wrapper, because you have to `new` the stack before you can use it
+
+[17:04:51.0737] <bakkot>
+difference between two lines of boilerplate and one line of boilerplate is a lot!
+
