@@ -151,3 +151,26 @@ Yeah, true. I haven't encountered this being an issue in the wild *yet* but it c
 [10:03:49.0247] <Andreu Botella>
 * but now that I'm thinking through this, I realize that the interaction with fetch and anything else that consumes or produces a stream browser/runtime-internally might not be as easy to implement
 
+
+2025-05-28
+[04:23:32.0021] <nicolo-ribaudo>
+Monkey-patching for postMessage the way it's used as a scheduler would be something like this:
+```js
+class MessageChannel extends globalThis.MessageChannel {
+  constructor(...args) {
+    super(...args);
+    this.port1.__channel = this;
+    this.port2.__channel = this;
+    patch(this.port1);
+    patch(this.port2);
+  }
+}
+```
+where `patch` wraps `onmessage`/`addEventListener` to get a registration-time snapshot, or as an alternative to store the `.postMessage`-time snapshot on this.__channel and run the event callback in it.
+
+[04:23:53.0556] <nicolo-ribaudo>
+(I think that this is bad code, but it's _possible_)
+
+[04:24:30.0075] <nicolo-ribaudo>
+And if the code patching is the same as the code needing the patch, it can just call `.wrap` instead (e.g. for React)
+
