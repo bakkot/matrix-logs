@@ -60,3 +60,62 @@ I made a PR https://github.com/bugsnag/sourcemaps.info/pull/6
 [04:37:58.0592] <jkup>
 Repo looks quite old, I'll give it a few weeks and then maybe try to find the owner on socials?
 
+
+2025-06-11
+[01:30:56.0677] <Shumaf Lovpache>
+Hi everyone. My team recently discovered an interesting technique used by React Server components.
+
+The React Server components machinery (in particular [react-client](https://github.com/facebook/react/tree/main/packages/react-client)) creates fake scripts with the same source map as a real user code to preserve source mapped traces in the browser. It allows recreating the top stack frame of the server code on the client preserving mapping to the original source code.
+
+Consider an example ([github repo](https://github.com/Soarex16/next-15-server-components-reproduction-app)):
+
+```js
+export default function Home() {
+  console.log('Home');
+  return <div>
+    <main>
+      <h1>Header</h1>
+      Some text
+    </main>
+    <footer>Footer</footer>
+  </div>;
+}
+```
+
+If you open this example in a browser, it will print to console the following message (first picture)
+And clicking to “page.tsx:3” points to the original source (second picture).
+
+From the user perspective, it’s a really neat feature, but unfortunately, this technique confuses js debuggers ([issue on GH](https://github.com/vercel/next.js/issues/77733)). This happens because debuggers think that this piece of code was bundled in different places multiple times.
+
+So when the user put a breakpoint, the debugger put breakpoints in all these fake scripts causing redundant breaks.
+
+Here is an example of one of the scripts:
+
+```js
+/* This module was rendered by a Server Component. Turn on Source Maps to see the server source. */
+
+({"Home":_=>
+
+        _()})
+
+//# sourceURL=rsc://React/Server/webpack-internal:///(rsc)/./app/page.tsx?0
+
+//# sourceMappingURL=http://localhost:3000/__nextjs_source-map?filename=webpack-internal%3A%2F%2F%2F%28rsc%29%2F.%2Fapp%2Fpage.tsx
+```
+
+We have several options for solving this problem, and all of them require coordination between debuggers and frameworks. Since it affects all major debuggers – Chrome DevTools, WebStorm, VS Code, I’m asking for your feedback as a starting point for discussion with the community.  
+Here they are:
+
+* Use some heuristics (like matching file structure, comments, etc.) to detect fake scripts that don't need breakpoints. This approach is unreliable and can easily break if React changes scripts structure in the future.  
+* Use some comment similar to \# sourceMappingURL to indicate that this file should be skipped by the debugger  
+* For fake scripts generate source maps with some extra field (like ignoreList but for generated code):
+
+```json
+{
+  "version" : 3,
+  "file": "out.js",
+  "ignored": true,
+  rest of the source map ...
+}
+```
+
