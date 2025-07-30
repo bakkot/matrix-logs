@@ -1,0 +1,252 @@
+2025-06-02
+[06:16:18.0614] <Jesse>
+after recovering over the weekend from lots of productive JS numerics conversations, here's my understanding of the current plan:
+
+* for July plenary: spec text and tests for proposal-intl-keep-trailing-zeros, going to stage 2 or even 2.7
+* measure proposal renamed to "amount", scope gets reduced, data model changes from decimals to digit strings
+* for July plenary: amount proposal for stage 2
+* amount removed from decimal proposal (because that functionality moves to proposal-amount), spec text polished and completed
+* for July plenary: no decimal update, no stage advancement
+* for September plenary: ask for stage 2 for decimal
+* smart units remains on the radar and up for discussion, though currently lacks a plan and schedule
+
+[06:16:22.0123] <Jesse>
+how does that look?
+
+[06:37:05.0173] <sffc>
+Don't remove Decimal.Amount until we have seen if standalone Amount actually gets Stage 2
+
+[06:38:00.0424] <sffc>
+In September plenary, we send Decimal for Stage 2, either on its own (if Amount got Stage 2 in July) or paired with Decimal.Amount
+
+[06:38:16.0027] <sffc>
+The rest aligns with my expectations 👍️
+
+
+2025-06-03
+[17:55:08.0715] <ljharb>
+my concerns about advancing decimal remain unchanged. but the rest sgtm
+
+[01:15:10.0155] <sffc>
+Should I cancel the Numerics call this Thursday evening?
+
+[01:23:02.0962] <Jesse>
+sgtm -- I think we're pretty much up-to-date at the moment
+
+[01:29:38.0259] <sffc>
+Only thing is if we wanted to sync with Jordan?
+
+[01:31:40.0548] <Jesse>
+ljharb: would you be able to attend the call this week?
+
+[01:33:09.0571] <Jesse>
+if not that's ok, but it would be great if you could join the call sometime in the near future
+
+[01:33:33.0401] <Jesse>
+it's biweekly
+
+[07:48:03.0392] <ljharb>
+i can’t make it this week, but maybe next time
+
+[07:48:55.0870] <sffc>
+OK in that case I will delete this week's meeting
+
+[08:39:47.0134] <Jesse>
+I've added some initial spec text for Amount: https://github.com/tc39/proposal-measure/pull/28
+
+[08:40:44.0773] <Jesse>
+it implicitly depends on intl-keep-trailing-zeroes because the approach to handling Amounts in Intl would be to first render them as strings, which could have trailing zeroes
+
+[10:40:27.0755] <Rob Palmer>
+> <@sffc:mozilla.org> Don't remove Decimal.Amount until we have seen if standalone Amount actually gets Stage 2
+
+Please could you help me understand this logic. If the committee thinks Amount (as a standalone concept) is not ready for Stage 2, why would it then succeed when coupled with Decimal?
+
+[11:51:24.0722] <sffc>
+There were concerns raised about it in the breakout session
+
+[11:52:09.0752] <sffc>
+Waldemar had some concerns I think about String Amount that didn't apply to Decimal Amount
+
+[11:54:12.0478] <sffc>
+Main issue IIRC was that String Amount doesn't have a well defined range of valid values, whereas Decimal Amount just inherits the range from Decimal
+
+[11:55:00.0000] <sffc>
+So String Amount is effectively adding yet another numeric type, but Decimal Amount is not since it is just a Decimal with metadata
+
+[11:56:30.0593] <sffc>
+I personally don't feel strongly about that point
+
+[12:07:18.0525] <Rob Palmer>
+That makes sense. So a more explicit rewording of your refinement would be:
+
+"Amount remains in Decimal if string Amount fails to reach Stage 2 due to the committee prefering Decimals over strings."
+
+[12:15:29.0829] <sffc>
+I'm not aware of other unresolved concerns about Amount other than perhaps motivation, but I feel good about the progress we've made on that front
+
+[12:16:20.0626] <sffc>
+My long standing position (discussed earlier in this channel) remains uncleaned
+
+[12:23:28.0803] <Rob Palmer>
+Apologies I did not read up. I see it now. This whole area generates so much written and verbal content... 
+
+[12:50:34.0703] <sffc>
+* My long standing position (discussed earlier in this channel) remains unchanged
+
+
+2025-06-04
+[01:43:17.0690] <eemeli>
+My understanding of where we got to in post-meeting discussions this week with Jesse and nicolo-ribaudo is that an Amount ought to hold a _mathematical value_ (as defined in '262), parsed from a string input value using the same method as for **ToIntlMathematicalValue ( value )**, but without support for non-finite values or -0. Amount would either have no built-in limits on the value, or it would match the limits imposed by Intl.NumberFormat.
+
+Overall, the intent would be to avoid defining a new numeric type beyond what's already in the spec, even if not easily accessible by users.
+
+[02:29:52.0477] <Jesse>
+that's my understanding as well -- thanks for sketching it out
+
+[02:31:06.0919] <Jesse>
+there's also an understanding that, if decimal were to advance, intl limits might also have to be adjusted (to account for the full range of decimal128, i.e. up to 34 significant digits and exponent of +/-6144), and ergo amount's limits
+
+[03:06:57.0078] <eemeli>
+Thinking on what we discussed, I'm kinda tending towards suggesting that we initially propose Amount with no built-in limits on the numerical value, like what's done with BigInt. Then we would only get rounding if fractionDigits or significantDigits were set in the options.
+
+[06:35:03.0160] <sffc>
+Implementations have their own harder limits. MVs are themselves unlimited, but they are usually bounded when creating an MV from a Number or elsewhere. The ICU4X limit is on the order of 2^16 digits and +/- 2^15 power of ten.
+
+[06:35:56.0059] <sffc>
+I think we should try for Stage 2 with _some_ limit, perhaps the Intl.NF limit, and we can work out _exactly what_ limit during Stage 2
+
+[06:39:16.0257] <Jesse>
+agree -- for now, the spec text I'm working on is working with unlimited mathematical values
+
+[06:44:27.0632] <sffc>
+One of my biggest regrets about the Temporal design is that we chose limits for things that make it painful to implement. We spend so much time trying to optimize the 64+32 bit ints we need to represent nanoseconds since epoch for 100,000+ years.
+
+[06:52:24.0844] <eemeli>
+During lunch today I joked about defining a tagged template literal for Decimal, but tbh it doesn't look _too bad_. Here's one of the Decimal readme examples:
+```
+function calculateBill(items, tax) {
+  let total = Decimal`0`;
+  for (let { price, count } of items) {
+    total = Decimal`${total} + ${price} * ${count}`;
+  }
+  return Decimal`${total} * (${tax} + 1)`;
+}
+```
+
+[06:53:14.0215] <nicolo-ribaudo>
+https://jsr.io/@nic/decimal-literal
+
+[06:57:33.0538] <eemeli>
+Is there a reason why that's not being considered for the spec?
+
+[06:59:50.0380] <sffc>
+I think we eventually want `1.2m` but that should return a primitive. It would be surprising for `1.2m !== 1.2m` with object-based decimals.
+
+[07:01:02.0992] <eemeli>
+You presumably meant this?
+```
+m`1.2` !== 1.2m
+```
+
+[07:01:10.0971] <sffc>
+I think it would be cool to have a decimal-based template syntax, where everything gets converted into a decimal.
+
+```
+let a = new Decimal("1");
+let b = "2";
+let c = 3;
+let d = Decimal`a + b + c`; // 6
+```
+
+[07:02:22.0493] <eemeli>
+That's what I have above and Nicolo in his decimal-literal? but with `${...}` rather than some implicit access to the local context.
+
+[07:02:46.0717] <sffc>
+Yes right
+
+[07:05:20.0109] <sffc>
+This type of template syntax has a special place for me. When I was first learning to program, when I was about 10, I was having problems with number math in ActionScript, and I drafted what a solution would look like, and what I came up with looks remarkably similar to this. It was my first ever proposal. 😅
+
+[07:07:02.0311] <sffc>
+I will make the observation that we don't actually need Decimal in order to implement the template syntax. It could use `Math.decimalAdd` as I suggested in issue 181, and return a Number.
+
+[07:11:34.0093] <sffc>
+We don't need to add Decimal if:
+```
+let a = 0.1;
+D`${a} + 0.2` === 0.3
+```
+desugars to:
+```
+let a = 0.1;
+Math.decimalAdd(a, 0.2) === 0.3
+```
+
+[07:15:35.0390] <sffc>
+A nice property of this direction is that we could have a Decimal mode, a Rational mode, a mode for finance, a mode for scientific computing, etc. We're not limited to Decimal128 and the arcane decisions it makes.
+
+[07:33:13.0505] <Jesse>
+is there any advantage to having this in the spec vs. as an external add-on?
+
+[07:34:16.0953] <sffc>
+JSSugar can implement the syntax so long as the primitives like Math.decimalAdd are in the standard library
+
+[07:36:20.0332] <sffc>
+Jesse, is your +1 about "the syntax is JSSugar's problem" or "we should expose primitives like Math.decimalAdd"
+
+[07:37:21.0463] <Jesse>
+my +1 was to the idea that such syntax would be JSSugar's problem
+
+[07:38:23.0305] <Jesse>
+imo `Math.decimalAdd` etc. could be considered as fallbacks in case a class-based Decimal fails
+
+[07:39:16.0553] <Jesse>
+but my sense of the temperature poll last week was that most people who follow this want decimal as we've designed it (modulo the discussion of amount & where it should exist)
+
+[07:39:53.0976] <Jesse>
+* but my sense of the temperature poll last week was that most people who follow this topic do want decimal as we've designed it (modulo the discussion of amount & where it should exist)
+
+[07:40:49.0094] <Jesse>
+(I think at one point I even experiemented with `Math.decimalAdd` etc. when things were looking especially bad with decimal. This was maybe 1.5 years ago)
+
+[07:42:10.0576] <sffc>
+I would really like to resolve issue 181. You posted a good comment on March 12, https://github.com/tc39/proposal-decimal/issues/181#issuecomment-2718669257, which I responded to, but you haven't responded back.
+
+[07:46:09.0506] <Jesse>
+I whipped up some WIP experiments with `Math.decimalAdd` to illustrate the issue, generating random ASTs that do arithmetic and comparing the results of doing the math as numbers vs. as decimals, but never commited it
+
+[07:47:03.0195] <sffc>
+Basically I think there needs to be a cohesive statement about why we think `Decimal` solves the problem statement better than `Math.decimalAdd`, if we believe that it does.
+
+(Also, we never got around to updating the problem statement. The README is still out of date.)
+
+[07:47:43.0787] <Jesse>
+there's still an in-flight PR for that: https://github.com/tc39/proposal-decimal/pull/195
+
+[08:34:49.0588] <ljharb>
+JSSugar isn't a thing (that was just chrome's nonviable idea for how to solve the shared problem), what do you mean "JSSugar's problem"?
+
+[08:40:57.0606] <sffc>
+Math.decimalAdd: https://developer.mozilla.org/en-US/play?id=vek0wYSHAUnyHe8nHoV1zLHZgmVluKk6XRjBkEG7Sj44JoN3yW03iumZ138KzrWN%2Baf0rWVYx4Af8B1j
+
+
+2025-06-18
+[07:58:01.0374] <eemeli>
+Just to confirm, we've a numerics call starting in one hour, yes?
+
+[08:22:32.0349] <Jesse>
+yes!
+
+[08:58:23.0415] <Jesse>
+I’ll be 5 min late
+
+[09:07:50.0266] <Jesse>
+I'm there, sound apparently doesn't work?
+
+[09:12:01.0751] <Jesse>
+https://github.com/tc39/proposal-measure/pull/28
+
+[09:15:29.0958] <Jesse>
+https://github.com/tc39/proposal-smart-unit-preferences smart units
+

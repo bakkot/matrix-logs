@@ -1,0 +1,1560 @@
+2025-02-12
+[03:42:51.0849] <eemeli>
+Looking over and considering Jesse's upcoming Decimal/Measure presentation and explainer, I get the sense that we really ought to find a way to reach the end goals here in multiple smaller steps, rather than one big leap. By Decimal normalising trailing zeros, the use cases for them introduce a dependency on Measure, but it gets a bit hairy if Measure then also depends on Decimal for its value representation.
+
+What if we were to initially not include _any_ conversions in Measure? Then we wouldn't need to change its inputs at all, and we would still be providing a way for Intl.NumberFormat and Intl.MessageFormat to get their formattable inputs as a combined value+units+precision package.
+
+Then we could consider separately the Smart Units part of this whole thing adding unit conversions, and Decimal defining its accessors on Measure, and we'd avoid having everythin depend on everything else.
+
+[04:11:38.0886] <eemeli>
+Here's a sketch of what that might look like: https://gist.github.com/eemeli/0bd413d2f711cbd6016673af8d68c38c
+
+That's in TS, so the real thing would need to have appropriate runtime checks for the types. The lack of any methods on the class is quite intentional, as is freezing it.
+
+I'm also starting to think that we might want to call this "Amount" rather than "Measure", mostly because then it also makes sense for currencies: it feels really clumsy to talk of a "measure of money", whereas an "amount of money" (or anything else, really) makes more sense.
+
+[04:17:23.0096] <Jesse>
+thanks!
+
+[04:18:49.0872] <Jesse>
+happy to discuss another name
+
+[04:19:34.0784] <Jesse>
+"measure" suggests physical quantities and (it feels like) is excludes currencies; "amount" clearly includes currencies but (to my mind) weakly excludes other kinds of measurements
+
+[04:22:29.0800] <Jesse>
+shouldn't we have a toLocaleString or at least toString in Amounts?
+
+[04:29:36.0662] <Jesse>
+I wonder if want to tie in to ISO 4217 (standardization of currencies) somehow or whether measure/amount is merely any tagged number (or string, or bigint) at all
+
+[04:30:09.0079] <Jesse>
+`new Amount(42.75, "foobar gramz")`
+
+[04:30:55.0318] <Jesse>
+I like the simplicity of the zero-method approach but I wonder if this deflates the value-add too much
+
+[04:31:28.0406] <Jesse>
+one of the nice value-add parts of measure, to my mind, was its tie-in to CLDR's units.xml
+
+[04:31:49.0994] <Jesse>
+exposing new capabilities to the language, rather than merely attaching a string to a number
+
+[04:43:30.0766] <eemeli>
+I would argue that e.g. "3 meters" or "42 grams" are both also "amounts", whereas calling those "measures" or "measurements" would be more opinionated about how the figure was reached.
+
+[04:44:28.0320] <eemeli>
+toLocaleString potentially yes, delegating to Intl.NumberFormat. Not at all so sure about toString; what would be the use case for it?
+
+[04:45:44.0998] <eemeli>
+I think that's a question that would be best answered within a more general currency formatting context, as any answer here ought to match the answer given by Intl.NumberFormat.
+
+[04:47:57.0156] <eemeli>
+I agree that conversion is nice, but I think it's also complicated -- and has its own Stage 1 proposal: https://github.com/tc39/proposal-smart-unit-preferences
+
+[04:57:08.0967] <Jesse>
+ah, right
+
+[04:57:27.0015] <Jesse>
+I wonder if the harmony under discussion should also include smart units
+
+[04:57:39.0255] <Jesse>
+the current measure README explicitly refers to smart units
+
+[05:03:06.0937] <eemeli>
+Yeah, there's a continuum of (at least) three separate considerations here that we're trying to solve:
+- How to represent a number together with its unit/currency/precision (Measure/Amount)
+- How to convert values between compatible units (Smart Units)
+- How to represent numbers better (Decimal)
+
+I think Decimal depends on Amount, and unit conversion _might_ depend on Decimal if that's the chosen type for the value of an Amount after conversion. So I'm looking for a way to solve the first problem in a way that doesn't require simultaneously solving all the problems and introducing all of these cross-dependencies.
+
+[05:09:12.0850] <Jesse>
+I like the suggestion to use decimal as the result of doing conversions
+
+[05:09:49.0234] <Jesse>
+these typically involve things like taking reciporocals or multiplying values (including squaring, cubing, etc.) so decimal feels like a good match
+
+[05:10:06.0311] <Jesse>
+since it's promise is to provide more precision
+
+[05:10:31.0620] <eemeli>
+The cleanest way that I see for this stack to proceed would be:
+1. Amount
+2. Decimal
+3. Unit conversions
+
+Then each step would only depend on things before it.
+
+[05:12:57.0943] <Jesse>
+that looks good -- I'd like to see decimal building on amount/measure so I think it makes sense to focus on amount
+
+[05:42:33.0698] <Jesse>
+I think given the amount of interest in these topics it might make sense to set up a regular call for decimal, measure/amount, and smart units
+
+[05:43:27.0156] <Jesse>
+things are sort of scattered atm -- I've discussed this stuff in TG2, TG3, in plenary, in this channel, and (to a much lesser extent) the delegates channel
+
+[05:44:59.0825] <Jesse>
+how about tomorrow (Thursday, February 13th) at, say, 18:00 CET?
+
+[05:58:07.0274] <littledan>
+I'm glad that we're laying out the whole space, but let's see if we can keep the result, or at least the first step, not too complex.
+
+[06:00:33.0514] <littledan>
+I'm sold on the need for a unit'ed Measure class, but I don't know why we'd have a third class
+
+[06:01:14.0104] <littledan>
+or is Amount just a way to rename Measure?
+
+[06:01:47.0113] <littledan>
+sorry maybe this was just me skimming too fast and the proposal is already good :)
+
+[06:02:21.0448] <Jesse>
+I think the current thinking is that amount is just a renaming of measure
+
+[06:02:35.0766] <Jesse>
+plus a certain shrinking of its scope
+
+[06:04:01.0246] <Jesse>
+there was a discussion in various places about whether measure/amount should support arithmetic, at all, and the consensus seems to be "no"; the most recent sketch is of a class that has no methods at all (except possibly toLocaleString)
+
+[06:04:47.0971] <littledan>
+I can see the argument for arithmetic, but it's really complicated, and having the base type exist facilitates people writing libraries to do that. (Of course the same could be said for Temporal)
+
+[06:05:23.0059] <sffc>
+(I can join tomorrow at 18:00 CET, or earlier)
+
+[06:05:44.0720] <littledan>
+I'd expect (citation needed!) that keeping it to one numerical type is probably simpler implementation-wise, but 3 classes vs one class with multiple possibilities for the value's type doesn't really simplify anything.
+
+[06:05:45.0737] <littledan>
+ Personally I don't mind Measure baking in Decimal (since measured quantities are very often decimals, and other numeric types might just be used in error)
+
+[06:08:11.0979] <Jesse>
+to my mind there are a couple senses of "arithmetic" -- 1. adding (or multiplying, or ...) two measure objects; and (2) converting to a "higher-order" unit, such as going from meter to meter^3 and converting between compatible scales (meters and inches)
+
+[06:08:33.0922] <Jesse>
+my understanding is that (1) is currently not very well received, but I'm not sure about (2)
+
+[06:09:08.0074] <sffc>
+Just looked at Jesse's slides. They look like exactly the kind of conversation I think we should be having right now. 👍️
+
+[06:10:10.0196] <eemeli>
+Yeah, "Amount" is effectively a synonym "Measure".
+
+[06:10:36.0971] <Jesse>
+> <@littledan:matrix.org> Personally I don't mind Measure baking in Decimal (since measured quantities are very often decimals, and other numeric types might just be used in error)
+
+agree, though I can see the value in rolling just with currently existing primitive types
+
+[06:11:01.0955] <Jesse>
+(one could go even further an imagine supporting only Number)
+
+[06:13:24.0410] <eemeli>
+As I see it, the primary utility gained from a minimal Amount/Measure is in the improvements of the Intl.NumberFormat API, and so it'd be rather suprising if `new Amount('42')` or `new Amount(42)` would not work.
+
+[06:13:53.0800] <eemeli>
+Given that calling `nf.format('42')` or `nf.format(42)` works.
+
+[06:14:36.0548] <littledan>
+Well, we could apply the `new Decimal` logic in the Measure constructor
+
+[06:14:41.0351] <littledan>
+for casting
+
+[06:15:00.0760] <eemeli>
+Huh, just realised as I typed that that `new Amount(42)` doesn't feel as wrong as `new Measure(42)` does, i.e. without the options.
+
+[06:15:29.0347] <littledan>
+(I like the name `Measure`)
+
+[06:16:11.0863] <eemeli>
+Why should `new Amount(x).value === x` not be retained? Something like `new Amount(x).asDecimal()` could be a thing, but there's no reason to throw away the original input value.
+
+[06:17:05.0070] <Jesse>
+> <@littledan:matrix.org> Well, we could apply the `new Decimal` logic in the Measure constructor
+
+I like that idea too but I've heard from a couple people that they'd like to use bigints in measures/amounts, and I'm a bit uncomfortable with going beyond the range of Decimal128
+
+[06:20:27.0829] <Jesse>
+I've made a new calendar item PR but it's not merged yet
+
+[06:20:43.0436] <Jesse>
+https://github.com/tc39/Reflector/issues/551
+
+[06:23:36.0881] <eemeli>
+I should be able to make that time as well.
+
+[06:24:32.0274] <eemeli>
+I'd appreciate a calendar invite at eemeli@mozilla.com for the meeting, once such is available.
+
+[06:37:22.0216] <littledan>
+why is this identity important?
+
+[06:45:40.0024] <eemeli>
+Because it would be surprising for that identity not to hold, and because it makes it straightforward to support all the same types that are supported by Intl.NumberFormat.
+
+[06:48:46.0098] <eemeli>
+I'm not so sure that it's important for the value type to be retained after e.g. conversion. So something like
+```
+new Amount(42, { unit: 'meter' }).convertTo('foot-and-inch').value
+```
+could well be a Decimal. Which is why I think we ought to do Amount first, then Decimal, then unit conversions. That way each step only depends on previous work.
+
+[06:51:46.0600] <Jesse>
+I think I'm favor having something like an `.asDecimal` method, to make any conversion explicit
+
+[06:54:54.0624] <eemeli>
+I added a `.toLocaleString()` to the gist.
+
+[06:58:48.0074] <littledan>
+I don't really feel like "this identity is intuitive" is a strong enough reason to make the data model more complex. I'd want to see a use case where you really want the representation to be something other than Decimal.
+
+[06:59:01.0133] <littledan>
+(yes, more flexible is more complex)
+
+[06:59:38.0885] <littledan>
+that only makes sense if the underlying data model is flexible among types
+
+[07:02:52.0327] <Jesse>
+> <@littledan:matrix.org> I don't really feel like "this identity is intuitive" is a strong enough reason to make the data model more complex. I'd want to see a use case where you really want the representation to be something other than Decimal.
+
+I've heard Mark want to use measure/amount to represent values of cryptocurrencies where one has a huge number of significant digits (beyond what can be faithfully represented in Decimal128)
+
+[07:03:39.0809] <Jesse>
+so I think for him being able to get the original value (in his case, a bigint) would be important
+
+[07:06:55.0459] <littledan>
+I don't understand why cryptocurrencies need more than 34 significant digits. Maybe they forgot that it's floating point rather than fixed point?
+
+[07:07:40.0215] <littledan>
+anyway sounds like an argument for BigDecimal over Decimal128; this is the wrong level to make that change IMO
+
+[07:07:40.0399] <Jesse>
+I also didn't push him on that; the cryptocurrencies I know don't use that many digits, but MM works in this space so I didn't push
+
+[07:08:08.0184] <Jesse>
+FWIW the Ethereum VM uses Decimal256
+
+[07:08:31.0641] <Jesse>
+so I guess they foresee a need for a vast number of digits
+
+[07:08:56.0143] <littledan>
+sure... idk I think this use case needs to be pushed on before we make a complexity-increasing decision on that basis
+
+[07:09:17.0594] <Jesse>
+right, I'm not familia with any other use case where such range is needed
+
+[07:09:21.0105] <littledan>
+you can always just not use this library
+
+[07:09:30.0847] <littledan>
+(and you can always fall back on Intl.NumberFormat taking strings)
+
+[07:12:41.0983] <Jesse>
+Decimal128 also seems to be the upper limit, today, of out-of-the-box compiler support, which is another indicator that 128 bits should be enough
+
+[07:13:11.0613] <Jesse>
+I like the argument that if 34 significant digits isn't enough, there are other ways to get what you want
+
+[07:13:37.0350] <littledan>
+I don't think compiler support is extremely relevant. This is more of a library thing. Anyway IEEE defines up to 128.
+
+[07:48:36.0816] <eemeli>
+If there's a need to do anything with the value, that's easier if it's a number, because then you can use `+` `-` `*` `/` etc. If my use case doesn't need the full 128 bits of precision, then a Decimal value would be clumsier to use.
+
+[07:49:24.0134] <eemeli>
+I would be open to removing the `.value` accessor`, and including something like `.asNumber()`.
+
+[07:49:33.0121] <eemeli>
+* I would be open to removing the `.value` accessor, and including something like `.asNumber()`.
+
+[07:50:20.0049] <eemeli>
+That would make adding a `.asDecimal()` later rather straightforward.
+
+[07:55:04.0705] <littledan>
+do you have an example of a case where that's a valid, rather than buggy, thing to do?
+
+[07:55:37.0325] <littledan>
+the design of Decimal is based on the hope that its methods *won't* be too clumsy to use in practice
+
+[07:56:36.0374] <littledan>
+I don't understand the argument for getting rid of an accessor for the value. IMO we should just decide on the data model and then represent it directly; no need to hide it.
+
+[08:06:08.0249] <eemeli>
+I see enforcing the Amount value to be a Decimal to be unnecessary complexity, because that's not needed when Amount is used when passing it between user code, _or_ when passing it to Intl.NumberFormat. I would also like to not make Amount conditional on Decimal, because that seems unnecessary. The primary direct use case for it that I have in mind is Intl.NumberFormat, and for that it'd be fine if it was just an opaque blob.
+
+It would be _nice_ if it was also useful for passing between user code, but if that requires reaching consensus on Decimal, then I would much prefer introducing it as a part of that consensus.
+
+[08:09:37.0990] <littledan>
+OK, sounds like there aren't any particular use cases, and we just disagree on what "simpler" means
+
+[08:09:51.0116] <littledan>
+but I do think we can work these details out after getting consensus on the broader plan overall
+
+[08:11:26.0701] <eemeli>
+Are there any particular use cases that would explicitly benefit from having the value as a Decimal?
+
+[08:12:12.0290] <littledan>
+well, if given a Measure as a parameter, then you know which type you get out of `.value`, and you know that you're not changing the value when accessing it as a decimal. So it becomes easier to use reliably.
+
+[08:13:21.0971] <eemeli>
+Hang on, "changing the value"? The Amount/Measure values should be immutable, yes?
+
+[08:13:45.0320] <littledan>
+changing in the sense of, when I access the value as a decimal, I faithfully get the exact thing
+
+[08:13:50.0263] <littledan>
+it's not transformed during the access
+
+[08:14:18.0020] <eemeli>
+If that's a concern, then would it not also be a concern if the transformation happens in the constructor?
+
+[08:14:58.0494] <littledan>
+well, it's a question of the data model, but sure, my personal preference would be for it to be strict
+
+[08:15:24.0068] <littledan>
+anyway, I think this is not that major of a question
+
+[08:15:38.0848] <littledan>
+the major question is: are we happy with introducing two classes like this? does this resolve the needs of Measure and Decimal?
+
+[08:16:10.0148] <sffc>
+If we stick with `Amount` always being a decimal, then we could just say that `new Amount(42)` or `new Amount(42n)` are not allowed; you need to create one from a Decimal
+
+[08:17:32.0893] <eemeli>
+It seems really rather unergonomic to need to do `new Amount(new Decimal(42))`.
+
+[08:18:13.0327] <littledan>
+I'm really confused about what goals you're trying to achieve, Eemeli
+
+[08:19:02.0949] <littledan>
+is it an abstract sense of minimalism/good design, or is there anything more concrete that you're trying to ensure is enabled?
+
+[08:25:04.0652] <eemeli>
+I am primarily looking to improve the experience of using Intl.NumberFormat by better separating the "what" and the "how" of its inputs, where we currently require `unit` and `currency` to be defined in the constructor, while the numerical value is passed in in the `.format()` method.
+
+This is particularly problematic in localization, where the options bag otherwise contains values that a translator may want or need to tweak. Including `currency: 'EUR'` there means that a translator working from French to US English could "fix" that option to say `currency: 'USD'` instead. Amount solves this problem by letting the developer fully control the value being formatted, by wrapping it in an object that includes both the currency code and the value.
+
+[08:26:47.0943] <littledan>
+OK, so then the problem with certain designs is that it'd make the upgrade of existing code more complicated, to insert decimal128 into the mix when the surrounding code already works?
+
+[08:29:04.0900] <eemeli>
+It would add extra, unnecessary work for an implementation to need to convert a value to Decimal before passing it on to Intl.NumberFormat, which already supports numbers, bigints, and numerical strings.
+
+[08:29:16.0551] <littledan>
+Alright, I see that argument
+
+[08:29:44.0633] <eemeli>
+And it adds complexity to our process to have two proposals each depend on the other.
+
+[08:30:51.0678] <littledan>
+I'm still not super excited about you saying that this means that Measure can come before Decimal -- I hope that Decimal can proceed once we work out the relationship with Measure (maybe Measure would come sooner, but I don't want to add artificial extra delay to Decimal)
+
+[08:33:05.0417] <littledan>
+anyway, I'm OK if we end up making Amount/Measure be polymorphic in this way -- not my first choice, but not terrible
+
+[09:16:51.0270] <eemeli>
+So here's an idle thought: If we end up with an opaque Amount that can hold a value + units + precision, and the units and precision are optional, then why should we add a separate Decimal class if we were to want to do operations like `.add()` or `.multiply()` on such values?
+
+As in, wouldn't it be cleaner to consider unitless values as just a type of Amount, rather than needing its own special class?
+
+[09:18:03.0981] <eemeli>
+At least personally, I find `amount.add(otherAmount)` much less objectionable than `decimal.add(otherDecimal)`, because in the former the values don't feel like they ought to be representable as primitives.
+
+[09:25:06.0259] <Jesse>
+one of the issues that has come up with arithmetic on numbers with precision is how to propagate the precision to the result
+
+[09:25:26.0969] <Jesse>
+IEEE 754 gives an answer to that, but there are other valid answers
+
+[09:27:04.0588] <Jesse>
+I guess the issue with rounding errors in JS Numbers (mainly arising once one starts doing arithmetic) would persist in this approach
+
+[09:28:21.0289] <sffc>
+I have a few arguments against the polymorphic Measure:
+
+1. Solves confusion regarding how we record precision 
+2. More seamless i18n integration with the new number ecosystem we're building 
+3. Easier to implement
+
+I acknowledge that integrating polymorphic Amount into an existing code base is a lossless transformation. However, I've previously been convinced by Jesse that Decimal128 covers basically all use cases. So I don't find that argument for polymorphic Amount to be very strong.
+
+[09:34:14.0827] <eemeli>
+sffc: Could you clarify what you mean by "polymorphic Amount"? Is that an Amount with a value that can be one of multiple different types?
+
+[09:37:11.0385] <Jesse>
+I think of dimensionless, unitless Amount as a sort of limiting case; I think of decimals as mathematical values
+
+[09:37:55.0716] <Jesse>
+and I guess developers would also think of them as such (though I admit that that's a bit hand wavy on my part)
+
+[09:39:09.0932] <Jesse>
+I can imagine an app that only works with integers under, say, 1 million. Using bigints for those numbers is fine, and helps me to think more clearly about my program than if I were to use Numbers
+
+[09:39:22.0240] <Jesse>
+(just making an analogy to existing datatypes)
+
+[09:40:23.0297] <sffc>
+> <@eemeli:mozilla.org> sffc: Could you clarify what you mean by "polymorphic Amount"? Is that an Amount with a value that can be one of multiple different types?
+
+Correct, as opposed to an Amount that is always Decimal
+
+[09:40:32.0999] <Jesse>
+ * I think of precision-less, unitless Amount as a sort of limiting case; I think of decimals as mathematical values
+
+[09:43:47.0819] <eemeli>
+This suggests to me that starting out with an opaque Amount would be safest, as it would allow its value to later be defined as a Decimal, or for the capabilities of Amount to later be expanded to cover what's proposed for Decimal.
+
+[09:45:58.0425] <nicolo-ribaudo>
+If we day "for now Amount is opaque basically containing a string / mathematical value", end then we re-explain it in terms of decimal, we have to be careful about how it might round differently
+
+[09:47:16.0518] <eemeli>
+We would need to initially impose limits in the Amount constructor that would be within the limits of what's expressible in IEEE 754.
+
+[09:47:54.0699] <Jesse>
+just to be precise, we mean the limits of IEEE 754 Decimal128?
+
+[09:48:01.0186] <eemeli>
+Yeah.
+
+[10:02:44.0686] <littledan>
+I'd like the discussion during the meeting to focus first on building consensus in committee that we should do both of these classes, and then later we can work out details like proposal merging vs not, and polymorphic vs decimal-linked measure. For this, it'd be ideal if all of us could hold back so that the queue could initially be *others* in committee who haven't already been discussing this as a group at length. (And then afterwards we can make statements about our positions within this, but I take it we all agree with this two-class approach where they have basically this role.) What do you think?
+
+[10:03:09.0863] <littledan>
+(I mean, not necessarily all of us, but the group who's been more active in discussion)
+
+[10:03:46.0632] <littledan>
+for example, ljharb has repeatedly expressed opposition for an unrelated reason. I think we should get that out of the way before we go into these additional details. (That topic is usually brought up just at the very end of the timebox, which doesn't allow for discussion)
+
+[10:04:25.0506] <littledan>
+but also we should explore other concerns the rest of the committee might have, e.g., "is this class worth it at all, or should it just be a library?"
+
+[10:04:55.0475] <littledan>
+I *think* we've made clear good reasons for all those basic points, but if people still disagree with them, we also won't get Stage 2, even if we have agreement among this group
+
+[10:06:03.0116] <littledan>
+sorry I don't mean to dictate the order, we can do whatever order, as long as we make space to hear out the various concerns. I just want to make sure that this conversation is broad and not *only* the same people who are in this channel and other meetings outside of plenary arguing among ourselves.
+
+[10:09:52.0342] <Jesse>
+I'd hope that, because the presentation is about measure, too, the set of those in committee who might have useful feedback would be somewhat wider
+
+[10:10:24.0853] <Jesse>
+and I hope others who have watched the development of related-but-distinct proposals might have some insight
+
+[12:09:50.0044] <eemeli>
+> I take it we all agree with this two-class approach where they have basically this role.
+
+I'm not sure that I agree with this part. I think the discussions so far have identified valid use cases that are served by Amount/Measure, and not by Decimal. Furthermore, I think that an opaque Amount can be defined and can be useful without any dependence on Decimal. Presuming then that at least one class (Amount) is added to the language, it is not clear to me that it would be better to add a second Decimal class, rather than including its functionality in Amount.
+
+[12:12:06.0355] <eemeli>
+* > I take it we all agree with this two-class approach where they have basically this role.
+
+I'm not sure that I agree with this part. I think the discussions so far have identified valid use cases that are served exclusively by Amount/Measure. Furthermore, I think that an opaque Amount can be defined and can be useful without any dependence on Decimal. Presuming then that at least one class (Amount) is added to the language, it is not clear to me that it would be better to add a second Decimal class, rather than including its functionality in Amount.
+
+[12:17:45.0581] <eemeli>
+I updated the gist again to show an opaque Amount, with a `toString()` method to get at a string representation of the value:
+https://gist.github.com/eemeli/0bd413d2f711cbd6016673af8d68c38c
+
+[13:19:03.0934] <littledan>
+How does this relate to arithmetic operations?
+
+[13:19:48.0955] <littledan>
+I understand if Amount/Measure serves your use cases, but we've presented a bunch of others which are not just that.
+
+[13:20:31.0655] <littledan>
+the other thing is, I was imagining that Amount/Measure would represent exactly the value that's passed into it; it doesn't form a floating point exponent itself
+
+[13:20:46.0212] <littledan>
+* the other thing is, I was imagining that Amount/Measure would represent exactly the value that's passed into it; it doesn't form a floating point exponent itself. And this is exactly what we're missing for decimal numbers.
+
+[13:22:05.0095] <littledan>
+Sometimes, a feature comes through which is useful for some people in committee rather than others. For example, most of TC39 is rather bored by Intl proposals, but they seem like a reasonable standard library, so they let them through. I'm wondering if Decimal might fall into that category for you, or whether it's something that you find to be important to block.
+
+[13:40:37.0024] <eemeli>
+I'm trying to say that as it seems like arithmetic operations can reasonably be considered to be included on Amount/Measure (they're currently included in its [README](https://github.com/tc39/proposal-measure/?tab=readme-ov-file#mathematical-operations), even), it's not clear to me how or why those arithmetic operations would differ from the arithmetic operations of a Decimal.
+
+So if we were to do pretty much what you proposed earlier, and consider the value of an Amount to be the same as the opaque value of a Decimal, we could serve the use cases of Decimal with an Amount that had `.add()`, `multiply()` and the other Decimal methds on it.
+
+[13:42:17.0883] <eemeli>
+Essentially, I'm trying to ask why we would need a second class beyond Amount.
+
+[14:17:58.0922] <littledan>
+Part of the reason was to make Decimal simpler by following the IEEE 754 data model, rather than make up our own arithmetic that would work against various values that can be in Amount
+
+[14:25:07.0484] <eemeli>
+What's to prevent using that with Amount values?
+
+[14:25:47.0390] <littledan>
+well, you didn't want the data model to be decimal, you wanted it to be number or string. So then it's not clear how to define arithmetic operations, or even everyday things like numerical equality.
+
+[14:32:59.0998] <eemeli>
+I am by no means settled in my opinions, and they've clearly evolved during this discussion. I do still think that having an explicitly Decimal value within an Amount is unnecessarily complex, but having an Amount effectively _be_ a Decimal seems like it would simplify things quite a bit.
+
+[14:40:23.0755] <littledan>
+well... you've raised analogous opinions before (when it was strings), and we've talked it through, and seem to continue to disagree. What are next steps?
+
+[14:41:29.0197] <littledan>
+I'm still interested in understanding, when you say "unnecessarily complex", whether this means "I don't feel like using it in my programs" or "it's essential that JavaScript doesn't have this complexity"
+
+[14:52:55.0458] <nicolo-ribaudo>
+Something that worries me about having a single class is that operations on units can get very complex. As long as it's just a conversion between "compatible" units everything is fine, but to support basic arithmetic you need to:
+- potentially throw on add/subtract for incompatible units 
+- for multiplication and division, support fractions (e.g. kg*m/s)
+
+[14:53:24.0230] <nicolo-ribaudo>
+While with the split it's easier to say "this class has more metadata, while this one supports arithmetic"
+
+
+2025-02-13
+[23:19:57.0396] <Jesse>
+one thing that's nice about having decimal as the underlying data for measure/amount (and, looking forward, for smart units), is that things like reciporcals, squaring & cubing, multiplication arise quite naturally. Decimal128 is a good fit because it offers a lot of precision in the face of these operations
+
+[03:57:41.0000] <eemeli>
+Mostly I'm trying to estimate complexity in terms of the conceptual load we're introducing. Right now we have two types in the spec that hold a numerical value (number and bigint), and with Amount we're due to introduce a third one. The core pitch with Decimal (as I understand it) is to represent decimal numbers, i.e. ones coming from the real world. But don't those almost always have some implicit unit attached? Its stated primary use case is for monetary values, so why not include the currency code with the value? I would think that it would be a very positive feature for something like
+```
+new Amount(42, { currency: 'USD' }).add(new Amount(13, { currency: 'BTC' }))
+```
+to throw an error.
+
+So from a JS developer point of view, I would think that it'd be simpler to understand a single Amount as being the thing to use for values coming from the real world, rather than needing to decide between an Amount and a Decimal, depending on what sort of operations might need to be done with the value.
+
+[04:01:30.0149] <eemeli>
+Let's say I start with two values
+```
+const foo = new Amount(42, { currency: 'EUR' })
+const bar = new Amount(13, { currency: 'EUR' })
+```
+
+With an amount that did decimal math, I could add those up as
+```
+foo.add(bar)
+```
+but if their values were Decimal instances, then I'd need to do
+```
+const sum = foo.value.add(bar.value)
+new Amount(sum, { currency: foo.currency })
+```
+
+To me that seems clumsier, more verbose, and it skips all the validation fo the former about `foo` and `bar` being addable.
+
+[04:03:55.0303] <eemeli>
+Are there many use cases for decimal values that do not have an implicit unit or currency attached to them?
+
+[06:20:58.0762] <sffc>
+Is there a meeting today at 18:00?
+
+[06:29:15.0979] <eemeli>
+I at least intend to join the call at the link mentioned in the Reflector issue: https://meetings.igalia.com/tc39jsnumerics
+
+[06:29:45.0618] <eemeli>
+Also, issue link: https://github.com/tc39/Reflector/issues/551
+
+[06:39:41.0074] <Jesse>
+yes, meeting today at 18:00 CET!
+
+[06:39:52.0127] <Jesse>
+(it's not yet in the TC39 calendar yet, sorry)
+
+[07:45:59.0019] <littledan>
+eemeli: Do you have any thoughts on the complexity that nicolo-ribaudo noted?
+
+[08:19:45.0985] <eemeli>
+The compatibility check will need to take into account the operation type and possibly include a conversion; for instance, adding `meter` and `centimeter` should be allowed with a conversion of one into the other, while adding `kilogram` to `meter-per-second` should fail. Multiplying a `kilogram` with a `meter-per-second` should still work, resulting in a `kilogram-meter-per-second`. The `-per-` infix/divisor is already supported by Intl.NumberFormat, btw.
+
+Similarly, adding a unitless value to one with a unit should fail, while multiplication ought to work. Currencies should not be considered convertible between different codes.
+
+In general, operating on things that may include a unit/currency and a precision indicator in addition to a numerical value does add a little bit of work, but only when those fields are actually used. Beyond the compatibility check & possible conversion, we would need to apply some strategy to merging the precisions.
+
+As a default strategy, the significant-figures approach should work: If either Amount has its precision as fraction digits, that number is converted to significant digits by adding `Math.floor(Math.log10(n) + 1)` to the value. if only one Amount has it set, that's applied on the result. If both have, then the smaller significant digits value is applied to the result. This same strategy can work for all arithmetic operations.
+
+As a later step, it could be possible to customize the precision calculation strategy, similarly to how it's possible to consider different precision indicators to work next to fraction & significant digits (e.g. error bars).
+
+The arithmetic operation on the value ought to be defined just as it is currently proposed for Decimal.
+
+[08:21:29.0272] <eemeli>
+* The compatibility check will need to take into account the operation type and possibly include a conversion; for instance, adding `meter` and `centimeter` should be allowed with a conversion of one into the other, while adding `kilogram` to `meter-per-second` should fail. Multiplying a `kilogram` with a `meter-per-second` should still work, resulting in a `kilogram-meter-per-second`. The `-per-` infix/divisor is already supported by Intl.NumberFormat, btw.
+
+Similarly, adding a unitless value to one with a unit should fail, while multiplication ought to work. Currencies should not be considered convertible between different codes.
+
+In general, operating on things that may include a unit/currency and a precision indicator in addition to a numerical value does add a little bit of work, but only when those fields are actually used. Beyond the compatibility check & possible conversion, we would need to apply some strategy to merging the precisions.
+
+As a default strategy, the significant-figures approach should work: If either Amount has its precision as fraction digits, that number is converted to significant digits by adding `Math.floor(Math.log10(n) + 1)` to the value. if only one Amount has a precision set, that's applied on the result. If both have, then the smaller significant digits value is applied to the result. This same strategy can work for all arithmetic operations.
+
+As a later step, it could be possible to customize the precision calculation strategy, similarly to how it's possible to consider different precision indicators to work next to fraction & significant digits (e.g. error bars).
+
+The arithmetic operation on the value ought to be defined just as it is currently proposed for Decimal.
+
+[08:29:29.0025] <Jesse>
+this is a bit late, (and this is our first go at this) but here is an extremely brief agenda for today's call in 30 min: https://docs.google.com/document/d/1O2EQC61TIDtkcvDSkhDf4N_R9GioT0foU2tH9HBdMdQ/edit?tab=t.0
+
+[08:29:38.0502] <Jesse>
+feel free to add anything there
+
+[11:04:00.0316] <littledan>
+> The arithmetic operation on the value ought to be defined just as it is currently proposed for Decimal.
+
+How should this work, when the underlying value may be a Number or string, as you've also requested?
+
+
+2025-02-14
+[01:59:19.0741] <eemeli>
+My revised request is for an opaque Amount, with Decimal-ish restrictions being applied in its constructor. That is extensible later into any of the following:
+- a polymorphic Amount
+- an Amount with a Decimal value
+- an Amount with Decimal capabilities
+
+[02:00:36.0741] <eemeli>
+This was discussed quit a bit on the call yesterday, the notes of which are in the doc linked above.
+
+[06:23:48.0025] <littledan>
+How about you suggest your one-class version to committee, to get initial feedback there?
+
+[06:24:33.0015] <littledan>
+that could help get this group unblocked. When we say "we're discussing this internally" to committee, it tends to encourage people to stand back and *not* share their thoughts.
+
+[06:26:09.0356] <littledan>
+I understand you're still considering multiple alternatives for a class which handles both Measure and Decimal goals, but I'm not really a fan of any of the forms of these (but I'm fine with advancing two classes together or sharing a namespace)
+
+[06:51:04.0219] <Jesse>
+we have time so if you like you'd be welcome to present say a 1-2 slide sketch of your idea in plenary eemeli 
+
+
+2025-02-16
+[04:57:51.0486] <eemeli>
+Jesse: Here are my two slides, which should hopefully fit directly into your reveal.js presentation: https://gist.github.com/eemeli/12282a9dc8449f136e97262764d8428a
+
+[09:41:02.0559] <Jesse>
+wonderful, thank you! I'll append those
+
+
+2025-02-19
+[09:37:43.0431] <nicolo-ribaudo>
+For today's discussion, let's try to be consistent calling it either Measure or Amount to avoid confusion between those that are not up to date with our discussions
+
+[09:37:55.0635] <littledan>
+OK, so which one?
+
+[09:38:16.0354] <nicolo-ribaudo>
+I'd go with Measure since it's what it was called before
+
+[09:38:39.0345] <littledan>
+alternatively: Eemeli's slide mentions amount as the joint class that does both things; maybe we can reserve it for that usage?
+
+[09:45:46.0512] <Jesse (TC39 🇺🇸)>
+My thinking was to call it “measure” throughout, though I can briefly mention that there’s an alternative. I’d also ask us to not bukeshed on that
+
+[09:58:27.0074] <littledan>
+OK good let's stick with Measure then
+
+[09:58:37.0155] <littledan>
+do the slides reflect this consistently?
+
+[11:03:12.0948] <Jesse (TC39 🇺🇸)>
+on it!
+
+[11:04:06.0193] <nicolo-ribaudo>
+Concretely, I wonder wether we could get some sort of stage 1.7 on Decimal (e.g. we believe it's ready for 2, but just waiting a bit to figure out how the other part integrates with it), and build basic Measure on top of it separately
+
+[11:04:19.0458] <nicolo-ribaudo>
+And then advance them together
+
+[11:04:54.0731] <nicolo-ribaudo>
+This would keep them separate, while solving the awkward situation of wanting them to basically depend on each other without knowing what's going to happen to the other hald
+
+[11:04:57.0389] <nicolo-ribaudo>
+* This would keep them separate, while solving the awkward situation of wanting them to basically depend on each other without knowing what's going to happen to the other half
+
+[11:06:13.0413] <sffc>
+A common thread I heard is "weaker parts of the proposal should not carry stronger parts". But, the definition of "weaker" versus "stronger" is _not_ consistent between all delegates.
+
+[11:07:18.0349] <sffc>
+* A common thread I heard is "stronger parts of the proposal should not carry weaker parts". But, the definition of "weaker" versus "stronger" is _not_ consistent between all delegates.
+
+[11:08:55.0772] <sffc>
+In past cycles we've heard a fair amount of skepticism that Decimal is motivated. Today is the first time I've heard similar skepticism that Measure might not be motivated.
+
+[11:09:33.0649] <nicolo-ribaudo>
+From experience, the more a proposal becomes "concrete" the more people express their skepticism
+
+[11:10:11.0324] <Jesse (TC39 🇺🇸)>
+I think in any siloed discussion of a proopsal, we would have to keep referring to the others and refer to the overall vision
+
+[11:10:36.0429] <Jesse (TC39 🇺🇸)>
+it feels that our stage process approach doesn't really support this; it's a matter of presentation
+
+[11:11:12.0916] <Jesse (TC39 🇺🇸)>
+the module harmony approach seems to be successful
+
+[11:11:30.0415] <sffc>
+The ideas are all still a bit abstract. Maybe having a library implement the whole proposal would be helpful to illuminate how it works and fits together.
+
+[11:11:47.0824] <Jesse (TC39 🇺🇸)>
+that sounds like a nice idea
+
+[11:32:24.0014] <Jesse (TC39 🇺🇸)>
+it seems to me that there are a couple options on the table for structuring this:
+
+[11:33:28.0063] <Jesse (TC39 🇺🇸)>
+I believe Eemeli's idea is:
+
+1. measure v1 (opaque)
+2. decimal (integrates 1)
+3. measure v2 (exposes decimal)
+4. (maybe) unit conversion
+
+[11:33:36.0465] <Jesse (TC39 🇺🇸)>
+(lmk if I'm getting this wrong)
+
+[11:33:42.0239] <Jesse (TC39 🇺🇸)>
+another approach could be:
+
+[11:33:49.0002] <littledan>
+I feel like we've done a good job explaining the motivation for Decimal, and our current challenge is more of building internal consensus on the form that Decimal should take, and then strongly pushing that.
+
+[11:34:29.0469] <Jesse (TC39 🇺🇸)>
+1. decimal
+2. measure (integrates decimal, adds convert-to-measure functionality to decimal)
+3. unit conversion
+
+[11:49:52.0741] <Jesse (TC39 🇺🇸)>
+with this second approcach, what we're calling "merging" would happen in step 2
+
+[11:50:37.0943] <Jesse (TC39 🇺🇸)>
+my gut sense is that this 3-step approach is less likely to fail on motivation grounds
+
+[11:50:59.0576] <Jesse (TC39 🇺🇸)>
+I fear that in the approach where we lead off with an opaque measure, we might fail because it's too thin/unmotivated
+
+[11:51:49.0982] <Jesse (TC39 🇺🇸)>
+like, even if everyone knows that the opaque measure just prepares the ground for a more featureful future, it still needs to advance on its own
+
+[13:44:28.0173] <sffc>
+I think eemeli prefers
+
+1. Measure
+2. Decimal
+3. Unit Conversion
+
+[13:45:03.0461] <eemeli>
+Yes.
+
+[13:46:27.0898] <sffc>
+I am not too worried about getting alignment from committee on thin, opaque Measure. I believe Dan agrees with that direction overall, I can work on Shu, and I didn't hear any other fundamental blocking concerns from plenary.
+
+[13:46:41.0078] <sffc>
+* I am not too worried about getting alignment from committee on thin, opaque Measure. I believe Dan [Minor] agrees with that direction overall, I can work on Shu, and I didn't hear any other fundamental blocking concerns from plenary.
+
+[13:46:58.0882] <littledan>
+I have repeatedly asked Eemeli whether he feels like blocking Decimal, and he has not responded. That is very important information here.
+
+[13:47:07.0685] <sffc>
+* I am not too worried about getting alignment from committee on thin, opaque Measure. I believe Dan \[Minor\] agrees with that direction overall, I can have more internal conversations with Shu, and I didn't hear any other fundamental blocking concerns from plenary.
+
+[13:47:18.0193] <littledan>
+I definitely do not feel like blocking Measure, personally
+
+[13:48:30.0768] <littledan>
+I do not at all mind Measure and Decimal advancing at the same time
+
+[13:48:56.0993] <littledan>
+(decimal seems ready; I don't see any reason to delay it further, once we have any cross-cutting issues with Measure/unit conversion worked out)
+
+[13:49:17.0070] <littledan>
+if we want to delay it, I want to know why
+
+[13:49:32.0859] <sffc>
+A desirable outcome from my point of view would be for us to present Measure/Decimal Harmony for Stage 2 in April. And once that happens, they could proceed to 2.7 at separate paces.
+
+[13:49:36.0998] <littledan>
+(beyond working out common issues)
+
+[13:49:56.0488] <Jesse (TC39 🇺🇸)>
+given that decimal is essentially ready, and that we could add the measure-decimal integration pretty straightforwardly in (v1 of) measure, I wonder if, practically speaking, it makes sense to focus on decimal for now
+
+[13:50:27.0307] <Jesse (TC39 🇺🇸)>
+happy to present a harmony in april, too
+
+[13:50:45.0120] <littledan>
+well, if Ben and Eemeli and Shane are going to prepare Measure for April, I don't see any reason to discourage that (given that there's nothing needed for decimal itself)
+
+[13:52:17.0661] <sffc>
+There was a lot of nitpicking today on Measure semantics, like, what syntax do we use for measures and currencies, etc etc, but nothing fundamental. I'm not sure if those are Stage 2 Blocking concerns, but it's still good to get those questions answered. I agree that Decimal is in the state it wants to be in; all the nitpicking was resolved in correspondence with Waldemar in 2024.
+
+[13:52:49.0920] <littledan>
+yes, and most of that will be resolved once we clarify that we're talking about a pretty minimal version of Measure
+
+[13:53:26.0464] <littledan>
+do we all agree that unit conversions can be "later" if we make Measure be monomorphic-decimal? This was a point that Eemeli made, that it *can't* be separated because we might later find out that it must be decimal...
+
+[13:54:32.0701] <Jesse (TC39 🇺🇸)>
+I think the greater precision offered by decimal is what we need for conversion
+
+[13:55:21.0052] <Jesse (TC39 🇺🇸)>
+(we heard that it's not out of the question to consider rational, though, but I think this is asking more than we can reasonably require)
+
+[13:55:28.0730] <Jesse (TC39 🇺🇸)>
+ * (we heard that it's not out of the question to consider rational, though, but I think this is asking more than we can reasonably supply)
+
+[13:55:32.0322] <eemeli>
+My primary interest is to get at least an opaque Amount to advance. My major current concern with Decimal is that both it and the Measure proposal claim to be providing a solution for representing monetary values in JavaScript. I think telling developers that they need to choose from two different solutions for that is a bit bad.
+
+[13:55:46.0280] <sffc>
+There's still the unresolved question about whether we have the third type that sits between NormalizedDecimal and Measure. Ideally that question would be resolved as part of Decimal/Measure Harmony but it can technically be added later
+
+[13:56:20.0600] <eemeli>
+I think we need a presentation at the next or a near-future meeting explicitly presenting unit conversions, taking up that part of the current Measure proposal.
+
+[13:56:49.0709] <Jesse (TC39 🇺🇸)>
+> <@jesse:igalia.com> (we heard that it's not out of the question to consider rational, though, but I think this is asking more than we can reasonably supply)
+
+like, rational offers the possibility of exact cancellation, such as (1/3) * 3 === 1 which we won't get from decimal128)
+
+[13:57:13.0339] <littledan>
+How do you think we should investigate that? What if we start out with fewer types, and add the middle one if we see that the need is strong?
+
+[13:57:15.0659] <eemeli>
+I would be very surprised to find myself blocking Decimal, btw, even if I were to present arguments against it in committee.
+
+[13:58:03.0439] <littledan>
+we have some pretty strong arguments for why we're focusing on decimal rather than rational. We're not trying to solve all the problems in the world. We might just need to tersely restate these in the April presentation.
+
+[13:58:22.0682] <littledan>
+(for one, trailing zeroes don't make sense in the rational context)
+
+[13:58:26.0780] <Jesse (TC39 🇺🇸)>
+I'm happy to consider a "full decimal" class, though it's a bit of an odd duck because it's *almost* the same as measure, just with no unit
+
+[13:58:41.0774] <Jesse (TC39 🇺🇸)>
+but it's not out of the question
+
+[13:58:48.0632] <eemeli>
+One challenge here is that I'm technically not a Measure champion. I discussed taking that role with Ben just before he went on leave, but that was not documented in writing.
+
+[13:59:21.0672] <littledan>
+please don't feel held back by these technicalities. That's not a reason to cast yourself as an outside agitator
+
+[13:59:22.0363] <Jesse (TC39 🇺🇸)>
+it certainly fits in with the logic of following temporal's example and having very clear separation of concerns
+
+[13:59:36.0437] <Richard Gibson>
+what is a "full decimal" class?
+
+[13:59:57.0558] <littledan>
+I agree that it's not out of the question, but I don't see the motivation sufficiently
+
+[14:00:02.0131] <littledan>
+non-canonicalized
+
+[14:00:24.0556] <Jesse (TC39 🇺🇸)>
+"full decimal" is an IEEE 754 Decimal128 value without normalization (so "1.2" would be different from "1.20"). Iow it tracks precision
+
+[14:00:29.0374] <eemeli>
+I don't mean that I'd be an outside agitator, but that e.g. accepting a rename to Amount or otherwise advancing the proposal is currently quite difficult.
+
+[14:00:38.0125] <littledan>
+we're trying to say canonicalize rather than normalize, right?
+
+[14:00:46.0373] <Jesse (TC39 🇺🇸)>
+right sorry, yes
+
+[14:01:07.0134] <Jesse (TC39 🇺🇸)>
+I did that switch a while ago but have slipped into identifying the two terms
+
+[14:01:50.0121] <littledan>
+sure, well, I feel like that's less a function of the official champion and more about whether you've persuaded anyone in this group that it's a better name.
+
+[14:02:12.0761] <Richard Gibson>
+hrm. For the record, I am very opposed to such a mixture of magnitude and precision. The direction presented in this plenary's item is much better.
+
+[14:02:48.0673] <littledan>
+The same goes for your suggestion to make one class rather than two--it's not your official position with respect to being a champion or not, but whether you persuade others here that it's a better idea.
+
+[14:03:47.0665] <littledan>
+we're operating by a sort of rough consensus here; Ben isn't acting as a harsh dictator
+
+[14:09:37.0752] <eemeli>
+My main concern with "measure" is that it feels inappropriate for currency values, which are explicitly mentioned in the very first sentence of the proposal repo:
+> Modeling units of measure is useful for any task that involves measurements from the physical world. It can also be useful for other types of measurement; for example, measurements of currency amounts.
+
+The word "amount" is more general and less opinionated, as it does not imply how the value was determined. It's also more natural to consider e.g. an "amount of meters" or an "amount of dollars" compared to a "measure of meters" or a "measure of dollars".
+
+[14:11:29.0699] <eemeli>
+It's past midnight here and I've had a really long day, so I'll need to leave further serious discussions until later.
+
+[14:12:38.0519] <littledan>
+good night!
+
+[14:13:05.0108] <littledan>
+maybe at some future point we should have polls in the group, at least for bikeshedding matters like this
+
+[14:13:36.0375] <Jesse (TC39 🇺🇸)>
+I'm happy with "amount"
+
+[14:13:52.0885] <nicolo-ribaudo>
+Fyi what we do for modules is that basically we consider the whole group as champion (as in, champions cannot make decision without some sort of agreement/majority in the group), but there is value in not everybody championing everything because then you can volunteer as a stage 2.7 reviewer
+
+[14:13:56.0023] <littledan>
+do you have a preference between the two?
+
+[14:14:14.0819] <eemeli>
+In general, I would find it difficult to reach a consensus on a proposal without involving any of its champions.
+
+[14:14:17.0698] <littledan>
+(I don't feel strongly one way or another)
+
+[14:14:26.0006] <Jesse (TC39 🇺🇸)>
+no preference; tbh I think both are 80% solutions
+
+[14:14:50.0282] <Jesse (TC39 🇺🇸)>
+what tips me one way, perhaps, is the use of currency
+
+[14:15:02.0702] <Jesse (TC39 🇺🇸)>
+otoh using non-currency is also a core goal
+
+[14:15:04.0315] <littledan>
+I imagine Ben wouldn't want us to pause developing the proposal while he's gone, but maybe his coworkers know more here
+
+[14:15:13.0178] <Jesse (TC39 🇺🇸)>
+so...I feel terminologically stuck
+
+[14:16:29.0465] <nicolo-ribaudo>
+Ben would very much prefer us to make progress without waiting for him
+
+[14:16:59.0794] <eemeli>
+I would feel much more comfortable developing the proposal if I or someone else actively participating were explicitly noted as a Measure champion.
+
+[14:18:03.0529] <eemeli>
+(now actually signing off, will catch up on the scrollback on my tomorrow)
+
+[14:18:03.0960] <nicolo-ribaudo>
+Let's add two between you, jesse, and shane?
+
+[14:18:13.0622] <nicolo-ribaudo>
+Bye!
+
+[14:22:22.0807] <sffc>
+Originally I had advocated for Rational _instead of_ Decimal, but I dropped that a long time ago. I still think Rational is better for i18n due to decoupling data model from formatting. But I dropped this concern given the very limited prior art for rationals, and since even CLDR doesn't really support it.
+
+[14:22:32.0020] <sffc>
+* Originally I had advocated for Rational _instead of_ Decimal. I still think Rational is better for i18n due to decoupling data model from formatting. But I dropped this concern given the very limited prior art for rationals, and since even CLDR doesn't really support it.
+
+[14:23:46.0308] <sffc>
+Who is the "official" Igalia substitute for Ben? I would like to work with you to get some spec text written for Measure.
+
+[14:24:03.0204] <Jesse (TC39 🇺🇸)>
+I'm not totally unsympathetic to that; I've done a lot of work with Scheme/Lisp and there, rationals are the data model for exact numbers
+
+[14:24:29.0977] <Jesse (TC39 🇺🇸)>
+but there are some downsides
+
+[14:24:45.0597] <littledan>
+sounds like Nic is explicitly saying that Jesse can serve as (co-)substitute in this case
+
+[14:24:51.0497] <nicolo-ribaudo>
+(I'll get Romulo to give you an official answer)
+
+[15:17:35.0641] <sffc>
+📢 Please review these slides I threw together for the continuation topic this afternoon: https://docs.google.com/presentation/d/1050DHlNOzcN-8LqJQ_6z8j-LryXgEqOcLfcVzkhJyEk/edit#slide=id.p
+
+[15:24:15.0424] <Chris de Almeida>
+sffc: the continuation was scheduled for tomorrow morning to accommodate Eemeli
+
+[15:29:00.0538] <Chris de Almeida>
+(also we only have 15 mins available left on paper today)
+
+[15:32:32.0112] <nicolo-ribaudo>
+Lgtm ✅️
+
+[15:33:17.0010] <nicolo-ribaudo>
+One question that is going to come up is "Why no Intl.Amount?"
+
+[15:44:25.0943] <Jesse (TC39 🇺🇸)>
++1 from me
+
+
+2025-02-20
+[16:08:03.0739] <Jesse (TC39 🇺🇸)>
+one thing that's unclear to me is what operations FullDecimal (I don't like the name but work with me) should support
+
+[16:08:17.0230] <Jesse (TC39 🇺🇸)>
+should it have comparison?
+
+[16:08:40.0015] <Jesse (TC39 🇺🇸)>
+I think we agree that FullDecimal should't do arithmetic
+
+[16:08:47.0269] <Jesse (TC39 🇺🇸)>
+but I wonder if we need comparison(s)
+
+[16:09:06.0491] <nicolo-ribaudo>
+If I'm the only one that liked the FullDecimal idea I'm happy to drop it, I just liked having "incrementally more information" on these numeric objects rather than "all or nothing", but I have no concrete use cases. It's more of a language purity thing
+
+[16:09:38.0742] <Jesse (TC39 🇺🇸)>
+I'm not opposed to it
+
+[16:10:17.0143] <Jesse (TC39 🇺🇸)>
+that's my only (weak) objection -- no clear use cases, it exists mainly for the purpose of abstract language niceness
+
+[16:10:22.0475] <nicolo-ribaudo>
+But yes if we have it, I would expect it to have comparison that also checks the precision
+
+[16:10:51.0784] <Jesse (TC39 🇺🇸)>
+IEEE 754 has a comparison that respects the precision (quantum) but it's really weird
+
+[16:11:08.0426] <sffc>
+I don't want FullDecimal to be a focus of the presentation. But we should probably be prepared for some of these questions given that delegates will nitpick about them.
+
+[16:11:09.0645] <Jesse (TC39 🇺🇸)>
+equals and less-than are supposed to work with mathematical value (iow ignore precisiopn)
+
+[16:11:10.0363] <ljharb>
+yeah it's very weird to compare precision
+
+[16:11:52.0660] <nicolo-ribaudo>
+But what if you explicitly have an object that is "number + precision"... you care about the precision, otherwise you'd just have the number
+
+[16:11:53.0484] <Jesse (TC39 🇺🇸)>
+you can detect that two values are mathematically equal but distinct if you have toString
+
+[16:11:57.0831] <Jesse (TC39 🇺🇸)>
+and equals
+
+[16:12:27.0621] <ljharb>
+then they're incomparable
+
+[16:12:34.0739] <sffc>
+I think FullDecimal should either do a total comparison or it should not have an equals function
+
+[16:13:43.0312] <Jesse (TC39 🇺🇸)>
+(sorry for this, maybe I should stop since FullDecimal isn't a focus of the presentation)
+
+[16:13:53.0818] <Jesse (TC39 🇺🇸)>
+I wonder if we should have a converter from FullDecimal to Decimal
+
+[16:14:04.0699] <Jesse (TC39 🇺🇸)>
+(which of course does have less-than, equals)
+
+[16:14:30.0684] <Jesse (TC39 🇺🇸)>
+this feels very temporal-y to me
+
+[16:14:36.0363] <nicolo-ribaudo>
+Yes, if we have the three classes I'd expect you to move up and down the hierarchy
+
+[16:14:46.0622] <nicolo-ribaudo>
+* Yes, if we have the three classes I'd expect you to be able to move up and down the hierarchy
+
+[16:14:49.0247] <Jesse (TC39 🇺🇸)>
+like, comparison just *does not exist* in FullDecimal. you have to explicitly move to another class to do that
+
+[16:18:00.0388] <sffc>
+I renamed it to "DecimalWithPrecision" in the two places it is referenced in the slides
+
+[16:19:15.0227] <ljharb>
+what does DecimalWithPrecision add besides just being a place to hold a precision value?
+
+[16:20:29.0053] <Jesse (TC39 🇺🇸)>
+one benefit I can see is that `toString` might have some good use cases
+
+[16:20:37.0248] <Jesse (TC39 🇺🇸)>
+exposing the extra precision data
+
+[16:21:05.0358] <Jesse (TC39 🇺🇸)>
+though tbh that's kinda what `toString` already does with (canonicalized) decimals
+
+[16:21:06.0274] <ljharb>
+ok so it's a bucket, to contain a decimal, a precision integer, and a toString function?
+
+[16:21:11.0294] <Jesse (TC39 🇺🇸)>
+sorry `toFixed`
+
+[16:21:24.0935] <ljharb>
+because if that's all it is, why not just have a toFixed on Decimal.prototype
+
+[16:21:26.0842] <Jesse (TC39 🇺🇸)>
+it essentially imputes a precision to the numeric value
+
+[16:21:35.0856] <Jesse (TC39 🇺🇸)>
+there is a toFixed
+
+[16:21:53.0858] <ljharb>
+`[d, precision]` → `d.toFixed(precision)` when i want the combo?
+
+[16:22:17.0525] <nicolo-ribaudo>
+Yes, it's exactly that to have the value and the precision as a single thing rather than having to track them individually
+
+[16:22:24.0500] <nicolo-ribaudo>
+* Yes, it's exactly that to have the value and the precision as a single thing rather than having to track them individually in parallel
+
+[16:22:49.0252] <ljharb>
+i totally get why that's beneficial, but that is a very very small value prop to add a Whole New Class
+
+[16:23:13.0216] <ljharb>
+especially when `Object.assign(Object(decimal), { precision })` also covers that
+
+[16:23:15.0803] <Jesse (TC39 🇺🇸)>
+I worry a bit about developer confusion, too
+
+[16:23:22.0582] <Jesse (TC39 🇺🇸)>
+(if we had the two decimal classes)
+
+[16:23:35.0852] <ljharb>
+nobody should be trying to java-ize JS by Nouning up all the things
+
+[16:23:43.0711] <ljharb>
+there needs to be sufficient rationale for stuff
+
+[16:23:51.0306] <nicolo-ribaudo>
+Well we even have classes like SetIterator 😛
+
+[16:23:56.0668] <ljharb>
+yes, and that's absurd
+
+[16:24:00.0995] <sffc>
+Do you have a suggestion about how `decimal.toFixed(5).withUnit("meter")` would work without the intermediate type
+
+[16:24:02.0315] <nicolo-ribaudo>
+But I do not necessarily disagree
+
+[16:24:03.0416] <ljharb>
+we shouldn't have ever had any of the iterator classes
+
+[16:24:24.0362] <nicolo-ribaudo>
+I guess without the intermediate type you'd do `decimal.toAmount({ precision, unit })`
+
+[16:24:27.0173] <ljharb>
+`(d) => d.toFixed(5).withUnit("meter")`?
+
+[16:24:37.0624] <Jesse (TC39 🇺🇸)>
+I might suggest `decimal.asMeasure({unit: "meter", precision: 5 })`
+
+[16:24:55.0134] <ljharb>
+like, it's already a solved problem how to carry multiple values around together (and there's multiple solutions, including an object, an array, a closure, etc)
+
+[16:25:01.0160] <ljharb>
+(possibly composite keys one day)
+
+[16:25:43.0256] <ljharb>
+the benefit of making a Thing for a thing is when there's lots of incremental value you can gain when you _for sure_ have multiple values associated together
+
+[16:25:50.0080] <sffc>
+I don't buy this argument, because then `ZonedDateTime` and most other Temporal types could just have been objects, too
+
+[16:26:10.0273] <ljharb>
+i believe they do pretty extensive validation, which imo is sufficient benefit
+
+[16:26:32.0002] <ljharb>
+but "two numeric values" doesn't require much in the way of validation
+
+[16:27:05.0604] <Jesse (TC39 🇺🇸)>
+we need to make sure the numbers are in range à la IEEE 754 so there is *some* validation
+
+[16:27:17.0809] <Jesse (TC39 🇺🇸)>
+it's not just a box of two arbitrary values
+
+[16:27:39.0697] <ljharb>
+sure. decimal covers the one tho, so it'd only be the range of valid precisions
+
+[16:27:50.0758] <ljharb>
+and since toFixed would do that anyways…
+
+[16:27:53.0305] <sffc>
+My model is that the precision gets "merged" into the Decimal without actually storing it in a separate slot
+
+[16:28:04.0234] <Jesse (TC39 🇺🇸)>
+ah I think there might be a misunderstanding -- toFixed produces a String
+
+[16:28:05.0641] <ljharb>
+what is the data model for that?
+
+[16:28:07.0339] <Jesse (TC39 🇺🇸)>
+not another Decimal
+
+[16:28:08.0266] <sffc>
+* My model is that the precision gets "merged" into the Decimal without actually storing it in a separate slot (internally)
+
+[16:28:13.0917] <ljharb>
+right, i get that.
+
+[16:28:21.0893] <nicolo-ribaudo>
+I think you are confused maybe
+
+[16:28:32.0629] <nicolo-ribaudo>
+Jordan is talking about the FullDecimal?
+
+[16:28:32.0977] <ljharb>
+doing math with multiple decimals-with-precision is not a goal, as i understand it
+
+[16:28:44.0427] <ljharb>
+so the only point of having a decimal-with-precision is to produce a string. am i mistaken?
+
+[16:28:56.0956] <sffc>
+What is the type returned by toFixed? Is it a String?
+
+[16:29:06.0033] <Jesse (TC39 🇺🇸)>
+yes
+
+[16:29:12.0955] <Jesse (TC39 🇺🇸)>
+and it already exists on decimal
+
+[16:29:16.0434] <nicolo-ribaudo>
+And we add `String.prototype.withUnit`?
+
+[16:29:34.0521] <ljharb>
+lol it'd be more like, `toFixed(5, { unit: 'meter' })` or something, i assunme
+
+[16:29:35.0741] <ljharb>
+* lol it'd be more like, `toFixed(5, { unit: 'meter' })` or something, i assume
+
+[16:29:51.0100] <sffc>
+ok, I see. Fine with me but I'm surprised ljharb is proposing using a string as a numeric type. :)
+
+[16:29:54.0031] <ljharb>
+but unless there's good use cases beyond "render a string" i don't know why we'd want a full Class for it
+
+[16:30:03.0643] <ljharb>
+lol, i'm not
+
+[16:38:09.0576] <Jesse (TC39 🇺🇸)>
+I can imagine that we could drop (canonicalized) Decimal's `toFixed` and `toPrecision`, keeping *only* `toString`; these methods would instead create a FullDecimal, not a string
+
+[16:39:07.0930] <Jesse (TC39 🇺🇸)>
+and FullDecimal would have `toString`, of course; it would read out the exact value + precision
+
+[16:39:25.0419] <Jesse (TC39 🇺🇸)>
+there'd be no way, in this line of thinking, of imputing a precision to a decimal
+
+[16:39:52.0725] <ljharb>
+ok but how is that better than me making an arrow function that closes over precision and the value
+
+[16:40:13.0004] <ljharb>
+or rather, how is that better _enough_ to justify a Class being added, which is a very costly and big thing
+
+[16:40:15.0128] <sffc>
+I quite like a design of `decimal.toFixed(5)` becoming `decimal.withFractionDigits(5).toString()` and using the intermediate type
+
+[16:40:48.0973] <sffc>
+(but again, let's please not get into the weeds on this in plenary tomorrow. it's a good topic for a champions meeting.)
+
+[16:41:04.0934] <ljharb>
+agreed
+
+[16:41:43.0832] <ljharb>
+i think that the intermediate type needs a much stronger elevator pitch than "it's slightly more ergononic than an arrow function closing over values", is all
+
+[19:07:31.0271] <littledan>
+So what do we want the focus to be tomorrow
+
+[19:54:00.0046] <sffc>
+> <@littledan:matrix.org> So what do we want the focus to be tomorrow
+
+Surfacing any remaining dissent of the type that would block either feature from advancing to Stage 2. Figuring out which delegates are not convinced if either proposal is not motivated and why.
+
+[19:55:01.0535] <sffc>
+* Surfacing any remaining dissent of the type that would block either feature from advancing to Stage 2. Figuring out which delegates are not convinced of the motivation of either proposal and why.
+
+[23:41:47.0663] <eemeli>
+My preferred solution for precision would be for Amount to include a `significantDigits` field. That class already includes an optional unit or currency indicator that needs to be accounted for by any operations on it. Adding precision to it as a third thing (beyond value + dimension) is a much smaller cost than adding a second thing to Decimal.
+
+[23:52:38.0334] <eemeli>
+That also allows for Amount to solve by itself the i18n issues around precision, rather than relying on the committee finding agreement on how and whether to include that within the Decimal proposal work.
+
+[00:31:28.0452] <eemeli>
+On API details: Is there any reason why Amount ought to include a secondary constructor like `Amount.from()`? I think Shane's slide 6 alludes to that, but it's not clear to me why that might be desirable over `new Amount()` supporting the same inputs as might be proposed for `Amount.from()`.
+
+[00:34:50.0122] <Romulo Cintra>
+While Ben is on leave, Jesse will be responsible for working on Measure/Amount/Decimal-related tasks, and the remaining tasks will be distributed among other team members, who can also provide support in other tasks if needed
+
+[08:15:58.0785] <sffc>
+Temporal sets precedent for `new` being strict to the data model and `.from` taking things that get coerced. But this is a nitpick that the champions should resolve. Doesn't have to do with proposal motivation.
+
+[08:16:57.0276] <sffc>
+Amount is proposed as opaque. The exact fields are not normative at stage 2.
+
+[08:20:18.0375] <eemeli>
+Sure, but e.g. on your slide 5 (data model) the currency/unit is specifically mentioned, but significantDigits is not.
+
+[08:22:23.0457] <eemeli>
+"new being strict to the data model and .from taking things that get coerced" sounds like a language design concept that ought to get explicitly discussed in committee, separately from either Temporal or Amount.
+
+[08:28:37.0161] <nicolo-ribaudo>
+Do you think new vs .from needs to be discussed before stage 2?
+
+[09:11:40.0791] <sffc>
+eemeli: The purpose of this presentation is to identify issues that could _block advancement to Stage 2_. Your comments are good things to discuss amongst the champions, but they do not strike me as the type of thing that need to be resolved before Stage 2.
+
+[09:17:34.0457] <sffc>
+I am seeking feedback on _the shape of the solution_ being a new type called Amount with semantics that is a wrapper over a numeric type with precision and a unit and extremely limited functionality. I think we are in furious agreement on that.
+
+[09:29:47.0840] <eemeli>
+I don't think .from vs. new is a blocking concern; I'm really just pointing out that it ought to be discussed in general, separately from either Temporal or Amount.
+
+[09:56:22.0954] <Jesse (TC39 🇺🇸)>
+I'm agnostic on static method vs. constructor
+
+[11:02:34.0700] <littledan>
+the protocol-based approach to Amount is interesting -- that hadn't occurred to me before
+
+[11:02:39.0714] <littledan>
+would that work?
+
+[11:03:02.0135] <littledan>
+just like an options bag with value, unit and precision
+
+[11:16:55.0815] <Jesse (TC39 🇺🇸)>
+thanks sffc for pushing this forward
+
+[11:17:20.0496] <Jesse (TC39 🇺🇸)>
+as N-ic and R-omulo mentioned I'm happy to take over the champion role for <s>measure</s> amount for now
+
+[11:17:45.0381] <nicolo-ribaudo>
+(co-)champion!
+
+[11:18:11.0722] <Jesse (TC39 🇺🇸)>
+AFAICS it's not the end of the world for amount to be considered mainly a 402 thing
+
+[11:18:36.0468] <Jesse (TC39 🇺🇸)>
+I expect we can sharpen the use cases and motivation and possibly make it clearer that it could be n 262
+
+[11:19:56.0257] <Jesse (TC39 🇺🇸)>
+my sense is that the options bag approach isn't quite what we want; I think we need to pass amounts around as values of their own and not merely as option bags waiting to be slotted into a function call
+
+[11:20:32.0365] <sffc>
+I feel the primordial approach is >> the protocol approach. I've definitely considered it before. It is technically a more narrow solution, but it has problems of its own.
+
+[11:20:38.0008] <ljharb>
+(certainly i'd assume that the values would be in internal slots and that Intl would read those)
+
+[11:22:06.0881] <sffc>
+I feel like we have headway to get alignment on an Intl-namespace thing (not Intl.NumberFormatOptionsBuilder but rather Intl.Amount)
+
+[11:23:23.0289] <sffc>
+And then I feel like we have headway to say that Intl.Amount should be just Amount
+
+[11:23:56.0427] <littledan>
+yeah I bet the committee will receive it differently if it's in Intl
+
+[11:24:11.0293] <littledan>
+I believe you, and am interested in understanding the problems
+
+[11:24:32.0045] <littledan>
+great presentation btw, sffc 
+
+[11:24:42.0403] <littledan>
+I think this really helped push the discussion forward
+
+[11:24:56.0850] <ljharb>
+additional functionality, or additional "non-rendering" use cases would help with that case; and also, userland packages/use cases that aren't solely about i18n would help
+
+[11:25:14.0782] <eemeli>
+> <@littledan:matrix.org> the protocol-based approach to Amount is interesting -- that hadn't occurred to me before
+
+That's the approach taken in the current proposed text for Intl.MessageFormat.
+
+[11:27:30.0332] <Jesse (TC39 🇺🇸)>
+> <@ljharb:matrix.org> additional functionality, or additional "non-rendering" use cases would help with that case; and also, userland packages/use cases that aren't solely about i18n would help
+
+I think the clearest use case there is unit conversion
+
+[11:27:49.0846] <sffc>
+Are you satisfied enough with the prospect for non-intl functionality being added in the future, such as add/subtract and unit conversion?
+
+[11:27:54.0337] <Jesse (TC39 🇺🇸)>
+arithmetic, too, though I kinda have mixed feelings about that one
+
+[11:28:36.0761] <ljharb>
+i'm not sure unit conversion is something that will ever be added; based on comments and my intuition it seems like a massive minefield
+
+[11:28:41.0610] <Jesse (TC39 🇺🇸)>
+> <@eemeli:mozilla.org> That's the approach taken in the current proposed text for Intl.MessageFormat.
+
+would love to hear more about the intersection of MF 2.0 and numbers/decimals/amounts
+
+[11:28:47.0423] <Jesse (TC39 🇺🇸)>
+(that wasn't on my radar)
+
+[11:29:38.0381] <ljharb>
+but also you can already do unit conversion and math with amounts, you just need to somewhat hardcode the conversion factors
+
+[11:29:57.0105] <ljharb>
+so adding unit conversion is only valuable if it avoids needing to code in the factors, right?
+
+[11:30:12.0595] <Jesse (TC39 🇺🇸)>
+> <@ljharb:matrix.org> i'm not sure unit conversion is something that will ever be added; based on comments and my intuition it seems like a massive minefield
+
+what's interesting is that the unit conversion thing comes close to one of the (admittedly, secondary/tertiarty) use cases for decimal, which is about scientific computation, or, more coarsely, "moar digits"
+
+[11:30:26.0563] <ljharb>
+sure. decimal math i'm sold on
+
+[11:30:40.0247] <eemeli>
+> <@jesse:igalia.com> would love to hear more about the intersection of MF 2.0 and numbers/decimals/amounts
+
+See e.g. here: https://github.com/unicode-org/message-format-wg/blob/main/spec/functions/number.md#operands-3
+
+[11:30:52.0853] <ljharb>
+but the units are only relevant for conversion factors when appropriate, and whether/how the precision matters is insanely complex
+
+[11:30:57.0582] <ljharb>
+* but the units are only relevant for conversion factors when appropriate, and whether/how the precision matters is insanely complex and varied
+
+[11:31:30.0423] <Jesse (TC39 🇺🇸)>
+here's a simple question that's homework for me: do any of the constants in units.xml for conversion go beyond the limits of IEEE 754?
+
+[11:31:53.0400] <Jesse (TC39 🇺🇸)>
+decimal128 that is
+
+[11:32:12.0450] <eemeli>
+Unit conversion depends on having a clear understanding of how math works on Amount values, hence wanting to leave it until later.
+
+[11:32:35.0345] <ljharb>
+the value is just a number - math works on it the way math works
+
+[11:32:41.0922] <ljharb>
+if it's a decimal then however decimal math works, etc
+
+[11:32:54.0361] <ljharb>
+the conversion factor (or conversion capability) is the part that seems hard to me
+
+[11:33:01.0487] <eemeli>
+What if it's a numeric string?
+
+[11:33:20.0302] <ljharb>
+then you're required to do the conversion before making an Amount anyways, based on the slides i saw?
+
+[11:33:34.0523] <ljharb>
+`value: number | bigint | Decimal` was somewhere i thought
+
+[11:33:50.0413] <ljharb>
+`Amount` doesn't seem like its goal is to handle numeric strings
+
+[11:34:04.0008] <eemeli>
+Ah, my version supported Amount('42').
+
+[11:34:15.0805] <eemeli>
+* Ah, my version supported new Amount('42').
+
+[11:34:20.0627] <ljharb>
+we don't do implicit coercion anymore tho, so i don't think that'd fly
+
+[11:34:43.0583] <ljharb>
+but either way the rules for conversion to a numeric type are/will be already decided elsewhere
+
+[11:35:27.0153] <eemeli>
+With an opaque Amount, that's inside Intl.NumbetFormat.
+
+[11:36:34.0976] <ljharb>
+but in that case the usage is only for string rendering. which means it's decidedly not generic and shouldn't be a 262 feature, which doesn't seem like the goal
+
+[11:46:26.0100] <eemeli>
+My version of an opaque Amount would include a toString() returning a representation of the otherwise inaccessible value. It's intended to:
+1. solve i18n/L10n bugs,
+2. provide a way to represent (but not operate on) numeric values beyond number,
+3. not conflict with anything that we might want to do with Decimal, and
+4. support later proposals for e.g. operations like conversion and Decimal integration.
+
+[11:47:39.0338] <ljharb>
+how would that representation be 402-agnostic?
+
+[11:48:09.0260] <littledan>
+do we want to do that as part of this, or should it be part of stable formatting?
+
+[11:48:43.0569] <littledan>
+are you putting it here as a hedge against stable formatting?
+
+[11:50:20.0763] <eemeli>
+littledan: Could you clarify? I don't really see the link with Stable Formatting.
+
+[11:50:40.0723] <eemeli>
+> <@ljharb:matrix.org> how would that representation be 402-agnostic?
+
+What does that mean?
+
+[11:50:49.0309] <Jesse (TC39 🇺🇸)>
+also wanted to ask that
+
+[11:51:08.0489] <ljharb>
+> toString() returning a representation … solve i18n/L10n bugs
+
+[11:51:28.0773] <ljharb>
+if it's using 402 algorithms to produce that representation, and it's in 262, then it'd have to be toLocaleString, wouldn't it?
+
+[11:53:02.0308] <eemeli>
+> <@eemeli:mozilla.org> I updated the gist again to show an opaque Amount, with a `toString()` method to get at a string representation of the value:
+> https://gist.github.com/eemeli/0bd413d2f711cbd6016673af8d68c38c
+
+ljharb: This is the "It" I'm describing above.
+
+[11:53:44.0498] <ljharb>
+ok, and how does this differ from Intl.NumberFormat now, with an options bag?
+
+[11:54:15.0146] <littledan>
+Rather than having toString, wouldn't toLocaleString('zxx') accomplish the same things?
+
+[11:54:25.0177] <eemeli>
+It allows for the value+dimension+precision to be encapsulated.
+
+[11:55:18.0048] <eemeli>
+> <@littledan:matrix.org> Rather than having toString, wouldn't toLocaleString('zxx') accomplish the same things?
+
+No, because the toString() would only include the numerical value.
+
+[11:55:35.0821] <ljharb>
+so does a closure. i don't think that's sufficient motivation to add something to the language
+
+[11:57:54.0701] <eemeli>
+You mean like toLocaleString()? That requires re-creating the formatter on every call.
+
+[12:00:59.0416] <Jesse (TC39 🇺🇸)>
+> <@eemeli:mozilla.org> No, because the toString() would only include the numerical value.
+
+I guess we omit the unit for pluralization reasons?
+
+[12:04:14.0191] <eemeli>
+Mostly it's to provide _some_ access to the opaque value, and to not duplicate the value available from toLocaleString('zxx').
+
+[12:05:28.0357] <eemeli>
+I would be very happy to iterate on the designs of an appropriate opaque Amount.
+
+[12:05:58.0005] <eemeli>
+It should really be a very small proposal.
+
+[12:13:17.0737] <ljharb>
+"re-creating the formatter", why is that expensive?
+
+[13:40:09.0277] <sffc>
+`toLocaleString` is a good on-ramp to i18n. It is often performant, and ICU4X can make it more performant, but the explicit Intl formatters are an option when benchmarks show it to be worthwhile.
+
+[13:41:02.0824] <ljharb>
+tbh the formatter design also seems like it doesn't belong as a class, but rather just as a function, but obv that ship has sailed
+
+
+2025-02-27
+[08:37:31.0283] <Chris de Almeida>
+* re: https://github.com/tc39/Reflector/issues/551
+
+what is the meeting duration?  edit: will set for 1 hour, as that seems to be the de facto standard for non-plenary tc39 meetings
+
+[08:58:38.0322] <Chris de Almeida>
+the numerics call is now on the private calendar.  if anyone would like to be added to the calendar invite, send me your email address
+
+[09:02:21.0854] <Jesse>
+I think E-emeli had asked about that
+
+[12:07:56.0693] <eemeli>
+Yes, please. eemeli@mozilla.com
+
+
+2025-02-28
+[16:25:10.0534] <sffc>
+Wait it's at 18:00 Europe/Berlin not 9:00 America/Los_Angeles? This causes conflicts for me in March because I almost always have a meeting at 10:00 America/Los_Angeles. It appears the conflict is fixed starting in April when Europe goes on DST.
+
+[16:26:38.0607] <sffc>
+I usually put all my meetings in America/Los_Angeles to avoid this issue in March and October. Call me US-centric. But mainly I'm using that time zone as my reference zone for DST rules.
+
+[16:27:33.0263] <sffc>
+(also: I've officially found myself a use case for Temporal.ZonedTime!)
+
+[07:34:01.0876] <Chris de Almeida>
+Jesse: ☝️
+

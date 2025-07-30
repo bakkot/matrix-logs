@@ -1,0 +1,663 @@
+2025-07-02
+[03:14:03.0877] <nicolo-ribaudo>
+Unfortunately I'll not be able to join the meeting today (due to some rain that happened a few days ago causing significant travel disruptions 😅)
+
+[03:14:13.0764] <nicolo-ribaudo>
+* Unfortunately I'll not be able to join the meeting today (due to some rain that happened a few days ago causing significant travel disruptions and messing up my schedule 😅)
+
+[04:30:26.0431] <eemeli>
+I'll be there. Should be able to share a draft of the spec changes for keep-trailing-zeros that I've been working on.
+
+[05:39:23.0143] <eemeli>
+Said spec draft: https://github.com/eemeli/ecma402/pull/1
+
+I found it easier to start on the diff by working on a branch of the whole `ecma402` repo; is there any ecmarkup tooling that could take a git diff and generate the usual sort of proposal spec presentation from that?
+
+[05:39:40.0438] <eemeli>
+* Said spec draft: https://github.com/eemeli/ecma402/pull/1
+
+I found it easier to start on the diff by working on a fork of the whole `ecma402` repo; is there any ecmarkup tooling that could take a git diff and generate the usual sort of proposal spec presentation from that?
+
+[05:46:59.0398] <Richard Gibson>
+> is there any ecmarkup tooling that could take a git diff and generate the usual sort of proposal spec presentation from that?
+
+well, it's trivial to just apply the diff and render the resulting spec—or did you have something else in mind, like translating `git diff --word-diff=plain` `[-removed-]`/`{+added+}` output into `<del>removed</del>`/`<ins>added</ins>`?
+
+[05:50:56.0236] <eemeli>
+Yes, to the latte question.
+
+[05:50:59.0754] <eemeli>
+* Yes, to the latter question.
+
+[05:52:09.0926] <Jesse>
+I'll be there
+
+[05:52:15.0642] <eemeli>
+Not having previously worked on a proposal that's more about changing existing text rather than adding new stuff, I figured I'd ask as I presume this type of thing happens on occasion.
+
+[06:18:21.0415] <Jesse>
+I've also got a PR for reducing the scope of measure in line with our earlier discussions: https://github.com/tc39/proposal-measure/pull/29
+
+[07:51:41.0710] <eemeli>
+Jesse: Added some comments on your PR.
+
+[07:57:17.0785] <eemeli>
+Jesse: In https://github.com/tc39/proposal-measure/pull/29 you're proposing that we drop units and currencies from the initial Amount? That seems surprisingly different from what we've been discussing so far.
+
+[08:20:57.0738] <Jesse>
+ah, right -- taking a look at the old notes, I realize I cut too much
+
+[08:21:05.0965] <Jesse>
+I'll restore units + currency
+
+[08:21:07.0426] <Jesse>
+sorry about that
+
+[08:21:12.0838] <Jesse>
+I'll restore units + currency
+
+[08:22:25.0657] <Jesse>
+in the spec text we do support units + currency, so the README and spec are out-of-sync
+
+[09:02:46.0863] <Jesse>
+call now: https://docs.google.com/document/d/1O2EQC61TIDtkcvDSkhDf4N_R9GioT0foU2tH9HBdMdQ/edit?pli=1&tab=t.0
+
+[09:07:01.0924] <Jesse>
+ugh permissions issue, stil trying...
+
+
+2025-07-03
+[04:41:13.0609] <Jesse>
+taking a look at the issue of the Amount spec text not yet handling Intl.NumberFormat, it seems to me that no spec text is needed (!) provided that keep-trailing-zero is merged in
+
+[04:44:20.0605] <Jesse>
+the `FormatNumeric` AO seems to be doing the heavy lifting in NumberFormat; and given that the `ToPrimitive` AO will result in a call to `toString` on Amount objects (because there won't be a `.valueOf` method), it seems to me that, with Eemeli's bugfix, NumberFormat should work out-of-the-box with Amounts
+
+[09:53:01.0307] <eemeli>
+Well, not with Amounts that include a unit or currency. For those, the toString() output will not be parseable as a number, and the currency or unit in the Amount will be discarded.
+
+[14:02:01.0697] <Richard Gibson>
+color me sniped: https://gist.github.com/gibson042/180b7147f84e17e4d55d2893f28719a2
+
+
+2025-07-04
+[02:20:33.0109] <eemeli>
+Regarding [this](https://github.com/tc39/proposal-measure/pull/29#discussion_r2182738311) short conversation between Jesse and myself, I've started to think that the default behaviour of `Amount.p.toString()` should be to return the numeric string with no unit/currency markers, so that e.g. `new Decimal(amount)` would work without any special Amount-detection code.
+
+The with-marker behaviour could be implemented optionally, e.g. with `.toString({ style: 'long' })` where `style: 'numeric'` would be the default.
+
+[02:37:28.0370] <eemeli>
+I've added suggestions to the PR implementing the above.
+
+
+2025-07-05
+[12:17:48.0748] <sffc>
+I strongly oppose a toString function not being round-trippable to the type it was created from
+
+[12:18:29.0872] <sffc>
+* I strongly oppose a toString function having default behavior that is not round-trippable to the type it was created from
+
+[12:20:57.0749] <sffc>
+* I strongly oppose a toString function having default behavior that is not round-trippable to the type it was created from, for a number of reasons. I didn't think this was a controversial position, but if it would help, I'll make another writeup like I did with #175 (why precision is important) and #181 (why Decimal isn't the only solution for representing exact numbers)
+
+[12:22:44.0258] <sffc>
+> so that e.g. new Decimal(amount) would work without any special Amount-detection code.
+This is based on the potentially flawed premise that `new Decimal(amount)` would call ToString on the `amount`, but TC39 has ruled that we don't want this type of implicit conversion.
+
+[12:22:49.0649] <sffc>
+* > so that e.g. new Decimal(amount) would work without any special Amount-detection code.
+
+This is based on the potentially flawed premise that `new Decimal(amount)` would call ToString on the `amount`, but TC39 has ruled that we don't want this type of implicit conversion.
+
+[12:27:42.0060] <sffc>
+Besides that point, I don't find the `new Decimal(amount)` argument to be convincing because:
+
+1. Brand checking is easy and ECMA does it all the time now, and even without brand checking, it could check for e.g. a `.decimal` field or a `Symbol.toDecimal` function
+2. Amount can have a `toDecimal` function, which looks nicer in chaining (people like method chaining)
+
+
+2025-07-09
+[02:41:25.0930] <Jesse>
+perhaps on Thursday we can discuss this
+
+[02:41:28.0143] <Jesse>
+https://github.com/tc39/proposal-measure/pull/29#discussion_r2194555604
+
+
+2025-07-10
+[09:04:01.0990] <Jesse>
+eemeli: are you able to come?
+
+[10:00:31.0366] <Jesse>
+here are the items I have as next steps for us:
+
+[10:00:47.0544] <Jesse>
+* Prepare slides for Measure for stage 2
+* Allow “1.2[kg]” in the constructor (currently not allowed)
+* Change Intl.NmberFormat to accept merely style: unit/currently without throwing.
+* Add toNumber to spec text
+* ToPrimitive: should give number or string if no currency/unit, throw otherwise.
+* RGN updates us about concerns re: currency in the chat or as an issue
+
+
+[10:02:25.0606] <Jesse>
+* - Prepare slides for Amount for stage 2
+- Allow “1.2\[kg\]” in the constructor (currently not allowed)
+- Change Intl.NmberFormat to accept merely style: unit/currently without throwing.
+- Add toNumber to spec text for Amount
+- ToPrimitive: should give number or string if no currency/unit, throw otherwise.
+- RGN updates us about concerns re: currency in the chat or as an issue
+
+[11:01:37.0239] <eemeli>
+Supporting “1.2[kg]” in the constructor would presumably let `new Amount(a)` "just work", where `a` is itself an Amount.
+
+
+2025-07-15
+[04:24:47.0381] <eemeli>
+The draft spec for keep-trailing-zeros is now available: https://tc39.es/proposal-intl-keep-trailing-zeros
+
+Richard Gibson's script was really useful in generating that from https://github.com/eemeli/ecma402/pull/1, which I'll continue to keep open & in sync with the proposal repo's version.
+
+I've submitted this for stage 2/2.7 advancement at the upcoming TC39 meeting, and am currently working on slides for it.
+
+
+2025-07-16
+[11:00:13.0188] <sffc>
+eemeli: For the Mixed Units proposal, Ben's README has examples like
+```
+    let footAndInch = new Measurement(5.5, {unit: "foot-and-inch"})
+    footAndInch.toComponents()
+    // [ {value: 5, unit: "foot"}, {value: 6, unit: "inch"}]
+    footAndInch.toString()
+    // "5 feet and 6 inches"
+```
+This requires unit conversion. Did you have in mind a way to implement mixed unit formatting without that?
+
+[11:00:59.0675] <sffc>
+Note: We already support ListFormat with type="unit", and you can glue together your own mixed unit format string if you have the individual values.
+
+[11:26:55.0830] <eemeli>
+One possibility, based on DurationFormat:
+```
+let nf = new Intl.NumberFormat('en', { style: 'unit', unit: 'foot-and-inch' })
+nf.format({ foot: 5, inch: 6 })
+```
+
+[13:21:05.0364] <sffc>
+I don't know if I want to open the can of worms of Intl.NumberFormat.prototype.format accepting a bag of fields
+
+[13:21:42.0410] <sffc>
+How do you feel about saying that mixed units will be shifted into the Smart Units proposal instead of their own proposal?
+
+[13:54:58.0643] <eemeli>
+I don't really see how they're connected, except as both advancing unit formatting? If that's enough, then maybe it makes sense to roll them up into one.
+
+[14:58:01.0042] <sffc>
+I mean, I'm not personally convinced that mixed unit formatting carries its own weight without the conversion half of the feature, since you can already get it manually by using a ListFormat to glue pieces together.
+
+[15:13:51.0680] <eemeli>
+That's fair. I'm not too invested in mixed units myself, so have no strong opinions here.
+
+
+2025-07-17
+[03:51:25.0956] <eemeli>
+I validated the keep-trailing-zeros spec changes by applying them to the Format.js Intl.NumberFormat polyfill, here: https://github.com/eemeli/formatjs
+
+The changes appear to work exactly as intended. It uses `decimal.js` internally to represent intl mathematical values, so I put the [[StringDigits]] as a new property on it, rather than adding a wrapping object.
+
+
+2025-07-22
+[01:53:23.0730] <sffc>
+https://github.com/tc39/proposal-measure/issues/43
+
+[01:54:36.0866] <sffc>
+At least 3 programming languages have an Amount-like thing in the standard library: Swift, Java, and F#. Several others have it in popular packages. Seems worth highlighting.
+
+[01:54:54.0632] <Jesse>
+thanks for putting that together
+
+[01:55:06.0030] <Jesse>
+I can add a slide for this
+
+[01:56:37.0749] <sffc>
+`Quantity` seems to be the most popular name for it, except in Swift which uses the name `Measurement`. No one I saw uses `Amount`. That doesn't mean it's a bad name, it just means there is less precedent for it
+
+[01:57:18.0901] <Jesse>
+IIRC we  also floated "quantity" a while back but didn't pick it
+
+[01:58:20.0618] <sffc>
+We can do a TG5 study at Stage 2 like we did with Temporal to decide between PlainDate, LocalDate, and CivilDate
+
+[02:01:09.0864] <sffc>
+Also, the "Why Amount" slide should have a bullet point about library interop: introducing a standard data type that third-party libraries can use interoperably
+
+[02:01:58.0533] <sffc>
+For example, a third-party unit conversion library and a third-party widget can talk natively with each other with Amount
+
+[02:02:08.0712] <sffc>
+* For example, a third-party unit conversion library and a third-party unit picker widget can talk natively with each other with Amount
+
+[02:02:55.0479] <sffc>
+(and of course they can also talk natively with Intl.NumberFormat)
+
+[02:03:36.0771] <sffc>
+Amount does this better than a protocol because it is immutable with its own prototype and methods for interacting with it
+
+[02:31:33.0711] <sffc>
+If anyone in plenary wants to push on the protocol thing… there's another topic on the agenda about why Thenables, TC39's most prominent procol, are a security risk due to prototype inheritance. Immutable objects with a specific API are safer.
+
+[05:03:47.0935] <eemeli>
+This seems like information that ought to be included in the readme, no?
+
+[05:04:15.0181] <Jesse>
+agree -- I can add that
+
+[05:05:15.0115] <eemeli>
+I would prefer not opening up the naming discussion again. It's a possibility, yes, but I don't think we should be actively pushing for more bikeshedding.
+
+[05:07:28.0331] <Jesse>
+my recollection is that we've largely settled on a name -- I think with "amount" we've been in a steady state for a while now
+
+[05:07:42.0265] <Jesse>
+(though indeed maybe a better name could come up)
+
+
+2025-07-24
+[06:29:21.0971] <eemeli>
+I see a numerics call on my calendar in a couple of hours; anything particular on the agenda? We've keep-trailing-zeros and Amount already on the TC39 agenda, but what's there to talk about before then?
+
+[06:33:10.0345] <Jesse>
+I'm not sure I know what to discuss; I think we have all our tasks for plenary already done. I guess during plenary we'll get a lot of feedback from outside this circle
+
+[07:20:43.0273] <eemeli>
+I'd be fine skipping this one unless someone has a topic they'd like us to talk about.
+
+[08:09:47.0932] <Jesse>
+wfm
+
+
+2025-07-28
+[06:29:56.0338] <eemeli>
+I just now came across [CSSNumericValue](https://drafts.css-houdini.org/css-typed-om-1/) spec, which already has the following work in browsers:
+```
+const pct = CSSNumericValue.parse('42.0%')
+[pct.value, pct.unit] // [42, 'percent']
+
+new CSSUnitValue(5, 'deg') // CSSUnitValue { value: 5, unit: 'deg', … }
+CSS.kHz(2.6) // CSSUnitValue { value: 2.6, unit: 'khz', … }
+
+CSS.px(10).mul(10).value // 100
+CSS.px(23).add(CSS.cm(4)).toString() // 'calc(23px + 4cm)'
+
+CSS.px(23).to('cm').value // 0.6085416666666668
+```
+
+[06:31:46.0443] <eemeli>
+It holds the values as numbers and is limited to CSS units, but does (somewhat) support arithmetic and unit conversions.
+
+
+2025-07-29
+[14:48:43.0695] <nicolo-ribaudo>
+Tell WH that the spec is meant to contain accessors, it's an oversight if it doesn't contain them?
+
+[15:01:45.0191] <nicolo-ribaudo>
+If we do infinities, could we say that the fractional and significant digits always show up as 0?
+
+[15:01:59.0293] <nicolo-ribaudo>
+My main problem with infinities is that I don't know what precision means for them
+
+[15:02:00.0001] <ljharb>
+NaN, obv
+
+[15:02:04.0631] <nicolo-ribaudo>
+Maybe
+
+[15:03:01.0549] <nicolo-ribaudo>
+But we shouldn't round non-inifnities to infinity, you should only get infinity if you actually pass infinity in
+
+[15:03:59.0277] <nicolo-ribaudo>
+It seems like Kevin was unconvinced, but overall there was enough support that we would have gotten to stage 2 if we had time to think about infinity 
+
+[15:04:26.0063] <nicolo-ribaudo>
+Happy that we settled when rounding happens
+
+[15:05:44.0444] <sffc>
+The infinity thing seems like a minor issue to hold up Stage 2 for resolving. I don't know if we had moved forward with the request for Stage 2 if more people than Kevin would have come out of the woodwork to share his concern. But, it seems that there was some additional explicit support in the Delegates channel, which is positive.
+
+[15:07:59.0779] <sffc>
+I see infinities and limits as tightly coupled. If you pass in a number over the limit, you get an infinite Amount. This is how ToIntlMV works.
+
+[15:10:19.0690] <eemeli>
+My initial sense is that Amount would be more valuable if it could guarantee its value to be finite.
+
+[15:10:34.0142] <eemeli>
+And that specifically supporting NaN would almost certainly be a mistake.
+
+[15:10:51.0973] <sffc>
+I'm surprised that Waldemar didn't seem to realize how ToIntlMV worked, because it was in NumberFormatV3 for which I think he was a reviewer. But it might have been a change we added relatively late in the process.
+
+[15:12:15.0016] <sffc>
+I don't think guaranteeing a finite value is any more valuable than, say, guaranteeing that the value has a unit, and we decided that it was okay for units to be a runtime thing, not part of the type signature.
+
+[15:13:49.0289] <nicolo-ribaudo>
+> <@eemeli:mozilla.org> And that specifically supporting NaN would almost certainly be a mistake.
+
+Yeah I'd prefer to still disallow NaN if Waldemar would be willing to accept it
+
+[15:14:04.0131] <eemeli>
+In my own thinking, the Amount value is effectively the JSON number value. That doesn't work if it's not finite.
+
+[15:15:00.0154] <eemeli>
+Didn't think of that analogy before just now, otherwise I'd have included it in the presentation.
+
+[15:15:35.0627] <Jesse>
+my own preference is for finite values only, but we could consider infinities
+
+[15:15:46.0927] <nicolo-ribaudo>
+> <@eemeli:mozilla.org> In my own thinking, the Amount value is effectively the JSON number value. That doesn't work if it's not finite.
+
+JSON doesn't support infinities??? 😱
+
+[15:16:04.0664] <Jesse>
+since we don't do arithmetic, and hence don't aim to align with IEEE 754, I don't see why we should include NaN or -0
+
+[15:17:02.0189] <eemeli>
+JSON numbers are unquoted decimal strings. No infinities.
+
+[15:17:34.0536] <Jesse>
+if we settle on an unlimited range for finite values (at least in the spec), should we also have infinite values?
+
+[15:18:44.0260] <nicolo-ribaudo>
+We round Infinity to the smallest MV then when cast to a float gives infinity? :)
+
+[15:19:10.0526] <nicolo-ribaudo>
+* We round Infinity to the smallest MV that when cast to a float gives infinity? :)
+
+[15:21:59.0157] <eemeli>
+On keep-trailing-zeros, I think we might still get 2.7 at this meeting, If Shane has time to review it? I understood Waldemar's blocking concern to have been identified as being beyond its scope.
+
+[15:22:51.0516] <Jesse>
+my understanding was that he either has a concern with Intl.NF as it exists today, or maybe a concern with the decimal spec text not updating Intl.NF
+
+[15:23:47.0771] <sffc>
+Yeah I didn't have it on my to-do list to review keep-trailing-zeros for 2.7 for some reason (I've been spending most of my time on intl-era-monthcode) but I'll get it in before tomorrow's meeting
+
+[15:25:14.0458] <sffc>
+eemeli, what is your proposed behavior when passing `Infinity` into the Amount constructor, in the world where Amount is for finite values only?
+
+[15:26:19.0111] <eemeli>
+From our current spec:
+> 7. If toParse is in « "NaN", "Infinity", "-Infinity" », throw a RangeError exception.
+
+[15:26:50.0237] <eemeli>
+In the constructor, that is.
+
+[15:27:14.0360] <sffc>
+To voice support for supporting Infinity beyond Waldemar's concern, I think it's useful for `Amount.from(0, "sec").convertUnit("Hz")` to return a value and not throw an error
+
+[15:27:28.0586] <Jesse>
+feels odd to me to think about `new Amouit(Infinity, { unit: "mile" })`
+
+[15:28:13.0756] <eemeli>
+(It's 1:30 am here, so I've poured myself a glass of rum, and am no longer braining at full power)
+
+[15:28:15.0873] <sffc>
+"infinite Hz" is a valid thing. It is a wave with a period of 0. It's useful in scientific applications
+
+[15:28:16.0680] <Jesse>
+do we want to emit `∞[mile]`?
+
+[15:28:52.0698] <eemeli>
+`Infinity[mile]` would match Number more closely.
+
+[15:29:10.0147] <sffc>
+My expectation would be either `∞[mile]` or `Infinity[mile]`, no strong preference one way or the other
+
+[15:30:05.0863] <sffc>
+```
+new Intl.NumberFormat("en", { style: "unit", unit: "second" }).format(Infinity)
+'∞ sec'
+```
+
+[15:30:57.0306] <Jesse>
+ok, that's good precedent
+
+[15:31:12.0227] <eemeli>
+... for `.toLocaleString()`.
+
+[15:31:15.0711] <Jesse>
+what about having an `isFinite()` method for amount?
+
+[15:32:07.0360] <sffc>
+I previously held the position that we should use Decimal as the numeric type and we swat down any complaints about the nature of the number by saying "it's just a Decimal". But I was under the understanding that we wanted to instead shift the mindset to "anything you can currently pass to Intl.NF.prototype.format, you should be able to put in an Amount".
+
+[15:33:20.0990] <Jesse>
+following that approach, we could support infinity (since decimal does)
+
+[15:34:09.0313] <Jesse>
+I might still opt for having unlimited range of finite values though
+
+[15:34:34.0319] <Jesse>
+(or at least find something that can fully contain decimal, number, and intl)
+
+[15:34:41.0350] <sffc>
+We have an explicitly "during Stage 2" issue to answer that question
+
+[15:35:30.0679] <eemeli>
+I think we a multiplicity of understandings about what Amount is and is meant to be.
+
+[15:36:20.0777] <sffc>
+Yes, but that's not a bad thing: it means it has many different use cases and people want it for different reasons
+
+[15:37:18.0964] <Jesse>
+agree -- I approached it thinking of finite values only but am happy to concede that infinity might actually arise (and is already supported by Intl.NF)
+
+[15:37:23.0655] <Jesse>
+it complicates the thinking, but just a little bit
+
+[15:37:29.0814] <eemeli>
+Yes, very much so.
+
+[15:37:31.0841] <sffc>
+I'd like to see a PR for making Amount support Infinity; Jesse could you make it? I wonder if we could get a timebox extension to discuss this. I think it would be productive.
+
+[15:37:50.0292] <Jesse>
+sure, I can make it
+
+[15:38:53.0602] <Jesse>
+my read of the room is that NaN should be banned, though?
+
+[15:39:01.0713] <eemeli>
+I think I'd like to see use cases for infinite amounts before considering a PR. Especially use cases within the context of the wider use cases.
+
+[15:39:37.0184] <sffc>
+Do you not buy my use case of "∞ Hz" and "0 sec" round-tripping?
+
+[15:40:13.0345] <Jesse>
+looking ahead, is that something that proposal-smart-units should do?
+
+[15:43:05.0654] <Jesse>
+we also have our old bugbear -0
+
+[15:43:24.0370] <Jesse>
+I'm interested in talking about infinity but much less interested in -0 and NaN
+
+[15:45:19.0961] <Jesse>
+atm I think we accept -0 as valid syntax but normalize it to 0
+
+[15:47:23.0633] <eemeli>
+I think the round-tripping is beyond the scope; the relevant part here is that "∞ Hz" makes sense as a thing to want to present. But if that's the only one you've got, that's a bit spoiled by Hertz not being a supported unit for Intl.NF.
+
+[15:48:29.0560] <Jesse>
+just noticing that `hertz` is listed in https://github.com/unicode-org/cldr/blob/main/common/supplemental/units.xml
+
+[15:48:42.0045] <Jesse>
+(I guess there are plenty of such units)
+
+[16:06:25.0037] <sffc>
+Made an issue for Infinity: https://github.com/tc39/proposal-measure/issues/50
+
+[16:07:21.0789] <Jesse>
+I can PM a chair to ask for a continuation
+
+[16:09:05.0198] <Jesse>
+what do we want? 30 min?
+
+[16:10:57.0626] <sffc>
+And another issue for NaN and -0: https://github.com/tc39/proposal-measure/issues/51
+
+[16:11:24.0628] <eemeli>
+I'm on my second glass of rum; not going to commit to anything, but not objecting to a continuation either.
+
+[16:14:24.0059] <sffc>
+I'd be amenable to a continuation if we can have a PR open for Infinity and can discuss it on the merits.
+
+[16:14:55.0158] <sffc>
+It seemed like Waldemar on Infinity and Kevin on Motivation were the only two concerns, yes?
+
+[16:17:26.0414] <sffc>
+But also it seems like the chairs want to end the meeting a day early and I don't want us as a champions group to come off as too pushy :)
+
+[16:40:45.0705] <Jesse>
+I asked for a continuation
+
+[16:41:07.0894] <Jesse>
+(but the continuation might not happen)
+
+
+2025-07-30
+[20:31:17.0434] <Richard Gibson>
+FWIW, I do not buy this use case. I'm willing to be convinced with concrete worked examples, but conversion isn't even part of Amount right now, and infinite values are just not well-behaved like that (e.g., what would one do with ∞ degrees?)
+
+[22:27:52.0991] <ljharb>
+yeah i don't really buy this either, infinity isn't an amount
+
+[22:28:01.0509] <ljharb>
+the word "amount" is intrinsically finite/discrete
+
+[22:28:24.0387] <ljharb>
+if you want infinity (or NaN) you could use ±`Infinity` on its own
+
+[22:28:30.0551] <ljharb>
+* if you want infinity (or NaN) you could use ±`Infinity` on its own, alongside an Amount
+
+[23:02:59.0249] <sffc>
+Is infinity a valid "measure", but not "amount"?
+
+[00:58:58.0841] <Richard Gibson>
+please don't take things in that direction. We don't need synonyms, we need concrete worked examples. And like I said, I _am_ willing to be convinced... it's certainly possible to have an infinite estimated duration due to total lack of progress for e.g. file transfers at 0 bytes/s or speed of 0 m/s, so it's not like the concept is impossible or incomprehensible. But it does also cause problems like lack of valid decimal (and hence JSON number) representation, and we should try to avoid inclusion doing more harm than good—especially since support could be added later, but can never be removed.
+
+[04:46:41.0920] <eemeli>
+Amount's internal-slot access from Intl.NF was raised as a concern by at least KG and MM. If we want to avoid that, I think we may need to add a `.value: string` readonly property or a `.valueOf(): string` method on Amount instances. At the moment, the only full-precision accessor for the value that's guaranteed to only contain the numeric value is `.toString({ displayUnit: 'never' })`, which doesn't seem like it'd be a sensible thing to encode in a protocol.
+
+Another alternative would be to have Intl.NF be able to parse the serialized form `1.5[kg]` to a value+unit.
+
+Are there other choices here? The proposal's spec text currently looks for the [[Value]] and [[FractionDigits]] internal slots.
+
+[05:50:01.0703] <Jesse>
+I'm glad MM and KG brought up the internal slot issue. I like the idea that Intl.NF do lightweight parsing (grabbing the substring of `toString()` up to the first `[`, if any). Having `.valueof()` return a string also strikes me as intuitively appropriate though I wonder if we might be painting ourselves into a corner somehow
+
+[05:52:42.0839] <Jesse>
+Shane posted an interesting example: https://github.com/tc39/proposal-measure/issues/50#issuecomment-3134873158
+
+[05:56:29.0378] <Jesse>
+so far I think the example uses of infinite amounts arise not from direct use of infinity, but inferred/calculated infinity like division by zero. This makes me wonder whether we should support infinity out-of-the-box, now, or defer the discussion to proposal-smart-units, which is concerned with the kinds of examples we've seen so far
+
+[06:02:45.0101] <Jesse>
+regarding Ashley's request for `BigInt(new Amount(bigint))`, I guess that would be solved by having Amount's `valueOf` return a string (without unit)?
+
+[06:06:49.0032] <Jesse>
+(hmm, maybe not, nvm)
+
+[06:07:15.0186] <Jesse>
+how feasible would it be to add a new `bigint` hint to `ToPrimitive`?
+
+[06:08:53.0025] <nicolo-ribaudo>
+What if we just didn't add toPrimitive on amount 
+
+[06:09:17.0776] <nicolo-ribaudo>
+And made valueOf return the string
+
+[06:10:33.0677] <nicolo-ribaudo>
+It means that amount+amount would do string concatenation, but that seems fine
+
+[06:10:42.0526] <nicolo-ribaudo>
+You should extract the numbers before doing math anyway 
+
+[06:20:53.0626] <Jesse>
+I might be misremembering but my understanding of the discussion that brought us to the infinity topic was the possibility that Amount might generate an infinite value when converting to Number or BigInt (or, looking into the future, Decimal). There's a kind of mismatch between the vision we offer of (more or less) unlimited finite values and the hard reality that Number (and Decimal) are limited. One way to resolve this would be to have Amount's `toNumber()` throw if it produces ±Infintiy
+
+[06:21:22.0241] <Jesse>
+iow I wonder if the discussion was initially triggered not so much by whether we accept infinity, but whether we emit infinity
+
+[06:21:57.0836] <Jesse>
+* I might be misremembering but my understanding of the discussion that brought us to the infinity topic was the possibility that Amount might generate an infinite value when converting to Number or BigInt (or, looking into the future, Decimal). There's a kind of mismatch between the vision we offer of (more or less) unlimited finite values and the hard reality that Number (and Decimal) are limited. One way to resolve this would be to have Amount's `toNumber()` throw if it would produce ±Infintiy
+
+[06:24:42.0636] <Jesse>
+there could be an option in `toNumber()` to actually produce ±Infinity, but throw by default
+
+[08:58:43.0620] <eemeli>
+My understanding is that infinity was raised as a concern by WH as it's a value that's supported by Number. And that he would also want to see NaN being supported.
+
+[08:59:47.0837] <eemeli>
+So their support comes from wanting to have Amount work as an "annotated Number".
+
+[09:45:57.0614] <sffc>
+Before jumping in head-first on this, we should discuss it with TG3. They didn't seem to realize that Intl.DateTimeFormat does the internal slot thing too.
+
+If we did do this, I think it should be a getter for `.stringNumber()` and `.unit` separately
+
+[09:50:22.0593] <Jesse>
+I could invite MM to the next TG3 call and we could book a bit of time to walk through the internal slots issue
+
+[10:01:29.0044] <ljharb>
+it's neither, it's a concept, not an actual number.
+
+[11:30:38.0131] <Jesse>
+do we still want to discuss the infinity issue in a continuation? or would we prefer to iterate on that here and GH?
+
+[11:38:35.0598] <Jesse>
+done
+
+[11:38:53.0019] <Jesse>
+we should make an issue for this and add it to the agenda
+
+[13:29:18.0791] <nicolo-ribaudo>
+nice
+
+[13:36:48.0157] <Jesse>
+Mark says he'll attend the August 14th TG2 call
+
+[13:36:57.0462] <Jesse>
+to talk about internal slots and Intl
+
+[13:38:16.0473] <Jesse>
+(talking about this in TG3 would also make sense of course)
+
+[13:38:44.0172] <sffc>
+For Infinity, I think we need to get champion group alignment first
+
+[13:38:52.0821] <eemeli>
+The Amount repo has been renamed: https://github.com/tc39/proposal-amount
+
+[13:39:08.0670] <sffc>
+But I'm going to suggest that we could take some time to discuss the Intl MV limits issue
+
+[13:39:22.0024] <Jesse>
+sgtm
+
+[13:39:52.0870] <Jesse>
+I've poked CDA to add a continuation
+
+[13:40:19.0853] <sffc>
+It's less a continuation and more of a new topic, but sure
+
+[13:43:33.0699] <Jesse>
+would you like to screenshare that issue?
+
+[13:43:48.0733] <sffc>
+Yeah
+
+[14:10:30.0142] <eemeli>
+ryzokuken: Could you rename this channel as "TC39 Decimal/Amount"?
+

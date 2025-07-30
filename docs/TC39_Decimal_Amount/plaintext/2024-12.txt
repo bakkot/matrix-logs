@@ -1,0 +1,426 @@
+2024-12-16
+[14:29:39.0489] <Rob Palmer>
+Sup
+
+[15:08:24.0154] <Ben (medical leave)>
+Hey, I’m out on medical leave until at least January 3rd, and am only checking matrix sporadically
+
+
+2024-12-17
+[20:11:04.0396] <sffc>
+Hi, everyone! Thanks Chris for making this room! I've been in a lot of DMs and other different communication channels with different subsets of people regarding the Decimal and Measure proposals, so I thought we would benefit from a single forum to talk and plan.
+
+[20:13:46.0529] <sffc>
+I had a good conversation with nicolo-ribaudo after the session I hosted in the December plenary. Basically, I would really like to see these proposals advance together as soon as possible. It might not seem like it, but I feel we are the closest we've been to getting a proposal that everyone on the committee is happy about.
+
+[20:14:52.0919] <sffc>
+It looks from the outside that we've been going in circles, but I describe it more as a helix: when we go back to the shape of a proposal we've had before, we arrive there with more stakeholders and a much more foolproof specification and understanding of the problem space.
+
+[01:25:48.0291] <Jesse>
+thanks for setting up this room! I think it makes sense to have a common place to discuss
+
+[01:26:19.0960] <Jesse>
+I also agree that what appears to be circular motion is actually progress
+
+[01:27:14.0063] <Jesse>
+having measure & decimal move together makes a lot of sense
+
+[01:31:51.0779] <Jesse>
+we'll be presenting a vision in February that unifies all these threads
+
+[04:13:47.0774] <eemeli>
+For Measure, this may also be relevant: https://github.com/mozilla/explainers/blob/main/amount.md
+
+That document also links to some relevant prior art & previous discussions.
+
+[10:57:57.0827] <littledan>
+I'm very happy to hear about this progress, and excited to learn more
+
+[10:59:33.0069] <sffc>
+> <@jesse:igalia.com> we'll be presenting a vision in February that unifies all these threads
+
+Part of the goal of this room is to communicate earlier and more often so we aren't surprised by presentations and what everyone else is working on. So I encourage you to share more information on what you are planning to present in February
+
+[11:00:19.0183] <littledan>
+sffc: When you say that you imagine Decimal and Measure advancing together, which version of Decimal do you have in your head?
+
+[11:13:27.0690] <sffc>
+I'd like to see something based on the "bonus slide" in my November presentation. Basically a form of hybrid solution. I expect lots of bikeshedding to follow
+
+[11:26:07.0352] <littledan>
+great, so, like, which one?
+
+[11:27:08.0576] <littledan>
+this? https://docs.google.com/presentation/d/1Uzrf-IwPrljF2BhCbCWuwQxlgGSm_bcd3FRbPO3Yrio/edit#slide=id.g31a6e89a509_0_8
+
+[11:28:15.0309] <littledan>
+do you want to propose two decimal types (with and without quanta)?
+
+[11:39:29.0734] <littledan>
+bikeshedding is good. I'm curious what you'd change vs the current proposal (besides advancing Measure)
+
+[11:43:49.0630] <eemeli>
+My preference would be to encapsulate within Measure the protocol that we need for interacting with Intl.NumberFormat, including formatting precision as fraction or significant digits, so that Decimal only needs to hold a numerical value.
+
+[11:44:48.0921] <littledan>
+I *think* I agree with that, but I imagine you'd still be able to pass in a Decimal directly (just like you can pass in Numbers)
+
+[11:48:34.0969] <eemeli>
+Sure, but if you're coming from some other decimal representation (say, one used by a JS library) that might incorporate precision with the value, a Measure would allow you to represent the value as a numerical string + give the precision separately.
+
+[11:48:52.0150] <littledan>
+sgtm
+
+[12:29:19.0991] <sffc>
+I don't completely agree with Eemeli's position
+
+[12:32:49.0835] <sffc>
+What I'd like to avoid is a Decimal proposal that doesn't consider Intl's needs and a separate Measure proposal that doesn't consider 262's needs
+
+[12:55:46.0783] <littledan>
+can you elaborate on that? what is it that you don't like? If we verify that the decomposition is clean, correct and logical, that is a way of considering the other's needs.
+
+[13:31:56.0813] <sffc>
+If TC39 were to bless a Decimal-without-precision as the recommended number type, the well-known Intl bug will continue to exist indefinitely. ECMA-262 numbers should "just work" when interoperating with Intl
+
+[13:33:02.0744] <sffc>
+That's what I mean about "avoid a Decimal proposal that doesn't consider Intl's needs"
+
+[13:34:10.0980] <sffc>
+In the other direction, I would like to see Measure become a standard protocol for interacting with dimensioned values (units and currencies). A software program already written using Measure can then easily change `toString` to `toLocaleString` and it will just work.
+
+[13:36:20.0593] <sffc>
+A potential three-layered solution _could_ be workable: one with `NormalizedDecimal128`, `FullDecimal128`, and `DimensionedDecimal128`. Intl can accept the later two.
+
+[14:00:47.0758] <eemeli>
+I'm actually not quite sure what "the well-known Intl bug" is in this context. Could you elaborate a bit?
+
+[14:08:16.0342] <nicolo-ribaudo>
+It's about how  you need to make sure to pass the same formatting option to separate APIs so that their results are coherent (NumberFormat and PluralRules), because the number that you pass to them doesn't encode all the necessary info
+
+[14:25:33.0676] <littledan>
+this feels a lot like the ISO calendar debate
+
+[14:26:12.0817] <littledan>
+I'm not really convinced that when we run into a problem, we need to make it a really noisy part of the API. I think it's enough to ensure that we have a data type that supports the right operations (here, Measure)
+
+[14:27:24.0778] <littledan>
+(sometimes it feels like pluralrules should've been a method on NumberFormat instead of a separate class)
+
+[14:27:30.0297] <sffc>
+I think in Temporal we ended up with the right data model, and we worked out a way to make it not be too "noisy"
+
+[14:28:32.0139] <littledan>
+well, I don't want to relitigate that, but in that case we did end up with only `now` methods for the ISO calendar, while making sure that we had a data model that worked with all calendars. Having just normalized decimal + Measure + NumberFormat forces you to explicitly construct a Measure instance might be analogous.
+
+[14:28:54.0237] <littledan>
+I don't feel extremely strongly about the ergonomics of Decimal + NumberFormat; I'm OK if you need to explicitly wrap it with something that gives it precision
+
+[14:31:02.0057] <sffc>
+I think that's basically the three-layered solution but without the middle layer
+
+[14:32:50.0431] <sffc>
+`myNormalizedDecimal.withFractionDigits(3).toLocaleString("th")`
+
+[14:33:02.0142] <littledan>
+Yeah, I'd be happy with that. What do you think?
+
+[14:37:29.0719] <sffc>
+Overall I'm happy with this composable data model. Ideally with the middle layer, and with names that need to be bikeshed.
+
+[14:38:19.0489] <littledan>
+can you explain the importance of the middle layer?
+
+[14:38:33.0492] <littledan>
+I'm not really sure when someone would want to use it
+
+[14:39:25.0278] <sffc>
+In this model, a `FullDecimal128` is a `DimensionedDecimal128` without a dimension. It is what feeds Intl APIs.
+
+[14:40:25.0370] <sffc>
+It could alternatively be modeled as a `DimensionedDecimal128` with a null unit. But if we have the opportunity, it seems having a self-contained `FullDecimal128` is a better design.
+
+[14:40:54.0172] <sffc>
+It allows things like `(2.5m).withFractionalDigits(2).withCurrency("USD").toLocaleString("en-CA")`
+
+[14:43:29.0081] <littledan>
+yeah, I guess it's analogous to how, in Temporal, we avoided data types with null things
+
+[14:43:58.0897] <littledan>
+agree that this should work
+
+[14:44:22.0542] <littledan>
+this could be done in a "weakly typed" way (with null units) or in a strongly typed way (with the mid layer)
+
+[14:44:24.0419] <sffc>
+We could make `NormalizedDecimal128.prototype.withFractionalDigits` return a `DimensionedDecimal128` with null unit, and `DimensionedDecimal128.prototype.withCurrency` throws an exception if the unit is not null. But that seems not as clean as a different object in the middle with its own methods.
+
+[14:44:49.0695] <littledan>
+why would it be DimensionedDecimal128 and not DimensionedNumeric (so it works with Number too)?
+
+[14:45:20.0271] <littledan>
+yeah, I think we share an understanding of the design space and can consider the difference to be "bikeshedding" (though at a high level)
+
+[14:47:43.0407] <sffc>
+> <@littledan:matrix.org> why would it be DimensionedDecimal128 and not DimensionedNumeric (so it works with Number too)?
+
+1. IEEE has given us a definition for how precision should work and I think we should use it instead of designing our own way of representing precision
+2. It's likely simpler and potentially more efficient to implement a DimensionedDecimal128 with a single numeric representation than one with a pluggable numeric representation
+
+[15:27:14.0961] <littledan>
+when you say "how precision should work", are you imagining implementing arithmetic operations or anything like that on these?
+
+[15:27:40.0780] <littledan>
+or comparisons, etc
+
+[15:30:05.0143] <sffc>
+What I mean is more like, let's avoid a debate about whether precision should be represented as `fractionDigits`, `min/max FractionDigits`, `significantDigits`, `errorBar`, etc. Like, I think it's not valuable and potentially harmful for there to be a difference between `(2.5m).withFractionDigits(2)` and `(2.5m).withSignificantDigits(3)`. But this isn't a topic we've discussed very much and I haven't heard many arguments one way or another.
+
+[15:31:30.0620] <littledan>
+oh, I see. I think once we decide we're working in terms of base-10 quanta, we sort of have an answer which can apply to Numbers as well. But I'm not sure if this answer serves the needs of these i18n applications.
+
+[15:35:55.0812] <littledan>
+anyway we could put that answer in Measure
+
+[15:38:14.0591] <littledan>
+but probably an API shouldn't be in terms of quanta; probably it should just be fractionDigits...
+
+[15:38:49.0219] <littledan>
+we can make sure that the data model acts the same as if it were stored in terms of quanta (I think that would be the case "for free")
+
+[15:40:00.0398] <littledan>
+quanta could probably give us a well-defined data model that we could derive from fraction digits, significant digits, etc. I agree that those differences should disappear in the measured value.
+
+
+2024-12-18
+[16:33:27.0307] <ljharb>
+> <@sffc:mozilla.org> I think in Temporal we ended up with the right data model, and we worked out a way to make it not be too "noisy"
+
+that’s because everything is only objects there - numbers ideally would eventually be primitives, and we should be designing with that goal in mind.
+
+[17:12:13.0678] <littledan>
+> <@ljharb:matrix.org> that’s because everything is only objects there - numbers ideally would eventually be primitives, and we should be designing with that goal in mind.
+
+Is there anything in the design that we described that wouldn’t work well with that?
+
+[17:12:42.0537] <littledan>
+If only the decimal is primitive, and measure is always object
+
+[17:12:53.0304] <ljharb>
+no that would work fine
+
+[17:13:22.0289] <littledan>
+> <@littledan:matrix.org> If only the decimal is primitive, and measure is always object
+
+This being the future state, and the initial proposal focusing on the wrappers
+
+[17:13:25.0972] <ljharb>
+(because most people wouldn’t likely use measure except to handle formatting with intl)
+
+[17:14:07.0435] <littledan>
+> <@ljharb:matrix.org> (because most people wouldn’t likely use measure except to handle formatting with intl)
+
+Arguably people should be doing unit-ed computations all over the place, but I think that is beyond the scope of measure (initially)
+
+[17:14:33.0317] <littledan>
+Also that isn’t really demonstrated in any other mainstream programming language 
+
+[17:15:52.0123] <littledan>
+Our destiny in TC39 is to be followers, not leaders
+
+[17:16:19.0778] <littledan>
+> <@littledan:matrix.org> This being the future state, and the initial proposal focusing on the wrappers
+
+Ljharb: just wanted to check, does this caveat weaken things?
+
+[17:16:44.0088] <littledan>
+(Within the context of, decimals are canonicalized)
+
+[17:17:33.0234] <ljharb>
+which, the primitives later? I’m def still unconvinced advancing anything without primitives is worth it, but it at least removes my objection on the basis of blocking primitives
+
+[17:18:24.0561] <littledan>
+Seems like we are at a point of common understanding, which is good
+
+[17:18:48.0790] <littledan>
+Even if we differ on tradeoffs
+
+[17:36:59.0195] <littledan>
+Eemeli: do you have remaining concerns about introducing classes as opposed to just using strings or something?
+
+[00:08:09.0250] <eemeli>
+I don't see how "just using strings" is a viable option for communicating precision, because we already assign meaning to formatting string values:
+```
+new Intl.NumberFormat('en').format('1.8000') === '1.8'
+new Intl.NumberFormat('en').format({ toString: () => '1.9000' }) === '1.9'
+```
+Or did you mean something else?
+
+I do not have any qualms about introducing a Measure class. If we do, I think it could well serve many of the use cases presented for Decimal as well.
+
+[00:09:40.0100] <eemeli>
+Because Measure doesn't exist, we could (should?) of course define its handling of string values to retain precision, so we'd end up with:
+```
+new Intl.NumberFormat('en').format(new Measure('1.8000')) === '1.8000'
+```
+
+[00:11:15.0229] <Jesse>
+that looks good -- that matches what I had in mind for measure & NF
+
+[00:12:41.0122] <Jesse>
+also, measure should work with any additional specifiers, such as num-significant-digits or num-fractional-digits, as it works today with strings
+
+[04:13:45.0320] <littledan>
+Re strings: oops! That was kind of an unforced error; we added that support somewhat recently, though I guess before we had thought much about how exactly decimal should work. Remember, that was already a redefinition, since previously it worked via a cast to number (if that can be counted as working) so I am optimistic that the change can be done in place.
+
+[04:15:07.0950] <littledan>
+But, Eemeli, can you explain how your position in Shane’s slide deck relates to your current thoughts about what we’ve been discussing in this room?
+
+[04:54:54.0453] <Jesse>
+> <@littledan:matrix.org> Re strings: oops! That was kind of an unforced error; we added that support somewhat recently, though I guess before we had thought much about how exactly decimal should work. Remember, that was already a redefinition, since previously it worked via a cast to number (if that can be counted as working) so I am optimistic that the change can be done in place.
+
+just to make sure I'm clear: do you mean making a normative PR in 402 alongside decimal + measure (whatever form it may take)?
+
+[04:58:10.0504] <littledan>
+> <@jesse:igalia.com> just to make sure I'm clear: do you mean making a normative PR in 402 alongside decimal + measure (whatever form it may take)?
+
+Yeah, that’s what this would be, if we want to pursue it. It’s how we got that string logic there in the first place, back when I was at a much earlier stage in pushing decimal
+
+[06:05:58.0602] <eemeli>
+With Measure and Decimal as separate proposals, my sense is that the former answers the question "How do I encapsulate the 'what' separately from the 'how' when formatting numerical values?", while the latter answers "How do I make math work like I expect?"
+
+This seems like a pretty effective and orthogonal separation of concerns, and it allows for the proposals to be evaluated separately. In that evaluation, I very strongly support Measure, but I'm skeptical about non-primitive Decimal.
+
+[06:07:43.0622] <eemeli>
+With a separately provided protocol for formatting, why does Decimal need to be in the spec?
+
+[06:13:14.0538] <Jesse>
+imo measure and decimal are indeed separate beasts (the clearest difference, to my mind, being that arithmetic for decimals should clearly work on day 1 but may not even be necessary for measure, at least not on day 1); I'm neutral on whether they proceed in parallel, or whether they get literally merged
+
+[06:47:49.0120] <littledan>
+Jesse explained the use cases of decimal in a bunch of TC39 presentations, and it didn't center on formatting (which is largely already solved by the string support for NumberFormat). Was there a part of those presentations that you found unpersuasive?
+
+[06:47:58.0106] <littledan>
+agree on the orthogonality
+
+[06:55:54.0192] <Jesse>
+> <@littledan:matrix.org> Jesse explained the use cases of decimal in a bunch of TC39 presentations, and it didn't center on formatting (which is largely already solved by the string support for NumberFormat). Was there a part of those presentations that you found unpersuasive?
+
+yeah -- the ide was that decimal provide bread-and-butter formatting, like Number, with `toString`, `toFixed`, and `toPrecision`, with serious formatting needs delegated to Intl.NF
+
+[08:24:16.0342] <eemeli>
+If we handle the formatting aspects separately and we don't implement Decimal as a primitive, I'm not persuaded that what remains is better than the Decimal libraries already out there, which clearly have been found by many users. The ergonomics aren't improved, and as far as I recall, performance is not presented as a selling point, so what's the remaining value proposition? Why does this problem in particular need to be solved within the spec, when it's already solved outside the spec?
+
+[08:37:43.0952] <littledan>
+that is not the use case, that is the functionality. You explained the *non-formatting-related* use cases for Decimal in your presentations.
+
+[08:39:21.0602] <littledan>
+Part of it is similar to the value proposition of Temporal: primarily, these values are passed between different pieces of code (which have trouble coordinating on using the same library), and secondarily, while we're at it, we're doing an especially careful and good job of designing this library, so it levels up the ecosystem.
+
+[08:40:30.0940] <eemeli>
+If, again, performance isn't a selling point, isn't a numerical string a really good interchange format for decimal values?
+
+[08:40:49.0859] <littledan>
+no, for the reasons that Nicolo explained
+
+[08:41:23.0477] <littledan>
+it is a poor interchange format since the second thing people will want to do with them (after formatting) is arithmetic operations, and that will immediately be silently buggy with strings.
+
+[08:42:35.0745] <littledan>
+so, this was my question, how should we analyze this concern and come to some kind of shared conclusion?
+
+[09:29:20.0828] <eemeli>
+First, it'd be really nice if the proposal repo reflected the benefits of decimal-in-spec over decimal-in-libraries, which is the status quo. At the moment, the spec readme lists three use cases:
+1. Representing human-readable decimal values such as money
+2. Data exchange [...] with external systems, such as databases and foreign function interfaces to other programming languages
+3. Numerical calculations on more precise floats
+
+Each of those use cases can be addressed equally well by MikeMcl's libraries.
+
+The value propositions that you put forward here don't appear in the readme at all, and neither the FAQ nor the "Known alternatives" sections answer the question "Why not a library?"
+
+So could the readme be revised to present the current arguments for the proposal not as if decimals weren't supported at all by the ecosystem, but instead showing how defining Decimal in the spec is an improvement on them? I understand that some of these arguments are certainly included in some of the Decimal presentations, but there's been 11 of those so far, and that's a lot of slides and discussions to look through.
+
+I at least look primarily at the proposal repo readme as the source of truth on what a proposal is about, and expect the presentations and discussions to be reflections of some of its aspects. If/as the Decimal readme doesn't seem to answer the questions I have, I may well not think e.g. of your valid point about string "summation" really being concatenation, and not see the value being presented.
+
+
+2024-12-19
+[20:19:57.0336] <sffc>
+> <@littledan:matrix.org> Arguably people should be doing unit-ed computations all over the place, but I think that is beyond the scope of measure (initially)
+
+I want to put Measure on a path to where it is the main gateway to dimensioned operations in units and currencies. I want it to be integrated with Decimal and the rest of the language, not just an interface to Intl. This is better for developers and better for users in the long run.
+
+[20:22:28.0974] <sffc>
+> <@littledan:matrix.org> Re strings: oops! That was kind of an unforced error; we added that support somewhat recently, though I guess before we had thought much about how exactly decimal should work. Remember, that was already a redefinition, since previously it worked via a cast to number (if that can be counted as working) so I am optimistic that the change can be done in place.
+
+Intl.NumberFormat has supported strings since its inception, but they were converted to numbers first. The recent proposal I championed kept the status quo except that more significant digits in the string would be retained. This should not have any direct impact on the direction of Decimal or Measure.
+
+[20:22:49.0493] <sffc>
+> <@littledan:matrix.org> Re strings: oops! That was kind of an unforced error; we added that support somewhat recently, though I guess before we had thought much about how exactly decimal should work. Remember, that was already a redefinition, since previously it worked via a cast to number (if that can be counted as working) so I am optimistic that the change can be done in place.
+
+ * `Intl.NumberFormat.prototype.format` has accepted strings since its inception, but they were converted to numbers first. The recent proposal I championed kept the status quo except that more significant digits in the string would be retained. This should not have any direct impact on the direction of Decimal or Measure.
+
+[20:23:00.0873] <sffc>
+ * `Intl.NumberFormat.prototype.format` has accepted strings since its inception, but they were converted to Numbers first. The recent proposal I championed kept the status quo except that more significant digits in the string would be retained. This should not have any direct impact on the direction of Decimal or Measure.
+
+[20:24:09.0408] <sffc>
+ * `Intl.NumberFormat.prototype.format` has accepted strings since its inception, but they were converted to Numbers first. The recent proposal I championed kept the status quo except that more significant digits in the string would be retained. I would have liked to retain trailing zeros, too, but that almost certainly would have broken the Web.
+
+The string support in Intl.NumberFormat should therefore not have any direct impact on the design of Decimal or Measure.
+
+[20:24:44.0514] <sffc>
+ * `Intl.NumberFormat.prototype.format` has accepted strings since its inception, but they were converted to Numbers first. The recent proposal I championed kept the status quo except that more nonzero significant digits in the string would be retained. I would have liked to retain trailing zeros, too, but that almost certainly would have broken the Web.
+
+The string support in Intl.NumberFormat should therefore not have any direct impact on the design of Decimal or Measure.
+
+[20:25:19.0120] <sffc>
+ * `Intl.NumberFormat.prototype.format` has accepted strings since its inception, but they were converted to Numbers first. The recent proposal I championed kept the status quo except that more nonzero significant digits in the string would be retained. I would have liked to retain trailing zeros, too, but that almost certainly would have broken the Web.
+
+The string support in Intl.NumberFormat should therefore not have any direct impact on the design of Decimal or Measure.
+
+However, this is a good example of why I want the Measure and Decimal champions to talk more; I don't think we should be developing these proposals in two silos.
+
+[20:32:17.0727] <sffc>
+> <@eemeli:mozilla.org> First, it'd be really nice if the proposal repo reflected the benefits of decimal-in-spec over decimal-in-libraries, which is the status quo. At the moment, the spec readme lists three use cases:
+> 1. Representing human-readable decimal values such as money
+> 2. Data exchange [...] with external systems, such as databases and foreign function interfaces to other programming languages
+> 3. Numerical calculations on more precise floats
+> 
+> Each of those use cases can be addressed equally well by MikeMcl's libraries.
+> 
+> The value propositions that you put forward here don't appear in the readme at all, and neither the FAQ nor the "Known alternatives" sections answer the question "Why not a library?"
+> 
+> So could the readme be revised to present the current arguments for the proposal not as if decimals weren't supported at all by the ecosystem, but instead showing how defining Decimal in the spec is an improvement on them? I understand that some of these arguments are certainly included in some of the Decimal presentations, but there's been 11 of those so far, and that's a lot of slides and discussions to look through.
+> 
+> I at least look primarily at the proposal repo readme as the source of truth on what a proposal is about, and expect the presentations and discussions to be reflections of some of its aspects. If/as the Decimal readme doesn't seem to answer the questions I have, I may well not think e.g. of your valid point about string "summation" really being concatenation, and not see the value being presented.
+
+I find Decimal's value proposition stronger if it is part of a holistic design for united computations in ECMAScript. This would really "level up" numbers in ECMAScript. And it's better for Intl because users who have these structured types floating around can call `toLocaleString` on them and it will just work.
+
+[20:32:50.0043] <sffc>
+ * I find Decimal's value proposition stronger if it is part of a holistic design for dimensioned computations in ECMAScript. This would really "level up" numbers in ECMAScript. And it's better for Intl because users who have these structured types floating around can call `toLocaleString` on them and it will just work.
+
+[20:33:04.0160] <sffc>
+ * I find Decimal's value proposition stronger if it is part of a holistic design for dimensions in ECMAScript. This would really "level up" numbers in ECMAScript. And it's better for Intl because users who have these structured types floating around can call `toLocaleString` on them and it will just work.
+
+[20:36:52.0386] <sffc>
+I really think we should avoid shipping the org chart here. We have two proposals that are both proposing to add new primordials for number-related things. These proposals must be evaluated as part of the bigger picture.
+
+[09:39:59.0699] <littledan>
+I don't see any evidence of silo'ing; the champions work at the same company (even if different clients are sponsoring the work) and developed the TC39 presentations together. Doing a design holistically is the plan. That said, if you want to block decimal on having measure be further along in development, I can understand that point of view.
+
+[12:58:33.0909] <sffc>
+Happy to hear we're aligned on making a holistic design!
+
+[13:41:37.0657] <littledan>
+that said, when you say "I really think we should avoid shipping the org chart", it sounds like a criticism of the design work so far, as if we are on a path to doing that. Do you see that as a property of the proposed designs?
+
+
+2024-12-20
+[16:51:04.0798] <sffc>
+The communication I've personally seen over the last few months has largely not crossed the membrane between the Decimal champions and the Measure champions, which gave me the impression that these two champion groups were making proposals narrowly focused on their individual use cases. I am happy that this is changing.
+
+
+2024-12-21
+[18:31:58.0213] <littledan>
+OK, I first heard about Measure in relation to Decimal, via the same group of people working together, but I guess you had been working on Measure going further back. In any case, glad we all agree it’s in a good state now.
+
