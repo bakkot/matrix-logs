@@ -32,3 +32,37 @@ console.log((await promise).key); // no boom
 ```
 turns out we already have the "safe promise resolve" capability with no changes to the language
 
+[21:30:05.0182] <TabAtkins>
+I... don't understand how that's safe. Doesn't that override/delete a .then property on the element, potentially wiping out an existing .then property?
+
+[21:32:44.0862] <bakkot>
+sorry, yes, the assumption is that you are only using this with an object you've just created yourself
+
+[21:32:55.0296] <bakkot>
+and you're trying to avoid the problem where someone might have put a `.then` on Object.prototype
+
+[21:33:25.0614] <bakkot>
+* sorry, yes, the assumption is that you are only using this with an object you've just created yourself, which you know not to have such a property
+
+[21:35:00.0663] <bakkot>
+* ```
+function safePromiseCapability() {
+  let { promise, resolve, reject } = Promise.withResolvers();
+  function safeResolve(val) {
+    if (Object.hasOwn(val, 'then')) throw new TypeError('you are not supposed to use this with thenables');
+    Object.defineProperty(val, 'then', { configurable: true, value: void 0 });
+    resolve(val);
+    delete val.then;
+  }
+  return { promise, safeResolve, reject };
+}
+
+let evilProto = { get then() { throw 'boom'; } };
+
+let { promise, safeResolve } = safePromiseCapability();
+safeResolve({ __proto__: evilProto, key: 'value' });
+console.log((await promise).key); // no boom
+```
+
+turns out we already have the "safe promise resolve" capability with no changes to the language
+
