@@ -135,3 +135,36 @@ I don't see why `hasOwn` is relevant in this case
 [23:00:10.0630] <nicolo-ribaudo>
 The idea is that instead of .resolve you would use bakkot's implementation above 
 
+[23:00:39.0548] <nicolo-ribaudo>
+> <@bakkot:matrix.org> ```
+> function safePromiseCapability() {
+>   let { promise, resolve, reject } = Promise.withResolvers();
+>   function safeResolve(val) {
+>     if (Object.hasOwn(val, 'then')) throw new TypeError('you are not supposed to use this with thenables');
+>     Object.defineProperty(val, 'then', { configurable: true, value: void 0 });
+>     resolve(val);
+>     delete val.then;
+>   }
+>   return { promise, safeResolve, reject };
+> }
+> 
+> let evilProto = { get then() { throw 'boom'; } };
+> 
+> let { promise, safeResolve } = safePromiseCapability();
+> safeResolve({ __proto__: evilProto, key: 'value' });
+> console.log((await promise).key); // no boom
+> ```
+> 
+> turns out we already have the "safe promise resolve" capability with no changes to the language
+
+This one
+
+[23:00:49.0560] <Mathieu Hofman>
+But you can't rely on that object being extensible anymore
+
+[23:02:00.0955] <nicolo-ribaudo>
+Mh ok
+
+[23:03:36.0454] <Mathieu Hofman>
+Unless throwing on a frozen animation instance is acceptable ?
+
