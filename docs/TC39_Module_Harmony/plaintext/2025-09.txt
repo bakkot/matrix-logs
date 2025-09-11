@@ -94,3 +94,36 @@ There are cases where relocating the base for a host-imported source is useful. 
 [15:23:31.0493] <kriskowal>
 For example, they often put a bunch of sources in ROM that are never executed in the initial realm but exist solely for mapping into a Compartment in different locations.
 
+[15:25:35.0621] <guybedford>
+I guess my remaining question is how to square this with registry hooks - if the result of the hook can override the URL
+
+[15:25:53.0519] <guybedford>
+maybe that's fine - the initial resolve picks a URL, the hook returns a module for that URL, the returned module overrides the URL
+
+[15:26:07.0562] <kriskowal>
+That’s actually table stakes.
+
+[15:26:33.0242] <kriskowal>
+There are lots of cases of aliasing, particularly through package.json exports/imports, where you import by one specifier and the module is executed from elsewhere.
+
+[15:27:04.0292] <kriskowal>
+But some of those cases are trickier than others and there are a variety of ways to handle it.
+
+[15:27:10.0323] <guybedford>
+the problem comes where the function is async - you would need the load hook to be sync with an async load - `load(url) -> { url, promise<ModuleSource> }`
+
+[15:27:27.0316] <guybedford>
+async resolver joyee pointed out earlier is a real concern
+
+[15:28:06.0346] <kriskowal>
+Yeah, the Compartment shim handles this case a bit more gracefully than that.
+
+[15:29:21.0177] <guybedford>
+fwiw in the module source proposal, I never precluded { id, moduleSource } from allowing identity distinct from moduleSource, and did call this out in a slide
+
+[15:29:30.0526] <kriskowal>
+The `importHook` can return a `ModuleSource`, and we’ve agreed that the `ModuleSource` carries a `base`. The Compartment is calling `importHook(specifier, options)` *after* creating an entry in the module map for the module record that the hook will fill, so cycles are handled.
+
+[15:30:12.0043] <guybedford>
+could be a poor version of instance identity to allow { id?, moduleSource } where id defaults to moduleSource.baseURL when otherwise unprovided
+
