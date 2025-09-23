@@ -198,3 +198,54 @@ This sounds to me like the same issue you'd have if you had a "task factory func
 [15:29:18.0613] <bakkot>
 I have a hard time imagining a case where a generator is the natural way to express the production of work but you want the body of the generator to be evaluated in the context of the worker tasks
 
+[15:30:16.0631] <Justin Ridgewell>
+An easy one is storing `workerId` in an `Async.Variable`
+
+[15:30:41.0396] <Jan Olaf Martin>
+and the produced work might want to close over a trace or span id
+
+[15:30:57.0902] <Justin Ridgewell>
+The producer could then read the worker's id (or trace/span/etc)
+
+[15:30:58.0340] <Jan Olaf Martin>
+and it should close over the trace of the worker task, not the creation of the queue/generator
+
+[15:31:47.0364] <Jan Olaf Martin>
+tbh, that _feels_ more likely than the case where it needs to close over context from the generator creation. again, in the unlikely scenario that we're already in
+
+[15:31:56.0352] <bakkot>
+Why would the generator want the `workerId`?
+
+[15:32:11.0992] <bakkot>
+I would really naturally expect it to close over the creation of the queue
+
+[15:32:16.0625] <Jan Olaf Martin>
+because it might create values that do async work (e.g. run async functions and yield promises)
+
+[15:32:45.0633] <bakkot>
+but again why would those things want the context of the workers?
+
+[15:32:56.0744] <bakkot>
+the workers are not the thing which caused the work to be done
+
+[15:33:00.0701] <Jan Olaf Martin>
+because otherwise you wouldn't be able to trace IO to the worker task?
+
+[15:33:00.0840] <bakkot>
+the thing which made the generator is that thing
+
+[15:33:16.0945] <bakkot>
+... why would you want to trace IO to the worker task?
+
+[15:33:24.0210] <bakkot>
+Maybe you are imagining a different thing than I am?
+
+[15:34:07.0271] <Justin Ridgewell>
+We're just making hypotheticals, but I often deal with async logging that I'd like match
+
+[15:34:36.0589] <Justin Ridgewell>
+Eg, concurrent calls from worker1 and worker2, which are executing producer code with `await`s in it
+
+[15:34:59.0957] <Justin Ridgewell>
+Without `workerId.get()`, the logs will appear jumbled
+
