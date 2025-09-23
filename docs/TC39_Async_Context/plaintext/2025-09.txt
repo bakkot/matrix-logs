@@ -273,3 +273,37 @@ bakkot: Did you have an example on your end of when the context when entering th
 [15:45:49.0631] <Jan Olaf Martin>
 * Quick and dirty attempt from my side, very similar idea: https://gist.github.com/jkrems/9fa7fe92bdc2b8a4b1964c971882c6bd
 
+[16:17:59.0546] <bakkot>
+I am imagining something like
+
+```
+let treeId = new AsyncContext.Variable();
+
+async function fetchChildren(node) {
+  console.log(`fetching children for node in tree from file ${treeId.get()}`);
+  return thing;
+}
+
+async function* walk(node) {
+  for (let child of await fetchChildren(node)) {
+    yield child;
+    if (child.hasChildren) {
+      yield* walk(child);
+    }
+  }
+}
+
+let runner = new TaskRunner({ workers: 4 });
+
+document.querySelector('#process').addEventListener('click', async () => {
+  let file = document.querySelector('#file').files[0];
+  let tree = parse(await file.bytes());
+  treeId.run(file.name, () => {
+    runner.add(walk(tree).map(console.log));
+  });
+});
+```
+
+[16:19:00.0066] <bakkot>
+the fact that the TaskRunner is the thing coordinating work is not relevant to the generator or the things it's calling; it only care about the context which created the work
+
