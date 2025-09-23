@@ -50,6 +50,38 @@ At this point, I'm still convinced that dropping all the spec around generators 
   <tr class="msg" id="L18"><td class="ts-cell"><a class="ts" href="#L18" alt="Tue Sep 23 2025 14:22:18 GMT-0700 (Pacific Daylight Time)">21:22</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-1" title="@jkrems:matrix.org">Jan Olaf Martin</span>&gt;</div></td><td class="msg-cell">A question here would be: What are the situations where yield would meaningfully restore context that <em>isn't</em> already restored by the scheduling mechanism that calls next?</td></tr>
   <tr class="msg" id="L19"><td class="ts-cell"><a class="ts" href="#L19" alt="Tue Sep 23 2025 14:23:40 GMT-0700 (Pacific Daylight Time)">21:23</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@stephenhicks:matrix.org">Steve Hicks</span>&gt;</div></td><td class="msg-cell">This is definitely still a general problem.  My point is that generators will almost never actually observe any difference (since they're almost always iterated in the same context they're instantiated in) but in the cases when that's not the case, the simpler "don't do anything with context" behavior seems more likely to be correct - and as a bonus, it's a performance win in the vast majority of cases where it didn't matter in the first place.</td></tr>
   <tr class="msg" id="L20"><td class="ts-cell"><a class="ts" href="#L20" alt="Tue Sep 23 2025 14:24:05 GMT-0700 (Pacific Daylight Time)">21:24</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@stephenhicks:matrix.org">Steve Hicks</span>&gt;</div></td><td class="msg-cell">Which is basically what Jan just said, in a few more words.</td></tr>
+  <tr class="msg" id="L21"><td class="ts-cell"><a class="ts" href="#L21" alt="Tue Sep 23 2025 15:05:36 GMT-0700 (Pacific Daylight Time)">22:05</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell">Basically any time you're doing anything more complicated than just iterating the whole thing in one shot, I would think</td></tr>
+  <tr class="msg" id="L22"><td class="ts-cell"><a class="ts" href="#L22" alt="Tue Sep 23 2025 15:06:12 GMT-0700 (Pacific Daylight Time)">22:06</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell"><p>I guess this is not all that common, but e.g. I have this helper where I want a function to be sync when passed a sync callback and async when passed an async callback</p>
+<pre><code>function split(genFn) {
+  function runSync(...args) {
+    const it = genFn(...args);
+    let next = it.next();
+    while (true) {
+      if (next.done) return next.value;
+      next = it.next(next.value);
+    }
+  }
+
+  async function runAsync(...args) {
+    const it = genFn(...args);
+    let next = it.next();
+    while (true) {
+      if (next.done) {
+        return await next.value;
+      }
+      try {
+        next = it.next(await next.value);
+      } catch (err) {
+        next = it.throw(err);
+      }
+    }
+  }
+
+  return { sync: runSync, async: runAsync };
+}
+</code></pre>
+</td></tr>
+  <tr class="msg" id="L23"><td class="ts-cell"><a class="ts" href="#L23" alt="Tue Sep 23 2025 15:06:40 GMT-0700 (Pacific Daylight Time)">22:06</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell">and I think it would be pretty weird if the async output of this helper did not work like the equivalent async function</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>

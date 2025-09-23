@@ -87,3 +87,42 @@ Which is basically what Jan was saying.
 [14:24:25.0900] <Steve Hicks>
 * Which is basically what Jan just said, in a few more words.
 
+[15:05:36.0233] <bakkot>
+Basically any time you're doing anything more complicated than just iterating the whole thing in one shot, I would think
+
+[15:06:12.0169] <bakkot>
+I guess this is not all that common, but e.g. I have this helper where I want a function to be sync when passed a sync callback and async when passed an async callback
+
+```
+function split(genFn) {
+  function runSync(...args) {
+    const it = genFn(...args);
+    let next = it.next();
+    while (true) {
+      if (next.done) return next.value;
+      next = it.next(next.value);
+    }
+  }
+
+  async function runAsync(...args) {
+    const it = genFn(...args);
+    let next = it.next();
+    while (true) {
+      if (next.done) {
+        return await next.value;
+      }
+      try {
+        next = it.next(await next.value);
+      } catch (err) {
+        next = it.throw(err);
+      }
+    }
+  }
+
+  return { sync: runSync, async: runAsync };
+}
+```
+
+[15:06:40.0518] <bakkot>
+and I think it would be pretty weird if the async output of this helper did not work like the equivalent async function
+
