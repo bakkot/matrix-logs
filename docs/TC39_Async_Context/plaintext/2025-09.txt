@@ -313,3 +313,38 @@ the fact that the TaskRunner is the thing coordinating work is not relevant to t
 [16:20:52.0463] <bakkot>
 * (here I am imagining TaskRunner is something like, `Promise.race` reads from the first `workers` iterables, then read the next one, etc, looping back to the start when the end of the list is reached and removing an iterable once it is finished)
 
+[16:55:40.0840] <Mathieu Hofman>
+> <@bakkot:matrix.org> I guess this is not all that common, but e.g. I have this helper where I want a function to be sync when passed a sync callback and async when passed an async callback
+> 
+> ```
+> function split(genFn) {
+>   function runSync(...args) {
+>     const it = genFn(...args);
+>     let next = it.next();
+>     while (true) {
+>       if (next.done) return next.value;
+>       next = it.next(next.value);
+>     }
+>   }
+> 
+>   async function runAsync(...args) {
+>     const it = genFn(...args);
+>     let next = it.next();
+>     while (true) {
+>       if (next.done) {
+>         return await next.value;
+>       }
+>       try {
+>         next = it.next(await next.value);
+>       } catch (err) {
+>         next = it.throw(err);
+>       }
+>     }
+>   }
+> 
+>   return { sync: runSync, async: runAsync };
+> }
+> ```
+
+We have the same thing in https://www.npmjs.com/package/@endo/trampoline
+
