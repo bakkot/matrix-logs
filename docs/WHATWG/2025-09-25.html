@@ -84,6 +84,16 @@ That is, if we cut off those two sources of script, is that enough to prevent an
 <p>Is there any reason that AbortController's <code>.abort()</code> couldn't remove the existing listeners? It already removes any web platform stuff which is listening (<a href="https://dom.spec.whatwg.org/#run-the-abort-steps">https://dom.spec.whatwg.org/#run-the-abort-steps</a>, step 2) but afaict user-defined abortables can't opt in to this.</p>
 </td></tr>
   <tr class="msg" id="L17"><td class="ts-cell"><a class="ts" href="#L17" alt="Thu Sep 25 2025 11:49:50 GMT-0700 (Pacific Daylight Time)">18:49</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell">The best you can do right now is to always use <code>{ once: true }</code>, but even that isn't quite the same because then it will be removed if someone does a <code>signal.dispatchEvent(new CustomEvent('abort'))</code></td></tr>
+  <tr class="msg" id="L18"><td class="ts-cell"><a class="ts" href="#L18" alt="Thu Sep 25 2025 11:55:08 GMT-0700 (Pacific Daylight Time)">18:55</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell"><p>Having AbortController's <code>abort()</code> automatically remove listeners from the signal would be very helpful but really want I want is for user-defined abortables to automatically get the same behavior as web-platform ones, i.e., bypassing the event infrastructure entirely.</p>
+<p>That gives you things you basically always want:</p>
+<ul>
+<li>someone manually doing a <code>dispatchEvent</code> on the <code>signal</code> won't trigger your callback</li>
+<li>another listener doing <code>stopImmediatePropagation</code> won't <em>prevent</em> your callback from being triggered</li>
+<li>the callback is automatically released once the signal is aborted</li>
+<li>adding a callback after the signal is already aborted won't do anything (and in particular won't hold a reference to your callback)</li>
+</ul>
+<p>I don't understand why the web platform uses a completely different set of infrastructure for abortables with all these nice properties and forces user code into this second-class event-based path with a bunch of footguns.</p>
+</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>
