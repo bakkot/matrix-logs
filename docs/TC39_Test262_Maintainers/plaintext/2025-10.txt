@@ -70,3 +70,50 @@ also it turns out to be somewhat difficult to cleanly separate: e.g. the `strict
 [10:29:23.0704] <bakkot>
 I dunno. I guess, what is the goal of splitting this? As an implementer, the test is fine in its current form (except that it would benefit from having descriptive messages for all the asserts so you know which case failed). When maintaining the tests I personally would find this much easier to maintain than a bunch of duplication across tests, but I'm not a test262 owner. When reviewing, you need to confirm that a.) each of the properties being verified is actually required to hold per spec and b.) the properties are are being verified correctly, which seems like it would be just the same if split up.
 
+[10:31:20.0947] <ptomato (intermittent availability)>
+I haven't looked at it since a couple of weeks ago so I'm not sure I have anything more specific to say right now until I have a chance to look at it again
+
+[10:31:21.0739] <Richard Gibson>
+I haven't looked at the PR, but am pretty firmly against including a reference implementation. I'm also against duplication, but that can be handled by common setup or a helper for that (given the stateful nature of iterators).
+
+[10:32:34.0162] <ptomato (intermittent availability)>
+at a minimum I'd want to make very clear in the assertion messages what the expectation is for implementations, i.e. do not blindly conform to this test
+
+[10:32:35.0775] <Richard Gibson>
+testing the *properties* with foreknowledge of what each iterator will produce should not require even a toy implementation, just a mapping of configuration inputs to expected properties
+
+[10:32:40.0581] <bakkot>
+I disagree on the reference implementation question but in this case that's not really what's happening. A representative example is, it's computing the expected length of the result iterator based on the lengths of the inputs and the mode:
+
+```
+  var lengths = iterables.map(function(array) {
+    return array.length;
+  });
+
+  var min = Math.min.apply(null, lengths);
+  var max = Math.max.apply(null, lengths);
+
+  // Expected number of iterations.
+  var count;
+  switch (mode) {
+    case "shortest":
+      count = min;
+      break;
+    case "longest":
+      count = max;
+      break;
+    case "strict":
+      count = max;
+      break;
+  }
+```
+
+[10:33:34.0814] <bakkot>
+Now, it _could_ hardcode these values for each of the 1000 cases it is testing, but... why? This is both clearer and easier to check.
+
+[10:33:47.0507] <Richard Gibson>
+that code looks good to me
+
+[10:34:48.0916] <Richard Gibson>
+and given that there probably are multiple files that need it, it should manifest as a helper function
+

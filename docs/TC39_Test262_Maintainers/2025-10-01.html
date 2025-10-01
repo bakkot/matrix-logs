@@ -54,6 +54,36 @@
   <tr class="msg" id="L20"><td class="ts-cell"><a class="ts" href="#L20" alt="Wed Oct 01 2025 09:37:28 GMT-0700 (Pacific Daylight Time)">16:37</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell">that seems worse</td></tr>
   <tr class="msg" id="L21"><td class="ts-cell"><a class="ts" href="#L21" alt="Wed Oct 01 2025 10:16:58 GMT-0700 (Pacific Daylight Time)">17:16</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell">also it turns out to be somewhat difficult to cleanly separate: e.g. the <code>strict</code> option throws when you exhaust the shortest iterator if the iterators are not the same length, so you either need to not pass that option when testing other properties or you need to compute the expected length and catch that error anyway</td></tr>
   <tr class="msg" id="L22"><td class="ts-cell"><a class="ts" href="#L22" alt="Wed Oct 01 2025 10:29:23 GMT-0700 (Pacific Daylight Time)">17:29</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell">I dunno. I guess, what is the goal of splitting this? As an implementer, the test is fine in its current form (except that it would benefit from having descriptive messages for all the asserts so you know which case failed). When maintaining the tests I personally would find this much easier to maintain than a bunch of duplication across tests, but I'm not a test262 owner. When reviewing, you need to confirm that a.) each of the properties being verified is actually required to hold per spec and b.) the properties are are being verified correctly, which seems like it would be just the same if split up.</td></tr>
+  <tr class="msg" id="L23"><td class="ts-cell"><a class="ts" href="#L23" alt="Wed Oct 01 2025 10:31:20 GMT-0700 (Pacific Daylight Time)">17:31</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@pchimento:igalia.com">ptomato (intermittent availability)</span>&gt;</div></td><td class="msg-cell">I haven't looked at it since a couple of weeks ago so I'm not sure I have anything more specific to say right now until I have a chance to look at it again</td></tr>
+  <tr class="msg" id="L24"><td class="ts-cell"><a class="ts" href="#L24" alt="Wed Oct 01 2025 10:31:21 GMT-0700 (Pacific Daylight Time)">17:31</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-11" title="@gibson042:matrix.org">Richard Gibson</span>&gt;</div></td><td class="msg-cell">I haven't looked at the PR, but am pretty firmly against including a reference implementation. I'm also against duplication, but that can be handled by common setup or a helper for that (given the stateful nature of iterators).</td></tr>
+  <tr class="msg" id="L25"><td class="ts-cell"><a class="ts" href="#L25" alt="Wed Oct 01 2025 10:32:34 GMT-0700 (Pacific Daylight Time)">17:32</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@pchimento:igalia.com">ptomato (intermittent availability)</span>&gt;</div></td><td class="msg-cell">at a minimum I'd want to make very clear in the assertion messages what the expectation is for implementations, i.e. do not blindly conform to this test</td></tr>
+  <tr class="msg" id="L26"><td class="ts-cell"><a class="ts" href="#L26" alt="Wed Oct 01 2025 10:32:35 GMT-0700 (Pacific Daylight Time)">17:32</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-11" title="@gibson042:matrix.org">Richard Gibson</span>&gt;</div></td><td class="msg-cell">testing the <em>properties</em> with foreknowledge of what each iterator will produce should not require even a toy implementation, just a mapping of configuration inputs to expected properties</td></tr>
+  <tr class="msg" id="L27"><td class="ts-cell"><a class="ts" href="#L27" alt="Wed Oct 01 2025 10:32:40 GMT-0700 (Pacific Daylight Time)">17:32</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell"><p>I disagree on the reference implementation question but in this case that's not really what's happening. A representative example is, it's computing the expected length of the result iterator based on the lengths of the inputs and the mode:</p>
+<pre><code>  var lengths = iterables.map(function(array) {
+    return array.length;
+  });
+
+  var min = Math.min.apply(null, lengths);
+  var max = Math.max.apply(null, lengths);
+
+  // Expected number of iterations.
+  var count;
+  switch (mode) {
+    case "shortest":
+      count = min;
+      break;
+    case "longest":
+      count = max;
+      break;
+    case "strict":
+      count = max;
+      break;
+  }
+</code></pre>
+</td></tr>
+  <tr class="msg" id="L28"><td class="ts-cell"><a class="ts" href="#L28" alt="Wed Oct 01 2025 10:33:34 GMT-0700 (Pacific Daylight Time)">17:33</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell">Now, it <em>could</em> hardcode these values for each of the 1000 cases it is testing, but... why? This is both clearer and easier to check.</td></tr>
+  <tr class="msg" id="L29"><td class="ts-cell"><a class="ts" href="#L29" alt="Wed Oct 01 2025 10:33:47 GMT-0700 (Pacific Daylight Time)">17:33</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-11" title="@gibson042:matrix.org">Richard Gibson</span>&gt;</div></td><td class="msg-cell">that code looks good to me</td></tr>
+  <tr class="msg" id="L30"><td class="ts-cell"><a class="ts" href="#L30" alt="Wed Oct 01 2025 10:34:48 GMT-0700 (Pacific Daylight Time)">17:34</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-11" title="@gibson042:matrix.org">Richard Gibson</span>&gt;</div></td><td class="msg-cell">and given that there probably are multiple files that need it, it should manifest as a helper function</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>
