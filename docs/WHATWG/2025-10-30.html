@@ -37,6 +37,46 @@
   <tr class="msg" id="L7"><td class="ts-cell"><a class="ts" href="#L7" alt="Thu Oct 30 2025 03:30:55 GMT-0700 (Pacific Daylight Time)">10:30</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-12" title="@annevk:matrix.org">annevk</span>&gt;</div></td><td class="msg-cell">Is this about same-site-cross-origin or cross-origin due to process limitations on certain platforms?</td></tr>
   <tr class="msg" id="L8"><td class="ts-cell"><a class="ts" href="#L8" alt="Thu Oct 30 2025 03:32:56 GMT-0700 (Pacific Daylight Time)">10:32</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@abotella:igalia.com">Andreu Botella</span>&gt;</div></td><td class="msg-cell">So far when considering the interaction with origins, we've only been considering the "same origin" spec check and ignoring sites, so both</td></tr>
   <tr class="msg" id="L9"><td class="ts-cell"><a class="ts" href="#L9" alt="Thu Oct 30 2025 03:33:34 GMT-0700 (Pacific Daylight Time)">10:33</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@abotella:igalia.com">Andreu Botella</span>&gt;</div></td><td class="msg-cell">But I guess the interaction with sites is far from settled</td></tr>
+  <tr class="msg" id="L10"><td class="ts-cell"><a class="ts" href="#L10" alt="Thu Oct 30 2025 03:45:25 GMT-0700 (Pacific Daylight Time)">10:45</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-5" title="@lwarlow:igalia.com">Luke Warlow</span>&gt;</div></td><td class="msg-cell"><p><span class="nick-12">annevk</span>: and <span class="nick-4">smaug</span></p>
+<p>Given the below html what do we think the end result should be:</p>
+<pre><code class="language-html">&lt;head&gt;
+    &lt;meta http-equiv="content-security-policy" content="require-trusted-types-for 'script'"&gt;
+&lt;/head&gt;
+&lt;div id="div1" onclick="alert(1)"&gt;&lt;/div&gt;
+&lt;span id="div2"&gt;&lt;/span&gt;
+&lt;script&gt;
+    let count = 0;
+trustedTypes.createPolicy('default', {
+    createScript: (a, b, c) =&gt; {
+        count++;
+        if (count &gt; 1) {
+            return a;
+        }
+        const attr = div1.attributes.getNamedItem('onclick');
+        div1.removeAttributeNode(attr);
+        div2.attributes.setNamedItem(attr);
+        return a;
+    }
+});
+
+div1.attributes[1].value = 'alert(2)';
+&lt;/script&gt;
+</code></pre>
+</td></tr>
+  <tr class="msg" id="L11"><td class="ts-cell"><a class="ts" href="#L11" alt="Thu Oct 30 2025 03:46:34 GMT-0700 (Pacific Daylight Time)">10:46</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-5" title="@lwarlow:igalia.com">Luke Warlow</span>&gt;</div></td><td class="msg-cell"><p>Chrome stable results in</p>
+<pre><code class="language-html">&lt;div id="div1" onclick="alert(2)"&gt;&lt;/div&gt;
+&lt;span id="div2" onclick="alert(1)"&gt;&lt;/span&gt;
+</code></pre>
+<p>Firefox Nightly in:</p>
+<pre><code class="language-html">&lt;div id="div1"&gt;&lt;/div&gt;
+&lt;span id="div2" onclick="alert(2)"&gt;&lt;/span&gt;
+</code></pre>
+<p>WebKit Trunk and Spec in:</p>
+<pre><code class="language-html">&lt;div id="div1"&gt;&lt;/div&gt;
+&lt;span id="div2" onclick="alert(1)"&gt;&lt;/span&gt;
+</code></pre>
+</td></tr>
+  <tr class="msg" id="L12"><td class="ts-cell"><a class="ts" href="#L12" alt="Thu Oct 30 2025 03:47:30 GMT-0700 (Pacific Daylight Time)">10:47</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@smaug:mozilla.org">smaug</span>&gt;</div></td><td class="msg-cell"><span class="nick-12">annevk</span>: it is not limitation on certain platforms. It is because of .domain.  So, same-site. But perhaps it could apply to some platforms in different-site case too.</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>
