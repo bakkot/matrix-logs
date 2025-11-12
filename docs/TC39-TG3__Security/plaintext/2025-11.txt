@@ -194,3 +194,52 @@ eg in `Error.prepareStackTrace(error, structuredStackTrace)` - it's not retrievi
 [06:14:54.0604] <Olivier Flückiger>
 Yes, the problem is that the error internally has all this stuff that you see listed on that doc attached. And turning it into a string can be observable via hooking into this prepareStackTrace function. So we can't do it transparently...
 
+[06:15:31.0159] <ljharb>
+i'm confused how it's observable - that page doesn't describe any hooks
+
+[06:15:49.0422] <ljharb>
+the stack string construction _from the structure i provided_ is observable, i see that
+
+[06:15:51.0175] <Olivier Flückiger>
+Anyway, I guess I can agree that this is a bit of a chrome specific issue.
+
+[06:16:00.0265] <ljharb>
+but the default stack trace's structure isn't accessible to me, is it?
+
+[06:16:22.0794] <Olivier Flückiger>
+it is, if you install your own code for prepareStackTrace
+
+[06:16:45.0582] <ljharb>
+… are you saying that the engine calls _the current value of Error.prepareStackTrace_ when making a string? O.o
+
+[06:17:06.0680] <ljharb>
+that… is a horrific capability to expose to users and it would be really good to move away from it :-(
+
+[06:17:56.0369] <Olivier Flückiger>
+ok, now we are on the same page I guess :)
+
+[06:18:12.0521] <nicolo-ribaudo>
+> <@ljharb:matrix.org> that… is a horrific capability to expose to users and it would be really good to move away from it :-(
+
+At least in Node.js packages rely on it — Babel does, for example 
+
+[06:18:19.0384] <nicolo-ribaudo>
+I don't remember for what
+
+[06:18:37.0612] <Olivier Flückiger>
+You can e.g., apply sourcemaps to stack traces
+
+[06:18:47.0348] <ljharb>
+oof
+
+[06:19:08.0851] <ljharb>
+do any of these use cases _not_ first use captureStackTrace?
+
+[06:19:53.0596] <ljharb>
+because then the cost of holding on to the structure would only be a problem for errors that go through captureStackTrace - the others could just memoize the string and collect the structure on first access
+
+[06:19:58.0820] <nicolo-ribaudo>
+> <@ljharb:matrix.org> do any of these use cases _not_ first use captureStackTrace?
+
+No, because there is no need for it. Most code is dealing with normal errors that already have a stack trace 
+
