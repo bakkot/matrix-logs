@@ -1176,3 +1176,67 @@ if (!neededUpdate) {
 [22:06:58.0511] <rbuckton>
 We discussed scoping awhile back in the pattern matching meetings with respect to `is` and `let` patterns. One of the problems with not having the binding be visible to an `else` has to do with inverting a condition, i.e., if you start with `if (x) A else B` and refactor to `if (!x) B else A`, you have to completely change how you write the code to bind the value
 
+[22:10:49.0524] <danielrosenwasser>
+It is a little funny that we might say "this thing can't be seen in an `else` but it's fine to see it in the `default` of a `switch`"
+
+[22:11:36.0908] <bakkot>
+I really think the argument from `using` against having the binding visible in the `else` is extremely strong, such that I would be opposed to the proposal going forward if the binding is visible in the `else`. Does anyone who thinks it should be visible in the `else` have thoughts on that specific topic?
+
+[22:11:54.0229] <snek>
+they're all standing in a circle talking rn
+
+[22:12:31.0218] <danielrosenwasser>
+I think I would have to do some reading on your concern there - is [this comment](https://github.com/tc39/proposal-Declarations-in-Conditionals/issues/3#issuecomment-3458395454) the right starting pint?
+
+[22:12:33.0797] <danielrosenwasser>
+* I think I would have to do some reading on your concern there - is [this comment](https://github.com/tc39/proposal-Declarations-in-Conditionals/issues/3#issuecomment-3458395454) the right starting point?
+
+[22:12:48.0556] <bakkot>
+the one above that, really, yes
+
+[22:12:55.0875] <bakkot>
+also https://github.com/tc39/proposal-Declarations-in-Conditionals/issues/12#issuecomment-3517821049
+
+[22:13:02.0901] <rbuckton>
+Or with a helper function:
+```
+function getResourceIfNeedsUpdate() {
+  using stack = new DisposableStack();
+  const resource = stack.use(getResource());
+  if (resource.needsUpdate) {
+     stack.move();
+     return resource;
+  }
+  return null;
+}
+
+if (using resource = getResourceIfNeedsUpdate()) {
+  resource.update();
+} else {
+  await postMessage('no updates required');
+}
+```
+
+[22:14:35.0010] <rbuckton>
+Or more generalized:
+```
+function holdResourceIf(acquire, test) {
+  using stack = new DisposableStack();
+  const resource = stack.use(acquire());
+  if (test(resource)) {
+    stack.move();
+    return resource;
+  }
+  return null;
+}
+
+if (using resource = holdResourceIf(() => getResource(), res => res.needsUpdate)) {
+  ...
+} else {
+  ...
+}
+```
+
+[22:15:00.0344] <Ashley Claymore>
+I shouldn't have said TDZ, really my Q should have been:  would it be a syntax error to access the binding in the else? Or are the use cases conditional-shadowing-within-true-branch
+

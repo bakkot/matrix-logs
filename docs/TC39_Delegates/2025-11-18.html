@@ -363,6 +363,49 @@ if (!neededUpdate) {
 </code></pre>
 </td></tr>
   <tr class="msg" id="L253"><td class="ts-cell"><a class="ts" href="#L253" alt="Mon Nov 17 2025 22:06:58 GMT-0800 (Pacific Standard Time)">06:06</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">We discussed scoping awhile back in the pattern matching meetings with respect to <code>is</code> and <code>let</code> patterns. One of the problems with not having the binding be visible to an <code>else</code> has to do with inverting a condition, i.e., if you start with <code>if (x) A else B</code> and refactor to <code>if (!x) B else A</code>, you have to completely change how you write the code to bind the value</td></tr>
+  <tr class="msg" id="L254"><td class="ts-cell"><a class="ts" href="#L254" alt="Mon Nov 17 2025 22:10:49 GMT-0800 (Pacific Standard Time)">06:10</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-5" title="@danielrosenwasser:matrix.org">danielrosenwasser</span>&gt;</div></td><td class="msg-cell">It is a little funny that we might say "this thing can't be seen in an <code>else</code> but it's fine to see it in the <code>default</code> of a <code>switch</code>"</td></tr>
+  <tr class="msg" id="L255"><td class="ts-cell"><a class="ts" href="#L255" alt="Mon Nov 17 2025 22:11:36 GMT-0800 (Pacific Standard Time)">06:11</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell">I really think the argument from <code>using</code> against having the binding visible in the <code>else</code> is extremely strong, such that I would be opposed to the proposal going forward if the binding is visible in the <code>else</code>. Does anyone who thinks it should be visible in the <code>else</code> have thoughts on that specific topic?</td></tr>
+  <tr class="msg" id="L256"><td class="ts-cell"><a class="ts" href="#L256" alt="Mon Nov 17 2025 22:11:54 GMT-0800 (Pacific Standard Time)">06:11</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-7" title="@devsnek:matrix.org">snek</span>&gt;</div></td><td class="msg-cell">they're all standing in a circle talking rn</td></tr>
+  <tr class="msg" id="L257"><td class="ts-cell"><a class="ts" href="#L257" alt="Mon Nov 17 2025 22:12:31 GMT-0800 (Pacific Standard Time)">06:12</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-5" title="@danielrosenwasser:matrix.org">danielrosenwasser</span>&gt;</div></td><td class="msg-cell">I think I would have to do some reading on your concern there - is <a href="https://github.com/tc39/proposal-Declarations-in-Conditionals/issues/3#issuecomment-3458395454">this comment</a> the right starting point?</td></tr>
+  <tr class="msg" id="L258"><td class="ts-cell"><a class="ts" href="#L258" alt="Mon Nov 17 2025 22:12:48 GMT-0800 (Pacific Standard Time)">06:12</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell">the one above that, really, yes</td></tr>
+  <tr class="msg" id="L259"><td class="ts-cell"><a class="ts" href="#L259" alt="Mon Nov 17 2025 22:12:55 GMT-0800 (Pacific Standard Time)">06:12</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell">also <a href="https://github.com/tc39/proposal-Declarations-in-Conditionals/issues/12#issuecomment-3517821049">https://github.com/tc39/proposal-Declarations-in-Conditionals/issues/12#issuecomment-3517821049</a></td></tr>
+  <tr class="msg" id="L260"><td class="ts-cell"><a class="ts" href="#L260" alt="Mon Nov 17 2025 22:13:02 GMT-0800 (Pacific Standard Time)">06:13</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell"><p>Or with a helper function:</p>
+<pre><code>function getResourceIfNeedsUpdate() {
+  using stack = new DisposableStack();
+  const resource = stack.use(getResource());
+  if (resource.needsUpdate) {
+     stack.move();
+     return resource;
+  }
+  return null;
+}
+
+if (using resource = getResourceIfNeedsUpdate()) {
+  resource.update();
+} else {
+  await postMessage('no updates required');
+}
+</code></pre>
+</td></tr>
+  <tr class="msg" id="L261"><td class="ts-cell"><a class="ts" href="#L261" alt="Mon Nov 17 2025 22:14:35 GMT-0800 (Pacific Standard Time)">06:14</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell"><p>Or more generalized:</p>
+<pre><code>function holdResourceIf(acquire, test) {
+  using stack = new DisposableStack();
+  const resource = stack.use(acquire());
+  if (test(resource)) {
+    stack.move();
+    return resource;
+  }
+  return null;
+}
+
+if (using resource = holdResourceIf(() =&gt; getResource(), res =&gt; res.needsUpdate)) {
+  ...
+} else {
+  ...
+}
+</code></pre>
+</td></tr>
+  <tr class="msg" id="L262"><td class="ts-cell"><a class="ts" href="#L262" alt="Mon Nov 17 2025 22:15:00 GMT-0800 (Pacific Standard Time)">06:15</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@aclaymore:matrix.org">Ashley Claymore</span>&gt;</div></td><td class="msg-cell">I shouldn't have said TDZ, really my Q should have been:  would it be a syntax error to access the binding in the else? Or are the use cases conditional-shadowing-within-true-branch</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>
