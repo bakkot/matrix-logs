@@ -1625,3 +1625,108 @@ To be clear, I want it to be UTF-8 only. I'm not representing my opinion
 [23:36:14.0158] <nicolo-ribaudo>
 It's what I got from the discussion
 
+[23:37:31.0027] <Michael Ficarra>
+I think the question was more like "is there something better we can do when the host uses the wrong encoding to decode the text?" and the answer is pretty easily "no", right?
+
+[23:38:52.0702] <sffc>
+If what people are saying about JSON imports being required to be UTF-8 is true, then a JSON file that is encoded on disk as UTF-16 BE will start with a NUL byte (or perhaps a BOM), which is invalid JSON, so the error happens early. But with import text, the conformant behavior would be to convert those bytes to replacement characters, and developers won't find out that there was an encoding problem. Implicit wrong encoding problems cause errors across many generations. Everyone here has seen garbled text on websites that results from the wrong encoding being used when reading bytes from a database or data file.
+
+[23:39:37.0562] <nicolo-ribaudo>
+CSS imports also assume UTF-8, but CSS is much more lenient and doesn't throw an error as far as I know
+
+[23:39:58.0690] <nicolo-ribaudo>
+I mean `type: "css"`
+
+[23:40:10.0956] <Michael Ficarra>
+@sffc:mozilla.org that's specifically with a mix-up between UTF-16LE and UTF-16BE, but there are many other encoding mixups that will cause mojibake in your string but overall still be valid JSON
+
+[23:40:36.0569] <snek>
+i'm very confused about where utf-8 is coming into this conversation for type text, is it because of type json?
+
+[23:40:51.0634] <Michael Ficarra>
+that's why I said consider windows-1252 and code points between 0x80 and 0xFF above
+
+[23:41:27.0358] <sffc>
+JSON is itself a text-based encoding. The first code point is { or [ or " or another syntax character, and it has the same encoding as the string values contained inside the JSON. This is different from binary encodings.
+
+[23:42:03.0031] <nicolo-ribaudo>
+But you need to first get that text from some bytes, no?
+
+[23:42:36.0713] <nicolo-ribaudo>
+It's bytes->text->json. You are saying "it's fine if bytes->text does the wrong thing because you are catching it at the next step", but MF pointed out that you won't always catch it at the next step
+
+[23:44:02.0466] <Michael Ficarra>
+yes and some encodings encode `{` and `[` and `"` the same as another encoding but encode `£` and `æ` the same
+
+[23:44:40.0572] <sffc>
+Yeah, like Latin-1, but not UTF-16
+
+[23:44:43.0534] <Michael Ficarra>
+so it's still valid JSON but the string data of the string that's encoded in the JSON is different because the wrong encoding was used to decode the JSON
+
+[23:45:21.0215] <Michael Ficarra>
+no, a latin-1 and UTF-16 mixup would not have this kind of behaviour
+
+[23:45:25.0998] <Chris de Almeida>
+we have been doing so well on time and have had to move a lot of topics up.  the downside is at this time, the day 2 and day 3 schedules are in rough shape.  we will update, but please be patient
+
+[23:45:35.0707] <snek>
+i feel like this conversation is being confused by the difference between abstract strings and utf8/utf16/etc strings
+
+[23:46:01.0522] <Michael Ficarra>
+wtf is an abstract string
+
+[23:46:19.0945] <sffc>
+A UTF-8 JSON parser might not fail on JSON stored as Latin-1. It should fail on JSON stored as UTF-16
+
+[23:46:57.0736] <Michael Ficarra>
+agreed, and?
+
+[23:47:30.0382] <sffc>
+And, then if the JSON file is encoded as UTF-16, then the error happens early
+
+[23:47:34.0868] <Michael Ficarra>
+a windows-1252 JSON parser will accept all JSON stored as latin-1 but some of it will have strings in the result that *are different*
+
+[23:47:51.0855] <snek>
+its not a thing in computer memory, its the theoretical characters. like the mathematical concept of numbers vs the concrete implementation of floating point.
+
+[23:47:56.0850] <Michael Ficarra>
+meaning there are no early errors
+
+[23:47:57.0595] <snek>
+idk if there's a better term
+
+[23:48:06.0030] <Michael Ficarra>
+it's just as fraught as text
+
+[23:48:38.0654] <Michael Ficarra>
+USV strings, or sequences of code points (ish)
+
+[23:48:48.0865] <ljharb>
+(ps, "the iterator protocol is crazy slow" is a strong use case for Array.zip)
+
+[23:49:13.0328] <Michael Ficarra>
+compelling case for engines to actually optimise their impleentations
+
+[23:49:29.0694] <snek>
+sequences of infinitely large code points, i guess? its not just restricted to how many characters there are in utf32 for example
+
+[23:50:00.0903] <Michael Ficarra>
+Unicode only defines 0x110000 code points
+
+[23:50:12.0161] <snek>
+i wouldn't think about it in terms of computer memory 
+
+[23:50:22.0323] <snek>
+* i wouldn't think about it in terms of computer memory or numbering characters
+
+[23:50:35.0681] <Michael Ficarra>
+so you mean... text?
+
+[23:50:59.0043] <sffc>
+You're saying that, since Windows-1252 encodes JSON syntax characters the same as UTF-8, then import type JSON gets a late error, which is the same as what will happen with import type Text. I agree that this is a true statement
+
+[23:50:59.0886] <snek>
+if that's the term for it
+
