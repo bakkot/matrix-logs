@@ -336,8 +336,33 @@ while ((match = tokenRegex.exec(input)) !== null) {
   <tr class="msg" id="L244"><td class="ts-cell"><a class="ts" href="#L244" alt="Mon Nov 17 2025 22:02:37 GMT-0800 (Pacific Standard Time)">06:02</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-5" title="@olivf.o1o.ch:immer.chat">Olivier Flückiger</span>&gt;</div></td><td class="msg-cell">Ok, I did not think about the <code>if (...; cond)</code> syntax. In my mind the binding was just <code>false</code> in the <code>else</code> case. So with that I see the appeal of not having it in else....</td></tr>
   <tr class="msg" id="L245"><td class="ts-cell"><a class="ts" href="#L245" alt="Mon Nov 17 2025 22:03:30 GMT-0800 (Pacific Standard Time)">06:03</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-5" title="@olivf.o1o.ch:immer.chat">Olivier Flückiger</span>&gt;</div></td><td class="msg-cell">but yeah, I am still worried about more TDZ</td></tr>
   <tr class="msg" id="L246"><td class="ts-cell"><a class="ts" href="#L246" alt="Mon Nov 17 2025 22:03:35 GMT-0800 (Pacific Standard Time)">06:03</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@stephenhicks:matrix.org">Steve Hicks</span>&gt;</div></td><td class="msg-cell">I'm confused, the <code>if (...; cond)</code> is exactly why it's useful to have the binding in the else - as in the better diagnostics example of <em>why</em> did the condition fail?</td></tr>
-  <tr class="msg" id="L247"><td class="ts-cell"><a class="ts" href="#L247" alt="Mon Nov 17 2025 22:04:34 GMT-0800 (Pacific Standard Time)">06:04</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-6" title="@jakea:matrix.org">Jake Archibald</span>&gt;</div></td><td class="msg-cell"><span class="nick-2">Steve Hicks</span>: maybe <code>if (const response = await fetch(…); response?.ok)</code>?</td></tr>
+  <tr class="msg" id="L247"><td class="ts-cell"><a class="ts" href="#L247" alt="Mon Nov 17 2025 22:04:34 GMT-0800 (Pacific Standard Time)">06:04</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-6" title="@jakea:matrix.org">Jake Archibald</span>&gt;</div></td><td class="msg-cell"><span class="nick-2">Steve Hicks</span>: <del>maybe <code>if (const response = await fetch(…); response?.ok)</code>?</del> ignore me, I'm tired</td></tr>
   <tr class="msg" id="L248"><td class="ts-cell"><a class="ts" href="#L248" alt="Mon Nov 17 2025 22:05:32 GMT-0800 (Pacific Standard Time)">06:05</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-7" title="@devsnek:matrix.org">snek</span>&gt;</div></td><td class="msg-cell">i think this motivates pattern matching, not having the binding available outside the consequent </td></tr>
+  <tr class="msg" id="L249"><td class="ts-cell"><a class="ts" href="#L249" alt="Mon Nov 17 2025 22:06:34 GMT-0800 (Pacific Standard Time)">06:06</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-5" title="@danielrosenwasser:matrix.org">danielrosenwasser</span>&gt;</div></td><td class="msg-cell">Pattern matching is cool, but other languages have this feature independent of pattern matching. There are plenty of times you want to bind a variable and check some specific condition that has nothing to do with truthiness or a type check.</td></tr>
+  <tr class="msg" id="L250"><td class="ts-cell"><a class="ts" href="#L250" alt="Mon Nov 17 2025 22:06:36 GMT-0800 (Pacific Standard Time)">06:06</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell"><p>better diagnostics argues for, but <code>using</code> argues against, and I think is much stronger (since for diagnostics you can of course just put the binding outside). I want to be able to write this, and have the resource be disposed before the <code>else</code>. I invite you to rewrite it assuming that the binding lives through the <code>else</code>. I can't make it pretty!</p>
+<pre><code>if (using resource = getResource(); resource.needsUpdate) {
+  resource.update();
+} else {
+  await postMessage('no updates required');
+}
+</code></pre>
+</td></tr>
+  <tr class="msg" id="L251"><td class="ts-cell"><a class="ts" href="#L251" alt="Mon Nov 17 2025 22:06:36 GMT-0800 (Pacific Standard Time)">06:06</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-14" title="@michaelficarra:matrix.org">Michael Ficarra</span>&gt;</div></td><td class="msg-cell">I really hope the champion understands the breadth of work required to actually prepare this proposal for Stage 2. It's a lot.</td></tr>
+  <tr class="msg" id="L252"><td class="ts-cell"><a class="ts" href="#L252" alt="Mon Nov 17 2025 22:06:54 GMT-0800 (Pacific Standard Time)">06:06</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@bakkot:matrix.org">bakkot</span>&gt;</div></td><td class="msg-cell"><p>best I've got is this:</p>
+<pre><code>let neededUpdate;
+{
+  using resource = getResource();
+  if (resource.needsUpdate) {
+    neededUpdate = true;
+    resource.update();
+  }
+}
+if (!neededUpdate) {
+  await postMessage('no updates required');
+}
+</code></pre>
+</td></tr>
+  <tr class="msg" id="L253"><td class="ts-cell"><a class="ts" href="#L253" alt="Mon Nov 17 2025 22:06:58 GMT-0800 (Pacific Standard Time)">06:06</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">We discussed scoping awhile back in the pattern matching meetings with respect to <code>is</code> and <code>let</code> patterns. One of the problems with not having the binding be visible to an <code>else</code> has to do with inverting a condition, i.e., if you start with <code>if (x) A else B</code> and refactor to <code>if (!x) B else A</code>, you have to completely change how you write the code to bind the value</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>
