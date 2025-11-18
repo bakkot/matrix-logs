@@ -12,3 +12,14 @@ I don't envy the work done by delegates. But I am a little jealous of the trip t
 [17:07:03.0065] <whosy>
 When less busy I should seek guidance again regarding my proposal.
 
+[04:35:19.0254] <Aapo Alasuutari>
+Question regarding Atomics wait/waitAsync and notify: are these intended to be just fronts for a futex API, possibly backed by the OS, or is the WL locking supposed to give some guarantees on top?
+
+There's an atomic read inside the critical section of DoWait that makes sense to me if it is intended to model the OS futex APIs possibly never suspending a thread if the futexword comparison with value fails immediately. But is that the intention, or am I completely lost?
+
+[06:40:56.0970] <Aapo Alasuutari>
+In effect what I guess I am asking is: is the critical section supposed to protect the buffer value / reading somehow as well? Looking at normal futex APIs it seems reasonable to implement the APIs using a native futex with the exception of the "fail-fast" path for waitAsync: using just futexes, the fail-fast read has to either be a separate atomic load before calling into a futex syscall, in which case it isn't done within the futex's critical section of course, or the main thread needs to spawn a separate thread for calling the syscall and then that thread needs to ... No, I guess it's just not really possible at all.
+
+[06:42:36.0101] <Aapo Alasuutari>
+Nevermind: it's possible with a parking lot futex but as far as I can tell, the futex still needs to be locked on a separate thread and the main thread would need to block until the futex thread confirms that it is going to sleep. That hardly seems like a "fail-fast" path.
+
