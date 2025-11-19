@@ -2833,3 +2833,93 @@ Infomaniak, swiss hosting
 [21:16:44.0564] <rbuckton>
 I ended up implementing something like this (`@esfx/canceltoken`, docs here: https://esfx.js.org/esfx/api/canceltoken/canceltoken.html#_esfx_canceltoken_CancelToken_class). It even theoretically works in place of `AbortSignal` on the web as it repurposes an `AbortSignal` instance with custom `[[Prototype]]`.
 
+[21:22:00.0343] <mgaudet|travelling>
+chipmorningstar: https://bugzilla.mozilla.org/show_bug.cgi?id=1914502 shallowEquals in react is one of the hottest functions, and uses this pattern 
+
+[21:22:17.0613] <Jake Archibald>
+bakkot: It'd be nice to keep `throwIfAborted()`. I guess JS will need an `AbortError`. As long as it passes `err instanceof Error && err.name === 'AbortError'`, that seems fine
+
+[21:23:45.0218] <Christian Ulbrich>
+Yeah chipmorningstar I am totally with you. And giving what nicolo-ribaudo said, I think we have to see real usages in the wild with actual numbers in critical paths.
+
+[21:23:51.0343] <rbuckton>
+I'd also considered `source.cancel(reason)` so you could cancel with a specific reason, not just `AbortError`.
+
+[21:24:26.0043] <snek>
+it can also be `HostCreateAbortError()`
+
+[21:24:54.0343] <Jake Archibald>
+rbuckton: `controller.abort()` has that too
+
+[21:25:31.0947] <Jake Archibald>
+snek: yeah that's fine, I'd just like there to be a cross-platform way to tell an 'abort' from other things.
+
+[21:25:39.0759] <nicolo-ribaudo>
+Can we just have a cancellation protocol (`obj[Symbol.subscribeForCancellation](cb)`), and have web AbortSignal do that? And the web AbortSignal uses the good algorithm for it
+
+[21:25:45.0451] <nicolo-ribaudo>
+And then our APIs can just use that protocol
+
+[21:25:53.0594] <Jake Archibald>
+rbuckton: https://dom.spec.whatwg.org/#dom-abortsignal-abort
+
+[21:26:20.0904] <rbuckton>
+See https://github.com/tc39/proposal-cancellation/issues/22. Back in 2018 the answer ended up being "No"
+
+[21:26:37.0159] <Jake Archibald>
+* rbuckton: https://dom.spec.whatwg.org/#dom-abortcontroller-abort
+
+[21:27:41.0356] <nicolo-ribaudo>
+The more time passes without a solution happening, the more people need to relax their constraint (if we gree that want some solution to happen)
+
+[21:27:43.0796] <rbuckton>
+Jake Archibald: if you haven't seen it, here is the Stage 0 cancellation proposal from 2017: https://github.com/tc39/proposal-cancellation/tree/master/stage0
+
+[21:28:00.0669] <Michael Ficarra>
+I don't think the API name (in this proposal's case) is a Stage 2 concern
+
+[21:28:07.0621] <nicolo-ribaudo>
+But I don't see in that issue why the answer ended up being no
+
+[21:29:11.0880] <bakkot>
+is there a reason to want this to be a symbol-named protocol instead of a string-named protocol? Because my plan was to add a string-named `whenAborted` or something to AbortSignal, which does the good algorithm, and have consumers like Governor do a call to the user-observable `.whenAborted`, which would make it de-facto a protocol 
+
+[21:29:20.0447] <Michael Ficarra>
+also percent of spec text that the name occupies does not make one bit of difference
+
+[21:29:24.0597] <bakkot>
+I think symbol-named protocols are good for things where you want the protocol implemented on arbitrary objects
+
+[21:29:28.0044] <bakkot>
+like iterator
+
+[21:29:34.0079] <bakkot>
+but don't see much reason for symbols for cases like this
+
+[21:29:39.0052] <rbuckton>
+I'd been working with Domenic Denicola on a solution and ended up being told later that the protocol idea was not going to be accepted and only thing WHATWG would consider would be a host hook.
+
+[21:29:40.0758] <Jake Archibald>
+eemeli: do you know why Map & Set don't use `count`?
+
+[21:29:42.0304] <bakkot>
+* but don't see much reason for symbol-named protocols for cases like this
+
+[21:29:54.0397] <nicolo-ribaudo>
+That the web API already has one way to register, and it can be confusing to have two
+
+[21:29:56.0776] <ljharb>
+you think it needs to happen before stage 2?
+
+[21:30:01.0882] <ljharb>
+* you think it needs to be decidd before stage 2?
+
+[21:30:02.0917] <rkirsling>
+I don't want to object but this really feels premature
+
+[21:30:03.0680] <ljharb>
+* you think it needs to be decided before stage 2?
+
+[21:30:06.0292] <nicolo-ribaudo>
+Unless we want every of its users to consider the event-based API to be deprecated
+
