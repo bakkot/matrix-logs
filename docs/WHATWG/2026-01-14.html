@@ -56,6 +56,23 @@ In other words, I did the bad thing of not raising some spec issues that I proba
   <tr class="msg" id="L22"><td class="ts-cell"><a class="ts" href="#L22" alt="Wed Jan 14 2026 06:09:35 GMT-0800 (Pacific Standard Time)">14:09</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-5" title="@lwarlow:igalia.com">Luke Warlow</span>&gt;</div></td><td class="msg-cell"><a href="https://html.spec.whatwg.org/multipage/links.html#dom-hyperlink-href">https://html.spec.whatwg.org/multipage/links.html#dom-hyperlink-href</a>
 
 For something like step 4 here I think putting a then before "return this's href"... is fine. Not sure it's needed. But yeah just "otherwise, then" seems wrong to me.</td></tr>
+  <tr class="msg" id="L23"><td class="ts-cell"><a class="ts" href="#L23" alt="Wed Jan 14 2026 06:26:04 GMT-0800 (Pacific Standard Time)">14:26</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-6" title="@jgraham_:matrix.org">jgraham</span>&gt;</div></td><td class="msg-cell"><p>So we want to add stream support in WebDriver BiDi so that e.g. you can access large network responses without having to buffer the entire response and pass in in a single message.</p>
+<p>So API-wise the way this will work is that some WebDriver operation that exposes a stream will return a WebDriver message with a UUID to that stream and you'll get protocol operations like <code>io.readStream({stream: &lt;id&gt;})</code> and <code>io.closeStream({stream: id})</code>.</p>
+<p>My question is: what's the best way to specify that? From a WebDriver point of view there isn't really a JS reader object involved; for <code>readStream</code> we could pretty much call <code>[=read request=]</code> with something like:</p>
+<pre><code>1. Let readRequest be a new read request with the following items:
+  1. [=chunk steps=] given |chunk|:
+    1. Let |response| be a new `io.ReadResult` with the &lt;code&gt;value&lt;/code&gt; field set to [=serialize protocol bytes=] given |chunk| and the &lt;code&gt;done&lt;/code&gt; field set to false.
+    1. Return [=success=] with data |response|.
+
+  1. [=close steps=]:
+    1. Let Let |response| be a new `io.ReadResult` with the &lt;code&gt;value&lt;/code&gt; field set to &lt;code&gt;""&lt;/code&gt; and the &lt;code&gt;done&lt;/code&gt; field set to true.
+
+ 1. [=error steps=] given |e|:
+    1. Return [=error=] with [=error code=] [=stream read error=].
+</code></pre>
+<p>And then it needs the equivalent of <code>ReadableStreamDefaultReaderRead</code> to eventually call <code>stream.[[controller]].[[PullSteps]](readRequest)</code> and actually invoke the steps.</p>
+<p>This is all doable, and honestly seems fairly easy to follow, but I'm somewhat worried that the Streams spec is going to turn out to depend on the assumption that all readers are actually IDL objects, and we're going to end up violating some invariants. The other option is to write the WebDriver spec to obtain an actual <code>ReadableStreamDefaultReader</code> object and work out how to write spec prose that manipulates DOM promises. I think that's going to be harder to follow from the WebDriver side, but avoids recreating a lot of the internal mechanics of the reader objects.</p>
+</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>

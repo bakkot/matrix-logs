@@ -574,3 +574,97 @@ https://html.spec.whatwg.org/multipage/links.html#dom-hyperlink-href
 
 For something like step 4 here I think putting a then before "return this's href"... is fine. Not sure it's needed. But yeah just "otherwise, then" seems wrong to me.
 
+[06:26:04.0054] <jgraham>
+So we want to add stream support in WebDriver BiDi so that e.g. you can access large network responses without having to buffer the entire response and pass in in a single message.
+
+So API-wise the way this will work is that some operation that exposes a stream will return an object with a UUID to that stream and you'll get protocol operations like `io.readStream({stream: <id>})` and `io.closeStream({stream: id})`.
+
+My question is: what's the best way to specify that? From a WebDriver point of view there isn't really a JS reader object involved; for `readStream` we could pretty much call `[=read request=]` with something like:
+```
+1. Let readRequest be a new read request with the following items:
+  1. [=chunk steps=] given |chunk|:
+    1. Let |response| be a new `io.ReadResult` with the <code>value</code> field set to [=serialize protocol bytes=] given |chunk| and the <code>done</code> field set to false.
+    1. Return [=success=] with data |response|.
+
+  1. [=close steps=]:
+    1. Let Let |response| be a new `io.ReadResult` with the <code>value</code> field set to <code>""</code> and the <code>done</code> field set to true.
+
+ 1. [=error steps=] given |e|:
+    1. Return [=error=] with [=error code=] [=stream read error=].
+```
+And then it needs the equivalent of `ReadableStreamDefaultReaderRead` to eventually call `stream.[[controller]].[[PullSteps]](readRequest)` and actually invoke the steps. 
+
+This is all doable, and honestly seems fairly easy to follow, but I'm somewhat worried that the Streams spec is going to turn out to depend on the assumption that all readers are actually IDL objects, and we're going to end up violating some invariants. The other option is to write the WebDriver spec to obtain an actual `ReadableStreamDefaultReader` object and work out how to write spec prose that manipulates DOM promises. I think that's going to be harder to follow from the WebDriver side, but avoids recreating a lot of the internal mechanics of the reader objects. 
+
+[06:29:20.0084] <jgraham>
+* So we want to add stream support in WebDriver BiDi so that e.g. you can access large network responses without having to buffer the entire response and pass in in a single message.
+
+So API-wise the way this will work is that some operation that exposes a stream will return a WebDriver protocol message with a UUID to that stream and you'll get protocol operations like `io.readStream({stream: <id>})` and `io.closeStream({stream: id})`.
+
+My question is: what's the best way to specify that? From a WebDriver point of view there isn't really a JS reader object involved; for `readStream` we could pretty much call `[=read request=]` with something like:
+
+```
+1. Let readRequest be a new read request with the following items:
+  1. [=chunk steps=] given |chunk|:
+    1. Let |response| be a new `io.ReadResult` with the <code>value</code> field set to [=serialize protocol bytes=] given |chunk| and the <code>done</code> field set to false.
+    1. Return [=success=] with data |response|.
+
+  1. [=close steps=]:
+    1. Let Let |response| be a new `io.ReadResult` with the <code>value</code> field set to <code>""</code> and the <code>done</code> field set to true.
+
+ 1. [=error steps=] given |e|:
+    1. Return [=error=] with [=error code=] [=stream read error=].
+```
+
+And then it needs the equivalent of `ReadableStreamDefaultReaderRead` to eventually call `stream.[[controller]].[[PullSteps]](readRequest)` and actually invoke the steps.
+
+This is all doable, and honestly seems fairly easy to follow, but I'm somewhat worried that the Streams spec is going to turn out to depend on the assumption that all readers are actually IDL objects, and we're going to end up violating some invariants. The other option is to write the WebDriver spec to obtain an actual `ReadableStreamDefaultReader` object and work out how to write spec prose that manipulates DOM promises. I think that's going to be harder to follow from the WebDriver side, but avoids recreating a lot of the internal mechanics of the reader objects.
+
+[06:29:59.0171] <jgraham>
+* So we want to add stream support in WebDriver BiDi so that e.g. you can access large network responses without having to buffer the entire response and pass in in a single message.
+
+So API-wise the way this will work is that some WebDriver operation that exposes a stream will return a message with a UUID to that stream and you'll get protocol operations like `io.readStream({stream: <id>})` and `io.closeStream({stream: id})`.
+
+My question is: what's the best way to specify that? From a WebDriver point of view there isn't really a JS reader object involved; for `readStream` we could pretty much call `[=read request=]` with something like:
+
+```
+1. Let readRequest be a new read request with the following items:
+  1. [=chunk steps=] given |chunk|:
+    1. Let |response| be a new `io.ReadResult` with the <code>value</code> field set to [=serialize protocol bytes=] given |chunk| and the <code>done</code> field set to false.
+    1. Return [=success=] with data |response|.
+
+  1. [=close steps=]:
+    1. Let Let |response| be a new `io.ReadResult` with the <code>value</code> field set to <code>""</code> and the <code>done</code> field set to true.
+
+ 1. [=error steps=] given |e|:
+    1. Return [=error=] with [=error code=] [=stream read error=].
+```
+
+And then it needs the equivalent of `ReadableStreamDefaultReaderRead` to eventually call `stream.[[controller]].[[PullSteps]](readRequest)` and actually invoke the steps.
+
+This is all doable, and honestly seems fairly easy to follow, but I'm somewhat worried that the Streams spec is going to turn out to depend on the assumption that all readers are actually IDL objects, and we're going to end up violating some invariants. The other option is to write the WebDriver spec to obtain an actual `ReadableStreamDefaultReader` object and work out how to write spec prose that manipulates DOM promises. I think that's going to be harder to follow from the WebDriver side, but avoids recreating a lot of the internal mechanics of the reader objects.
+
+[06:30:27.0566] <jgraham>
+* So we want to add stream support in WebDriver BiDi so that e.g. you can access large network responses without having to buffer the entire response and pass in in a single message.
+
+So API-wise the way this will work is that some WebDriver operation that exposes a stream will return a WebDriver message with a UUID to that stream and you'll get protocol operations like `io.readStream({stream: <id>})` and `io.closeStream({stream: id})`.
+
+My question is: what's the best way to specify that? From a WebDriver point of view there isn't really a JS reader object involved; for `readStream` we could pretty much call `[=read request=]` with something like:
+
+```
+1. Let readRequest be a new read request with the following items:
+  1. [=chunk steps=] given |chunk|:
+    1. Let |response| be a new `io.ReadResult` with the <code>value</code> field set to [=serialize protocol bytes=] given |chunk| and the <code>done</code> field set to false.
+    1. Return [=success=] with data |response|.
+
+  1. [=close steps=]:
+    1. Let Let |response| be a new `io.ReadResult` with the <code>value</code> field set to <code>""</code> and the <code>done</code> field set to true.
+
+ 1. [=error steps=] given |e|:
+    1. Return [=error=] with [=error code=] [=stream read error=].
+```
+
+And then it needs the equivalent of `ReadableStreamDefaultReaderRead` to eventually call `stream.[[controller]].[[PullSteps]](readRequest)` and actually invoke the steps.
+
+This is all doable, and honestly seems fairly easy to follow, but I'm somewhat worried that the Streams spec is going to turn out to depend on the assumption that all readers are actually IDL objects, and we're going to end up violating some invariants. The other option is to write the WebDriver spec to obtain an actual `ReadableStreamDefaultReader` object and work out how to write spec prose that manipulates DOM promises. I think that's going to be harder to follow from the WebDriver side, but avoids recreating a lot of the internal mechanics of the reader objects.
+
