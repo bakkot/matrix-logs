@@ -1120,3 +1120,89 @@ I have some appreciation for the feature and have been looking at ASTs of tagged
 [11:44:44.0649] <rbuckton>
 This seems like a good use case for expression-bodied getters, IMO.
 
+[11:46:00.0524] <rbuckton>
+* I _have_ been tempted to propose something like C#'s "expression bodied methods", which use `=>`, i.e.:
+
+```csharp
+// C#
+class C
+{
+  int _x = 0;
+  public int x => _x; // public getter with shorthand expression body
+  public int y {
+    get => _x;
+    set => _x = value;
+  }
+}
+```
+
+Which could could cut down on boilerplate for the `alias` case:
+
+```js
+class C {
+  #x = { value: 0 }; // for something more complex
+  get x => this.#x.value;
+  accessor y {
+    get => this.#x.value;
+    set => this.#x.value = value;
+  }
+}
+
+// vs.
+
+class C {
+  #x;
+  get x() { return this.#x.value; 
+  accessor y {
+    get () { return this.#x.value; }
+    set (value) { this.#x.value = value; }
+  }
+}
+```
+
+[11:46:34.0266] <rbuckton>
+* This seems like a good use case for expression-bodied getters, IMO.
+i.e., `get x => this.#x`
+
+[11:46:58.0460] <Lea Verou>
+is there a proposal for this?
+
+[11:47:31.0381] <Lea Verou>
+* is there a proposal for this? (edit: nvm, just saw the earlier messages!)
+
+[11:48:11.0343] <Steve Hicks>
+Couldn't aliases/forwarding be done with a decorated accessor? It would be a little wasteful of the unused underlying accessor, but there's any number of ways you could write
+```
+@alias({get: () => this.foo.bar, set: (x) => this.foo.bar = x})
+accessor bar;
+```
+or
+```
+@alias({owner: this.#foo, prop: 'bar'}) // obviously order matters here, could be lazy () => this.#foo
+```
+
+And if you wanted to define a bunch of them, you could compose your own decorator that saved some boilerplate
+```
+@myalias('foo') accessor foo;
+@myalias('bar') accessor bar;
+```
+where `@myalias` could effectively "close over" any `this.#owner`.
+
+[11:48:21.0626] <rbuckton>
+Not yet. I'd considered it when I proposed grouped/auto-accessors but since that proposal was blocked from Stage 2 until decorators hit Stage 4, I held off.
+
+[11:49:00.0423] <Lea Verou>
+Separating the object from the prop like that seems even more awkward than the status quo
+
+[11:49:18.0252] <Lea Verou>
+though this makes me wonder if instead of alias accessors we need a syntax-level feature for referencing property chains
+
+[11:49:26.0688] <rbuckton>
+that certainly isn't very concise, imo. 
+
+[11:49:29.0165] <Lea Verou>
+then regular decorators could do it
+
+[11:49:37.0945] <Lea Verou>
+plus, lots of other use cases outside accessors
+

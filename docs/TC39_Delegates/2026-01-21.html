@@ -209,7 +209,7 @@ class C
 </code></pre>
 <p>Which could could cut down on boilerplate for the <code>alias</code> case:</p>
 <pre><code class="language-js">class C {
-  #x;
+  #x = { value: 0 }; // for something more complex
   get x =&gt; this.#x.value;
   accessor y {
     get =&gt; this.#x.value;
@@ -235,7 +235,27 @@ class C {
   <tr class="msg" id="L146"><td class="ts-cell"><a class="ts" href="#L146" alt="Wed Jan 21 2026 11:38:55 GMT-0800 (Pacific Standard Time)">19:38</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-9" title="@nicolo-ribaudo:matrix.org">nicolo-ribaudo</span>&gt;</div></td><td class="msg-cell">All property forwarding was about getters btw, setters are much rarer</td></tr>
   <tr class="msg" id="L147"><td class="ts-cell"><a class="ts" href="#L147" alt="Wed Jan 21 2026 11:39:27 GMT-0800 (Pacific Standard Time)">19:39</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-9" title="@nicolo-ribaudo:matrix.org">nicolo-ribaudo</span>&gt;</div></td><td class="msg-cell">One codebase uses typescript, the others do not. Validation is higher in the ones that do not use TS</td></tr>
   <tr class="msg" id="L148"><td class="ts-cell"><a class="ts" href="#L148" alt="Wed Jan 21 2026 11:41:00 GMT-0800 (Pacific Standard Time)">19:41</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-12" title="@naugtur:matrix.org">Zb Tenerowicz (ZTZ/naugtur)</span>&gt;</div></td><td class="msg-cell">I have some appreciation for the feature and have been looking at ASTs of tagged templates recently</td></tr>
-  <tr class="msg" id="L149"><td class="ts-cell"><a class="ts" href="#L149" alt="Wed Jan 21 2026 11:44:44 GMT-0800 (Pacific Standard Time)">19:44</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">This seems like a good use case for expression-bodied getters, IMO.</td></tr>
+  <tr class="msg" id="L149"><td class="ts-cell"><a class="ts" href="#L149" alt="Wed Jan 21 2026 11:44:44 GMT-0800 (Pacific Standard Time)">19:44</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">This seems like a good use case for expression-bodied getters, IMO.<br>i.e., <code>get x =&gt; this.#x</code></td></tr>
+  <tr class="msg" id="L150"><td class="ts-cell"><a class="ts" href="#L150" alt="Wed Jan 21 2026 11:46:58 GMT-0800 (Pacific Standard Time)">19:46</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-11" title="@leaverou:matrix.org">Lea Verou</span>&gt;</div></td><td class="msg-cell">is there a proposal for this? (edit: nvm, just saw the earlier messages!)</td></tr>
+  <tr class="msg" id="L151"><td class="ts-cell"><a class="ts" href="#L151" alt="Wed Jan 21 2026 11:48:11 GMT-0800 (Pacific Standard Time)">19:48</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-2" title="@stephenhicks:matrix.org">Steve Hicks</span>&gt;</div></td><td class="msg-cell"><p>Couldn't aliases/forwarding be done with a decorated accessor? It would be a little wasteful of the unused underlying accessor, but there's any number of ways you could write</p>
+<pre><code>@alias({get: () =&gt; this.foo.bar, set: (x) =&gt; this.foo.bar = x})
+accessor bar;
+</code></pre>
+<p>or</p>
+<pre><code>@alias({owner: this.#foo, prop: 'bar'}) // obviously order matters here, could be lazy () =&gt; this.#foo
+</code></pre>
+<p>And if you wanted to define a bunch of them, you could compose your own decorator that saved some boilerplate</p>
+<pre><code>@myalias('foo') accessor foo;
+@myalias('bar') accessor bar;
+</code></pre>
+<p>where <code>@myalias</code> could effectively "close over" any <code>this.#owner</code>.</p>
+</td></tr>
+  <tr class="msg" id="L152"><td class="ts-cell"><a class="ts" href="#L152" alt="Wed Jan 21 2026 11:48:21 GMT-0800 (Pacific Standard Time)">19:48</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">Not yet. I'd considered it when I proposed grouped/auto-accessors but since that proposal was blocked from Stage 2 until decorators hit Stage 4, I held off.</td></tr>
+  <tr class="msg" id="L153"><td class="ts-cell"><a class="ts" href="#L153" alt="Wed Jan 21 2026 11:49:00 GMT-0800 (Pacific Standard Time)">19:49</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-11" title="@leaverou:matrix.org">Lea Verou</span>&gt;</div></td><td class="msg-cell">Separating the object from the prop like that seems even more awkward than the status quo</td></tr>
+  <tr class="msg" id="L154"><td class="ts-cell"><a class="ts" href="#L154" alt="Wed Jan 21 2026 11:49:18 GMT-0800 (Pacific Standard Time)">19:49</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-11" title="@leaverou:matrix.org">Lea Verou</span>&gt;</div></td><td class="msg-cell">though this makes me wonder if instead of alias accessors we need a syntax-level feature for referencing property chains</td></tr>
+  <tr class="msg" id="L155"><td class="ts-cell"><a class="ts" href="#L155" alt="Wed Jan 21 2026 11:49:26 GMT-0800 (Pacific Standard Time)">19:49</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">that certainly isn't very concise, imo. </td></tr>
+  <tr class="msg" id="L156"><td class="ts-cell"><a class="ts" href="#L156" alt="Wed Jan 21 2026 11:49:29 GMT-0800 (Pacific Standard Time)">19:49</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-11" title="@leaverou:matrix.org">Lea Verou</span>&gt;</div></td><td class="msg-cell">then regular decorators could do it</td></tr>
+  <tr class="msg" id="L157"><td class="ts-cell"><a class="ts" href="#L157" alt="Wed Jan 21 2026 11:49:37 GMT-0800 (Pacific Standard Time)">19:49</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-11" title="@leaverou:matrix.org">Lea Verou</span>&gt;</div></td><td class="msg-cell">plus, lots of other use cases outside accessors</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>
