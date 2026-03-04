@@ -73,3 +73,48 @@ ideally champions only need maintain, but admin's fine on a proposal repo if nee
 [08:26:18.0122] <ljharb>
 (and nobody should have explicit read access, usually)
 
+
+2026-03-04
+[12:15:07.0885] <bakkot>
+instead of `function.sent`, what if `GeneratorPrototype.bindFirstNextToFirstArgument`:
+
+```
+const GeneratorProto = Object.getPrototypeOf(function*(){});
+
+GeneratorProto.bindFirstNextToFirstArgument = function () {
+  const genFn = this;
+  return function (...args) {
+    let realGen = null;
+
+    return {
+      next(value) {
+        if (realGen === null) {
+          realGen = genFn(value, ...args);
+          return realGen.next();
+        }
+        return realGen.next(value);
+      },
+      return(value) {
+        return (realGen ??= genFn(undefined, ...args)).return(value);
+      },
+      throw(err) {
+        return (realGen ??= genFn(undefined, ...args)).throw(err);
+      },
+      [Symbol.iterator]() {
+        return this;
+      },
+    };
+  };
+};
+
+// usage
+let wrapped = (function* (sent, x, y) {
+  console.log(x, y, sent);
+  yield 0;
+}).bindFirstNextToFirstArgument();
+
+let gen = wrapped(1, 2);
+let rv = gen.next('first'); // prints 'first', 1, 2
+console.log(rv.value); // prints 0
+```
+
