@@ -118,3 +118,55 @@ let rv = gen.next('first'); // prints 'first', 1, 2
 console.log(rv.value); // prints 0
 ```
 
+[12:16:57.0838] <Michael Ficarra>
+it wouldn't print `1, 2, 'first'`?
+
+[12:18:56.0230] <bakkot>
+sorry, yes, was messing with it and forgot to fix that
+
+[12:19:06.0576] <bakkot>
+* instead of `function.sent`, what if `GeneratorPrototype.bindFirstNextToFirstArgument`:
+
+```
+const GeneratorProto = Object.getPrototypeOf(function*(){});
+
+GeneratorProto.bindFirstNextToFirstArgument = function () {
+  const genFn = this;
+  return function (...args) {
+    let realGen = null;
+
+    return {
+      next(value) {
+        if (realGen === null) {
+          realGen = genFn(value, ...args);
+          return realGen.next();
+        }
+        return realGen.next(value);
+      },
+      return(value) {
+        return (realGen ??= genFn(undefined, ...args)).return(value);
+      },
+      throw(err) {
+        return (realGen ??= genFn(undefined, ...args)).throw(err);
+      },
+      [Symbol.iterator]() {
+        return this;
+      },
+    };
+  };
+};
+
+// usage
+let wrapped = (function* (sent, x, y) {
+  console.log(x, y, sent);
+  yield 0;
+}).bindFirstNextToFirstArgument();
+
+let gen = wrapped(1, 2);
+let rv = gen.next('first'); // prints 1, 2, 'first'
+console.log(rv.value); // prints 0
+```
+
+[12:19:07.0990] <bakkot>
+updated
+
