@@ -2344,3 +2344,28 @@ yeah same
 [12:23:25.0666] <Chengzhong Wu>
 * ecma262 callback does not require keeping everything in the function alive, technically
 
+[12:26:15.0433] <Lea Verou>
+Or preventExtensions altogether: https://es.discourse.group/t/automatic-preventextensions-on-object-prototype/2516
+
+[12:27:15.0080] <rbuckton>
+Could leverage AsyncContext.Variable for this. I just threw together a rough implementation using AsyncContext and AbortController that looks something like this:
+
+```js
+declare class Scope {
+    [Symbol.asyncDispose](): Promise<void>;
+    fork<R>(cb: () => R): Promise<R>;
+    static get hasExited(): boolean;
+
+    // DOM extension?
+    // static get signal(): AbortSignal;
+}
+
+async function f() {
+    await using scope = new Scope();
+    const a = scope.fork(async () => { ... if (Scope.hasExited) return; ... });
+    const b = scope.fork(async () => {});
+    const c = scope.fork(async () => {});
+    const [aa, bb, cc] = await Promise.all([a, b, c]);
+}
+```
+
