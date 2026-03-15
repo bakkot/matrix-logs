@@ -56,6 +56,28 @@ I would also be interested to know how Jordan feels about it for his use cases.<
   <tr class="msg" id="L16"><td class="ts-cell"><a class="ts" href="#L16" alt="Sun Mar 15 2026 12:09:13 GMT-0700 (Pacific Daylight Time)">19:09</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-8" title="@ewinslow:matrix.org">Evan Winslow</span>&gt;</div></td><td class="msg-cell">One reason in favor of leaving the parenthesized RHS syntax is actually bundlers: To faithfully represent ESM semantics, they tend to lazily do property access on the module object. So you end up seeing a lot of <code>(0, ns.fn)(...args)</code> in the bundled code to simulate calling a named import without accidentally setting <code>this</code> to the module object <code>ns</code></td></tr>
   <tr class="msg" id="L17"><td class="ts-cell"><a class="ts" href="#L17" alt="Sun Mar 15 2026 12:22:05 GMT-0700 (Pacific Daylight Time)">19:22</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">One of the requirements we have for structs is the ability to maintain private state, which can only be accessed by methods and functions declared on the <code>struct</code> itself, just as on classes.<br>Struct methods currently have some unique differences to class methods which are intended to be improvements over normal class methods, however. For one, struct instance methods are intended to have a fixed <code>this</code> type that is enforced at runtime so as to reduce polymorphism. In addition, shared structs are currently specified to only be legal at the top level of a module, so no <code>shared struct</code> expressions or <code>shared struct</code> declarations inside functions or blocks. This means that <code>shared struct</code> methods are guaranteed to be placed on a declaration at the top level, which will help improve static analysis of these methods as a knock-on effect.</td></tr>
   <tr class="msg" id="L18"><td class="ts-cell"><a class="ts" href="#L18" alt="Sun Mar 15 2026 12:30:01 GMT-0700 (Pacific Daylight Time)">19:30</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">Awhile back I suggested we consider introducing a <code>Symbol.geti</code>/<code>Symbol.seti</code> protocol in conjunction with slice/index-from-end notation, which could be defined on an object intended to be used as a key. I wonder if something like that could be leveraged to allow you to just use a function as a key: <code>myArr[Array.prototype.slice](...)</code></td></tr>
+  <tr class="msg" id="L19"><td class="ts-cell"><a class="ts" href="#L19" alt="Sun Mar 15 2026 12:36:49 GMT-0700 (Pacific Daylight Time)">19:36</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-8" title="@ewinslow:matrix.org">Evan Winslow</span>&gt;</div></td><td class="msg-cell">Ah, interesting. Can you say more? Which object would have the <code>Symbol.geti</code>? <code>myArr</code> or <code>slice</code>? and what would be the implementation?</td></tr>
+  <tr class="msg" id="L20"><td class="ts-cell"><a class="ts" href="#L20" alt="Sun Mar 15 2026 12:37:21 GMT-0700 (Pacific Daylight Time)">19:37</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell"><p>The idea was that you could have a <code>Slice</code> class and an <code>Index</code> class that supported these symbols, and that you could use <code>x:y</code> literal syntax to produce a <code>Slice</code> and <code>^x</code> syntax to produce an <code>Index</code> computed from the end of an array, such that the following are equivalent:</p>
+<pre><code class="language-js">myArr[0:1];
+myArr[new Slice(0, 1)];
+new Slice(0, 1)[Symbol.geti](myArr);
+
+myArr[^1];
+myArr[new Index(1, true /*fromEnd*/)];
+new Index(1, true)[Symbol.geti](myArr);
+</code></pre>
+<p>A <code>Symbol.geti</code> for a function could just be a call to <code>bind</code>:</p>
+<pre><code class="language-js">myArr[Array.prototype.slice](1, 2);
+Array.prototype.slice[Symbol.geti](myArr)(1, 2);
+Array.prototype.slice.bind(myArr)(1, 2);
+</code></pre>
+<p>Or a possible <code>Symbol.calli</code> could intercept invocation:</p>
+<pre><code class="language-js">myArr[Array.prototype.slice](1, 2);
+Array.prototype.slice[Symbol.calli](myArr, 1, 2);
+</code></pre>
+</td></tr>
+  <tr class="msg" id="L21"><td class="ts-cell"><a class="ts" href="#L21" alt="Sun Mar 15 2026 12:38:20 GMT-0700 (Pacific Daylight Time)">19:38</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell"><code>slice</code> would, or rather, any function would. The symbol just avoids depending on <code>bind</code> or <code>call</code> directly to avoid the issue with <code>then</code> we see with <code>Promise</code>.</td></tr>
+  <tr class="msg" id="L22"><td class="ts-cell"><a class="ts" href="#L22" alt="Sun Mar 15 2026 12:39:42 GMT-0700 (Pacific Daylight Time)">19:39</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-15" title="@rbuckton:matrix.org">rbuckton</span>&gt;</div></td><td class="msg-cell">The downside is that putting it on all functions would possibly change existing behavior, in which case some other token would be necessary to opt in. i.e., <code>myArr[::Array.prototype.slice](1, 2)</code>, or similar.</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>

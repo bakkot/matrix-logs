@@ -263,3 +263,42 @@ Struct methods currently have some unique differences to class methods which are
 [12:30:01.0715] <rbuckton>
 Awhile back I suggested we consider introducing a `Symbol.geti`/`Symbol.seti` protocol in conjunction with slice/index-from-end notation, which could be defined on an object intended to be used as a key. I wonder if something like that could be leveraged to allow you to just use a function as a key: `myArr[Array.prototype.slice](...)`
 
+[12:36:49.0997] <Evan Winslow>
+Ah, interesting. Can you say more? Which object would have the `Symbol.geti` and what would be the implementation?
+
+[12:37:10.0348] <Evan Winslow>
+* Ah, interesting. Can you say more? Which object would have the `Symbol.geti`? `myArr` or `slice`? and what would be the implementation?
+
+[12:37:21.0902] <rbuckton>
+The idea was that you could have a `Slice` class and an `Index` class that supported these symbols, and that you could use `x:y` literal syntax to produce a `Slice` and `^x` syntax to produce an `Index` computed from the end of an array, such that the following are equivalent:
+```js
+myArr[0:1];
+myArr[new Slice(0, 1)];
+new Slice(0, 1)[Symbol.geti](myArr);
+
+myArr[^1];
+myArr[new Index(1, true /*fromEnd*/)];
+new Index(1, true)[Symbol.geti](myArr);
+```
+
+A `Symbol.geti` for a function could just be a call to `bind`:
+
+```js
+myArr[Array.prototype.slice](1, 2);
+Array.prototype.slice[Symbol.geti](myArr)(1, 2);
+Array.prototype.slice.bind(myArr)(1, 2);
+```
+
+Or a possible `Symbol.calli` could intercept invocation:
+```js
+myArr[Array.prototype.slice](1, 2);
+Array.prototype.slice[Symbol.calli](myArr, 1, 2);
+```
+
+
+[12:38:20.0507] <rbuckton>
+`slice` would, or rather, any function would. The symbol just avoids depending on `bind` or `call` directly to avoid the issue with `then` we see with `Promise`.
+
+[12:39:42.0292] <rbuckton>
+The downside is that putting it on all functions would possibly change existing behavior, in which case some other token would be necessary to opt in. i.e., `myArr[::Array.prototype.slice](1, 2)`, or similar.
+
