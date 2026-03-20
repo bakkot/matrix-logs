@@ -1019,3 +1019,42 @@ The benefit to Elixir is that it won't suffer from the performance regressions p
 [20:04:56.0320] <rbuckton>
 In F#-style `|>` is just function application. Call the thing on the right with the argument on the left. F# even has multiple-argument styles for `|>`
 
+[20:05:39.0341] <rbuckton>
+F#-style doesn't need closure allocs when used with PFA. Those can be statically replaced with an immediate call, and could even be specified as such.
+
+[20:06:10.0035] <rbuckton>
+`x |> f(?)` is easily evaluated without a closure
+
+[20:06:28.0841] <jschoi>
+Yes, in the end, that was the part that was important. The engines just did not want to encourage more hot function allocation. They want people to name their functions or to use callbacks that are very simple to optimize. With Elixir or Hack pipes, you cannot do `x |> f(y)` to mean `f(y)(x)`, and, for the engines, this is an advantage. They might have been fine with it if F# pipes restricted the RHS side to a member expression?
+
+[20:06:39.0782] <rbuckton>
+And so is `x |> f`
+
+[20:07:15.0705] <jschoi>
+* Yes, in the end, that was the part that was important. The engines just did not want to encourage more hot function allocation. They want people to name their functions or to use callbacks that are very simple to optimize. With Elixir or Hack pipes, you cannot do `x |> f(y)` to mean `f(y)(x)`, and, for the engines, this is an advantage. They might have been fine with it if F# pipes restricted the RHS side to a member expression like ` |> f` or `|> NS.f`?
+
+[20:07:17.0544] <rbuckton>
+You only really need to produce a closure for `f(?)` on its own
+
+[20:08:05.0019] <jschoi>
+It’s true that autocompletion engines could use a zeroth-argument-is-probably-the-principle-type heuristic on F# pipes, switching to the next argument’s type. With F# pipes and PFA syntax, as soon as I type `x |>`, my editor’s autocompletion engine could assume that I’m going to type `x |> f(?` or something similar, and it could show completions for standalone functions that expect `x`’s type in its zeroth place. And, if I then type `x |> f(0,` instead, then it can switch to the next argument’s type. Just as a heuristic.
+
+…And this would be true even for Hack pipes, too, wouldn’t it? If I type `x |>`, and we were using Hack pipes, the engine could *also* use the same heuristic. It could show functions that expect `x`’s in their zeroth place. So, actually, Justin, I might have changed my mind again thanks to Ron, haha. I think Hack pipes probably are fine for autocompletion.
+
+In any case…it’s this part that’s important. The engines just did not want to encourage more hot function allocation. They want named functions. With Elixir or Hack pipes, you cannot do `x |> f(y)` to mean `f(y)(x)`, and this is an advantage for the engines.
+
+
+[20:08:26.0547] <jschoi>
+* It’s true that autocompletion engines could use a zeroth-argument-is-probably-the-principle-type heuristic on F# pipes, switching to the next argument’s type. With F# pipes and PFA syntax, as soon as I type `x |>`, my editor’s autocompletion engine could assume that I’m going to type `x |> f(?` or something similar, and it could show completions for standalone functions that expect `x`’s type in its zeroth place. And, if I then type `x |> f(0,` instead, then it can switch to the next argument’s type. Just as a heuristic.
+
+…And this would be true even for Hack pipes, too, wouldn’t it? If I type `x |>`, and we were using Hack pipes, the engine could _also_ use the same heuristic. It could show functions that expect `x`’s in their zeroth place. So, actually, Justin, I might have changed my mind again thanks to Ron, haha. I think Hack pipes probably are fine for autocompletion.
+
+[20:09:18.0283] <Justin Ridgewell>
+I don't think this is the style that F#'s syntax promotes, though. You _can_ do this, but there's the subtle push towards `f` without explicitly placing the arg.
+
+[20:09:49.0147] <jschoi>
+* It’s true that autocompletion engines could use a zeroth-argument-is-probably-the-principle-type heuristic on F# pipes, switching to the next argument’s type. With F# pipes and PFA syntax, as soon as I type `x |>`, my editor’s autocompletion engine could assume that I’m going to type `x |> f(?` or something similar, and it could show completions for standalone functions that expect `x`’s type at its zeroth parameter. And, if I then type `x |> f(0,` instead, then it can switch to the next argument’s type. Just as a heuristic.
+
+…And this would be true even for Hack pipes, too, wouldn’t it? If I type `x |>`, and we were using Hack pipes, the engine could _also_ use the same heuristic. It could show functions that expect `x`’s type at their zeroth parameters. So, actually, Justin, I might have changed my mind again thanks to Ron, haha. I think Hack pipes probably are fine for autocompletion.
+
