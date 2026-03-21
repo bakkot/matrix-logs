@@ -1647,3 +1647,55 @@ if (foo && !(bar |> isBar(##))) { ... }
 if (foo && !isBar(bar)) { ... }
 ```
 
+[21:48:37.0845] <Evan Winslow>
+* Another aspect of this discussion that I think merits consideration, given a goal of **persuading method users to switch to something more tree-shakable**: precedence. Methods are tight, which means there are several cases where migrating from normal method calls to a "loose" pipeline is... awkward. As a simple example, take any awaited method call:
+
+```js
+// Class methods
+await this.deletePost(id);
+
+// Call-this / tight-elixir
+await this..deletePost(id); // Easy peasy
+
+// Hack
+await this |> deletePost(##, id); // Oops!
+this |> await deletePost(##, id); // No more bug, but this is pretty different from method chaining at this point...
+await (this |> deletePost(##, id)); // No more bug, but oof, we're back to paren-balancing...
+```
+
+Has this issue been discussed yet?
+
+[21:48:52.0643] <Evan Winslow>
+* Another example is arithmetic between the results of two method calls, based on real example for our codebase:
+
+```js
+// Class methods
+this.fn1() + this.fn2(arg1, arg2);
+
+// Call-this / tight-elixir
+this..fn1() + this..fn2(arg1, arg2);
+
+// Hack
+(this |> fn1(##)) + (this |> fn2(##, arg1, arg2));
+
+// Plain functions
+fn1(this) + fn2(this, arg1, arg2);
+```
+
+[21:49:10.0724] <Evan Winslow>
+* Boolean expression, also based on a real example:
+
+```js
+// Class methods
+if (foo && !bar.isBar()) { ... }
+
+// Call-this / tight-elixir
+if (foo && !bar..isBar()) { ... }
+
+// Hack
+if (foo && !(bar |> isBar(##))) { ... }
+
+// Plain functions
+if (foo && !isBar(bar)) { ... }
+```
+
