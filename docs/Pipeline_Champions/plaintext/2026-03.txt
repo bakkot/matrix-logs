@@ -1955,3 +1955,33 @@ I hadn’t seen anyone make the connection between call-this and Reflect.apply u
 * Your “how would you phrase [their problem statements]” question is addressed to ljharb, but, for what it’s worth, when I put call-this’s proposal together, I relied on statistical uses of `.call`, `.bind`, and `.apply` from Gzemnid (see [issue #12](https://github.com/tc39/proposal-call-this/issues/12)).
 I hadn’t seen anyone make the connection between call-this and Reflect.apply until you did. I would love to hear more about how call-this would help Reflect.apply. Maybe it would be worth adding to the explainer.
 
+[13:02:21.0497] <jschoi>
+Pipes would incentive plain functions at least a little, if not a lot. The magnitude is uncertain, but I think it certainly would be a positive effect (a little or a lot…for me, personally, a lot).
+People like writing and reading `x.f0(a).f1(b).f2(c)`, and they don’t like writing or reading `f2(f1(f0(x, a), b), c)`. So they choose to make `f0`, `f1`, and `f2` prototype methods and not standalone functions. 
+The same people might like reading `x |> f0(##, a) |> f1(##, b)` more than `f2(f1(f0(x, a), b), c)`.
+Those people might even like reading it enough to choose to make `f0`, `f1`, and `f2` plain functions instead of prototype methods, where they wouldn’t have done it had it remained a choice between only `x.f0(a).f1(b).f2(c)`, and they don’t like writing or reading `f2(f1(f0(x, a), b), c)`.
+But would the difference be *enough* to cause a significant increase in plain function usage? Nobody can claim to be confident about the whole community; we can only make our best judgements. I certainly think it would make plain function usage nicer. 
+Of course, like you said, pipe operators have benefits other than incentivizing DCE-friendly plain functions. But Hack pipes *do* “nudging the ecosystem towards compatible functions”; the debate shouldn’t be about whether they nudge at all but about how *much* they would.
+
+[13:03:26.0512] <Richard Gibson>
+> I hadn’t seen anyone make the connection between call-this and Reflect.apply until you have, but I would love to hear more about this
+
+Basically, all of https://github.com/tc39/proposal-call-this/blob/main/README.md#:~:text=There%20are%20a%20variety%20of%20reasons%20why%20developers%20use%20.call and half of https://github.com/tc39/proposal-call-this/blob/main/README.md#call-is-clunky are already addressed by `Reflect.apply`:
+```
+-rec.method(arg0)
++const { apply } = Reflect
++apply(method, rec, [arg0])
+```
+It specifically remedies the subject–verb separation of `.call`, and actually does a better job of protecting against monkey-patching and prototype pollution by being immune from subsequent modification of `Function.prototype.call` itself... the only complaint it doesn't address is subject–verb–object ordering, which is also already possible to handle with [helpers](https://github.com/tc39/proposal-function-helpers) like
+```
+-apply(method, rec, [arg0])
++const callThis = (rec, fn, ...args) => apply(fn, rec, args)
++callThis(rec, method, arg0)
+```
+that's much better than `method.call(rec, arg0)` but empirically not by enough for widespread replacement of `.call`, and neither have been good enough to meaningfully encourage exporting collections of receiver-sensitive functions outside of a containing class, which I think is where a reframed call-this proposal has some room to work.
+
+And regardless, I'm pretty much of the opinion that a data-flow perspective on call-this doesn't even make sense. Even the above `callThis` helper is intersects with pipeline on the same footing as any other function, and is less like to participate in a pipeline than e.g. `Object.fromEntries`. And while I don't consider it likely that pipeline would significantly encourage libraries to export functions rather than classes (because, as noted above, calling a method on a class instance gets the same pipeline DX benefits as calling a bare function), I _do_ consider it likely that ergonomic call-this syntax would encourage libraries to export methods _in addition to_ their containing classes for the improved tree-shaking
+
+[13:04:51.0532] <jschoi>
+I’m a little confused by this. `expr |> ##.method()` is almost always worse than `expr.method()`, except in the rare case you would need to parenthesize `expr` in `(expr).method()`.
+
