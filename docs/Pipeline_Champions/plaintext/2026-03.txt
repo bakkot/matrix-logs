@@ -2109,3 +2109,27 @@ import { C, increment } from "c.js";
 console.log(increment.call(new C(99n))); // 100n
 ```
 
+[08:03:00.0975] <Richard Gibson>
+* `extends` doesn't disrupt such connections, nor even the ability to observe them. This is in part about the gap between code that static analysis _can_ classify as unused vs. code that current static analysis _does_ classify as unused, and also about interplay between authors, tools, and the language itself. As a demonstration, consider expanding the example from above:
+
+```
+export class C {
+  /* constructor and "core" members */
+  #counter = 0n;
+  constructor(initial = 0n) { this.#counter = BigInt(initial); }
+  adjustBy(n) { this.#counter += BigInt(n); }
+  get counter() { return this.#counter; }
+};
+const { prototype: CShakable } = class extends C {
+  /* tree-shakable methods */
+  increment() { this.adjustBy(1n); return this.counter; }
+  decrement() { this.adjustBy(-1n); return this.counter; }
+};
+export const { increment, decrement } = CShakable;
+```
+
+```
+import { C, increment } from "c.js";
+console.log(increment.call(new C(99n))); // 100n
+```
+
