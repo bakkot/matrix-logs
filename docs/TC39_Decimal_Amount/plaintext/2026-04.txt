@@ -44,3 +44,86 @@ I'm using Object.prototype.toString here not literally, but rather as an example
 [16:47:46.0980] <Richard Gibson>
 put another way, there's little benefit to emitting `parseFloat`-resistant "[3 foot]" if the empty-unit output "[42]" is `JSON.parse`able
 
+
+2026-04-10
+[21:45:44.0832] <ljharb>
+i don't think it matters if it works with parseFloat or not; anyone using those functions with unbounded input is already pretty screwed
+
+[22:15:48.0831] <Richard Gibson>
+all else being equal, I think there's benefit in picking a format that never produces non-exceptional output from `parseFloat`/`JSON.parse`/etc. And harm in a format that produces non-exceptional output _most_ of the time but not in the general case, as noted [above](https://matrix.to/#/!NnKyFxSjabKpyjbPcL:matrix.org/$3Wz77dLsgCdcgmtdnQtpXsxVGDqmx9YSr6nu6D0Fvxw?via=matrix.org&via=igalia.com&via=mozilla.org)
+
+[22:15:54.0246] <Richard Gibson>
+* all else being equal, I think there's benefit in picking a format that never produces non-exceptional output from `parseFloat`/`JSON.parse`/etc. And harm in a format that produces non-exceptional output _most_ of the time but not in the general case, as noted [above](https://matrix.to/#/!NnKyFxSjabKpyjbPcL:matrix.org/$3Wz77dLsgCdcgmtdnQtpXsxVGDqmx9YSr6nu6D0Fvxw?via=matrix.org&via=igalia.com&via=mozilla.org).
+
+[22:39:46.0045] <ljharb>
+all else being equal sure
+
+[22:40:03.0858] <ljharb>
+ideally it either always produces NaN or always produces the intended number 
+
+[22:40:11.0232] <ljharb>
+but if it doesn't, that's ok
+
+[22:40:38.0533] <Richard Gibson>
+what would push us away from upholding that ideal?
+
+[22:41:13.0685] <ljharb>
+how gnarly it forces the syntax to be :-) meaning, we should figure out the ideal aesthetic output first, and then, see what we'd need to tweak to meet the parseX goals
+
+[22:43:31.0276] <Richard Gibson>
+so to be clear: you think the subjective aesthetics of a string format take priority over ensuring consistent behavior that makes misuse obvious?
+
+[22:43:54.0590] <Richard Gibson>
+do you consider the examples at https://matrix.to/#/!NnKyFxSjabKpyjbPcL:matrix.org/$ISSj4yKoUkiMBT4U7wq1FX4XRSwUVpqvyaQBmhMRvw4?via=matrix.org&via=igalia.com&via=mozilla.org to be gnarly?
+
+[22:44:15.0055] <ljharb>
+for parseInt and parseFloat, which are very difficult to NOT obviously misuse? yes.
+
+[22:44:24.0951] <ljharb>
+i mean i think the brackets are weird
+
+[22:45:13.0615] <ljharb>
+the whole point of an Amount is that you don't need a string representation, except for over the wire, so as long as there's a way to detect compliance and create an Amount from a string, then why would anybody try to parse for it?
+
+[22:45:36.0099] <ljharb>
+(meaning i think Amount should have a static predicate for "is an amount string" and also a way, constructor or static factory, to coerce that string to an Amount)
+
+[22:45:50.0414] <ljharb>
+and if those things exist, then there'd be no call for parseX, so they have no bearing on the result
+
+[22:46:01.0580] <Richard Gibson>
+I think we are operating under different definitions of "obvious"... I would say that most, and perhaps almost all, uses of parseInt and parseFloat are not **obviously** wrong precisely because they tend to work as authors intend _most_ of the time
+
+[22:49:00.0966] <ljharb>
+i mean starting the string with any nondigit character seems like it serves the goal of "always NaN", right?
+
+[22:49:42.0128] <Richard Gibson>
+yes, for `parseFloat`
+
+[22:50:08.0765] <Richard Gibson>
+well, non-digit non-`.`
+
+[22:50:17.0501] <ljharb>
+parseInt also?
+
+[22:50:57.0417] <Richard Gibson>
+I think so, at least with unspecified radix
+
+[22:51:31.0452] <ljharb>
+ok fair, i guess it'd have to be "not [a-zA-Z.]" to cover all radixes
+
+[22:52:26.0067] <ljharb>
+* ok fair, i guess it'd have to be "not \[0-9a-zA-Z.\]" to cover all radixes
+
+[22:52:38.0381] <ljharb>
+* ok fair, i guess it'd have to be "not \[\\s0-9a-zA-Z.\]" to cover all radixes
+
+[22:52:42.0904] <ljharb>
+* ok fair, i guess it'd have to be "not \[\\s0-9a-zA-Z.\]" to cover everything
+
+[22:55:06.0622] <Richard Gibson>
+but yes, the general point is that a prefix chosen from a large menu of available punctuation characters accomplishes the goal
+
+[02:21:54.0157] <eemeli>
+I filed [tc39/proposal-amount#97](https://github.com/tc39/proposal-amount/issues/97) to continue the above discussion.
+
