@@ -67,3 +67,205 @@ FYI, I added the following slide to the [Amount presentation](https://docs.googl
 > 
 > We are open to iterating on and improving the ConvertUnitValue algorithm during Stage 2, as long as we don't end up imposing an implicit requirement on implementations to support arbitrary precision arithmetic, or support for rational values.
 
+
+2026-05-19
+[17:00:49.0491] <Jesse 🇯🇵>
+we can probably improve upon that, though I think that there will never be an ideal solution given the (reasonable!) constraint that we don't insist on rationals/arbitrary-precision arithmetic
+
+[17:01:22.0749] <Jesse 🇯🇵>
+I expect there to always be spoiler examples like this
+
+[17:02:38.0458] <Jesse 🇯🇵>
+working with powers of tens, as in this example, should be straightforward to special-case
+
+[17:03:00.0560] <Jesse 🇯🇵>
+* working with powers of ten, as in this example (and other similar conversions), should be straightforward to special-case
+
+[17:38:46.0226] <Richard Gibson>
+I do not think we should special-case powers of ten. The spec already has full real-number arithmetic, and translating to binary64 is just inherently lossy—we either do the latter only after the former, or bite the bullet on having surprises like this (but for my part at least, I was shocked to see that `5 * 1e-6 !== 5 / 1e-6`).
+
+[17:39:05.0279] <Richard Gibson>
+* I do not think we should special-case powers of ten. The spec already has full real-number arithmetic, and translating to binary64 is just inherently lossy—we either do the latter only after the former, or bite the bullet on having surprises like this (but for my part at least, I was shocked to see that `5 * 1e-6 !== 5 / 1e6`).
+
+[17:39:54.0474] <Richard Gibson>
+* I do not think we should special-case powers of ten. The spec already has full real-number arithmetic, and translating to binary64 is just inherently lossy—we either do the latter only after the former, or bite the bullet on having surprises like this (but for my part at least, I was shocked to see that `5 * 1e-6 !== 5 / 1e6`, not that I should have been).
+
+[17:41:14.0510] <Jesse 🇯🇵>
+right -- we can try to fix cases like this (and accept that there will still be other gotcha examples), or draw a line here and say that this is just an unavoidable
+
+[17:41:19.0980] <Jesse 🇯🇵>
+* right -- we can try to fix cases like this (and accept that there will still be other gotcha examples), or draw a line here and say that this is just unavoidable
+
+[17:44:59.0792] <Jesse 🇯🇵>
+I notice that `units.xml` calls out conversions the differ by powers of 10 and powers of 2
+
+[17:45:19.0174] <Jesse 🇯🇵>
+special-casing 10 (and 2) might be motivated on those grounds
+
+[17:46:19.0933] <Jesse 🇯🇵>
+anyway, not committing to this right now; just mentioning this as a potential response
+
+[17:47:07.0569] <Richard Gibson>
+can you elaborate? I don't think I know what you mean by "calls out"
+
+[17:50:23.0046] <Jesse 🇯🇵>
+ah I spoke too soon; I was referring to the presence of attributes `power10` and `power2` in the `unitPrefixes` part of `units.xml`, but those aren't really relevant here
+
+[17:50:36.0991] <Jesse 🇯🇵>
+still, one can read off powers of ten (and two) from the conversion constants
+
+[17:52:14.0266] <Jesse 🇯🇵>
+iow we can make a distinction between conversion factor data like `factor='0.03110348'` and `factor='0.001'
+
+[17:52:28.0955] <Jesse 🇯🇵>
+* iow we can make a distinction between conversion factor data like `factor='0.03110348'` and `factor='0.001'`
+
+[17:52:33.0089] <Richard Gibson>
+we can, but I am against that
+
+[01:23:59.0216] <sffc>
+The slide talking about this as a "known 'issue'" is the right thing to do; as noted in the issue, this is "just now Numbers work" and is the result of the highly intentional move to use float math instead of decimal math that we did to address the V8 concerns.
+
+[01:49:39.0234] <eemeli>
+Do we already have real-number arithmetic on non-integer values?
+
+[01:54:03.0812] <Richard Gibson>
+yes: https://tc39.es/ecma262/multipage/notational-conventions.html#sec-mathematical-operations
+> *Mathematical values*: Arbitrary real numbers, used as the default numeric type.
+> *Extended mathematical values*: Mathematical values together with +∞ and -∞.
+> Numeric operators such as +, ×, =, and ≥ refer to those operations as determined by the type of the operands. When applied to mathematical values, the operators refer to the usual mathematical operations. When applied to extended mathematical values, the operators refer to the usual mathematical operations over the extended real numbers; indeterminate forms are not defined and their use in this specification should be considered an editorial error.
+
+[01:54:22.0387] <Richard Gibson>
+* yes: https://tc39.es/ecma262/multipage/notational-conventions.html#sec-mathematical-operations
+
+> * _Mathematical values_: Arbitrary real numbers, used as the default numeric type.
+> * _Extended mathematical values_: Mathematical values together with +∞ and -∞.
+> 
+> …
+> Numeric operators such as +, ×, =, and ≥ refer to those operations as determined by the type of the operands. When applied to mathematical values, the operators refer to the usual mathematical operations. When applied to extended mathematical values, the operators refer to the usual mathematical operations over the extended real numbers; indeterminate forms are not defined and their use in this specification should be considered an editorial error.
+
+[01:56:35.0090] <eemeli>
+I agree that we have the capability in the spec for real-number arithmetic; I meant to ask whether we actually exercise this capability for non-integer numeric values.
+
+[01:57:00.0686] <ljharb>
+do we not do that in temporal?
+
+[01:57:30.0827] <Jesse 🇯🇵>
+~~JDH asked it~~
+
+[01:57:47.0293] <Jesse 🇯🇵>
+* ~~JHD asked it~~
+
+[02:00:10.0974] <sffc>
+We do not exercise this in a way that requires browsers to implement a general-purpose decimal math library.
+
+[02:01:01.0026] <sffc>
+Temporal exercises a limited scope of MV arithmetic operations that can be implemented using u64 integer math.
+
+[02:01:03.0098] <ljharb>
+ok, but that wasn't your question :-)
+
+[02:01:25.0760] <ljharb>
+isn't the whole point of decimal tho that we have general-purpose decimal math?
+
+[02:01:35.0363] <ljharb>
+* isn't the whole point/value of decimal tho that we have general-purpose decimal math?
+
+[02:02:22.0499] <sffc>
+The current iteration of Amount sits on top of the engine's existing number types. When Decimal gets added, then Decimal-Amounts will use decimal math behavior.
+
+[02:02:52.0443] <ljharb>
+ah ok, i certainly don't expect Amount to add this capability
+
+[02:02:58.0293] <ljharb>
+* ah ok, i certainly don't expect Amount to add this capability (absent Decimal)
+
+[02:03:54.0912] <Jesse 🇯🇵>
+and not just this capability, but we don't want it to be necessary to have something more or less on par with arbitrary-precision arithmetic
+
+[02:04:27.0039] <Richard Gibson>
+we do, especially in ECMA-402 but also in -262, trivially so for simple evaluation of a numeric literal: https://tc39.es/ecma262/#sec-runtime-semantics-stringnumericvalue
+> StrUnsignedDecimalLiteral ::: DecimalDigits . DecimalDigits? ExponentPart?
+> …
+> Return RoundMVResult((a + (b × 10**-n)) × 10**e).
+
+[02:04:53.0786] <Richard Gibson>
+* we do, especially in ECMA-402 but also in ECMA-262, trivially so for simple evaluation of a numeric literal: https://tc39.es/ecma262/#sec-runtime-semantics-stringnumericvalue
+
+> StrUnsignedDecimalLiteral ::: DecimalDigits . DecimalDigits? ExponentPart?
+> …
+> Return RoundMVResult((a + (b × 10\*\*-n)) × 10\*\*e).
+
+[02:06:23.0684] <eemeli>
+Eh, sure, but the result there is immediately turned into a Number.
+
+[02:06:45.0361] <eemeli>
+Somewhat relevant: https://github.com/tc39/ecma262/pull/3857#pullrequestreview-4317420297
+
+[02:09:39.0573] <Jesse 🇯🇵>
+I think the feedback "isn't Amount a backdoor decimal?" makes sense only in a world in which we haven't _really_ exercised mathematical values except perhaps in some simple ways (like maybe checking whether something is an integer)
+
+[04:35:13.0379] <eemeli>
+Where and how do we define the _mathematical value_ of a non-integral finite Number? I'm not finding it in ECMA-262. The [Number Type](https://tc39.es/ecma262/#sec-ecmascript-language-types-number-type) section gets really close, but it does not actually say that where it says "value" that's the same as "mathematical value".
+
+[04:37:39.0866] <sffc>
+Intl stringifies and parses. I don't know if there is a standalone float-to-MV AO.
+
+[04:38:13.0663] <sffc>
+It's important to define the semantics of the conversion. Stringify-and-parse is a well-defined semantic (and not the only such semantic).
+
+[04:48:41.0932] <eemeli>
+I agree, and I'm going to file a PR fixing [this line](https://github.com/tc39/proposal-amount/blob/643ba440bb86065ea42ea3b2def903c7b1f7f1b1/spec.emu#L457) in the Amount proposal.
+
+My question is more generic, though, given that the spec explicitly [says this](https://tc39.es/ecma262/#sec-mathematical-operations):
+> A conversion from a Number or BigInt x to a mathematical value is denoted as "the mathematical value of x", or ℝ(x). The mathematical value of +0𝔽 and -0𝔽 is the mathematical value 0. The mathematical value of non-finite values is not defined.
+
+As we say that, I definitely expect that mathematical values of finite Number values are defined _somewhere_. And that "value" and "mathematical value" are not interchangeable.
+
+[04:53:46.0283] <Richard Gibson>
+https://tc39.es/ecma262/multipage/notational-conventions.html#mathematical-value-of
+
+[04:55:52.0619] <Richard Gibson>
+* https://tc39.es/ecma262/multipage/notational-conventions.html#mathematical-value-of
+> A conversion from a Number or BigInt *x* to a mathematical value is denoted as "the *mathematical value of* *x*", or ℝ(*x*). The mathematical value of **+0**𝔽 and **-0**𝔽 is the mathematical value 0. The mathematical value of non-finite values is not defined. The *extended mathematical value of* *x* is the mathematical value of *x* for finite values, and is +∞ and -∞ for **+∞**𝔽 and **-∞**𝔽 respectively; it is not defined for **NaN**.
+
+[04:56:20.0402] <Richard Gibson>
+* https://tc39.es/ecma262/multipage/notational-conventions.html#mathematical-value-of
+
+> A conversion from a Number or BigInt _x_ to a mathematical value is denoted as "the _mathematical value of_ _x_", or ℝ(_x_). The mathematical value of **+0**𝔽 and **-0**𝔽 is the mathematical value 0. The mathematical value of non-finite values is not defined. The _extended mathematical value of_ _x_ is the mathematical value of _x_ for finite values, and is +∞ and -∞ for **+∞**𝔽 and **-∞**𝔽 respectively; it is not defined for **NaN**.
+
+[04:56:39.0680] <Richard Gibson>
+* https://tc39.es/ecma262/multipage/notational-conventions.html#mathematical-value-of
+
+> A conversion from a Number or BigInt _x_ to a mathematical value is denoted as "the _mathematical value of_ _x_", or ℝ(_x_). The mathematical value of **+0**𝔽 and **-0**𝔽 is the mathematical value 0. The mathematical value of non-finite values is not defined. The _extended mathematical value of_ _x_ is the mathematical value of _x_ for finite values, and is +∞ and -∞ for +∞𝔽 and -∞𝔽 respectively; it is not defined for **NaN**.
+
+[05:00:24.0615] <eemeli>
+Richard Gibson: My point is that that doesn't actually say what the mathematical value of a finite Number _is_.
+
+[05:01:52.0662] <Richard Gibson>
+I'm not sure what more you would want; *Numbers* are defined right above that as "IEEE 754-2019 binary64 (double-precision floating point) values"
+
+[05:05:29.0959] <Richard Gibson>
+so every finite Number is exactly equal to (-1)**_sign_ × _significand_ × 2 ** (_E_ - 1023), with bit-size bounds on _significand_ and _E_
+
+[05:05:43.0559] <Richard Gibson>
+* so every finite Number is exactly equal to (-1)\*\*_sign_ × _significand_ × 2\*\*(_E_ - 1023), with bit-size bounds on _significand_ and _E_
+
+[05:06:29.0134] <eemeli>
+I would want some text to explicitly say something like "The mathematical value of a Number is its exact IEEE 754-2019 binary64 value."
+
+[05:08:46.0721] <eemeli>
+Especially as we have behaviour like `String(0.15) === '0.15'`.
+
+[05:10:06.0184] <Richard Gibson>
+* so every finite Number is exactly equal to (-1)\*\*_sign_ × _significand_ × 2\*\*(_E_ - 1023), with bit-size bounds on _significand_ and _E_ (the latter of which is an 11-bit unsigned integer, and the former of which can be derived from a 52-bit unsigned integer)
+
+[05:11:45.0008] <eemeli>
+Note that for BigInts there's no such issue, as they're explicitly described as "representing arbitrary integers in a one-to-one correspondence".
+
+[05:13:44.0875] <Richard Gibson>
+String(_number_) goes to [Number::toString](https://tc39.es/ecma262/multipage/ecmascript-data-types-and-values.html#sec-numeric-types-number-tostring), which doesn't convert _number_ to a mathematical value (rather, it constructs mathematical integers that can be manipulated to tightly bracket _number_)
+
+[05:29:33.0648] <eemeli>
+Amount PR fixing the issue: https://github.com/tc39/proposal-amount/pull/112
+

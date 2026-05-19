@@ -668,3 +668,130 @@ It’s also subject to change
 [06:06:12.0959] <sideshowbarker>
 …because the project is also not particularly dogmatic or religious about anything
 
+
+2026-05-19
+[00:04:37.0007] <Tim van der Lippe>
+A while back I filed https://github.com/whatwg/html/issues/12258 I would love Servo to be passing the relevant `<link>` WPT tests, but by following the spec I am unable to. That said, I think the spec is correct here and the performance footgun mentioned in the issue should be avoided. Anybody else can chime in to give their opinion? My proposal would be to update the WPT tests to check that the main thread is not blocked to follow the spec. That would fail the test in all browsers, since they all block the main thread until the link request has finished loading.
+
+[00:30:51.0058] <annevk>
+Tim van der Lippe: I added you to the triage team so you can nominate issues for the agenda. For that particular issue I suspect the lack of refetching is due to the "memory cache" browsers have, which I thought was specified by Noam Rosenthal, but I can't actually find it following the various link algorithms just now. 
+
+[00:50:20.0281] <Noam Rosenthal>
+> <@annevk:matrix.org> Tim van der Lippe: I added you to the triage team so you can nominate issues for the agenda. For that particular issue I suspect the lack of refetching is due to the "memory cache" browsers have, which I thought was specified by Noam Rosenthal, but I can't actually find it following the various link algorithms just now. 
+
+We have not specified memory cache. Only the preload cache which is somewhat related/adjacent. The main blocker for memory cache was that it can't be reliably tested. We can add MAY language to it or try to get commitment from all engines to make it interoperable 
+
+[00:54:06.0118] <Noam Rosenthal>
+> <@timvdlippe:matrix.org> A while back I filed https://github.com/whatwg/html/issues/12258 I would love Servo to be passing the relevant `<link>` WPT tests, but by following the spec I am unable to. That said, I think the spec is correct here and the performance footgun mentioned in the issue should be avoided. Anybody else can chime in to give their opinion? My proposal would be to update the WPT tests to check that the main thread is not blocked to follow the spec. That would fail the test in all browsers, since they all block the main thread until the link request has finished loading.
+
+You mean parser blocking rather than main thread right?
+
+[00:55:30.0312] <Tim van der Lippe>
+Based on what I see in the test, the main thread is blocked. https://github.com/web-platform-tests/wpt/blob/19e8af2814ae234d1a5174a4243a0483b29d20f1/html/semantics/document-metadata/the-link-element/link-rel-attribute.html#L24 blocks it and then line 25 doesn't continue until the link element is fully resolved again. In Firefox, this means that the full request has completed and only then line 25 runs.
+
+[00:57:04.0280] <Tim van der Lippe>
+In Servo, line 25 runs immediately and since the style hasn't been applied again, it fails the assertion. Servo also has an in-memory cache, but it's asynchronous.
+
+[01:23:39.0144] <Noam Rosenthal>
+> <@timvdlippe:matrix.org> Based on what I see in the test, the main thread is blocked. https://github.com/web-platform-tests/wpt/blob/19e8af2814ae234d1a5174a4243a0483b29d20f1/html/semantics/document-metadata/the-link-element/link-rel-attribute.html#L24 blocks it and then line 25 doesn't continue until the link element is fully resolved again. In Firefox, this means that the full request has completed and only then line 25 runs.
+
+Ah I see it's for changing rel after the stylesheet is loaded. Not sure if I see this is as directly connected to memory cache which is generally an async thing. Need to get some time to refresh my own memory cache on this 
+
+[01:25:19.0007] <Tim van der Lippe>
+In Servo, we do have parser-blocking scripts, but we only check for these in the loading phase. As soon as we completed loading, even if an element was previously considered parser-blocking, it can no longer block any scripts. It seems that other browsers add these script-blocking elements regardless if the page has finished loading or not.
+
+[02:46:38.0219] <annevk>
+Tim van der Lippe: also if anyone else from Servo needs triage access please let me know (here or DM)
+
+[03:19:45.0776] <Noam Rosenthal>
+Tim van der Lippe: ok this is indeed memory cache and the test is wrong to rely on that un-specced behavior. In certain situations it is not guaranteed that the styleshheet would still be in the cache (though it's very likely!) I think the test should be modified to be async and wait for a new load event on the link element which I think should fire either way?
+
+[03:55:24.0220] <Sacha Greif>
+quick announcement: the 2026 State of CSS survey is now live! you can take it here:
+
+https://survey.devographics.com/en-US/survey/state-of-css/2026
+
+as always any help relaying the news on social media will be much appreciated :)
+
+[03:55:52.0956] <Sacha Greif>
+oh also, while on the topic of surveys, the results for the recent State of Web Dev AI survey have just been published: https://2026.stateofai.dev/
+
+[04:14:18.0935] <annevk>
+Noam Rosenthal: I think the equality PR still doesn't have an answer for cyclic references. It should probably assert somehow?
+
+[04:20:51.0216] <Noam Rosenthal>
+> <@annevk:matrix.org> Noam Rosenthal: I think the equality PR still doesn't have an answer for cyclic references. It should probably assert somehow?
+
+Would need to pass an optional visited set for all the equality methods. Doable but a bit clunky. I wonder if this should be more of a MUST thing as usually users of this would be types where this isn't possible anyway 
+
+[04:28:57.0970] <annevk>
+I'm not sure what you mean exactly. You mean MUST NOT be cyclical? I can't really think of cases where it would be, but we have to handle the eventuality somehow.
+
+[04:34:29.0821] <Noam Rosenthal>
+> <@annevk:matrix.org> I'm not sure what you mean exactly. You mean MUST NOT be cyclical? I can't really think of cases where it would be, but we have to handle the eventuality somehow.
+
+Something like "callers of this API must make sure that references are not cyclical" or something like that. But I am ok with also passing a visited set optional argument. Let me see how that looks in the spec 
+
+[04:37:01.0656] <annevk>
+Oh I guess we first need to detect cycles if we want to assert it? Annoying. I guess the visited set optional argument can be named and not exported so it's purely an implementation detail.
+
+[04:38:25.0933] <Noam Rosenthal>
+Yea it can be un-exported, and always consulted before checking the type specific equality operator. I think it can perhaps be done without it by having a generic "visit" that goes over everything first. 
+
+[04:38:41.0197] <Noam Rosenthal>
+(this whole thing feels like an interview question)
+
+[05:13:10.0302] <annevk>
+Hah, Infra is full of questions you probably don't want to pose in such a situation.
+
+[06:08:16.0620] <Noam Rosenthal>
+annevk: see new revision for cyclical reference checks.
+
+[06:15:24.0521] <zcorpan>
+annevk: should we add an operation to invert a binary tree for the lolz?
+
+[07:13:19.0626] <annevk>
+Let's define an AI-endpoint for determining the number of golf balls that would fit into some arbitrary object.
+
+[07:32:24.0995] <Jake Archibald>
+annevk: https://github.com/whatwg/fullscreen/pull/261 - quick update to fullscreen for the new popover terms. The CI is failing, but I don't think that's my fault
+
+[07:33:52.0322] <annevk>
+Jake Archibald: does HTML export hide all popovers until?
+
+[07:50:22.0525] <Luke Warlow>
+https://github.com/whatwg/fullscreen/issues/245 there's also an existing issue related to full screen and popovers
+
+[07:50:46.0614] <Jake Archibald>
+annevk: yep!
+
+[07:53:53.0536] <Tim van der Lippe>
+Yes that was my thinking as well. Will send you a PR 👍️
+
+[07:54:51.0632] <Jake Archibald>
+Luke Warlow: hah, so I took it back down to three args
+
+[07:54:54.0584] <Jake Archibald>
+I'll add a comment
+
+[07:56:33.0153] <Jake Archibald>
+ah you got there first
+
+[08:02:55.0853] <annevk>
+Jake Archibald: oh maybe PR Preview is behind. CI seems to be succeeding actually.
+
+[08:03:11.0621] <Tim van der Lippe>
+https://github.com/servo/servo/pull/45012 will export a PR to  WPT
+
+[08:04:44.0593] <annevk>
+I guess PR Preview might be running a slightly older version of Bikeshed.
+
+[09:31:56.0938] <TabAtkins>
+Hmm, I don't think it should be. But the issue here is that PR preview generates a diff, and the old version has a failing link (which is the point of this PR), and that's causing the whole service to fail (presumably because it builds without overriding the `Die On` which whatwg sets)
+
+[09:56:51.0502] <annevk>
+TabAtkins: good point, I'll file an issue.
+
+[09:59:35.0612] <annevk>
+https://github.com/tobie/pr-preview/issues/177
+
