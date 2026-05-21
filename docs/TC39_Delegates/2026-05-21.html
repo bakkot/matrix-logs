@@ -60,6 +60,141 @@
   <tr class="msg" id="L30"><td class="ts-cell"><a class="ts" href="#L30" alt="Thu May 21 2026 02:10:53 GMT-0700 (Pacific Daylight Time)">09:10</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-6" title="@eemeli:mozilla.org">eemeli</span>&gt;</div></td><td class="msg-cell">In the explainer, I get a performance vibe from the use cases, in particular state management/virtual DOM.</td></tr>
   <tr class="msg" id="L31"><td class="ts-cell"><a class="ts" href="#L31" alt="Thu May 21 2026 02:13:48 GMT-0700 (Pacific Daylight Time)">09:13</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-11" title="@gibson042:matrix.org">Richard Gibson</span>&gt;</div></td><td class="msg-cell">hmm, I guess, but that's in the sense that "deep comparison speeds up real software", not in the sense that "deep comparison itself should be faster"</td></tr>
   <tr class="msg" id="L32"><td class="ts-cell"><a class="ts" href="#L32" alt="Thu May 21 2026 02:15:04 GMT-0700 (Pacific Daylight Time)">09:15</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-5" title="@olivf.o1o.ch:immer.chat">Olivier Flückiger</span>&gt;</div></td><td class="msg-cell">So I asked gemini to write a deep equals...</td></tr>
+  <tr class="msg" id="L33"><td class="ts-cell"><a class="ts" href="#L33" alt="Thu May 21 2026 02:15:31 GMT-0700 (Pacific Daylight Time)">09:15</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-5" title="@olivf.o1o.ch:immer.chat">Olivier Flückiger</span>&gt;</div></td><td class="msg-cell"><pre><code>function deepEquals(a, b, visited = new WeakMap()) {
+  if (Object.is(a, b)) return true;
+
+  if (a == null || b == null) return false;
+  if (typeof a !== typeof b) return false;
+
+  if (typeof a !== 'object' &amp;&amp; typeof a !== 'function') return false;
+  if (typeof b !== 'object' &amp;&amp; typeof b !== 'function') return false;
+
+  // If both are functions and Object.is(a, b) was false, they are distinct functions.
+  if (typeof a === 'function') return false;
+
+  // Cycle detection
+  let aVisited = visited.get(a);
+  if (aVisited &amp;&amp; aVisited.has(b)) return true;
+  if (!aVisited) {
+    aVisited = new WeakSet();
+    visited.set(a, aVisited);
+  }
+  aVisited.add(b);
+
+  // Prototype check
+  if (Reflect.getPrototypeOf(a) !== Reflect.getPrototypeOf(b)) return false;
+  if (Object.isExtensible(a) !== Object.isExtensible(b)) return false;
+
+  // Built-in specific comparisons
+  if (a instanceof Number || a instanceof Boolean || a instanceof String || a instanceof Symbol || a instanceof BigInt) {
+    if (!Object.is(a.valueOf(), b.valueOf())) return false;
+  }
+
+  if (a instanceof Promise || a instanceof WeakMap || a instanceof WeakSet || (typeof WeakRef !== 'undefined' &amp;&amp; a instanceof WeakRef)) {
+    return false;
+  }
+
+  if (a instanceof Date) {
+    if (!Object.is(a.getTime(), b.getTime())) return false;
+  }
+
+  if (a instanceof RegExp) {
+    if (a.source !== b.source || a.flags !== b.flags) return false;
+  }
+
+  if (a instanceof ArrayBuffer || (typeof SharedArrayBuffer !== 'undefined' &amp;&amp; a instanceof SharedArrayBuffer)) {
+    if (a.byteLength !== b.byteLength) return false;
+    const viewA = new Uint8Array(a);
+    const viewB = new Uint8Array(b);
+    for (let i = 0; i &lt; a.byteLength; i++) {
+      if (viewA[i] !== viewB[i]) return false;
+    }
+  }
+
+  if (a instanceof DataView) {
+    if (a.byteLength !== b.byteLength) return false;
+    const viewA = new Uint8Array(a.buffer, a.byteOffset, a.byteLength);
+    const viewB = new Uint8Array(b.buffer, b.byteOffset, b.byteLength);
+    for (let i = 0; i &lt; a.byteLength; i++) {
+      if (viewA[i] !== viewB[i]) return false;
+    }
+  }
+
+  // Set comparison
+  if (a instanceof Set) {
+    if (a.size !== b.size) return false;
+    const matchedB = new Set();
+    for (const itemA of a) {
+      let found = false;
+      for (const itemB of b) {
+        if (!matchedB.has(itemB) &amp;&amp; deepEquals(itemA, itemB, visited)) {
+          matchedB.add(itemB);
+          found = true;
+          break;
+        }
+      }
+      if (!found) return false;
+    }
+  }
+
+  // Map comparison
+  if (a instanceof Map) {
+    if (a.size !== b.size) return false;
+    const matchedB = new Set();
+    for (const [keyA, valA] of a) {
+      let found = false;
+      for (const [keyB, valB] of b) {
+        if (!matchedB.has(keyB) &amp;&amp; deepEquals(keyA, keyB, visited) &amp;&amp; deepEquals(valA, valB, visited)) {
+          matchedB.add(keyB);
+          found = true;
+          break;
+        }
+      }
+      if (!found) return false;
+    }
+  }
+
+  // Compare own properties (including symbols, non-enumerable properties, holey arrays, and descriptors)
+  const keysA = Reflect.ownKeys(a);
+  const keysB = Reflect.ownKeys(b);
+
+  if (keysA.length !== keysB.length) return false;
+
+  for (const key of keysA) {
+    if (a instanceof Error &amp;&amp; key === 'stack') continue; // Ignore stack traces in error comparison
+
+    const descB = Object.getOwnPropertyDescriptor(b, key);
+    if (!descB) return false;
+    const descA = Object.getOwnPropertyDescriptor(a, key);
+
+    if (descA.enumerable !== descB.enumerable) return false;
+    if (descA.configurable !== descB.configurable) return false;
+    if (descA.writable !== descB.writable) return false;
+    if (Boolean(descA.get) !== Boolean(descB.get)) return false;
+    if (Boolean(descA.set) !== Boolean(descB.set)) return false;
+
+    if (descA.get) {
+      if (!deepEquals(descA.get, descB.get, visited)) return false;
+    } else {
+      if (!deepEquals(a[key], b[key], visited)) return false;
+    }
+  }
+
+  return true;
+}
+</code></pre>
+</td></tr>
+  <tr class="msg" id="L34"><td class="ts-cell"><a class="ts" href="#L34" alt="Thu May 21 2026 02:15:50 GMT-0700 (Pacific Daylight Time)">09:15</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-14" title="@michaelficarra:matrix.org">Michael Ficarra</span>&gt;</div></td><td class="msg-cell"><blockquote data-md=">">yes, one of the major use-cases is testing (where execution time is not as important), but CI time is not costless<br></blockquote>This sure sounds like there is an expectation that this is somehow a "hot" operation that the champions would like to make faster.</td></tr>
+  <tr class="msg" id="L35"><td class="ts-cell"><a class="ts" href="#L35" alt="Thu May 21 2026 02:15:52 GMT-0700 (Pacific Daylight Time)">09:15</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-5" title="@olivf.o1o.ch:immer.chat">Olivier Flückiger</span>&gt;</div></td><td class="msg-cell">just to have a baseline of "how hard" is this for llms...</td></tr>
+  <tr class="msg" id="L36"><td class="ts-cell"><a class="ts" href="#L36" alt="Thu May 21 2026 02:17:22 GMT-0700 (Pacific Daylight Time)">09:17</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-11" title="@gibson042:matrix.org">Richard Gibson</span>&gt;</div></td><td class="msg-cell"><code>if (Object.isExtensible(a) !== Object.isExtensible(b)) return false</code> is not behavior in any deepEquals that I've ever seen...</td></tr>
+  <tr class="msg" id="L37"><td class="ts-cell"><a class="ts" href="#L37" alt="Thu May 21 2026 02:17:24 GMT-0700 (Pacific Daylight Time)">09:17</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-14" title="@michaelficarra:matrix.org">Michael Ficarra</span>&gt;</div></td><td class="msg-cell">we don't have a slides link for this topic?</td></tr>
+  <tr class="msg" id="L38"><td class="ts-cell"><a class="ts" href="#L38" alt="Thu May 21 2026 02:17:42 GMT-0700 (Pacific Daylight Time)">09:17</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-6" title="@eemeli:mozilla.org">eemeli</span>&gt;</div></td><td class="msg-cell">... thus far!</td></tr>
+  <tr class="msg" id="L39"><td class="ts-cell"><a class="ts" href="#L39" alt="Thu May 21 2026 02:18:03 GMT-0700 (Pacific Daylight Time)">09:18</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-14" title="@michaelficarra:matrix.org">Michael Ficarra</span>&gt;</div></td><td class="msg-cell">apparently the LLM has!</td></tr>
+  <tr class="msg" id="L40"><td class="ts-cell"><a class="ts" href="#L40" alt="Thu May 21 2026 02:18:11 GMT-0700 (Pacific Daylight Time)">09:18</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-11" title="@gibson042:matrix.org">Richard Gibson</span>&gt;</div></td><td class="msg-cell">I'm not disputing the claim about slides, just about the explainer</td></tr>
+  <tr class="msg" id="L41"><td class="ts-cell"><a class="ts" href="#L41" alt="Thu May 21 2026 02:18:20 GMT-0700 (Pacific Daylight Time)">09:18</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-6" title="@ljharb:matrix.org">ljharb</span>&gt;</div></td><td class="msg-cell">lol i haven't either, but comparing integrity level is definitely a good call</td></tr>
+  <tr class="msg" id="L42"><td class="ts-cell"><a class="ts" href="#L42" alt="Thu May 21 2026 02:18:30 GMT-0700 (Pacific Daylight Time)">09:18</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-5" title="@olivf.o1o.ch:immer.chat">Olivier Flückiger</span>&gt;</div></td><td class="msg-cell">I think I asked it to find counterexamples and then it came up with that</td></tr>
+  <tr class="msg" id="L43"><td class="ts-cell"><a class="ts" href="#L43" alt="Thu May 21 2026 02:18:35 GMT-0700 (Pacific Daylight Time)">09:18</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-9" title="@cpitclaudel:epfl.ch">Clément Pit-Claudel</span>&gt;</div></td><td class="msg-cell">The regex comparison is missing lastIndex. Not sure if we care</td></tr>
+  <tr class="msg" id="L44"><td class="ts-cell"><a class="ts" href="#L44" alt="Thu May 21 2026 02:19:28 GMT-0700 (Pacific Daylight Time)">09:19</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-6" title="@ljharb:matrix.org">ljharb</span>&gt;</div></td><td class="msg-cell">yep, that counts too</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>

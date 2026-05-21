@@ -2041,3 +2041,163 @@ hmm, I guess, but that's in the sense that "deep comparison speeds up real softw
 [02:15:04.0823] <Olivier Flückiger>
 So I asked gemini to write a deep equals...
 
+[02:15:31.0954] <Olivier Flückiger>
+```
+function deepEquals(a, b, visited = new WeakMap()) {
+  if (Object.is(a, b)) return true;
+
+  if (a == null || b == null) return false;
+  if (typeof a !== typeof b) return false;
+
+  if (typeof a !== 'object' && typeof a !== 'function') return false;
+  if (typeof b !== 'object' && typeof b !== 'function') return false;
+
+  // If both are functions and Object.is(a, b) was false, they are distinct functions.
+  if (typeof a === 'function') return false;
+
+  // Cycle detection
+  let aVisited = visited.get(a);
+  if (aVisited && aVisited.has(b)) return true;
+  if (!aVisited) {
+    aVisited = new WeakSet();
+    visited.set(a, aVisited);
+  }
+  aVisited.add(b);
+
+  // Prototype check
+  if (Reflect.getPrototypeOf(a) !== Reflect.getPrototypeOf(b)) return false;
+  if (Object.isExtensible(a) !== Object.isExtensible(b)) return false;
+
+  // Built-in specific comparisons
+  if (a instanceof Number || a instanceof Boolean || a instanceof String || a instanceof Symbol || a instanceof BigInt) {
+    if (!Object.is(a.valueOf(), b.valueOf())) return false;
+  }
+
+  if (a instanceof Promise || a instanceof WeakMap || a instanceof WeakSet || (typeof WeakRef !== 'undefined' && a instanceof WeakRef)) {
+    return false;
+  }
+
+  if (a instanceof Date) {
+    if (!Object.is(a.getTime(), b.getTime())) return false;
+  }
+
+  if (a instanceof RegExp) {
+    if (a.source !== b.source || a.flags !== b.flags) return false;
+  }
+
+  if (a instanceof ArrayBuffer || (typeof SharedArrayBuffer !== 'undefined' && a instanceof SharedArrayBuffer)) {
+    if (a.byteLength !== b.byteLength) return false;
+    const viewA = new Uint8Array(a);
+    const viewB = new Uint8Array(b);
+    for (let i = 0; i < a.byteLength; i++) {
+      if (viewA[i] !== viewB[i]) return false;
+    }
+  }
+
+  if (a instanceof DataView) {
+    if (a.byteLength !== b.byteLength) return false;
+    const viewA = new Uint8Array(a.buffer, a.byteOffset, a.byteLength);
+    const viewB = new Uint8Array(b.buffer, b.byteOffset, b.byteLength);
+    for (let i = 0; i < a.byteLength; i++) {
+      if (viewA[i] !== viewB[i]) return false;
+    }
+  }
+
+  // Set comparison
+  if (a instanceof Set) {
+    if (a.size !== b.size) return false;
+    const matchedB = new Set();
+    for (const itemA of a) {
+      let found = false;
+      for (const itemB of b) {
+        if (!matchedB.has(itemB) && deepEquals(itemA, itemB, visited)) {
+          matchedB.add(itemB);
+          found = true;
+          break;
+        }
+      }
+      if (!found) return false;
+    }
+  }
+
+  // Map comparison
+  if (a instanceof Map) {
+    if (a.size !== b.size) return false;
+    const matchedB = new Set();
+    for (const [keyA, valA] of a) {
+      let found = false;
+      for (const [keyB, valB] of b) {
+        if (!matchedB.has(keyB) && deepEquals(keyA, keyB, visited) && deepEquals(valA, valB, visited)) {
+          matchedB.add(keyB);
+          found = true;
+          break;
+        }
+      }
+      if (!found) return false;
+    }
+  }
+
+  // Compare own properties (including symbols, non-enumerable properties, holey arrays, and descriptors)
+  const keysA = Reflect.ownKeys(a);
+  const keysB = Reflect.ownKeys(b);
+
+  if (keysA.length !== keysB.length) return false;
+
+  for (const key of keysA) {
+    if (a instanceof Error && key === 'stack') continue; // Ignore stack traces in error comparison
+
+    const descB = Object.getOwnPropertyDescriptor(b, key);
+    if (!descB) return false;
+    const descA = Object.getOwnPropertyDescriptor(a, key);
+
+    if (descA.enumerable !== descB.enumerable) return false;
+    if (descA.configurable !== descB.configurable) return false;
+    if (descA.writable !== descB.writable) return false;
+    if (Boolean(descA.get) !== Boolean(descB.get)) return false;
+    if (Boolean(descA.set) !== Boolean(descB.set)) return false;
+
+    if (descA.get) {
+      if (!deepEquals(descA.get, descB.get, visited)) return false;
+    } else {
+      if (!deepEquals(a[key], b[key], visited)) return false;
+    }
+  }
+
+  return true;
+}
+```
+
+[02:15:50.0773] <Michael Ficarra>
+> yes, one of the major use-cases is testing (where execution time is not as important), but CI time is not costless
+This sure sounds like there is an expectation that this is somehow a "hot" operation that the champions would like to make faster.
+
+[02:15:52.0987] <Olivier Flückiger>
+just to have a baseline of "how hard" is this for llms...
+
+[02:17:22.0718] <Richard Gibson>
+`if (Object.isExtensible(a) !== Object.isExtensible(b)) return false` is not behavior in any deepEquals that I've ever seen...
+
+[02:17:24.0669] <Michael Ficarra>
+we don't have a slides link for this topic?
+
+[02:17:42.0267] <eemeli>
+... thus far!
+
+[02:18:03.0431] <Michael Ficarra>
+apparently the LLM has!
+
+[02:18:11.0001] <Richard Gibson>
+I'm not disputing the claim about slides, just about the explainer
+
+[02:18:20.0401] <ljharb>
+lol i haven't either, but comparing integrity level is definitely a good call
+
+[02:18:30.0657] <Olivier Flückiger>
+I think I asked it to find counterexamples and then it came up with that
+
+[02:18:35.0156] <Clément Pit-Claudel>
+The regex comparison is missing lastIndex. Not sure if we care
+
+[02:19:28.0161] <ljharb>
+yep, that counts too
+
