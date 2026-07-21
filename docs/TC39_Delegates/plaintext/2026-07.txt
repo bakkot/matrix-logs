@@ -1904,3 +1904,47 @@ I guess only +242 -131 for the actual implementation though, that was mostly tes
 [12:32:44.0599] <Michael Ficarra>
 I actually like the name Composite
 
+[12:37:23.0496] <rbuckton>
+I wish I were in a better position to discuss pattern matching, but all I have with me is my phone at the moment (and this takes awhile to type out). I looked into various ways to adopt pattern about 4 years ago now after researching the approaches taken in Rust, Swift, Python, C#, and a few other languahes, and was initially optimistic about the possibility of  `if..let`. I found, though, that our current semantics for binding  and assignment patterns are incompatible with well established pattern matching tenants. Our destructuring patterns aren't nearly strict enough, which would mean either inconsistent semantics between a normal `let` and `if..let`, or the need to introduce new syntax to opt-in to stricter matching behavior. The other big concern was how to differentiate between a binding and a reference. Typed languages can leverage static analysis and type systems, but JS does not have that capability. This, in turn, meant even more syntactic complexity to work around that results in footguns because it would by necessity be opt-in and not opt-out. The end result would either be confusing semantics or messy syntax, or a very limited, rough and inconsistent pattern matching experience.
+
+I found, though, that the C# syntax and semantics were a good fit. C# separates destructuring (called "Deconstruction") from pattern matching and has both a branching `match` expression form and an infix `is` expression form. It's syntax for named bindings is both simple and explcit: `Pattern Identifier?`, where `Pattern` includes type names as well as `var`. Adapted to JS, this would mean you could write something like:
+
+```
+if (val is [Number x, Number y])...
+```
+
+or
+
+```
+if (val is { a: { b: String } a })...
+```
+
+or just
+
+```
+if (val is { a: let a })...
+```
+
+to both match and extract deeply nested values without bind/reference syntax confusion, while avoiding extra syntax for the most common cases (testing against types). I find patterns like `x is Map or Set`, `x is not String`, `x is Some(Number)`, and `x is [Number, Number] ` extremely convenient and clear, while `x is @String or @Number` (or similar) far less so. 
+
+[12:37:31.0842] <Justin Ridgewell>
+Is there a scenario where ordering matters? If we held `done` results, and pushed pending calls first, could that simplify everything?
+
+[12:37:39.0817] <Justin Ridgewell>
+Then the consumer still sees a coherent stream.
+
+[12:38:05.0104] <bakkot>
+is there a scenario where the order of values from an iterator matters? to ask the question is to answer, surely?
+
+[12:39:02.0307] <Michael Ficarra>
+@bakkot:matrix.org I think this is just more support for my hypothesis that everyone is basically always going to want to use the unordered variants of these things
+
+[12:39:19.0151] <rbuckton>
+(a few typos, sorry. Not going to try fixing them because edits in Element on mobile always mess up formatting) 
+
+[12:39:23.0381] <Justin Ridgewell>
+How would a consumer associate the pulled promise with the internal `map`/`filter`'s call?
+
+[12:39:48.0557] <Justin Ridgewell>
+I don't know if there's a way for them to hold an identity where they could prove it
+
