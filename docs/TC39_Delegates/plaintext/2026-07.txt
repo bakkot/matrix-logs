@@ -2378,3 +2378,43 @@ Btw, I'm intentionally ignoring `stack` in that
 [13:48:12.0960] <James M Snell>
 * Btw, I'm intentionally ignoring `stack` in that as it's just a quick example 
 
+[13:50:13.0446] <bakkot>
+or, say you to fetch a bunch of files, but the files have associated filenames, like [{ name, url }, { name, url }]; you ultimately want a `Map` from `name` to `url` and you know by construction that the names are unique. so you do
+
+```
+let result = new Map;
+let iter = items.toAsync().map(async ({ name, url }) => [name, await fetch(url)]).buffer(3); // 3 fetches at once
+for (let [name, file] of iter) {
+  result[name] = file
+}
+```
+
+[13:50:35.0290] <bakkot>
+* or, say you to fetch a bunch of files, but the files have associated filenames, like \[{ name, url }, { name, url }\]; you ultimately want a `Map` from `name` to `url` and you know by construction that the names are unique. so you do
+
+```
+let result = new Map;
+let iter = items.toAsync()
+  .map(async ({ name, url }) => [name, await fetch(url)])
+  .buffer(3); // 3 fetches at once
+for (let [name, file] of iter) {
+  result[name] = file
+}
+```
+
+[13:51:43.0912] <bakkot>
+* or, say you to fetch a bunch of files, but the files have associated filenames, like \[{ name, url }, { name, url }\]; you ultimately want a `Map` from `name` to `url` and you know by construction that the names are unique. so you do
+
+```
+let result = new Map;
+let iter = items.toAsync()
+  .map(async ({ name, url }) => [name, await fetch(url)])
+  .buffered(3); // 3 fetches at once
+for (let [name, file] of iter) {
+  result[name] = file
+}
+```
+
+[13:52:59.0779] <bakkot>
+you can get results strictly faster with unordered `map`/`buffered` in that example, because then you are always fetching three results at once; when order is enforced, you can't drain later results from the buffer until earlier ones have settled, so you're often blocked waiting for earlier ones to settle. there's a nice animation of this in actually on https://github.com/tc39/proposal-unordered-async-iterator-helpers
+
