@@ -4045,3 +4045,112 @@ The same way `let x; { let x }` aren't the same var.
 [12:45:07.0949] <bakkot>
 or `class A { #x; static { class B { #x } }` for that matter
 
+[12:45:17.0621] <bakkot>
+* or `class A { #x; static { class B { #x } } }` for that matter
+
+[12:45:32.0505] <Steve Hicks>
+But you're saying that it _is_ the same in `private #x; class A { #x }`?
+
+[12:45:51.0949] <bakkot>
+no
+
+[12:45:55.0651] <bakkot>
+those are also different fields
+
+[12:45:59.0657] <bakkot>
+in literally exactly the same way
+
+[12:46:13.0294] <Steve Hicks>
+So why is `private #x; class A { #x; [#x]; }` an error?
+
+[12:46:41.0465] <Justin Ridgewell>
+Because the same private name can't be installed on the same object twice.
+
+[12:46:48.0784] <bakkot>
+for the same reason that `class A { #x; [#x] }` is an error
+
+[12:46:52.0650] <bakkot>
+the `private #x` has nothing to do with this
+
+[12:46:54.0910] <peetk>
+but they're not the same lmao
+
+[12:47:06.0735] <peetk>
+^
+
+[12:47:08.0560] <bakkot>
+it's just that `class A { #x; [#x] }` means "install #x on these instances twice"
+
+[12:47:12.0002] <bakkot>
+and that's an error
+
+[12:47:31.0780] <Steve Hicks>
+okay so we're interpreting the not-yet-defined `[#x]` syntax differently
+
+[12:47:32.0898] <bakkot>
+the `private #x` declaration does not come into play in any way
+
+[12:47:36.0047] <ljharb>
+(wouldn't be if one was x and one was y tho)
+
+[12:47:40.0556] <Steve Hicks>
+I think that's the disconnect
+
+[12:48:15.0432] <keith_miller>
+How much value do we get from shadowing? is it something we'd be willing to kill for `private #x`
+
+[12:48:46.0219] <bakkot>
+I get no value from shadowing and would be happy to kill it
+
+[12:48:54.0753] <bakkot>
+but we do already have it for classes
+
+[12:48:59.0699] <bakkot>
+so I don't see that much value in killing it either
+
+[12:49:02.0023] <keith_miller>
+As in `private #x class { #x = 1 }` refers to the outer
+
+[12:49:19.0305] <keith_miller>
+Yeah, idk maybe that's confusing
+
+[12:49:43.0906] <bakkot>
+oh, I don't love making `#x = 1` sometimes a declaration and sometimes a reference
+
+[12:49:49.0182] <bakkot>
+I'd be OK with making that line an error though
+
+[12:49:51.0073] <Steve Hicks>
+I guess I don't see `class { #x }` as defining a "thing" #x in the same way that `private #x` does precisely because the latter allows `[#x]` but the former doesn't.
+
+[12:49:53.0021] <Justin Ridgewell>
+The double initialization error already exists: 
+```
+class Base {
+    constructor(o) {
+        return o;
+    }
+}
+class Sub extends Base {
+    #x;
+    constructor(o, v) {
+        super(o);
+        this.#x = v;
+    }
+}
+const o = {};
+new Sub(o, 1);
+new Sub(o, 2);
+
+VM433:7 Uncaught TypeError: Cannot initialize #x twice on the same object
+    at <instance_members_initializer> (<anonymous>:7:5)
+    at new Sub (<anonymous>:9:9)
+    at <anonymous>:15:1
+<instance_members_initializer> @ VM433:7
+Sub @ VM433:9
+(anonymous) @ VM433:15
+```
+
+[12:50:06.0767] <Justin Ridgewell>
+This is using the super override trick.
+
