@@ -3595,3 +3595,103 @@ nothing else
 [11:55:10.0440] <ljharb>
 it'd still leak with proxies though
 
+[11:55:21.0533] <Chengzhong Wu>
+it can not do `obj.foo = #hello`
+
+[11:55:37.0080] <ljharb>
+* it'd still leak with proxies though, including with `privateSymbol in arbitraryObject`
+
+[11:55:41.0134] <Olivier Flückiger>
+ok, so it's a untouchable object?
+
+[11:55:52.0675] <ljharb>
+it's not an object, it's an unreified PropertyKey
+
+[11:55:52.0950] <Chengzhong Wu>
+like, not a first class value
+
+[11:56:00.0562] <ljharb>
+* it's not an object, it's an unreified PropertyKey - a PrivateName, which is already in the spec
+
+[11:56:02.0415] <Chengzhong Wu>
+* like, not a first class value, is it?
+
+[11:56:05.0196] <ljharb>
+no
+
+[11:56:16.0890] <ljharb>
+* it'd still leak with proxies though, including with `privateSymbol in arbitraryObject`, which imo makes it a bit of a nonstarter
+
+[11:56:38.0194] <Olivier Flückiger>
+that is the def. of a non-firstclass. it's a unique value but you can only refer to it in some places
+
+[11:56:47.0436] <James M Snell>
+I guess I'm less concerned with proxies and less concerned with making it fool proof... would prefer we just pave existing path rather than invent new syntax. Just me tho
+
+[11:57:08.0178] <ljharb>
+i get that. but "making it foolproof" is the reason private fields are already so valuable
+
+[11:57:09.0636] <bakkot>
+if you read the slide it had `export { #foo } for 'importer.js'` so you would be deciding who can import it for exactly that reason
+
+[11:57:24.0953] <ljharb>
+(and why we're better than every other language because we actually have private state that can't be runtime-introspected)
+
+[11:57:45.0770] <Olivier Flückiger>
+meta comment: I think our timeboxes feel way to small this time.
+
+[11:57:55.0582] <ljharb>
+* (and why we're better than every other language because we actually have private state that can't be runtime-introspected, whereas every other language has "_DO_NOT_USE_THIS_OR_BE_FIRED")
+
+[11:58:05.0915] <Michael Ficarra>
+I think it was only KG's timeboxes that were way too small
+
+[11:58:07.0563] <Caio Lima>
+There's also the early error of used but not defined that private fields brings. With Symbols it needs to become a runtime error.
+
+[11:58:26.0757] <bakkot>
+I did not expect this one to be controversial
+
+[11:58:34.0951] <Chris de Almeida>
+yeah, but we still always want to capture it because chairs often drain the queue before moving on.  (cognitive momentum to TCQ Legendary Edition (LE))
+
+[11:58:40.0855] <bakkot>
+I should have started with a recap of "what are private fields and why do we have them"
+
+[11:58:46.0319] <bakkot>
+because it seems like there is a lot of confusion about those questions
+
+[11:58:46.0678] <Chris de Almeida>
+* yeah, but we still always want to capture it because chairs often drain the queue before moving on.  (cognitive momentum from TCQ Legendary Edition (LE))
+
+[11:59:12.0707] <Michael Ficarra>
+hopefully you're at least using the copy queue button
+
+[11:59:24.0706] <Chris de Almeida>
+I mean..  _I_ am
+
+[11:59:52.0111] <Chengzhong Wu>
+is there a copy queue button?
+
+[11:59:52.0527] <ljharb>
+for one, i think it would make it much more likely we'll never have proper numerical math primitives, and that would be an incalculable harm
+
+[12:00:08.0912] <Michael Ficarra>
+chairs have all sorts of features, which includes a copy queue button, yes
+
+[12:00:13.0690] <Lea Verou>
+What I was going to say, in case it triggers any useful ideas:
+
+Similar concerns as eemeli . Without this being first-class there are too many open questions about how these behave. E.g. `Object.assign()`, `Object.defineProperty()`, exports etc. 
+
+But the motivation seems clear, many authors already use symbols that way and the fact that they are exposed via getOwnPropertySymbols() is a surprise to some. But like eemeli , I do wonder if we need a whole new primitive for this however.
+
+First, is lexical scope actually part of the requirements? Or just the ability to assign properties that are not visible to the outside unless explicitly shared, essentially like a more ergonomic version of the weakmap pattern?
+
+Seeing the slides my mental model was that this looks a lot like symbols with
+(a) more ergonomic syntax, that 
+(b) cannot be accessed via the usual ways of accessing symbols
+
+I wonder if it would be expressed in those terms, then it becomes predictable and the semantics fall directly out of that. Exports work, etc.
+With a new descriptor, it could be completely decoupled from syntax and even be applied to string properties too. Then `#foo` is only syntactic sugar to create and register such symbols that automatically have the right descriptor (just like symbols are automatically `enumerable: false`)
+
