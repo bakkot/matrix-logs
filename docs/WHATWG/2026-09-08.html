@@ -30,6 +30,131 @@
   <tr class="msg" id="L0"><td class="ts-cell"><a class="ts" href="#L0" alt="Tue Sep 08 2026 07:07:43 GMT-0700 (Pacific Daylight Time)">14:07</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-4" title="@smaug:mozilla.org">smaug</span>&gt;</div></td><td class="msg-cell">How should one interpret <a href="https://html.spec.whatwg.org/#active-parser">https://html.spec.whatwg.org/#active-parser</a> "has not yet been stopped ". That stopped is a long algorithm spinning event loop and what not. Does "stopping" happen when that algorithm is about to be called, is being called or has been called?</td></tr>
   <tr class="msg" id="L1"><td class="ts-cell"><a class="ts" href="#L1" alt="Tue Sep 08 2026 07:09:28 GMT-0700 (Pacific Daylight Time)">14:09</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-11" title="@theidinside:mozilla.org">sfarre</span>&gt;</div></td><td class="msg-cell">and follow up, sort of related question to ^ - if we have a page whose load event has not been fired yet, we navigate away, then back, restore from bfcache, should the load event be fired then?</td></tr>
   <tr class="msg" id="L2"><td class="ts-cell"><a class="ts" href="#L2" alt="Tue Sep 08 2026 07:18:01 GMT-0700 (Pacific Daylight Time)">14:18</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-11" title="@theidinside:mozilla.org">sfarre</span>&gt;</div></td><td class="msg-cell">what I am referring to here, is an example where chrome puts a page in bfcache before the load event, and upon restore, does not fire a load event</td></tr>
+  <tr class="msg" id="L3"><td class="ts-cell"><a class="ts" href="#L3" alt="Tue Sep 08 2026 07:23:18 GMT-0700 (Pacific Daylight Time)">14:23</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-12" title="@annevk:matrix.org">annevk</span>&gt;</div></td><td class="msg-cell">I suspect instrumenting Claude with that question and telling it to write a bunch of tests would be a good start to figuring out what the solution will have to look like. These definitions are probably Hixie-era. (Looking at blame and trying to figure out what Hixie modeled it after might also give some clues.)</td></tr>
+  <tr class="msg" id="L4"><td class="ts-cell"><a class="ts" href="#L4" alt="Tue Sep 08 2026 07:23:51 GMT-0700 (Pacific Daylight Time)">14:23</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-11" title="@theidinside:mozilla.org">sfarre</span>&gt;</div></td><td class="msg-cell">It was that, that led me here :)</td></tr>
+  <tr class="msg" id="L5"><td class="ts-cell"><a class="ts" href="#L5" alt="Tue Sep 08 2026 07:24:14 GMT-0700 (Pacific Daylight Time)">14:24</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-11" title="@theidinside:mozilla.org">sfarre</span>&gt;</div></td><td class="msg-cell"><pre><code class="language-python">#!/usr/bin/env python3
+"""
+Serve two pages to manually test BFCache with a static in-flight image.
+
+Usage:
+    python3 bfcache-static-img-test.py
+
+Open http://localhost:8383/page1, click the link to page2, then press Back.
+The page will show whether it was restored from BFCache.
+"""
+
+import http.server
+import struct
+import time
+import zlib
+
+PORT = 8383
+
+
+def make_png(width=128, height=128):
+    def chunk(ctype, data):
+        c = ctype + data
+        return struct.pack("&gt;I", len(data)) + c + struct.pack("&gt;I", zlib.crc32(c) &amp; 0xFFFFFFFF)
+    raw = b""
+    for y in range(height):
+        raw += b"\x00" + b"\xff\x00\x00" * width
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", struct.pack("&gt;IIBBBBB", width, height, 8, 2, 0, 0, 0))
+        + chunk(b"IDAT", zlib.compress(raw))
+        + chunk(b"IEND", b"")
+    )
+
+
+IMAGE_PNG = make_png()
+
+PAGE1 = b"""\
+&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;&lt;title&gt;Page 1 - static image loading&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;p&gt;readyState: &lt;span id="rs"&gt;&lt;/span&gt;&lt;/p&gt;
+&lt;div id="result"&gt;&lt;/div&gt;
+&lt;img src="/slow-image"&gt;
+&lt;p&gt;&lt;a href="/page2"&gt;Navigate to page 2&lt;/a&gt;&lt;/p&gt;
+&lt;script&gt;
+const rs = document.getElementById('rs');
+const update = () =&gt; rs.textContent = document.readyState;
+update();
+document.onreadystatechange = update;
+
+window.addEventListener('load', () =&gt; {
+  document.getElementById('result').textContent += 'load event fired\\n';
+});
+
+window.addEventListener('pageshow', e =&gt; {
+  if (e.persisted) {
+    document.getElementById('result').textContent += 'RESTORED FROM BFCACHE\\n';
+    document.getElementById('result').style.cssText =
+      'background:green;color:white;padding:1em;font-size:1.5em';
+  }
+});
+&lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+"""
+
+PAGE2 = b"""\
+&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;&lt;title&gt;Page 2&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;p&gt;Now press Back.&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+"""
+
+
+class Handler(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        if self.path == '/page1':
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/html')
+            self.send_header('Content-Length', str(len(PAGE1)))
+            self.end_headers()
+            self.wfile.write(PAGE1)
+        elif self.path == '/page2':
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/html')
+            self.send_header('Content-Length', str(len(PAGE2)))
+            self.end_headers()
+            self.wfile.write(PAGE2)
+        elif self.path == '/slow-image':
+            self.send_response(200)
+            self.send_header('Content-Type', 'image/png')
+            self.send_header('Content-Length', str(len(IMAGE_PNG)))
+            self.send_header('Cache-Control', 'no-store')
+            self.end_headers()
+            self.wfile.flush()
+            print('  [slow-image] headers sent, stalling 120s...')
+            time.sleep(10)
+            self.wfile.write(IMAGE_PNG)
+            print('  [slow-image] body sent')
+        else:
+            self.send_response(404)
+            self.end_headers()
+
+    def log_message(self, fmt, *args):
+        print(f'  {fmt % args}')
+
+
+if __name__ == '__main__':
+    server = http.server.ThreadingHTTPServer(('127.0.0.1', PORT), Handler)
+    print(f'http://localhost:{PORT}/page1')
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print()
+
+</code></pre>
+<p>simple python example</p>
+</td></tr>
+  <tr class="msg" id="L6"><td class="ts-cell"><a class="ts" href="#L6" alt="Tue Sep 08 2026 07:24:53 GMT-0700 (Pacific Daylight Time)">14:24</a></td><td class="nick-cell"><div class="m-ov">&lt;<span class="nick nick-11" title="@theidinside:mozilla.org">sfarre</span>&gt;</div></td><td class="msg-cell">and i am expanding gecko behavior and realized I was also doing what chrome was doing, but I am not sure if thats right. dropping a load event seems iffy</td></tr>
 
 </tbody></table></div></div></div>
 </body></html>
