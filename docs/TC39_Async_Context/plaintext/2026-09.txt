@@ -4,3 +4,23 @@ I've been looking into uncaught error / unhandled rejection attribution (see AI-
 
 Is this the behavior we're most likely to go with?  A quick chat with our tracing team suggests that they're worried about losing the context from closer to where the error was actually thrown.  I could imagine trying to set things up so that e.g. catch blocks restore the context from the thrown error, possibly similar with promise.catch (etc), which would be a lot more useful for tracing.  Or maybe there's other ways to get it - but going with the ALS precedent basically makes error tracing useless.  I'm really curious what Abdelrahman Awad's experience with this precedent is.
 
+
+2026-09-08
+[10:22:31.0101] <Abdelrahman Awad>
+I looked into this as well and I agree with you that error tracing is mostly useless here.
+
+We do two things that’s related to tracing:
+
+1. Set span status (i.e: `ok/error`).
+2. Report error events/logs that is correlated to the span/trace id.
+
+First case is mostly not an issue because all of our Span APIs wrap user callbacks and promises, so do similar APIs (Otel), so if anything throws sync or async we set the status in the same call frame the error escapes from. We wouldn't be using the async context for this, which is probably why I didn't look too hard at it or worry about it.
+
+If we were to use the async context for setting the span status, then I agree with your team, it would have to be the context closest to the error, otherwise it may point users to the wrong place if they want to fix the error. This might be a case of “technically correct, but practically useless” otherwise.
+
+Where it matters for us is everything that has to look the span up, so correlating logs, metrics, and error events to traces/spans, today it is buggy for us and the proposal would fix it.
+
+On the two ALS rules, rejections attributing to the resolve/reject context is fine. For uncaught sync errors attributing to the outermost task, the proposal is a non-gain for us since we have no spans to correlate/trace to at that point.
+
+This could be that we currently have a server-centric tracing model, we are working on a session model for the client traces but it wouldn’t benefit from the async context either.
+
