@@ -16,3 +16,14 @@ Mathieu Hofman erights kriskowal  who have engaged on the discussion before.
 [07:59:08.0925] <Richard Gibson>
 some thoughts: I don't care much about inefficiency in this edge case, but am opposed to introducing observability of partially installed private methods and accessors. However, I don't see the problem with PR 12... slide 8 claims that it invokes one trap "for every property", but it looks to me like it's just one [[PrivateMethods]]-conditional [[IsExtensible]] check inside InitializeInstanceElements, which runs once per _class_. So PR 12 remains my preference, but if that can't work for some reason I'm just missing, then given the tight constraints on proxies here (_[[IsExtensible]] applied to the Proxy object must return the same value as [[IsExtensible]] applied to the Proxy object's target object_), I would lean towards bypassing the trap by traversing [[ProxyTarget]] until finding the need for a revoked-proxy TypeError or a non-proxy object (_which would deny proxies the ability to **reactively** prevent extensions when asked if they are extensible, but whatever_). I would _not_ be happy with blind uniform treatment of proxies.
 
+[08:33:29.0983] <Olivier Flückiger>
+The problem is you can already observe properties mid-way and also freeze the object mid-way. but not methods. that is why we can easily hoist the check out of method installation (since they are currently pure), but not hoist it out of installing properties.
+
+[08:33:49.0604] <Olivier Flückiger>
+```
+class C {
+  #f1 = 1;
+  #f2 = Object.freeze(this); // Freezes `this` after #f1 is added, before #f2!
+}
+```
+
