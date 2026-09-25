@@ -25,3 +25,18 @@ If that is correct, it basically makes the collection of source modules from imp
 [08:49:04.0389] <Olivier Flückiger>
 Granted, I got it correct so far, I was wondering how to rectify the problem. And I had one complicated and one trivial idea. The complicated one is to disallow sending it back to the same worker that sent it out. The trivial idea was to only allow one clone.
 
+
+2026-09-25
+[18:32:50.0028] <guybedford>
+Olivier Flückiger: great questions, you've exactly understood the design here yes it does enable _better_ GC by having source-identities as they are a weak map of source identities to instances.
+
+We discussed this in the modules meeting today and determined that neither of those solutions you suggested here are ideal - the reason being that putting a limit on transfer count seems arbitrarily restrictive to virtualization systems.
+
+Instead we discussed having weak identity at the per-agent level instead. The idea being that we can make the per-agent module identity itself collectible within each agent individually when the module source is collected and the module identity has no remaining references. Then the weak map of module identity to module instance can be cleared as well. Avoiding the cross-thread GC problems, while maintaining the concept of shared identity.
+
+Under that design the gap would mostly be if you had a source module import() it and get an instance, then transfer it away while the registry was cleared (say if it came from an iframe), and then if transfer the source back in you would get the same identity, but the instance would have been cleared away already.
+
+This seems totally fine though, and in line with what one would expect of proper module GC I think.
+
+I've updated the identity PR to include this new invariant now.
+
