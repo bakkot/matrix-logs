@@ -2071,3 +2071,58 @@ yes, the one where you are only assigning to an existing field, rather than decl
 [22:05:09.0078] <bakkot>
 seems good to me
 
+[22:05:33.0004] <ljharb>
+ok, I’m convinced. Thank you (i stand by all my clarifications tho)
+
+[22:06:13.0507] <Olivier Flückiger>
+Unpopular opinion: we have too small timeboxes! If we spend all the next topics time to talk here that is kinda bad for the conversation
+
+[22:06:33.0214] <bakkot>
+I was considering making this one larger but I did already have > 3 hours on the agenda...
+
+[22:06:43.0754] <Mathieu Hofman>
+I never said anything about async code. My concern is about avoiding introducing new synchronous re-entrancy. If you have synchronous code doing cancellation, the receiving system handling the cancellation is not currently at the top of the stack (the triggering system of the abort is). What the callback does is ultimately modify some state in the system handling the abort. If that system is somewhere already on the call stack it needs to be capable of handling that state change when the stack unrolls to it, so checking for an abort state is already a requirement. Same story about entrypoints to the system, which must already check for aborted state. The only difference is how much "cleanup" you'd be able to do immediately vs when when the system checks for an aborted state. Concretely in your example, the queue loop can check the abort state of the signal associated with the task before executing it. I don't see how that requires any modification of the tasks themselves, or why that would be much less efficient than immediately removing the task from the queue.
+
+[22:06:49.0151] <ljharb>
+nobody will mind a Kevin day
+
+[22:06:51.0619] <Michael Ficarra>
+the process document is like that for a reason!
+
+[22:06:55.0914] <Michael Ficarra>
+no time to explain because note taking
+
+[22:06:59.0835] <Justin Ridgewell>
+Under Jordan's suggestion:
+```
+private #speak;
+class Parent {
+  constructor() {
+    this.#speak();
+  }
+
+  #speak () {
+    console.log('parent');
+  }
+}
+
+class Child extends Parent {
+  #speak() {
+    console.log('child')
+  }
+}
+
+new Child(); // "parent"
+```
+
+But if we kept the "can't install twice", this throws. I like the throwing.
+
+[22:07:16.0607] <bakkot>
+Michael Ficarra I can take over for notes for a minute
+
+[22:07:53.0529] <rkirsling>
+on the present topic, I think `Symbol.for` is a terrible name and shouldn't be mimicked
+
+[22:09:05.0193] <rkirsling>
+(but I really like the proposal and want it to advance)
+
